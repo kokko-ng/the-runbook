@@ -1,0 +1,126 @@
+schema_version: 1
+id: act1
+title: "Meridian Logistics - Azure environment"
+
+groups:
+  - id: grp-corp
+    label: "Corporate services"
+  - id: grp-ops
+    label: "Warehouse operations"
+  - id: grp-onprem
+    label: "On-premises (Kallang data center)"
+
+nodes:
+  - id: sub-prod
+    label: "Meridian Production"
+    kind: subscription
+    position: {x: 0, y: 0}
+
+  - id: rg-hub
+    label: "rg-hub-sea"
+    kind: resource-group
+    group: grp-corp
+    position: {x: -240, y: 120}
+
+  - id: vnet-hub
+    label: "vnet-hub-sea"
+    kind: vnet
+    group: grp-corp
+    position: {x: -240, y: 240}
+
+  - id: snet-shared
+    label: "snet-shared-services"
+    kind: subnet
+    group: grp-corp
+    position: {x: -380, y: 360}
+
+  - id: snet-gateway
+    label: "GatewaySubnet"
+    kind: subnet
+    group: grp-corp
+    position: {x: -100, y: 360}
+
+  - id: vm-dc01
+    label: "vm-dc01 (domain controller)"
+    kind: vm
+    group: grp-corp
+    position: {x: -380, y: 480}
+
+  - id: rg-ops
+    label: "rg-ops-sea"
+    kind: resource-group
+    group: grp-ops
+    position: {x: 240, y: 120}
+
+  - id: vnet-warehouse
+    label: "vnet-warehouse-sea"
+    kind: vnet
+    group: grp-ops
+    position: {x: 240, y: 240}
+
+  - id: snet-app
+    label: "snet-wms-app"
+    kind: subnet
+    group: grp-ops
+    position: {x: 160, y: 360}
+
+  - id: vm-wms01
+    label: "vm-wms01 (warehouse mgmt)"
+    kind: vm
+    group: grp-ops
+    position: {x: 160, y: 480}
+
+  - id: nsg-app
+    label: "nsg-wms-app"
+    kind: nsg
+    group: grp-ops
+    position: {x: 380, y: 360}
+
+  - id: dc-kallang
+    label: "Kallang data center"
+    kind: on-premises
+    group: grp-onprem
+    position: {x: -100, y: 600}
+
+edges:
+  - id: e-sub-rghub
+    source: sub-prod
+    target: rg-hub
+    kind: dependency
+  - id: e-sub-rgops
+    source: sub-prod
+    target: rg-ops
+    kind: dependency
+  - id: e-rghub-vnethub
+    source: rg-hub
+    target: vnet-hub
+    kind: dependency
+  - id: e-rgops-vnetwarehouse
+    source: rg-ops
+    target: vnet-warehouse
+    kind: dependency
+  - id: e-vnethub-snetshared
+    source: vnet-hub
+    target: snet-shared
+    kind: dependency
+  - id: e-vnethub-snetgateway
+    source: vnet-hub
+    target: snet-gateway
+    kind: dependency
+  - id: e-snetshared-dc01
+    source: snet-shared
+    target: vm-dc01
+    kind: dependency
+  - id: e-vnetwarehouse-snetapp
+    source: vnet-warehouse
+    target: snet-app
+    kind: dependency
+  - id: e-snetapp-wms01
+    source: snet-app
+    target: vm-wms01
+    kind: dependency
+  - id: e-nsgapp-snetapp
+    source: nsg-app
+    target: snet-app
+    kind: dependency
+    label: "associated"

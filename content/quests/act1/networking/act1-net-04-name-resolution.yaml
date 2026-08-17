@@ -1,0 +1,269 @@
+schema_version: 1
+id: act1-net-04-name-resolution
+title: "It Resolves On My Machine"
+act: 1
+chapter: act1-networking
+domain: az104-d4
+order: 4
+role: cloud-admin
+checkpoint: true
+summary: "The storage endpoint resolves to a public address from inside the VNet. Nobody is happy about it."
+entry: e1-private-dns
+
+encounters:
+  - id: e1-private-dns
+    type: design_decision
+    title: "A name for the reporting service"
+    speaker: manager
+    objectives: [AZ104-4.5]
+    scenario: |
+      Priya has good news, which at Meridian usually arrives attached to a
+      deadline.
+
+      "You're a cloud admin now. Same desk, more tickets. First one: the
+      reporting service needs a proper name. Right now the finance team reaches
+      it by IP address, which Evelyn typed into a spreadsheet, and that
+      spreadsheet is now three departments deep."
+
+      The service runs on a machine inside snet-wms-app. It is reached only from
+      inside Meridian's network - the hub, the spokes, and eventually Kallang
+      over the VPN. It must not be reachable from the internet.
+
+      "Call it reports.meridian.internal. Marcus says nothing public. Evelyn says
+      nothing expensive. I say nothing that takes a week."
+    prompt: "How do you give the reporting service a resolvable internal name?"
+    options:
+      - id: opt-private-zone
+        label: "Create an Azure private DNS zone for meridian.internal and link it to the VNets that need to resolve it"
+        correct: true
+        explain: >
+          A private DNS zone provides name resolution inside linked VNets with no
+          public exposure and no servers to run. Virtual network links control
+          exactly which networks can resolve the zone, and autoregistration can
+          keep records current for machines in a linked VNet. It is the direct
+          Azure answer to "internal names, no internet."
+        rep: 8
+        diagram_ops:
+          - op: add_node
+            node:
+              id: dns-private
+              label: "meridian.internal (private zone)"
+              kind: dns-zone
+              group: grp-corp
+              status: healthy
+          - op: add_edge
+            edge:
+              id: e-dns-vnetwarehouse
+              source: dns-private
+              target: vnet-warehouse
+              kind: dependency
+              label: "vnet link"
+          - op: add_edge
+            edge:
+              id: e-dns-vnethub
+              source: dns-private
+              target: vnet-hub
+              kind: dependency
+              label: "vnet link"
+      - id: opt-public-zone
+        label: "Create a public Azure DNS zone for meridian.internal with records pointing at the private IP"
+        correct: false
+        consequence: >
+          Marcus asks why Meridian's internal hostnames and private addressing are
+          now enumerable by anyone on the internet.
+        explain: >
+          A public zone publishes its records to the world. The addresses are
+          unroutable from outside, so the service stays unreachable, but you have
+          handed out a map of the internal estate for free. Internal names belong
+          in a private zone.
+        rep: -12
+      - id: opt-hosts
+        label: "Add a hosts file entry on every machine that needs to reach the reporting service"
+        correct: false
+        explain: >
+          It resolves today and rots immediately: every new machine needs the
+          entry, every address change needs a sweep, and nothing tells you which
+          machines were missed. This is the manual maintenance pattern that DNS
+          exists to replace.
+        rep: -8
+      - id: opt-dc-dns
+        label: "Add the record to the on-premises DNS servers on vm-dc01 and point the VNets at them"
+        correct: false
+        explain: >
+          Workable, and some estates do run this way - but it makes every VNet's
+          name resolution depend on a domain controller and the links to it, for a
+          service that only needs to be resolvable inside Azure. A private zone
+          has no servers to patch, size, or lose.
+        rep: -5
+    next: e2-storage-incident
+
+  - id: e2-storage-incident
+    type: troubleshoot
+    title: "P2: Nightly export leaving the network"
+    speaker: security
+    objectives: [AZ104-4.5, AZ104-4.4]
+    ticket:
+      id: "MER-4601"
+      reporter: "Marcus Lim (security)"
+      priority: "P2"
+      opened: "08:30"
+      body: |
+        Firewall logs show the nightly manifest export from vm-wms01 to
+        stmeridianexports egressing to a public Azure address instead of staying
+        on the private endpoint we paid for. Traffic is TLS so content is fine,
+        but this was supposed to be private. Please explain by close of business.
+    scenario: |
+      Meridian's nightly manifest export writes to a storage account,
+      stmeridianexports. Two weeks ago you deployed a private endpoint for it so
+      the traffic would stay inside the VNet - Marcus signed the change, Evelyn
+      approved the cost.
+
+      The export still works. That is the problem: it works over the public
+      endpoint, so the private endpoint is a line item doing nothing.
+
+      Desmond, reading the ticket: "The endpoint's fine. Something is answering
+      the name before the private zone does."
+    time_budget: 5
+    investigate:
+      - id: inv-change
+        label: "Read your own private endpoint change record"
+        speaker: narrator
+        reveals: >
+          MER-4402 created the private endpoint in snet-wms-data and allocated
+          10.101.3.68. The change checklist has one unticked box: "Integrate with
+          private DNS zone."
+      - id: inv-marcus
+        label: "Ask Marcus what the firewall logs actually show"
+        speaker: security
+        reveals: >
+          "Outbound 443 to 20.60.x.x, which is Azure Storage public space, every
+          night at 01:15 on the dot. Volume matches the export size. It is not
+          malicious, it is just not what you told me you were building."
+      - id: inv-desmond
+        label: "Ask Desmond where to start"
+        speaker: mentor
+        reveals: >
+          "A private endpoint gives you a private IP. It does not change what the
+          storage account's public name resolves to unless you tell DNS about it.
+          Resolve the name from a machine in the VNet and see what comes back."
+      - id: inv-app
+        label: "Check the export job's configuration on vm-wms01"
+        speaker: ticket
+        reveals: >
+          The job targets https://stmeridianexports.blob.core.windows.net - the
+          standard endpoint name, unchanged. No IP addresses are hardcoded
+          anywhere in the config.
+    commands:
+      - id: cmd-nslookup
+        label: "Resolve the storage endpoint from vm-wms01"
+        command: "az vm run-command invoke -g rg-ops-sea -n vm-wms01 --command-id RunShellScript --scripts 'nslookup stmeridianexports.blob.core.windows.net'"
+        output: |
+          Server:   168.63.129.16
+          Address:  168.63.129.16#53
+
+          Non-authoritative answer:
+          Name:     stmeridianexports.privatelink.blob.core.windows.net
+          Address:  20.60.202.36
+        time_cost: 1
+        note: "The CNAME to privatelink resolves onward to a public address."
+      - id: cmd-pe-show
+        label: "Show the private endpoint and its allocated IP"
+        command: "az network private-endpoint show -g rg-ops-sea -n pe-exports --query 'customDnsConfigs' -o table"
+        output: |
+          Fqdn                                            IpAddresses
+          ----------------------------------------------  -------------
+          stmeridianexports.blob.core.windows.net         10.101.3.68
+        time_cost: 1
+        note: "The endpoint exists and holds 10.101.3.68, as designed."
+      - id: cmd-zone-list
+        label: "List private DNS zones in the subscription"
+        command: "az network private-dns zone list -o table"
+        output: |
+          Name                    ResourceGroup    NumberOfRecordSets    NumberOfVirtualNetworkLinks
+          ----------------------  ---------------  --------------------  -----------------------------
+          meridian.internal       rg-hub-sea       4                     2
+        time_cost: 1
+        note: "No privatelink.blob.core.windows.net zone exists at all."
+      - id: cmd-dns-zone-group
+        label: "Check the private endpoint's DNS zone group"
+        command: "az network private-endpoint dns-zone-group list -g rg-ops-sea --endpoint-name pe-exports -o table"
+        output: |
+          (empty)
+        time_cost: 1
+        note: "No zone group, so nothing ever created the DNS record for the endpoint."
+      - id: cmd-storage-fw
+        label: "Check the storage account's public network access setting"
+        command: "az storage account show -n stmeridianexports --query 'networkRuleSet' -o json"
+        output: |
+          {
+            "defaultAction": "Allow",
+            "ipRules": [],
+            "virtualNetworkRules": []
+          }
+        time_cost: 2
+        note: "Public access is still permitted, which is why the export succeeds."
+    fixes:
+      - id: fix-dns-zone-group
+        label: "Create the privatelink.blob.core.windows.net private DNS zone, link it to the VNet, and add a DNS zone group on the endpoint"
+        correct: true
+        explain: >
+          A private endpoint allocates a private IP but changes nothing about
+          resolution on its own. The privatelink zone linked to the VNet is what
+          makes the standard hostname resolve to 10.101.3.68 inside the network,
+          and a DNS zone group keeps that record in step with the endpoint
+          automatically. The export then uses the private path with no
+          application change. Locking down public network access on the storage
+          account is the sensible follow-up once the private path is proven.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: pe-exports
+              label: "pe-exports (10.101.3.68)"
+              kind: private-endpoint
+              group: grp-ops
+              status: healthy
+          - op: add_edge
+            edge:
+              id: e-pe-snetdata
+              source: pe-exports
+              target: snet-data
+              kind: private-link
+              label: "private endpoint"
+      - id: fix-hardcode-ip
+        label: "Point the export job directly at 10.101.3.68 instead of the hostname"
+        correct: false
+        consequence: >
+          Works tonight. Breaks silently the next time the endpoint is rebuilt
+          with a different address.
+        explain: >
+          Hardcoding the private IP bypasses DNS rather than fixing it, and TLS
+          certificate validation against a bare IP fails or must be disabled -
+          trading a routing problem for a security one. Every other client of this
+          storage account also still resolves publicly.
+        rep: -10
+      - id: fix-deny-public
+        label: "Set the storage account's public network access to Deny and let the export find the private path"
+        correct: false
+        consequence: >
+          The 01:15 export fails outright. Finance has no manifest file in the morning.
+        explain: >
+          Denying public access without fixing resolution means the name still
+          resolves to a public address that now refuses the connection, so the job
+          breaks instead of quietly taking the wrong path. Locking down public
+          access is correct, but it belongs after the private path resolves.
+        rep: -10
+      - id: fix-custom-dns
+        label: "Point the VNet's DNS at vm-dc01 and add an A record for the storage hostname there"
+        correct: false
+        explain: >
+          It can be made to work, and estates with on-premises DNS sometimes must
+          - but it puts a manually maintained record for a Microsoft-owned
+          hostname on your domain controller, which nothing updates when the
+          endpoint changes. The privatelink zone plus a zone group is the
+          supported path and is self-maintaining.
+        rep: -5
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: END

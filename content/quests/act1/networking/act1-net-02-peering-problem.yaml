@@ -1,0 +1,231 @@
+schema_version: 1
+id: act1-net-02-peering-problem
+title: "The Peering Problem"
+act: 1
+chapter: act1-networking
+domain: az104-d4
+order: 2
+role: junior-cloud-admin
+checkpoint: true
+summary: "The spoke cannot reach the hub. Maintenance window says everything went fine."
+entry: e1-ticket
+
+encounters:
+  - id: e1-ticket
+    type: troubleshoot
+    title: "P2: Warehouse app cannot authenticate"
+    speaker: noc
+    objectives: [AZ104-4.2, AZ104-4.4]
+    ticket:
+      id: "MER-4412"
+      reporter: "NOC Manila (overnight shift)"
+      priority: "P2"
+      opened: "09:12"
+      body: |
+        Pickers at Kallang cannot log in to the warehouse app. App tier is up,
+        web tier is up, database responds. Application log shows repeated
+        "domain controller unreachable" on vm-wms01. Nothing changed on our side.
+        Escalating to cloud team.
+    scenario: |
+      The NOC pings you at 09:12. Forty tablets on the warehouse floor are
+      showing a login spinner and the shift supervisor has started counting
+      pallets on paper, which he is enjoying and no one else is.
+
+      Desmond is in a design review until ten. Priya has already asked twice
+      whether it is "the Azure thing from last week."
+
+      The app itself is healthy. What it cannot do is reach vm-dc01 in the hub -
+      the peering you built in your first week.
+    time_budget: 6
+    investigate:
+      - id: inv-noc
+        label: "Ask the NOC what ran during the overnight maintenance window"
+        speaker: noc
+        reveals: >
+          "Change MER-3980, approved. Network team recreated the hub VNet's
+          peering to standardize the naming - it was hub-to-wh, now it is
+          hub-to-warehouse. Ran clean, no errors. Took four minutes."
+      - id: inv-app
+        label: "Read the application log on vm-wms01"
+        speaker: ticket
+        reveals: >
+          Authentication attempts fail with a timeout, not a rejection. The app
+          never gets a response from 10.100.1.10. A rejection would point at
+          credentials or the domain controller itself; a timeout points at the
+          path.
+      - id: inv-marcus
+        label: "Ask Marcus Lim whether security changed any rules overnight"
+        speaker: security
+        reveals: >
+          "Nothing from us. The NSG on snet-wms-app hasn't been touched since you
+          built it - I'd have the approval in my inbox. Check your own change
+          first before you come to me."
+      - id: inv-desmond
+        label: "Interrupt Desmond in the design review"
+        speaker: mentor
+        reveals: >
+          He steps out for ninety seconds. "Recreated peering, you say. Peering is
+          two objects, not one. Go look at both of them. And do it before you
+          touch anything, because I am not un-breaking a firewall rule you added
+          at half past nine."
+    commands:
+      - id: cmd-hub-peering
+        label: "List peerings on the hub VNet"
+        command: "az network vnet peering list -g rg-hub-sea --vnet-name vnet-hub-sea -o table"
+        output: |
+          Name               PeeringState    PeeringSyncLevel     AllowForwardedTraffic    AllowVirtualNetworkAccess
+          -----------------  --------------  -------------------  -----------------------  ---------------------------
+          hub-to-warehouse   Initiated       RemoteNotInSync      False                    True
+        time_cost: 1
+        note: "PeeringState is the first thing to read on any peering ticket."
+      - id: cmd-spoke-peering
+        label: "List peerings on the warehouse VNet"
+        command: "az network vnet peering list -g rg-ops-sea --vnet-name vnet-warehouse-sea -o table"
+        output: |
+          (empty)
+        time_cost: 1
+        note: "No rows. The spoke side of the pair does not exist."
+      - id: cmd-effective-routes
+        label: "Show effective routes on the app tier NIC"
+        command: "az network nic show-effective-route-table -g rg-ops-sea -n nic-wms01 -o table"
+        output: |
+          Source    State    Address Prefix    Next Hop Type    Next Hop IP
+          --------  -------  ----------------  ---------------  -------------
+          Default   Active   10.101.0.0/16     VnetLocal
+          Default   Active   0.0.0.0/0         Internet
+          Default   Active   10.0.0.0/8        None
+          Default   Active   192.168.0.0/16    None
+        time_cost: 2
+        note: "No route to 10.100.0.0/16. If peering were connected, one would be here."
+      - id: cmd-nsg-rules
+        label: "Show effective NSG rules on the app tier NIC"
+        command: "az network nic list-effective-nsg -g rg-ops-sea -n nic-wms01 -o table"
+        output: |
+          Name                    Direction    Priority    Access    Protocol    SourceAddressPrefix    DestinationPortRange
+          ----------------------  -----------  ----------  --------  ----------  ---------------------  ----------------------
+          allow-web-in            Inbound      100         Allow     Tcp         10.101.1.0/24          443
+          allow-dc-out            Outbound     100         Allow     *           *                      *
+          AllowVnetOutBound       Outbound     65000       Allow     *           VirtualNetwork         *
+          AllowInternetOutBound   Outbound     65001       Allow     *           *                      *
+        time_cost: 2
+        note: "Outbound to the domain controller is permitted. The rules are not the problem."
+      - id: cmd-dc-status
+        label: "Check whether vm-dc01 is running"
+        command: "az vm get-instance-view -g rg-hub-sea -n vm-dc01 --query instanceView.statuses[1] -o table"
+        output: |
+          Code                       Level    DisplayStatus
+          -------------------------  -------  ---------------
+          PowerState/running         Info     VM running
+        time_cost: 1
+      - id: cmd-connectivity
+        label: "Run a connectivity check from vm-wms01 to the domain controller"
+        command: "az network watcher test-connectivity --source-resource vm-wms01 --dest-address 10.100.1.10 --dest-port 389 -o table"
+        output: |
+          ConnectionStatus    AvgLatencyInMs    ProbesFailed    ProbesSent
+          ------------------  ----------------  --------------  ------------
+          Unreachable         -                 100             100
+        time_cost: 2
+        note: "Every probe failed - consistent with no route rather than a filtered port."
+    fixes:
+      - id: fix-recreate-spoke
+        label: "Create the matching peering from vnet-warehouse-sea back to vnet-hub-sea"
+        correct: true
+        explain: >
+          A peering is two objects, one in each VNet, and both must exist before
+          traffic flows. Deleting and recreating the hub side left the spoke side
+          deleted, so the hub's peering sits in Initiated with RemoteNotInSync
+          waiting for a partner that is not there. Creating the spoke-to-hub
+          peering moves both sides to Connected and the 10.100.0.0/16 route
+          appears on the NIC.
+        rep: 10
+        diagram_ops:
+          - {op: set_edge_status, edge: peer-hub-warehouse, status: healthy}
+          - {op: set_status, node: vm-wms01, status: healthy}
+          - {op: set_status, node: vnet-warehouse, status: healthy}
+      - id: fix-nsg-any
+        label: "Add an any-any allow rule to nsg-wms-app so nothing can be blocking the traffic"
+        correct: false
+        consequence: >
+          Marcus Lim's alerting picks up a permissive rule within four minutes.
+          The pickers are still holding tablets.
+        explain: >
+          The effective rules already permit outbound to the domain controller,
+          and Network Watcher reported Unreachable rather than a filtered port -
+          both point away from NSGs. An any-any rule does not create the missing
+          route, so the symptom persists and you have opened the subnet up for
+          nothing.
+        rep: -10
+      - id: fix-restart-dc
+        label: "Restart vm-dc01 to clear whatever state is refusing the authentication requests"
+        correct: false
+        consequence: >
+          Everything that authenticates against the hub now fails too, not just
+          the warehouse app. Priya's second question of the morning arrives.
+        explain: >
+          The instance view shows vm-dc01 running, and the app sees timeouts
+          rather than rejections, so the domain controller is not the failing
+          component. Restarting a shared authentication server on a hunch widens
+          a single-app outage into a company-wide one.
+        rep: -15
+      - id: fix-udr
+        label: "Add a user-defined route on snet-wms-app pointing 10.100.0.0/16 at the hub"
+        correct: false
+        consequence: >
+          The route appears in the table. The probes still fail.
+        explain: >
+          A UDR can express where traffic should go, but with no peering there is
+          no path for it to take - a route to a VNet you are not connected to has
+          no valid next hop. UDRs steer traffic across connectivity that already
+          exists; they do not create it.
+        rep: -8
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: e2-postmortem
+
+  - id: e2-postmortem
+    type: design_decision
+    title: "The five-minute postmortem"
+    speaker: mentor
+    objectives: [AZ104-4.2]
+    scenario: |
+      The tablets come back. The shift supervisor keeps his paper tally going for
+      another hour out of spite.
+
+      Desmond comes out of his review, reads the peering output over your
+      shoulder, and grunts, which from him is a commendation.
+
+      "Change MER-3980 was approved and it still took the floor down for an hour.
+      Priya's going to ask what we're changing so it doesn't happen again. Give
+      her one thing. Not a five-point plan - one thing that would actually have
+      caught this."
+    prompt: "What do you put in the postmortem?"
+    options:
+      - id: opt-verify-both
+        label: "Peering changes must verify both sides report Connected before the window closes"
+        correct: true
+        explain: >
+          The change did exactly what it said and still broke: the gap was that
+          success was measured on one side only. Verifying PeeringState on both
+          VNets is a check that catches this specific failure in seconds, and it
+          costs the change window nothing.
+        rep: 8
+      - id: opt-no-changes
+        label: "Freeze all network changes outside of quarterly maintenance weekends"
+        correct: false
+        explain: >
+          It would have prevented this outage and every improvement along with it.
+          Change freezes trade a specific, cheap verification step for a blanket
+          slowdown, and the batched changes that follow a freeze are harder to
+          diagnose, not easier.
+        rep: -5
+      - id: opt-monitor
+        label: "Add an alert on the warehouse app's authentication error rate"
+        correct: false
+        explain: >
+          Worth having, but it detects the outage rather than preventing it - the
+          NOC had already detected this one within minutes and it still cost an
+          hour. Detection improvements do not substitute for a verification step
+          in the change itself.
+        rep: -5
+    next: END

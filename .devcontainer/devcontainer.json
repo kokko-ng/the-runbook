@@ -1,0 +1,120 @@
+// devcontainer.json — the-runbook
+// Generated from the kokko-devcontainer cookiecutter template.
+// See DEVCONTAINER.md next to this directory for what is installed and how to
+// change it; the upstream INSTRUCTIONS.md has the full host setup guide.
+{
+  "name": "the-runbook-dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      // Forwarded to the Dockerfile so /Users/<host_user> -> /home/vscode
+      // resolves macOS absolute paths in Claude plugin configs.
+      "HOST_USER": "${localEnv:USER}"
+    }
+  },
+  "remoteUser": "vscode",
+  "features": {
+    "ghcr.io/devcontainers/features/node:2": {
+      // Feature option pin — invisible to Dependabot; see MANAGING.md -> Pin audit.
+      "version": "24"
+    },
+    // Docker-in-Docker — a second Docker daemon inside the container.
+    // Its image store lives in a named `dind-var-lib-docker-*` volume that
+    // survives container removal, is not counted by `docker system df`, and is
+    // not reclaimed by `docker image prune`. It therefore grows unnoticed until
+    // the Colima VM's disk fills. Prune it from INSIDE the container with
+    // `docker system prune -a`, and delete the volume by name when retiring a
+    // project. See MANAGING.md -> Disk management.
+    "ghcr.io/devcontainers/features/docker-in-docker:4": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": true
+    }
+  },
+  "containerEnv": {
+    "PYTHONPATH": "${containerWorkspaceFolder}/backend",
+    "UV_LINK_MODE": "copy",
+    // `devcontainer exec` / `docker exec` don't forward the host terminal's
+    // env: COLORTERM is lost and TERM arrives as plain "xterm". Chalk-based
+    // CLIs (Claude Code, Copilot CLI, ...) then fall back to 16-color mode
+    // and downsample their brand colors to the nearest ANSI color — Claude
+    // Code's orange becomes ANSI red, which the bundled Ghostty palette
+    // renders as maroon. Both documented hosts (Ghostty, VS Code) are
+    // truecolor terminals, so advertise that container-wide.
+    "COLORTERM": "truecolor",
+    // Where post-create.sh looks for frontend dependencies (package.json).
+    "DEVCONTAINER_FRONTEND_DIR": "frontend",
+    // Provisioning toggles read by post-create.sh. These are the answers you
+    // gave the template; flip one and rebuild to change what gets installed.
+    "DEVCONTAINER_INSTALL_COPILOT_CLI": "0",
+    "DEVCONTAINER_INSTALL_PLAYWRIGHT": "1",
+    // Playwright browsers live in a named volume (see "mounts") so a rebuild
+    // does not re-download ~400MB of Chromium; post-create skips
+    // the install when this directory is already populated.
+    "PLAYWRIGHT_BROWSERS_PATH": "/home/vscode/.cache/ms-playwright",
+    // Passthrough for CI: with KOKKO_SKIP_PLUGINS=1 in the host env,
+    // post-create skips the plugin bootstrap (network calls that need a
+    // signed-in CLI). Unset on a normal host, this resolves to "" — a no-op.
+    "KOKKO_SKIP_PLUGINS": "${localEnv:KOKKO_SKIP_PLUGINS}"
+  },
+  "initializeCommand": "bash .devcontainer/init-host-certs.sh",
+  // Capture provisioning output — post-create failures are otherwise lost in
+  // the container creation log. See /tmp/post-create.log inside the container.
+  "postCreateCommand": "bash -o pipefail -c 'bash .devcontainer/post-create.sh 2>&1 | tee /tmp/post-create.log'",
+  // Re-apply bundled config on every start, so a container that pulled newer
+  // .devcontainer/config/ files picks them up without a manual step.
+  "postStartCommand": "bash .devcontainer/post-create.sh --config-only",
+  // Backend (8000) and frontend dev server (5173).
+  // Two containers cannot forward the same host port — see MANAGING.md -> Port conflicts.
+  "forwardPorts": [8000, 5173],
+  "runArgs": [
+    // Chromium (used by the Playwright CLI) spawns many short-lived processes.
+    // 512 is too low — raise to 1024 to avoid EAGAIN errors.
+    "--pids-limit=1024",
+    // Chromium renderers share memory via /dev/shm; Docker's 64MB default
+    // makes headless pages crash with cryptic tab errors.
+    "--shm-size=1g"
+  ],
+  // Named volumes, scoped to this project: package caches survive rebuilds (a
+  // rebuild otherwise re-downloads every wheel and npm tarball), and zsh
+  // history persists across containers. Nothing is shared with other projects,
+  // so each one pays its own download and its own disk. post-create.sh chowns
+  // these on first use.
+  "mounts": [
+    "source=the-runbook-uv-cache,target=/home/vscode/.cache/uv,type=volume",
+    "source=the-runbook-npm-cache,target=/home/vscode/.npm,type=volume",
+    "source=the-runbook-zsh-history,target=/commandhistory,type=volume",
+    // Playwright browsers: first creation pays the download, every rebuild
+    // after is fast. Target must match PLAYWRIGHT_BROWSERS_PATH above.
+    // The shared scope keeps the historical `pw-browsers` name so existing
+    // volumes are reused rather than orphaned.
+    "source=the-runbook-pw-browsers,target=/home/vscode/.cache/ms-playwright,type=volume"
+  ],
+  // Optional bind mounts — add entries to "mounts" above as needed.
+  // Shell config and Claude Code settings are bundled in .devcontainer/config/
+  // and installed by post-create.sh, so no host mounts are required by default.
+  //
+  //   // Claude Code state — persists conversation history across rebuilds
+  //   // (post-create.sh will not overwrite settings.json if this is mounted)
+  //   "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind"
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "Vue.volar",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python",
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true
+        }
+      }
+    }
+  }
+}

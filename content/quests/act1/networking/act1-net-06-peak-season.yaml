@@ -1,0 +1,291 @@
+schema_version: 1
+id: act1-net-06-peak-season
+title: "Peak Season"
+act: 1
+chapter: act1-networking
+domain: az104-d4
+order: 6
+role: cloud-admin
+checkpoint: true
+summary: "One front end held all year. Peak season starts in three weeks."
+entry: e1-lb-choice
+
+encounters:
+  - id: e1-lb-choice
+    type: design_decision
+    title: "Three weeks to peak"
+    speaker: manager
+    objectives: [AZ104-4.9]
+    scenario: |
+      Priya brings the capacity numbers and a coffee, which means the numbers are
+      bad.
+
+      "Peak season is three weeks out. Last year the picking portal fell over
+      twice on the same Tuesday. It runs on one machine and the pickers hit it
+      over HTTPS from tablets on the warehouse wifi."
+
+      Two more requirements arrived with the numbers. Marcus wants a web
+      application firewall in front of the portal - there was an incident at a
+      competitor and the board has read about it. Ops wants the portal to route
+      /reports to the reporting service and everything else to the picking app,
+      because the tablets have one bookmark and nobody is changing it.
+
+      "Evelyn will pay for one thing. Pick the right one."
+    prompt: "What do you put in front of the picking portal?"
+    options:
+      - id: opt-appgw
+        label: "Azure Application Gateway with WAF, path-based routing, and a backend pool of portal instances"
+        correct: true
+        explain: >
+          The requirements are all layer 7: HTTPS, a web application firewall, and
+          routing by URL path. Application Gateway is the layer 7 load balancer
+          that does all three in one resource, with TLS termination and health
+          probes against the backend pool. A layer 4 load balancer cannot see a
+          URL path and has no WAF.
+        rep: 8
+        diagram_ops:
+          - op: add_node
+            node:
+              id: agw-portal
+              label: "agw-wms-portal (WAF_v2)"
+              kind: app-gateway
+              group: grp-ops
+              status: healthy
+          - op: add_edge
+            edge:
+              id: e-agw-snetweb
+              source: agw-portal
+              target: snet-web
+              kind: traffic
+              label: "backend pool"
+      - id: opt-lb
+        label: "Azure Load Balancer (standard) with a health probe on 443 and the portal instances in the backend pool"
+        correct: false
+        explain: >
+          A standard load balancer distributes the traffic and handles the
+          availability requirement, but it operates at layer 4: it cannot inspect
+          a URL path to split /reports from the rest, and it has no WAF. Two of
+          the three requirements go unmet.
+        rep: -8
+      - id: opt-traffic-manager
+        label: "Traffic Manager with the portal as an endpoint, adding more endpoints as capacity grows"
+        correct: false
+        explain: >
+          Traffic Manager is DNS-based and directs clients between endpoints -
+          typically regions - rather than balancing connections within one. It
+          does not terminate TLS, filter requests, or route on path, and DNS
+          caching on the tablets makes it a poor fit for instance-level failover.
+        rep: -10
+      - id: opt-scale-up
+        label: "Move the portal to a larger VM size, since one machine only failed twice all year"
+        correct: false
+        consequence: >
+          The larger machine fails on the same Tuesday, once, for longer.
+        explain: >
+          Scaling up raises the ceiling but keeps a single point of failure and
+          still delivers no WAF and no path routing. The portal failing at peak is
+          an availability problem, and availability needs more than one instance
+          behind something that can take one out of rotation.
+        rep: -8
+    next: e2-probe-incident
+
+  - id: e2-probe-incident
+    type: troubleshoot
+    title: "P1: Portal returns 502 under load"
+    speaker: noc
+    objectives: [AZ104-4.8]
+    ticket:
+      id: "MER-4790"
+      reporter: "NOC Manila"
+      priority: "P1"
+      opened: "11:41"
+      body: |
+        Peak day. Picking portal intermittently returns 502 Bad Gateway from the
+        application gateway. Roughly one request in three. Both backend instances
+        are running and respond when we curl them directly from inside the VNet.
+        Gateway itself shows Healthy in the portal blade.
+    scenario: |
+      Peak season, day one, 11:41. The application gateway went in two weeks ago
+      with three portal instances behind it and it has been flawless in testing.
+
+      Under real load, roughly a third of requests come back 502. The tablets
+      retry, the pickers re-scan, and the queue at the loading bay grows.
+
+      Desmond is already at your desk with a chair. "A 502 from a gateway means
+      it could not get a good answer from the back. Find out what the gateway
+      thinks of the backends, not what you think of them."
+    time_budget: 6
+    investigate:
+      - id: inv-noc
+        label: "Ask the NOC which instances the failures correlate with"
+        speaker: noc
+        reveals: >
+          "We can't tell from the client side - the tablets just see 502. But
+          curling each backend directly from a jump box in the VNet returns 200
+          on all three, every time, including right now."
+      - id: inv-ops
+        label: "Ask Ops what changed on the portal instances"
+        speaker: ticket
+        reveals: >
+          "New build went out Sunday. It moved the health endpoint from / to
+          /healthz because the old one was doing a full database check on every
+          hit and hammering the database. Release notes mention it."
+      - id: inv-desmond
+        label: "Ask Desmond how to read the gateway's view"
+        speaker: mentor
+        reveals: >
+          "Backend health. The gateway probes each instance and only sends
+          traffic to the ones that pass. If a third of requests fail, ask how many
+          instances the gateway currently believes are alive."
+      - id: inv-marcus
+        label: "Ask Marcus whether the WAF is blocking requests"
+        speaker: security
+        reveals: >
+          "WAF is in Prevention mode but the blocked count is single digits an
+          hour, all obvious scanner noise. A WAF block returns 403, not 502.
+          Not us."
+    commands:
+      - id: cmd-backend-health
+        label: "Show application gateway backend health"
+        command: "az network application-gateway show-backend-health -g rg-ops-sea -n agw-wms-portal -o table"
+        output: |
+          BackendAddress    Port    Health      HealthProbeLog
+          ----------------  ------  ----------  --------------------------------------------------
+          10.101.1.10       443     Healthy     Probe status code 200
+          10.101.1.11       443     Unhealthy   Received status code 404 from backend server
+          10.101.1.12       443     Unhealthy   Received status code 404 from backend server
+        time_cost: 1
+        note: "Two of three backends are out of rotation, and the probe is getting a 404."
+      - id: cmd-probe-show
+        label: "Show the health probe configuration"
+        command: "az network application-gateway probe show -g rg-ops-sea --gateway-name agw-wms-portal -n probe-portal -o json"
+        output: |
+          {
+            "path": "/",
+            "protocol": "Https",
+            "interval": 30,
+            "timeout": 30,
+            "unhealthyThreshold": 3,
+            "match": { "statusCodes": ["200-399"] }
+          }
+        time_cost: 1
+        note: "The probe still targets /, which the new build no longer serves."
+      - id: cmd-curl-health
+        label: "Curl both health paths on a backend from inside the VNet"
+        command: "az vm run-command invoke -g rg-ops-sea -n vm-jump01 --command-id RunShellScript --scripts 'curl -sk -o /dev/null -w \"/ %{http_code}\\n\" https://10.101.1.11/ ; curl -sk -o /dev/null -w \"/healthz %{http_code}\\n\" https://10.101.1.11/healthz'"
+        output: |
+          / 404
+          /healthz 200
+        time_cost: 2
+        note: "Confirms it: the old probe path is gone, the new one answers."
+      - id: cmd-instance-versions
+        label: "Check which build each instance is running"
+        command: "az vm run-command invoke -g rg-ops-sea -n vm-portal01 --command-id RunShellScript --scripts 'cat /opt/wms-portal/VERSION'"
+        output: |
+          2026.08.1
+        time_cost: 2
+        note: "Instance 01 is on the old build, which still serves /. The other two are not."
+      - id: cmd-waf-log
+        label: "Query WAF logs for blocked requests"
+        command: "az monitor log-analytics query -w law-meridian --analytics-query 'AzureDiagnostics | where Category == \"ApplicationGatewayFirewallLog\" | summarize count() by action_s' -o table"
+        output: |
+          action_s    count_
+          ----------  --------
+          Blocked     7
+        time_cost: 2
+        note: "Seven blocks in an hour. Not the source of a third of requests failing."
+    fixes:
+      - id: fix-probe-path
+        label: "Update the health probe path to /healthz so it matches the current build"
+        correct: true
+        explain: >
+          The gateway only forwards to backends that pass their probe. Sunday's
+          build moved the health endpoint and the probe kept asking for /, so the
+          two upgraded instances answered 404 and were removed from rotation - the
+          502s are requests arriving when the one remaining healthy instance is
+          saturated. Pointing the probe at /healthz brings all three back. A
+          health endpoint is part of the load balancer contract, so moving one is
+          a change to both sides.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: agw-portal, status: healthy}
+          - {op: set_status, node: snet-web, status: healthy}
+      - id: fix-rollback-build
+        label: "Roll the portal instances back to build 2026.08.1 so / answers again"
+        correct: false
+        consequence: >
+          The database load problem the new build fixed comes back, at peak, on
+          the busiest day of the year.
+        explain: >
+          It restores the probe path by undoing an improvement, and it is the
+          slower fix - rolling back three application instances during peak versus
+          changing one probe path. The build was not wrong; the probe was not
+          updated with it.
+        rep: -10
+      - id: fix-scale-out
+        label: "Add three more portal instances to the backend pool to absorb the load"
+        correct: false
+        consequence: >
+          The new instances run the current build, fail the same probe, and never
+          enter rotation. The 502s continue.
+        explain: >
+          Scaling out cannot help when the gateway rejects the new instances for
+          the same reason it rejected the existing ones. Backend health showed two
+          of three already out; capacity was never the constraint.
+        rep: -10
+      - id: fix-disable-probe
+        label: "Widen the probe's accepted status codes to 200-499 so a 404 counts as healthy"
+        correct: false
+        explain: >
+          It puts all three instances back in rotation by making the probe
+          incapable of detecting a broken backend - a 404, a 403, and a genuinely
+          failed instance would all now read as healthy. The probe's job is to
+          tell the truth about the backend; point it at an endpoint that does.
+        rep: -12
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: e3-close
+
+  - id: e3-close
+    type: design_decision
+    title: "The quiet afternoon"
+    speaker: manager
+    objectives: [AZ104-4.8]
+    scenario: |
+      All three instances are back in rotation by 12:05. The loading bay queue
+      clears by half past. Nobody outside the room notices it happened.
+
+      Priya stops by at the end of the day.
+
+      "Ops shipped a build that changed a health endpoint and neither team knew it
+      mattered to the other. That's going to happen again with something else.
+      What do you want me to take to the platform meeting?"
+    prompt: "What do you ask for?"
+    options:
+      - id: opt-contract
+        label: "Treat the health endpoint as a documented interface between the app and the load balancer, with the probe config reviewed on any change to it"
+        correct: true
+        explain: >
+          The failure was an undocumented coupling: two teams owned two halves of
+          one contract and neither knew it existed. Naming the contract and tying
+          it to the change process addresses the pattern rather than this one
+          endpoint, and it costs a line in a checklist.
+        rep: 8
+      - id: opt-freeze
+        label: "No application releases during peak season"
+        correct: false
+        explain: >
+          It narrows the window for this class of failure without removing it, and
+          it delays fixes during the period when they matter most - the new build
+          existed because the old one was overloading the database at peak.
+        rep: -5
+      - id: opt-alert
+        label: "An alert on application gateway unhealthy backend count"
+        correct: false
+        explain: >
+          Genuinely worth having, and cheap - but it is detection, and the NOC had
+          this within minutes anyway. It does not stop the next endpoint change
+          from silently taking instances out of rotation.
+        rep: -3
+    next: END

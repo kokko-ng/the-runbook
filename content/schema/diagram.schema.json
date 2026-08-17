@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-runbook.app/schema/diagram.schema.json",
+  "title": "Base architecture diagram",
+  "description": "Starting state of the living architecture map for one act. Quests mutate it through diagram ops.",
+  "type": "object",
+  "required": ["schema_version", "id", "nodes"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "id": { "$ref": "#/$defs/slug" },
+    "title": { "type": "string" },
+    "groups": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/group" },
+      "default": []
+    },
+    "nodes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/node" }
+    },
+    "edges": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/edge" },
+      "default": []
+    }
+  },
+  "$defs": {
+    "group": {
+      "type": "object",
+      "required": ["id", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "label": { "type": "string", "minLength": 1 }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["id", "label", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "label": { "type": "string", "minLength": 1 },
+        "kind": { "$ref": "#/$defs/kind" },
+        "group": { "$ref": "#/$defs/slug" },
+        "status": { "$ref": "#/$defs/status", "default": "healthy" },
+        "note": { "type": "string" },
+        "position": {
+          "description": "Optional authored layout hint; the renderer auto-lays-out when absent.",
+          "type": "object",
+          "required": ["x", "y"],
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+          }
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "required": ["id", "source", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "source": { "$ref": "#/$defs/slug" },
+        "target": { "$ref": "#/$defs/slug" },
+        "label": { "type": "string" },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "peering",
+            "vpn",
+            "expressroute",
+            "private-link",
+            "traffic",
+            "replication",
+            "identity",
+            "dependency"
+          ],
+          "default": "dependency"
+        },
+        "status": { "$ref": "#/$defs/status", "default": "healthy" }
+      }
+    },
+    "kind": {
+      "description": "Azure resource kind; selects the icon in the renderer.",
+      "type": "string",
+      "enum": [
+        "subscription",
+        "resource-group",
+        "vnet",
+        "subnet",
+        "nsg",
+        "route-table",
+        "vpn-gateway",
+        "firewall",
+        "load-balancer",
+        "app-gateway",
+        "public-ip",
+        "private-endpoint",
+        "dns-zone",
+        "vm",
+        "vmss",
+        "app-service",
+        "function-app",
+        "aks",
+        "container-app",
+        "storage-account",
+        "sql-database",
+        "cosmos-db",
+        "key-vault",
+        "entra-id",
+        "log-analytics",
+        "monitor",
+        "backup-vault",
+        "recovery-vault",
+        "policy",
+        "management-group",
+        "user",
+        "on-premises",
+        "internet"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["healthy", "warning", "broken", "degraded", "planned"]
+    },
+    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
+  }
+}

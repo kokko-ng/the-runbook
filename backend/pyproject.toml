@@ -1,0 +1,31 @@
+[project]
+name = "the-runbook-backend"
+version = "0.1.0"
+description = "Django backend and content pipeline for The Runbook"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=5.2,<6.0",
+    "django-ninja>=1.3",
+    "pyyaml>=6.0",
+    "jsonschema>=4.23",
+]
+
+[project.optional-dependencies]
+prod = [
+    "mysqlclient>=2.2",
+    "django-anymail[sendgrid]>=11.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-django>=4.9",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.dev"
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.uv]
+package = false

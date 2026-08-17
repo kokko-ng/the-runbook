@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-runbook.app/schema/objectives.schema.json",
+  "title": "Exam objective registry",
+  "description": "Objectives for one exam, grouped into domains and skill-tree clusters. Drives both the skill tree and the coverage matrix.",
+  "type": "object",
+  "required": ["schema_version", "exam", "title", "act", "domains"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "exam": { "type": "string", "pattern": "^az[0-9]{3}$" },
+    "title": { "type": "string", "minLength": 1 },
+    "act": { "type": "integer", "minimum": 1, "maximum": 2 },
+    "source_url": { "type": "string", "format": "uri" },
+    "fetched_on": { "type": "string", "format": "date" },
+    "domains": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/domain" }
+    }
+  },
+  "$defs": {
+    "domain": {
+      "type": "object",
+      "required": ["id", "title", "chapter", "clusters"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "title": { "type": "string", "minLength": 1 },
+        "chapter": {
+          "description": "Chapter slug this domain maps to; one skill tree per domain.",
+          "$ref": "#/$defs/slug"
+        },
+        "weight": {
+          "description": "Published exam weighting, e.g. '20-25%'. Informational only.",
+          "type": "string"
+        },
+        "clusters": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/cluster" }
+        }
+      }
+    },
+    "cluster": {
+      "description": "One node in the skill tree: a group of related objectives.",
+      "type": "object",
+      "required": ["id", "title", "objectives"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "title": { "type": "string", "minLength": 1 },
+        "requires": {
+          "description": "Cluster ids that must be lit before this one is reachable in the tree layout.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/slug" }
+        },
+        "objectives": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/objective" }
+        }
+      }
+    },
+    "objective": {
+      "type": "object",
+      "required": ["id", "text"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Stable objective id, e.g. AZ104-4.2.",
+          "type": "string",
+          "pattern": "^AZ[0-9]{3}-[0-9]+\\.[0-9]+$"
+        },
+        "text": { "type": "string", "minLength": 1 }
+      }
+    },
+    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
+  }
+}
