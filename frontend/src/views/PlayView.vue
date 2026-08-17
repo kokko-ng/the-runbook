@@ -60,7 +60,7 @@ async function nextQuest() {
           <StandingMeter :rep="game.state.rep" :compact="ui.isPhone" />
           <button
             type="button"
-            class="btn btn-quiet !min-h-9 !px-2.5 !text-[0.75rem]"
+            class="btn btn-quiet btn-compact"
             @click="ui.toggleSkills()"
           >
             Skills
@@ -192,7 +192,7 @@ async function nextQuest() {
     >
       <MapPane :diagram="game.state.diagram" class="flex-1">
         <template #actions>
-          <button type="button" class="btn btn-quiet !min-h-9 !px-3" @click="ui.closeMap()">
+          <button type="button" class="btn btn-quiet btn-compact" @click="ui.closeMap()">
             Close
           </button>
         </template>

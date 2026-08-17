@@ -52,7 +52,7 @@ function progress(clusterId: string) {
             to spend
           </p>
         </div>
-        <button type="button" class="btn btn-quiet !min-h-9 !px-3" @click="ui.closeSkills()">
+        <button type="button" class="btn btn-quiet btn-compact" @click="ui.closeSkills()">
           Close
         </button>
       </header>
@@ -74,7 +74,7 @@ function progress(clusterId: string) {
               </div>
               <button
                 type="button"
-                class="btn btn-quiet !min-h-9 shrink-0 !px-3"
+                class="btn btn-quiet btn-compact shrink-0"
                 :disabled="
                   game.state.skillPoints < PERKS[perk].cost ||
                   game.state.perksOwned[perk] >= PERKS[perk].cap
