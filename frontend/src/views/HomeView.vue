@@ -93,7 +93,7 @@ function formatDate(iso: string) {
       <div class="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
         <span class="eyebrow">The Runbook</span>
         <div class="flex items-center gap-2">
-          <RouterLink to="/account" class="btn btn-quiet !min-h-9 !px-2.5 !text-[0.75rem]">
+          <RouterLink to="/account" class="btn btn-quiet btn-compact">
             {{ account.signedIn ? 'Account' : 'Sync across devices' }}
           </RouterLink>
           <ThemeToggle />
@@ -226,7 +226,7 @@ function formatDate(iso: string) {
                   <span class="font-medium">{{ bonus.title }}</span>
                   <button
                     type="button"
-                    class="btn btn-quiet !min-h-8 !px-2 !text-[0.75rem]"
+                    class="btn btn-quiet btn-compact"
                     @click="play(bonus.id)"
                   >
                     Take it on
@@ -238,7 +238,7 @@ function formatDate(iso: string) {
             <button
               v-if="hasSave && !progressFor(chapter.id)?.done && chapterQuests(chapter.id).length"
               type="button"
-              class="btn btn-quiet mt-3 !min-h-9 !px-3 !text-[0.8125rem]"
+              class="btn btn-quiet btn-compact mt-3"
               @click="playChapter(chapter.id)"
             >
               {{ progressFor(chapter.id)?.started ? 'Resume this chapter' : 'Jump to this chapter' }}

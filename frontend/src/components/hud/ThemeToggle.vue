@@ -7,7 +7,7 @@ const ui = useUiStore()
 <template>
   <button
     type="button"
-    class="btn btn-quiet !min-h-9 !px-2.5 !text-[0.75rem]"
+    class="btn btn-quiet btn-compact"
     :aria-label="`Switch to ${ui.theme === 'dark' ? 'light' : 'dark'} theme`"
     @click="ui.toggleTheme()"
   >

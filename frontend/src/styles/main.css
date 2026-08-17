@@ -362,6 +362,24 @@
     cursor: not-allowed;
   }
 
+  /*
+   * Secondary chrome: dense where there is a mouse, comfortable where there is
+   * a finger. Pointer type is the honest signal here, not viewport width - a
+   * small laptop window still has a cursor.
+   */
+  .btn-compact {
+    min-height: 36px;
+    padding: 0 0.625rem;
+    font-size: 0.75rem;
+  }
+
+  @media (pointer: coarse) {
+    .btn-compact {
+      min-height: 44px;
+      padding: 0 0.75rem;
+    }
+  }
+
   .panel {
     background: var(--surface-raised);
     border: 1px solid var(--rule);

@@ -1,0 +1,33 @@
+- generic [ref=f23e3]:
+  - banner [ref=f23e4]:
+    - generic [ref=f23e5]:
+      - link "The Runbook" [ref=f23e6] [cursor=pointer]:
+        - /url: /
+      - button "Switch to dark theme" [ref=f23e7]: Dark
+  - main [ref=f23e8]:
+    - heading "Account" [level=1] [ref=f23e9]
+    - paragraph [ref=f23e10]: "An account does one thing: keeps your progress in step across devices. The game is free and fully playable without one, and everything you have already played stays on this device either way."
+    - generic [ref=f23e11]:
+      - generic [ref=f23e12]:
+        - button "Sign in" [ref=f23e13]
+        - button "Create an account" [ref=f23e14]
+      - generic [ref=f23e15]:
+        - generic [ref=f23e16]:
+          - generic [ref=f23e17]: Email
+          - textbox "Email" [ref=f23e18]
+        - generic [ref=f23e19]:
+          - generic [ref=f23e20]: Password
+          - textbox "Password" [ref=f23e21]
+        - button "Sign in" [ref=f23e22]
+      - paragraph [ref=f23e23]:
+        - button "Forgotten your password?" [ref=f23e24]
+    - link "Back to the start" [ref=f23e25] [cursor=pointer]:
+      - /url: /
+  - contentinfo [ref=f23e26]:
+    - generic [ref=f23e27]:
+      - paragraph [ref=f23e28]: The Runbook is an independent study aid. It is not affiliated with, endorsed by, or sponsored by Microsoft. Azure, AZ-104, AZ-305, and Microsoft are trademarks of the Microsoft group of companies. Meridian Logistics and everyone who works there are fictional.
+      - navigation [ref=f23e29]:
+        - link "Privacy" [ref=f23e30] [cursor=pointer]:
+          - /url: /privacy
+        - link "Terms" [ref=f23e31] [cursor=pointer]:
+          - /url: /terms

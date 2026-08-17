@@ -26,7 +26,7 @@ const usable = computed(() => {
       v-for="perk in PERK_IDS"
       :key="perk"
       type="button"
-      class="btn btn-quiet !min-h-9 !px-2.5 !text-[0.8125rem]"
+      class="btn btn-quiet btn-compact"
       :disabled="game.state.perksOwned[perk] === 0 || !usable[perk]"
       :title="PERKS[perk].description"
       @click="game.dispatch({ type: 'USE_PERK', perk })"

@@ -18,18 +18,38 @@ export class ApiError extends Error {
 
 let csrfToken: string | null = null
 
+/**
+ * Forget the cached CSRF token and fetch a fresh one.
+ *
+ * Django rotates the CSRF token when a session starts or ends, so a token held
+ * from before a sign-in is stale for the very next request. Call this after any
+ * login, signup, or logout.
+ */
+export async function refreshCsrf(): Promise<void> {
+  csrfToken = null
+  try {
+    const resp = await fetch('/api/auth/csrf', { credentials: 'same-origin' })
+    if (resp.ok) csrfToken = ((await resp.json()) as { csrf_token: string }).csrf_token
+  } catch {
+    // Left null; the next request fetches it again.
+  }
+}
+
 function cookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))
   return match?.[1] ? decodeURIComponent(match[1]) : null
 }
 
 async function ensureCsrf(): Promise<string> {
+  // A token fetched explicitly by refreshCsrf wins over the cookie, which may
+  // still hold the pre-rotation value the browser has not yet replaced.
+  if (csrfToken) return csrfToken
+
   const fromCookie = cookie('csrftoken')
   if (fromCookie) {
     csrfToken = fromCookie
     return fromCookie
   }
-  if (csrfToken) return csrfToken
 
   const resp = await fetch('/api/auth/csrf', { credentials: 'same-origin' })
   if (!resp.ok) throw new ApiError(resp.status, 'Could not reach the server.')

@@ -8,7 +8,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 import * as api from '@/api/account'
-import { ApiError } from '@/api/client'
+import { ApiError, refreshCsrf } from '@/api/client'
 import { migrate } from '@/engine/save'
 import type { GameState } from '@/engine/types'
 import * as localSave from '@/persistence/localSave'
@@ -31,8 +31,18 @@ export const useAccountStore = defineStore('account', () => {
     throw caught
   }
 
-  /** Called once at startup. Silent on failure: an account is optional. */
+  /**
+   * Called once at startup. Silent on failure: an account is optional.
+   *
+   * Most players are guests, so this skips the request entirely when no session
+   * cookie exists - it saves a round trip and keeps a 401 out of the console on
+   * every single page load.
+   */
   async function restore() {
+    if (!document.cookie.includes('sessionid=')) {
+      email.value = null
+      return
+    }
     try {
       const account = await api.currentAccount()
       email.value = account?.email ?? null
@@ -48,6 +58,9 @@ export const useAccountStore = defineStore('account', () => {
     try {
       const account = await api.signup(address, password)
       email.value = account.email
+      // The new session rotated the CSRF token; the save upload follows straight
+      // after this and would be rejected with the old one.
+      await refreshCsrf()
     } catch (caught) {
       fail(caught)
     } finally {
@@ -61,6 +74,7 @@ export const useAccountStore = defineStore('account', () => {
     try {
       const account = await api.login(address, password)
       email.value = account.email
+      await refreshCsrf()
     } catch (caught) {
       fail(caught)
     } finally {
@@ -79,6 +93,8 @@ export const useAccountStore = defineStore('account', () => {
       email.value = null
       sync.value = 'idle'
       busy.value = false
+      // Ending the session rotates the token too.
+      await refreshCsrf()
     }
   }
 
@@ -106,8 +122,13 @@ export const useAccountStore = defineStore('account', () => {
       const remote = await api.fetchSave()
       if (!remote) {
         // First device on this account: the local save becomes the server's.
-        if (localState) await push(localState)
-        sync.value = 'synced'
+        // push() owns the status from here - overwriting it would report a
+        // successful sync after a failed upload.
+        if (localState) {
+          await push(localState)
+        } else {
+          sync.value = 'synced'
+        }
         return null
       }
 

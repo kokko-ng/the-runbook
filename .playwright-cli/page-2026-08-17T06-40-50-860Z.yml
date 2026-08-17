@@ -1,0 +1,30 @@
+- generic [ref=f25e3]:
+  - main [ref=f25e4]:
+    - paragraph [ref=f25e5]: The Runbook
+    - heading "Terms of use" [level=1] [ref=f25e6]
+    - generic [ref=f25e7]:
+      - generic [ref=f25e8]:
+        - heading "No affiliation with Microsoft" [level=2] [ref=f25e9]
+        - paragraph [ref=f25e10]: The Runbook is an independent study aid produced by an unrelated third party. It is not affiliated with, endorsed by, sponsored by, or approved by Microsoft Corporation. Microsoft, Azure, and the exam codes AZ-104 and AZ-305 are trademarks of the Microsoft group of companies and are used here only to describe what the material covers.
+      - generic [ref=f25e11]:
+        - heading "What this is and is not" [level=2] [ref=f25e12]
+        - paragraph [ref=f25e13]: The game teaches material that appears in Microsoft's published exam study guides. It is not a practice exam, does not reproduce exam questions, and does not guarantee that you will pass anything. Microsoft revises its exam objectives periodically; content here is mapped against the study guides as published on the date shown in the skills drawer, and may lag a revision.
+      - generic [ref=f25e14]:
+        - heading "Accuracy" [level=2] [ref=f25e15]
+        - paragraph [ref=f25e16]: Scenarios, command output, and explanations are written to be realistic, but they are fiction with a teaching purpose. Do not run commands from the game against a production environment on the assumption that the output will match. Always check Microsoft's own documentation before acting on anything you learn here.
+      - generic [ref=f25e17]:
+        - heading "Cost and availability" [level=2] [ref=f25e18]
+        - paragraph [ref=f25e19]: The game is free in full. There are no payments, subscriptions, or paid tiers, and no part of the content is withheld behind one. It is offered as is, with no guarantee of availability, and it may change or stop being hosted at any time.
+      - generic [ref=f25e20]:
+        - heading "Fiction" [level=2] [ref=f25e21]
+        - paragraph [ref=f25e22]: Meridian Logistics, its staff, its systems, and its incidents are invented. Any resemblance to a real company or person is coincidental.
+    - link "Back to the start" [ref=f25e23] [cursor=pointer]:
+      - /url: /
+  - contentinfo [ref=f25e24]:
+    - generic [ref=f25e25]:
+      - paragraph [ref=f25e26]: The Runbook is an independent study aid. It is not affiliated with, endorsed by, or sponsored by Microsoft. Azure, AZ-104, AZ-305, and Microsoft are trademarks of the Microsoft group of companies. Meridian Logistics and everyone who works there are fictional.
+      - navigation [ref=f25e27]:
+        - link "Privacy" [ref=f25e28] [cursor=pointer]:
+          - /url: /privacy
+        - link "Terms" [ref=f25e29] [cursor=pointer]:
+          - /url: /terms
