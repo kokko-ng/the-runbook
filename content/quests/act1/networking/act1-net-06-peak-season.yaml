@@ -15,7 +15,7 @@ encounters:
     type: design_decision
     title: "Three weeks to peak"
     speaker: manager
-    objectives: [AZ104-4.9]
+    objectives: [AZ104-4.12]
     scenario: |
       Priya brings the capacity numbers and a coffee, which means the numbers are
       bad.
@@ -93,7 +93,7 @@ encounters:
     type: troubleshoot
     title: "P1: Portal returns 502 under load"
     speaker: noc
-    objectives: [AZ104-4.8]
+    objectives: [AZ104-4.13]
     ticket:
       id: "MER-4790"
       reporter: "NOC Manila"
@@ -254,7 +254,7 @@ encounters:
     type: design_decision
     title: "The quiet afternoon"
     speaker: manager
-    objectives: [AZ104-4.8]
+    objectives: [AZ104-4.12]
     scenario: |
       All three instances are back in rotation by 12:05. The loading bay queue
       clears by half past. Nobody outside the room notices it happened.

@@ -15,7 +15,7 @@ encounters:
     type: design_decision
     title: "A name for the reporting service"
     speaker: manager
-    objectives: [AZ104-4.5]
+    objectives: [AZ104-4.11]
     scenario: |
       Priya has good news, which at Meridian usually arrives attached to a
       deadline.
@@ -101,7 +101,7 @@ encounters:
     type: troubleshoot
     title: "P2: Nightly export leaving the network"
     speaker: security
-    objectives: [AZ104-4.5, AZ104-4.4]
+    objectives: [AZ104-4.11, AZ104-4.10]
     ticket:
       id: "MER-4601"
       reporter: "Marcus Lim (security)"

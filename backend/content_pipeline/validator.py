@@ -79,11 +79,15 @@ class ObjectiveRegistry:
         self.cluster_titles: dict[str, str] = {}
         self.domains: dict[str, dict[str, Any]] = {}
         self.exams: list[dict[str, Any]] = []
+        # Chapters are played in the order their domains are declared, which is
+        # the exam's own order - not alphabetically by slug.
+        self.chapter_order: dict[str, int] = {}
 
         for item in files:
             data = item.data
             self.exams.append(data)
             for domain in data.get("domains", []):
+                self.chapter_order.setdefault(domain["chapter"], len(self.chapter_order))
                 self.domains[domain["id"]] = domain
                 for cluster in domain.get("clusters", []):
                     ids = [obj["id"] for obj in cluster.get("objectives", [])]
@@ -461,7 +465,7 @@ def validate(tree: ContentTree) -> list[Problem]:
     # reference any node the base diagram declares or an earlier quest adds, but
     # not one that only appears later in the act.
     available: dict[int, tuple[set[str], set[str]]] = {}
-    for item in sorted(tree.quests, key=_play_order):
+    for item in sorted(tree.quests, key=lambda i: _play_order(i, objectives.chapter_order)):
         act = item.data["act"]
         if act not in available:
             available[act] = (diagrams.nodes(act), diagrams.edges(act))
@@ -477,16 +481,18 @@ def validate(tree: ContentTree) -> list[Problem]:
     return problems
 
 
-def _play_order(item: LoadedFile) -> tuple[int, str, int, int, str]:
+def _play_order(item: LoadedFile, chapter_order: dict[str, int]) -> tuple[int, int, int, int, str]:
     """Sort key matching the order a player meets quests.
 
-    Bonus variants sort immediately after the quest they vary, so they can use
+    Chapters follow the order their domains are declared in the objective
+    registry, which is the exam's own order rather than alphabetical. Bonus
+    variants sort immediately after the quest they vary, so they can use
     anything their parent introduced.
     """
     data = item.data
     return (
         data["act"],
-        data["chapter"],
+        chapter_order.get(data["chapter"], 999),
         data.get("order", 1),
         1 if "bonus_variant_of" in data else 0,
         data["id"],

@@ -1,0 +1,327 @@
+schema_version: 1
+id: act1-net-07-jump-box-is-gone
+title: "The Jump Box Is Gone"
+act: 1
+chapter: act1-networking
+domain: az104-d4
+order: 7
+role: cloud-admin
+checkpoint: true
+summary: "Marcus decommissioned the 2021 jump box on schedule. Nobody arranged what replaces it."
+entry: e1-admin-access
+
+encounters:
+  - id: e1-admin-access
+    type: design_decision
+    title: "How anyone reaches a server now"
+    speaker: security
+    objectives: [AZ104-4.8]
+    scenario: |
+      Marcus decommissioned the jump box at 15:53 on cutover day, exactly as he
+      said he would. It is now Thursday and nobody can reach vm-wms01 to restart
+      a stuck service.
+
+      "That box had a public IP, RDP open to the internet, and a local admin
+      account four people shared," Marcus says, with the calm of a man who has
+      been right for three years. "I am not putting it back. Tell me what you
+      want instead and I will approve it today if it is not that."
+
+      The requirement is narrow: a handful of admins occasionally need a shell or
+      a desktop on machines inside the spoke VNets. No standing internet exposure.
+      Evelyn will pay for something modest. Priya wants it before the weekend.
+    prompt: "What do you propose for administrative access?"
+    options:
+      - id: opt-bastion
+        label: "Deploy Azure Bastion in the hub VNet and reach machines through the portal over TLS"
+        correct: true
+        explain: >
+          Bastion is the managed jump host: it sits in its own AzureBastionSubnet,
+          brokers RDP and SSH over TLS through the portal, and means no target
+          machine needs a public IP or an inbound internet rule at all. Deployed in
+          the hub, peered spokes reach it too, which is why the hub exists. It
+          removes the exposure Marcus objected to rather than relocating it.
+        rep: 8
+        diagram_ops:
+          - op: add_node
+            node:
+              id: snet-bastion
+              label: "AzureBastionSubnet (10.100.4.0/26)"
+              kind: subnet
+              group: grp-corp
+              status: healthy
+          - op: add_node
+            node:
+              id: bastion-hub
+              label: "bas-hub-sea"
+              kind: firewall
+              group: grp-corp
+              status: healthy
+          - op: add_edge
+            edge:
+              id: e-vnethub-snetbastion
+              source: vnet-hub
+              target: snet-bastion
+              kind: dependency
+          - op: add_edge
+            edge:
+              id: e-bastion-snetbastion
+              source: bastion-hub
+              target: snet-bastion
+              kind: dependency
+      - id: opt-new-jumpbox
+        label: "Build a replacement jump box with a public IP, but restrict RDP to the office address range with an NSG"
+        correct: false
+        consequence: >
+          Marcus reads the first eight words and declines the change.
+        explain: >
+          It is better than the old box and still the same shape: a machine you
+          must patch, with a public IP and an inbound rule that has to be right
+          forever. Source restrictions break the moment someone works from home,
+          and the usual fix is widening the rule. Bastion removes the machine and
+          the rule together.
+        rep: -8
+      - id: opt-vpn-client
+        label: "Give each admin a point-to-site VPN client into the hub VNet"
+        correct: false
+        explain: >
+          Point-to-site is a legitimate answer when people need broad network
+          access to many resources, but it means certificate or Entra configuration
+          per client, a gateway sized for it, and admins holding routable access to
+          the whole VNet rather than a brokered session to one machine. It is more
+          than the requirement asks for.
+        rep: -5
+      - id: opt-public-ip-each
+        label: "Give each machine that needs administration its own public IP, with just-in-time access enabled"
+        correct: false
+        explain: >
+          Just-in-time access does shrink the exposure window, but you are still
+          attaching public IPs to workload servers and relying on a control being
+          switched on correctly every time. Machines in a spoke should not be
+          internet-addressable at all when a broker can reach them privately.
+        rep: -10
+    next: e2-public-ip
+
+  - id: e2-public-ip
+    type: design_decision
+    title: "One address, permanently"
+    speaker: mentor
+    objectives: [AZ104-4.3]
+    scenario: |
+      Bastion is approved. Desmond catches the change on its way past him and
+      stops at the public IP for the application gateway that fronts the picking
+      portal.
+
+      "Basic SKU, dynamic allocation. That was fine when it was a test. It is now
+      in front of the thing pickers use, and Kallang's firewall has an allow rule
+      pointing at that address."
+
+      He is describing two separate problems in one line.
+
+      "Also we are going zone-redundant on that gateway next quarter, so whatever
+      you pick has to still be there when we do."
+    prompt: "How do you configure the public IP address for the application gateway?"
+    options:
+      - id: opt-standard-static
+        label: "Standard SKU with static allocation, zone-redundant"
+        correct: true
+        explain: >
+          Standard SKU public IPs are always statically allocated, so the address
+          survives a deallocation and Kallang's firewall rule keeps pointing at
+          something real. Standard is also the only SKU that supports availability
+          zones and is required by zone-redundant Application Gateway v2, so it
+          satisfies next quarter's plan without a second change. Note Standard IPs
+          are secure by default: traffic is denied unless an NSG rule permits it.
+        rep: 8
+        diagram_ops:
+          - op: add_node
+            node:
+              id: pip-agw
+              label: "pip-agw-portal (Standard, static)"
+              kind: public-ip
+              group: grp-ops
+              status: healthy
+          - op: add_edge
+            edge:
+              id: e-pip-agw
+              source: pip-agw
+              target: agw-portal
+              kind: traffic
+      - id: opt-basic-static
+        label: "Keep Basic SKU but change the allocation from dynamic to static"
+        correct: false
+        explain: >
+          It fixes the address changing, and nothing else. Basic SKU public IPs
+          cannot be zone-redundant, are not supported by Application Gateway v2,
+          and Basic is on a retirement path. You would be doing this work twice.
+        rep: -8
+      - id: opt-dynamic-dns
+        label: "Leave the IP dynamic and have Kallang's firewall resolve a DNS name instead"
+        correct: false
+        consequence: >
+          The firewall caches the resolved address for an hour. The next
+          deallocation costs Kallang an hour of failed posts.
+        explain: >
+          Firewalls that accept hostnames resolve them on a schedule, so a changing
+          address behind a name still causes an outage window. When another party's
+          rule points at your address, that address needs to be static.
+        rep: -10
+      - id: opt-standard-dynamic
+        label: "Standard SKU with dynamic allocation, so the address is released when the gateway is stopped"
+        correct: false
+        explain: >
+          Standard SKU public IPs do not offer dynamic allocation; they are static
+          by definition. The saving you are reaching for does not exist, and the
+          configuration would be rejected.
+        rep: -5
+    next: e3-service-endpoint
+
+  - id: e3-service-endpoint
+    type: troubleshoot
+    title: "P2: Exports failing after the storage lockdown"
+    speaker: security
+    objectives: [AZ104-4.9, AZ104-4.5]
+    ticket:
+      id: "MER-4830"
+      reporter: "Marcus Lim (security)"
+      priority: "P2"
+      opened: "07:20"
+      body: |
+        I locked down stmeridianlogs last night as agreed - public network access
+        set to Deny, since everything that uses it is inside the VNet. The
+        overnight log shipping job on vm-dc01 has been failing since 01:00 with
+        AuthorizationFailure. The private endpoint work we did was for
+        stmeridianexports, not this account. What did I miss?
+    on_enter_diagram_ops:
+      - {op: set_status, node: vm-dc01, status: broken}
+      - {op: set_status, node: snet-shared, status: warning}
+    scenario: |
+      Marcus has started making changes himself, which Desmond considers a
+      worrying development and Priya considers delegation.
+
+      stmeridianlogs collects diagnostic logs from the hub. Everything that writes
+      to it lives in snet-shared-services. Last night Marcus set the account's
+      public network access to Deny, and the log shipping job stopped.
+
+      The account has no private endpoint. Marcus is asking whether he needs to
+      buy one for every storage account Meridian owns, and Evelyn is copied.
+    time_budget: 5
+    investigate:
+      - id: inv-marcus
+        label: "Ask Marcus exactly what he changed"
+        speaker: security
+        reveals: >
+          "Networking blade, public network access from Enabled to Disabled.
+          Default action Deny. I did not add anything to the exception list
+          because I assumed traffic from inside the VNet counted as inside."
+      - id: inv-desmond
+        label: "Ask Desmond how storage decides what is inside"
+        speaker: mentor
+        reveals: >
+          "A storage account has no idea what a VNet is unless you tell it. Either
+          the subnet gets a service endpoint and the account allows that subnet, or
+          the account gets a private endpoint and a private IP. Cheap option first -
+          he does not need a private endpoint on every account."
+      - id: inv-job
+        label: "Read the failing job's log on vm-dc01"
+        speaker: ticket
+        reveals: >
+          AuthorizationFailure at 01:00, 02:00, and hourly since. The job
+          authenticates with a managed identity that holds Storage Blob Data
+          Contributor, so this is not a permissions grant that expired.
+      - id: inv-evelyn
+        label: "Answer Evelyn's question about cost before she asks again"
+        speaker: cfo
+        reveals: >
+          "If the answer is a private endpoint per storage account, I want the
+          number of storage accounts first. If there is something that costs
+          nothing, start there."
+    commands:
+      - id: cmd-network-rules
+        label: "Show the storage account's network rules"
+        command: "az storage account show -n stmeridianlogs --query 'networkRuleSet' -o json"
+        output: |
+          {
+            "bypass": "AzureServices",
+            "defaultAction": "Deny",
+            "ipRules": [],
+            "virtualNetworkRules": []
+          }
+        time_cost: 1
+        note: "Deny by default, and no virtual network rule permits snet-shared-services."
+      - id: cmd-subnet-endpoints
+        label: "Show service endpoints on the shared services subnet"
+        command: "az network vnet subnet show -g rg-hub-sea --vnet-name vnet-hub-sea -n snet-shared-services --query 'serviceEndpoints' -o json"
+        output: |
+          null
+        time_cost: 1
+        note: "The subnet has no service endpoint for Microsoft.Storage."
+      - id: cmd-rbac
+        label: "Check the managed identity's role assignment"
+        command: "az role assignment list --assignee 8f21c4de-1a77-4e3b-9c02-77a41d9e2b10 --scope /subscriptions/.../stmeridianlogs -o table"
+        output: |
+          Principal                             Role                            Scope
+          ------------------------------------  ------------------------------  -----------------
+          vm-dc01-identity                      Storage Blob Data Contributor   stmeridianlogs
+        time_cost: 2
+        note: "The permission grant is intact, so this is a network decision, not an RBAC one."
+      - id: cmd-diag
+        label: "Query storage diagnostics for the failures"
+        command: "az monitor log-analytics query -w law-meridian --analytics-query 'StorageBlobLogs | where StatusText contains \"NetworkError\" | summarize count() by CallerIpAddress' -o table"
+        output: |
+          CallerIpAddress    count_
+          -----------------  --------
+          10.100.1.10        68
+        time_cost: 2
+        note: "Denied calls arrive from the private address of vm-dc01."
+    fixes:
+      - id: fix-service-endpoint
+        label: "Enable the Microsoft.Storage service endpoint on snet-shared-services and add that subnet to the account's network rules"
+        correct: true
+        explain: >
+          A service endpoint extends the subnet's identity to the storage service
+          over the Azure backbone, so the account can allow that specific subnet
+          while keeping everything else denied. It costs nothing, applies per
+          subnet rather than per account, and is the right answer to Evelyn's
+          question. Both halves are needed: the endpoint on the subnet and the
+          matching virtual network rule on the account.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: vm-dc01, status: healthy}
+          - {op: set_status, node: snet-shared, status: healthy}
+      - id: fix-reenable-public
+        label: "Set public network access back to Enabled and revisit the lockdown later"
+        correct: false
+        consequence: >
+          The job recovers. The security improvement is reverted, and "later" is
+          not on anyone's calendar.
+        explain: >
+          It restores service by undoing the control, when a free configuration
+          change achieves both. Reverting a security change should be reserved for
+          when the correct fix is not yet known, and here the effective rules and
+          subnet configuration make it obvious within two commands.
+        rep: -10
+      - id: fix-ip-rule
+        label: "Add vm-dc01's address 10.100.1.10 to the account's IP rules"
+        correct: false
+        explain: >
+          Storage account IP rules accept public addresses, not private VNet
+          addresses, so this rule would either be rejected or silently never match.
+          Traffic from inside a VNet is identified by subnet through a service
+          endpoint, not by private IP.
+        rep: -8
+      - id: fix-private-endpoint
+        label: "Deploy a private endpoint for stmeridianlogs, matching what was done for the exports account"
+        correct: false
+        consequence: >
+          Evelyn asks how many more storage accounts there are. There are eleven.
+        explain: >
+          It would work, and for a genuinely sensitive account it is the stronger
+          control - private IP, no public endpoint, traffic that never touches the
+          Microsoft backbone's public path. But it carries an hourly cost per
+          endpoint plus the private DNS work, for an internal log account that a
+          free service endpoint secures adequately. Match the control to the risk.
+        rep: -5
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: END

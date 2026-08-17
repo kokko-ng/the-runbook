@@ -1,0 +1,326 @@
+schema_version: 1
+id: act1-id-01-forty-new-badges
+title: "Forty New Badges"
+act: 1
+chapter: act1-identity
+domain: az104-d1
+order: 1
+role: junior-cloud-admin
+checkpoint: true
+summary: "The Johor cross-dock opens in three weeks and nobody there has an account yet."
+entry: e1-accounts
+
+encounters:
+  - id: e1-accounts
+    type: design_decision
+    title: "Forty-six people, no accounts"
+    speaker: manager
+    objectives: [AZ104-1.1]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: id-entra
+          label: "Meridian Entra ID tenant"
+          kind: entra-id
+          group: grp-corp
+          status: healthy
+      - op: add_edge
+        edge:
+          id: id-e-sub-entra
+          source: sub-prod
+          target: id-entra
+          kind: identity
+          label: "trusts"
+    scenario: |
+      Priya Raman finds you on your fourth morning with a laptop already open,
+      which is how she starts every conversation that ends in more work.
+
+      "Johor cross-dock opens in three weeks. Forty pickers on handheld
+      scanners, six floor supervisors. HR has the roster. None of them exist in
+      the tenant."
+
+      She turns the laptop around. The roster is a spreadsheet: name, personal
+      email, start date, site, job family. Every row says site Johor. Forty say
+      Picker, six say Supervisor.
+
+      "Two more things. Ops will hire more of them - this is a ramp, not a
+      one-off. And Marcus wants every action on the warehouse system traceable
+      to a person, because last year the auditors asked and we could not
+      answer."
+
+      Meridian's tenant is meridianlogistics.com, licensed for Microsoft Entra
+      ID P1 through its Microsoft 365 subscription. HQ staff are synced from the
+      on-premises domain in Kallang by Microsoft Entra Connect. The Johor
+      warehouse floor has no domain-joined machines and no line back to the
+      Kallang data center yet.
+    prompt: "How do you create and organize the Johor accounts?"
+    options:
+      - id: opt-shared
+        label: "Three shared accounts - one per shift - so the scanners can be handed over without a login dance"
+        correct: false
+        consequence: >
+          The auditors ask the same question next year and you give them the same answer.
+        explain: >
+          Shared accounts destroy the one thing Marcus asked for: every scan,
+          adjustment, and deletion resolves to a shift, not a person. They also
+          make MFA and self-service password reset meaningless, and offboarding
+          one leaver means changing a password that fifteen people rely on. A
+          shared credential is a credential nobody owns.
+        rep: -15
+      - id: opt-static
+        label: "Create 46 cloud users and add them to a static security group you maintain by hand"
+        correct: false
+        consequence: >
+          The group is accurate for eleven days.
+        explain: >
+          The accounts are right, the group is the problem. Priya said this is a
+          ramp, so membership changes weekly and a manually maintained list
+          drifts the moment someone forgets. Static assignment is fine for small
+          stable sets; when membership is derivable from user attributes, the
+          directory should derive it.
+        rep: -5
+      - id: opt-dynamic
+        label: "Create 46 cloud users with department and office location set, and a dynamic security group that matches on those attributes"
+        correct: true
+        explain: >
+          Each person gets their own identity, which satisfies traceability, and
+          the group membership becomes a consequence of the user record rather
+          than a second thing to remember. A dynamic membership rule such as
+          user.department -eq "Warehouse" -and user.city -eq "Johor" adds every
+          future hire automatically and removes leavers when HR changes their
+          attributes. Dynamic groups need Microsoft Entra ID P1, which Meridian
+          already has.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: id-grp-warehouse
+              label: "grp-warehouse-johor (dynamic)"
+              kind: user
+              group: grp-corp
+              status: healthy
+          - op: add_edge
+            edge:
+              id: id-e-entra-grpwh
+              source: id-entra
+              target: id-grp-warehouse
+              kind: identity
+              label: "member of"
+      - id: opt-m365
+        label: "Create a Microsoft 365 group so the supervisors get a shared mailbox and a Teams site out of it"
+        correct: false
+        explain: >
+          A Microsoft 365 group provisions a mailbox, a SharePoint site, and a
+          Teams team for forty people whose only device is a handheld scanner.
+          Beyond the clutter, the group type matters later: Azure role
+          assignments and group-based licensing want a security group, and
+          mail-enabled security groups and distribution lists cannot be given
+          Azure roles at all. Create a security group, and add a shared mailbox
+          separately if the supervisors ask for one.
+        rep: -5
+    next: e2-properties
+
+  - id: e2-properties
+    type: design_decision
+    title: "The supervisor who will not join"
+    speaker: mentor
+    objectives: [AZ104-1.2]
+    scenario: |
+      Desmond Toh reviews the group at four in the afternoon, which is when he
+      reviews everything, and finds forty-five members instead of forty-six.
+
+      "Your rule is fine. Your missing person is Nadia Hassan. She's a Kallang
+      supervisor transferring to Johor to run the ramp, so she already had an
+      account before you started."
+
+      He pulls up her record. Department reads Distribution. City reads
+      Singapore. Both are wrong as of Monday. At the top of the blade, a line
+      you have not seen on the other forty-five accounts:
+
+      "Source: Windows Server AD."
+
+      "That one came in through Entra Connect from the Kallang domain," Desmond
+      says. "HR updated her record in the HR system. The HR system writes to
+      on-premises Active Directory, not to Entra. Somebody has to close the
+      gap and today that somebody is you."
+
+      He waits, which is his version of a hint.
+    prompt: "How do you get Nadia into grp-warehouse-johor?"
+    options:
+      - id: opt-edit-entra
+        label: "Edit her department and city in the Microsoft Entra admin center"
+        correct: false
+        consequence: >
+          The fields are greyed out. Desmond does not say anything, which is worse.
+        explain: >
+          For a user whose source is Windows Server AD, the synchronized
+          attributes are read-only in Entra ID - the authority is the
+          on-premises directory. Even where a field can be forced, the next
+          synchronization cycle overwrites it. Editing downstream of the source
+          of authority is a change with a countdown on it.
+        rep: -8
+      - id: opt-manual-add
+        label: "Add her to grp-warehouse-johor manually as a one-off exception"
+        correct: false
+        explain: >
+          Dynamic group membership is computed, not stored: you cannot add or
+          remove members by hand, and the option is not offered. That
+          restriction is the point of a dynamic group - membership is always a
+          function of the current attribute values, so there is exactly one
+          place to look when it is wrong.
+        rep: -5
+      - id: opt-convert
+        label: "Change the group's membership type from dynamic to assigned and manage all 46 by hand"
+        correct: false
+        consequence: >
+          Switching membership type clears the existing membership. You now have an empty group and 46 people to re-add.
+        explain: >
+          This trades a working automation for a maintenance chore because one
+          record is stale, and converting membership type discards the computed
+          members rather than freezing them. When one input is wrong, fix the
+          input.
+        rep: -10
+      - id: opt-fix-source
+        label: "Update department and city in on-premises Active Directory and let Entra Connect sync the change"
+        correct: true
+        explain: >
+          Synchronized users are governed by their source directory, so the fix
+          belongs in Kallang's AD. Once Entra Connect runs its next delta cycle
+          the updated attributes land in Entra ID, the dynamic rule
+          re-evaluates, and Nadia joins the group with no exception to remember.
+          Correcting the authoritative record also keeps the HR system, AD, and
+          Entra telling the same story.
+        rep: 10
+    next: e3-licenses
+
+  - id: e3-licenses
+    type: design_decision
+    title: "Evelyn has read the quote"
+    speaker: cfo
+    objectives: [AZ104-1.3]
+    scenario: |
+      Evelyn Koh, Meridian's CFO, books fifteen minutes and uses eleven of them.
+
+      "Forty-six licenses. The quote I have in front of me assumes Microsoft 365
+      E3 at the same rate as head office. That is a four-figure monthly increase
+      for people who do not have desks."
+
+      She is right about the desks. The pickers sign in to one thing - the
+      warehouse app on a handheld scanner. They do not get a mailbox, they do
+      not open documents, and they will never see a Windows desktop. The six
+      supervisors need email and a browser.
+
+      Meridian's agreement includes Microsoft 365 F3, the frontline worker plan,
+      at roughly a fifth of the E3 rate. F3 covers a mailbox, browser-based
+      apps, and Entra ID P1 features including self-service password reset.
+
+      "I am not asking you to skip licensing," Evelyn says. "I am asking you not
+      to buy desktops for people holding scanners. And whatever you pick, I do
+      not want to have this conversation again for every new hire."
+    prompt: "How do you license the Johor accounts?"
+    options:
+      - id: opt-group-f3
+        label: "Assign Microsoft 365 F3 to grp-warehouse-johor using group-based licensing, with usage location set on every user"
+        correct: true
+        explain: >
+          F3 matches what frontline accounts actually consume, and assigning the
+          SKU to the group rather than to people means every hire the dynamic
+          rule pulls in gets licensed with no ticket, and every leaver loses it
+          when their attributes change. Usage location is not optional: license
+          assignment fails for any user whose usage location is empty, because
+          service availability is decided per country.
+        rep: 10
+        diagram_ops:
+          - {op: set_label, node: id-grp-warehouse, label: "grp-warehouse-johor (dynamic, M365 F3)"}
+      - id: opt-e3-all
+        label: "Give everyone E3 to match head office - one SKU is simpler to support"
+        correct: false
+        consequence: >
+          Evelyn's spreadsheet gains a row and a color.
+        explain: >
+          Uniformity has real value, but not at five times the rate for
+          entitlements nobody uses. Frontline SKUs exist precisely for this
+          shape of user, and Microsoft supports mixed SKUs in one tenant as a
+          normal arrangement. Simplicity that costs a four-figure monthly
+          premium is a purchasing decision, not an architecture decision.
+        rep: -8
+      - id: opt-per-user-f3
+        label: "Assign Microsoft 365 F3 to each of the 46 accounts individually"
+        correct: false
+        consequence: >
+          Three weeks later two new pickers cannot sign in and nobody knows why.
+        explain: >
+          The right SKU by the wrong mechanism. Per-user assignment does not
+          follow the group, so every hire needs a manual step and every leaver
+          leaves a paid license behind. Group-based licensing exists so that
+          entitlement follows membership, which is the same reason you built the
+          dynamic group in the first place.
+        rep: -5
+      - id: opt-pool
+        label: "Buy twelve licenses and rotate them between accounts as shifts change"
+        correct: false
+        explain: >
+          Microsoft 365 licenses are per named user, not concurrent seats, so
+          rotating them is a licensing violation as well as an operational
+          disaster: removing a license mid-shift strips the user's service
+          plans immediately and starts the clock on their mailbox data. There is
+          no floating-license model to exploit here.
+        rep: -12
+    next: e4-check
+
+  - id: e4-check
+    type: knowledge_check
+    title: "Twelve red rows"
+    speaker: mentor
+    objectives: [AZ104-1.3, AZ104-1.2]
+    scenario: |
+      The licenses go on. Twenty minutes later the group's licensing view shows
+      thirty-four users licensed and twelve with a red "License assignment
+      failed" marker.
+
+      The facts on the screen: the tenant holds 60 Microsoft 365 F3 licenses and
+      46 are needed. All 46 accounts appear as members of grp-warehouse-johor.
+      The twelve failures were all created on Tuesday by a colleague who
+      imported them from a CSV that had one fewer column than yours.
+
+      Desmond reads it over your shoulder and says nothing, so you are being
+      tested.
+    question: >
+      What is causing the twelve failures, and what fixes them?
+    options:
+      - id: opt-quota
+        label: "The tenant has run out of F3 licenses; buy twelve more"
+        correct: false
+        explain: >
+          Sixty licenses against forty-six users leaves fourteen spare, so
+          availability is not the constraint. Insufficient licenses is a real
+          group-licensing failure mode, but it presents as the last N users
+          failing, not as an arbitrary twelve created on the same day from the
+          same file.
+      - id: opt-usage-location
+        label: "Those twelve users have no usage location set; set it, and the assignment retries automatically"
+        correct: true
+        explain: >
+          Group-based licensing evaluates each member individually and fails the
+          ones it cannot license. Usage location is a required attribute because
+          service availability varies by country, and a CSV import missing that
+          column produces exactly this pattern - same batch, same missing field.
+          Setting usage location on the twelve users lets the group's
+          assignment reprocess them without touching the group.
+      - id: opt-synced
+        label: "Those twelve are synchronized from on-premises AD and synchronized users cannot hold cloud licenses"
+        correct: false
+        explain: >
+          Synchronized users are licensed exactly like cloud-only users - the
+          Johor accounts are cloud-only anyway. Synchronization limits which
+          attributes you can edit in Entra ID; it has no bearing on whether an
+          account can hold a subscription license.
+      - id: opt-wait
+        label: "Dynamic membership has not finished processing for those twelve; wait for the next evaluation"
+        correct: false
+        explain: >
+          All 46 already show as members, so membership evaluation has
+          completed. A user still outside the group would simply not appear in
+          the licensing view at all - it would not appear with an assignment
+          error, because there would be no assignment to fail.
+    next: END

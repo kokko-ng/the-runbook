@@ -46,9 +46,13 @@ class CoverageReport:
     def unauthored(self) -> list[DomainCoverage]:
         return [domain for domain in self.domains if not domain.authored]
 
-    def failures(self, require_all: bool = False) -> list[str]:
+    def failures(self, require_all: bool = False, only: str | None = None) -> list[str]:
+        """Coverage problems. `only` narrows enforcement to one domain, which is
+        what parallel authoring of separate chapters needs."""
         problems: list[str] = []
         for domain in self.enforced:
+            if only and domain.id != only:
+                continue
             for objective_id in domain.unmapped:
                 bonus = self.domain_bonus(domain, objective_id)
                 if bonus:
@@ -60,6 +64,8 @@ class CoverageReport:
                     problems.append(f"{objective_id} ({domain.id}) is not covered by any encounter")
         if require_all:
             for domain in self.unauthored:
+                if only and domain.id != only:
+                    continue
                 problems.append(f"{domain.id} ({domain.title}) has no authored quests")
         return problems
 

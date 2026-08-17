@@ -1,0 +1,436 @@
+schema_version: 1
+id: act1-id-02-outside-help
+title: "Outside Help"
+act: 1
+chapter: act1-identity
+domain: az104-d1
+order: 2
+role: junior-cloud-admin
+checkpoint: true
+summary: "A third-party haulier needs to see the dashboards, and the service desk is drowning in password resets."
+entry: e1-guests
+
+encounters:
+  - id: e1-guests
+    type: design_decision
+    title: "Two people from Sentosa Freight"
+    speaker: manager
+    objectives: [AZ104-1.4]
+    scenario: |
+      Sentosa Freight runs Meridian's line-haul between Kallang and the Johor
+      cross-dock. During the ramp, two of their planners need to see the
+      warehouse dashboards so they can stage trailers against the pick wave.
+
+      Priya has already agreed to it, which is how you find out about it.
+
+      "Two named people. Ling Wei and Arjun Rao. They keep their own laptops,
+      their own email at sentosafreight.com, and their own IT department, which
+      I have met and would not describe as attentive. The contract runs eight
+      weeks with an option to extend."
+
+      What they need is read access to a dashboard and nothing else. What they
+      must not have is a Meridian mailbox, a Meridian device, or an account that
+      survives the contract.
+
+      Marcus Lim has already sent a calendar invite titled "partner access -
+      15 min" for tomorrow morning, which means he expects an answer he can
+      argue with.
+    prompt: "How do you give Ling and Arjun access?"
+    options:
+      - id: opt-b2b
+        label: "Invite both as B2B guest users using their sentosafreight.com addresses"
+        correct: true
+        explain: >
+          B2B collaboration puts the credential where it belongs: Sentosa
+          Freight authenticates its own people, enforces its own MFA and
+          lifecycle, and Meridian holds only a guest object to authorize.
+          Nothing to license, no password to reset, and revoking access is one
+          deletion rather than a chase across mailboxes and devices. Guest
+          objects are still real directory principals, so you can put them in
+          groups and grant them Azure roles normally.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: id-guest-sentosa
+              label: "Guests - Sentosa Freight (B2B)"
+              kind: user
+              group: grp-corp
+              status: healthy
+          - op: add_edge
+            edge:
+              id: id-e-entra-guests
+              source: id-entra
+              target: id-guest-sentosa
+              kind: identity
+              label: "external"
+      - id: opt-member
+        label: "Create them member accounts in meridianlogistics.com so they are managed like staff"
+        correct: false
+        consequence: >
+          Nine weeks later Arjun has left Sentosa Freight and his Meridian account is still signing in.
+        explain: >
+          Making contractors members means Meridian now issues their passwords,
+          buys their licenses, and - the part that bites - is the only party who
+          knows they should be offboarded. Nobody at Sentosa Freight will send
+          you a leaver notice for an account in your tenant. Guest identities
+          fail closed when the partner disables the source account.
+        rep: -10
+      - id: opt-shared
+        label: "Create one 'sentosa-partner' account and send the credentials to their shared planning inbox"
+        correct: false
+        consequence: >
+          Marcus opens the calendar invite with a screenshot of the email.
+        explain: >
+          A shared account emailed to a distribution list is a credential with
+          no owner, no attribution, and an indefinite copy sitting in every
+          recipient's mailbox. When the contract ends you cannot tell who still
+          has it. This fails the same traceability requirement that shaped the
+          warehouse accounts.
+        rep: -15
+      - id: opt-vpn
+        label: "Give them accounts in the Kallang on-premises domain and a VPN client"
+        correct: false
+        explain: >
+          This grants two external planners a foothold in the corporate domain
+          and a network path to it in order to read a web dashboard. It is a far
+          larger grant than the requirement, and it puts their lifecycle in the
+          one directory whose accounts also unlock domain-joined machines.
+          Match the access to the ask.
+        rep: -12
+    next: e2-collaboration
+
+  - id: e2-collaboration
+    type: design_decision
+    title: "Marcus has fifteen minutes"
+    speaker: security
+    objectives: [AZ104-1.4, AZ104-1.2]
+    scenario: |
+      Marcus Lim runs the meeting from a laptop with one browser tab open, which
+      is his entire preparation ritual and it has been right for three years.
+
+      "I signed in as a test guest this morning. From that account I can list
+      every user in the tenant, read their job titles and phone numbers, see
+      every group and who is in it, and send an invitation to another guest of
+      my choosing. I have no Azure permissions at all."
+
+      He lets that sit.
+
+      "So before your two planners land, tell me what changes. And do not tell
+      me the Azure role assignment covers it, because I did not have one."
+
+      The relevant settings are in External Identities, under external
+      collaboration settings: guest user access level, who is allowed to invite
+      guests, and an allow or deny list of partner domains. All three are
+      currently at their defaults.
+    prompt: "What do you change before the invitations go out?"
+    options:
+      - id: opt-restrict
+        label: "Set guest access to the most restrictive level, allow invitations only from admins and the Guest Inviter role, and allow-list sentosafreight.com"
+        correct: true
+        explain: >
+          The most restrictive guest access level limits a guest to properties
+          and memberships of their own directory objects, so directory
+          enumeration stops. Restricting who may invite closes the guest-invites-
+          guest path Marcus demonstrated, and a domain allow-list means a
+          mistyped or malicious invitation to another company simply fails. All
+          three are tenant-wide settings that cost nothing and apply before any
+          guest exists.
+        rep: 10
+      - id: opt-rbac-only
+        label: "Change nothing here - the guests only get Reader on the dashboard, so Azure RBAC already limits them"
+        correct: false
+        consequence: >
+          Marcus repeats the demonstration in the next security review, with your name on the slide.
+        explain: >
+          This is the trap Marcus set. Azure RBAC governs Azure resources;
+          directory read permissions in Entra ID are a separate plane, which is
+          why his test guest could enumerate the whole tenant with no role
+          assignment at all. Two control planes, two sets of settings.
+        rep: -10
+      - id: opt-block
+        label: "Turn external collaboration off entirely and email the dashboards out as PDFs each morning"
+        correct: false
+        consequence: >
+          Within a fortnight a planner has a personal Dropbox link to a live export.
+        explain: >
+          Blocking the supported path does not remove the business need, it
+          relocates it somewhere you cannot see or revoke. Governed guest access
+          with restricted directory permissions is both safer and cheaper than
+          the shadow process that replaces it.
+        rep: -8
+      - id: opt-directory-readers
+        label: "Assign the guests the Directory Readers role so they can look up Meridian staff contact details"
+        correct: false
+        explain: >
+          This moves in the wrong direction: Directory Readers grants exactly
+          the tenant-wide read that Marcus is trying to remove, and it is a
+          directory role rather than an Azure role, so it applies everywhere at
+          once. Nothing in the requirement mentions looking up staff.
+        rep: -10
+    next: e3-sspr
+
+  - id: e3-sspr
+    type: design_decision
+    title: "Thirty resets a week"
+    speaker: manager
+    objectives: [AZ104-1.5]
+    scenario: |
+      Priya drops a service desk report on your desk. Password resets, last four
+      weeks: 118. Ninety-one of them from warehouse accounts. Average handling
+      time eleven minutes, all of it on the phone, most of it at shift change.
+
+      "The Johor ramp triples the account count. Do the arithmetic and then do
+      not make me look at it."
+
+      The constraints, which you confirm with the Johor site lead:
+
+      Supervisors carry company mobiles. Pickers do not, and personal phones are
+      not permitted on the floor for safety reasons. Every picker has a personal
+      email address on file from HR onboarding. There is a shared kiosk PC in
+      the break room. Every warehouse account holds Microsoft 365 F3, which
+      includes Microsoft Entra ID P1.
+
+      Self-service password reset can be enabled for none, a selected group, or
+      all users. Registration can be forced at next sign-in. You choose which
+      authentication methods are available and how many a user must satisfy.
+    prompt: "How do you configure self-service password reset?"
+    options:
+      - id: opt-sms-all
+        label: "Enable SSPR for all users with mobile phone (SMS) as the only method"
+        correct: false
+        consequence: >
+          Ninety-one users register nothing and the phone keeps ringing.
+        explain: >
+          A method the population cannot use is the same as no method: the
+          pickers have no phone on the floor to receive a code. A single
+          required method also means one compromised channel is a full account
+          takeover, which is why two methods is the normal bar for reset.
+        rep: -10
+      - id: opt-two-methods
+        label: "Enable SSPR for the warehouse group with two required methods - email and security questions - and force registration at next sign-in"
+        correct: true
+        explain: >
+          Both methods work for someone holding a scanner and standing at a
+          kiosk, so the population can actually enroll. Requiring two means a
+          single leaked answer or mailbox is not enough on its own. Forcing
+          registration at next sign-in is what converts a configured feature
+          into a used one - unregistered users still call the service desk.
+          Scoping to the group lets you prove it works before widening it.
+        rep: 10
+      - id: opt-one-method
+        label: "Enable SSPR for all users with one required method, to keep the reset quick at shift change"
+        correct: false
+        explain: >
+          Speed at shift change is a real concern, but dropping to one method
+          means anyone who can read a mailbox can take an account. It also
+          rolls out to administrators in the same stroke, and administrator
+          accounts are held to a stricter standard - security questions are not
+          available to them at all.
+        rep: -8
+      - id: opt-supervisors
+        label: "Skip SSPR and give the six floor supervisors the Password Administrator role so they can reset their own teams"
+        correct: false
+        consequence: >
+          Six supervisors can now reset each other's passwords, and one of them resets Nadia's.
+        explain: >
+          This converts a service desk problem into a privileged access problem.
+          Password Administrator is a directory role, not a per-team
+          permission - its holders can reset any non-administrator account in
+          the tenant, including accounts outside their site. It also leaves the
+          eleven-minute manual process intact, just staffed by different people.
+        rep: -12
+    next: e4-sspr-broken
+
+  - id: e4-sspr-broken
+    type: troubleshoot
+    title: "P3: 'Your administrator has not enabled you to use this feature'"
+    speaker: ticket
+    objectives: [AZ104-1.5, AZ104-1.2]
+    ticket:
+      id: "MER-4487"
+      reporter: "Service desk (Kallang)"
+      priority: "P3"
+      opened: "07:55"
+      body: |
+        Warehouse users still calling for password resets one week after the
+        SSPR rollout. When they follow the reset link they get "Your
+        administrator has not enabled you to use this feature" before they are
+        asked for anything. Head office pilot users report the reset works
+        fine. Nine calls yesterday, all Johor.
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: id-sspr
+          label: "SSPR policy (Selected group)"
+          kind: entra-id
+          group: grp-corp
+          status: broken
+      - op: add_edge
+        edge:
+          id: id-e-entra-sspr
+          source: id-entra
+          target: id-sspr
+          kind: identity
+          label: "password reset"
+      - {op: set_status, node: id-grp-warehouse, status: warning}
+    scenario: |
+      A week after the rollout the service desk queue looks exactly like it did
+      before the rollout, which is not what you promised Priya.
+
+      The error the pickers see arrives before any authentication method is
+      offered. That is a scoping message, not a method failure - the reset
+      portal is declining to start the flow at all for those accounts.
+
+      Head office reports no problem. Nine calls yesterday, every one of them
+      from Johor.
+
+      Desmond is at his desk and appears willing to be interrupted, which
+      happens roughly twice a quarter.
+    time_budget: 6
+    investigate:
+      - id: inv-desk
+        label: "Ask the service desk which accounts can reset and which cannot"
+        speaker: ticket
+        reveals: >
+          "Head office works. We tested twelve of them - the same twelve we
+          tested during the pilot last quarter. Nobody from Johor has ever got
+          past that error message."
+      - id: inv-watch
+        label: "Watch a picker attempt the reset from the break room kiosk"
+        speaker: self
+        reveals: >
+          She enters her user name and the captcha, and the error appears
+          immediately. She is never asked for an email code or a security
+          question, so registration is not the gate - the flow stops before
+          method selection.
+      - id: inv-desmond
+        label: "Interrupt Desmond"
+        speaker: mentor
+        reveals: >
+          "We piloted this last quarter. Twelve volunteers, one group, and I set
+          the policy to Selected and pointed it at that group. Then the pilot
+          ended and everyone moved on to something else. Go and read what the
+          policy is scoped to before you touch a single user."
+      - id: inv-marcus
+        label: "Ask Marcus whether Conditional Access is blocking the reset portal"
+        speaker: security
+        reveals: >
+          "Two policies in the tenant, both report-only, neither targets the
+          password reset flow. If something were blocking at sign-in you would
+          see a Conditional Access failure code, not a feature message. Not us."
+    commands:
+      - id: cmd-sspr-props
+        label: "Entra admin center: Protection > Password reset > Properties"
+        command: "Portal: Microsoft Entra admin center > Protection > Password reset > Properties"
+        output: |
+          Self service password reset enabled:  Selected
+          Select group:                         grp-sspr-pilot
+          Members in selected group:            12
+        time_cost: 1
+        note: "Selected means one group and only one group. Everyone else gets the feature message."
+      - id: cmd-pilot-members
+        label: "List the members of grp-sspr-pilot"
+        command: "az ad group member list --group grp-sspr-pilot --query \"[].{upn:userPrincipalName, dept:department}\" -o table"
+        output: |
+          Upn                                          Dept
+          -------------------------------------------  --------------
+          desmond.toh@meridianlogistics.com            IT
+          priya.raman@meridianlogistics.com            IT
+          marcus.lim@meridianlogistics.com             Security
+          ... 9 more rows, all department IT or Finance
+        time_cost: 1
+      - id: cmd-warehouse-count
+        label: "Count the members of grp-warehouse-johor"
+        command: "az ad group member list --group grp-warehouse-johor --query \"length(@)\""
+        output: |
+          46
+        time_cost: 1
+        note: "The dynamic rule is working. The group is populated and none of it is in scope for reset."
+      - id: cmd-user-check
+        label: "Show one affected picker's account"
+        command: "az ad user show --id lina.suryani@meridianlogistics.com --query \"{upn:userPrincipalName, enabled:accountEnabled, usageLocation:usageLocation, dept:department}\""
+        output: |
+          {
+            "dept": "Warehouse",
+            "enabled": true,
+            "upn": "lina.suryani@meridianlogistics.com",
+            "usageLocation": "MY"
+          }
+        time_cost: 1
+        note: "Enabled, licensed, correct attributes. Nothing wrong with the user object."
+      - id: cmd-methods
+        label: "Entra admin center: Protection > Password reset > Authentication methods"
+        command: "Portal: Microsoft Entra admin center > Protection > Password reset > Authentication methods"
+        output: |
+          Number of methods required to reset:  2
+          Methods available to users:           Email, Security questions
+          Number of questions to register:      3
+          Number of questions to reset:         3
+        time_cost: 1
+        note: "Exactly what you configured. The methods are not the problem."
+      - id: cmd-ca
+        label: "List Conditional Access policies and their state"
+        command: "az rest --method GET --url \"https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies?\\$select=displayName,state\" --query \"value\" -o table"
+        output: |
+          DisplayName                          State
+          -----------------------------------  --------------
+          CA01 - Require MFA for admins        enabledForReportingButNotEnforced
+          CA02 - Block legacy authentication   enabledForReportingButNotEnforced
+        time_cost: 2
+        note: "Both report-only. Neither is enforcing anything on anyone."
+    fixes:
+      - id: fix-scope-all
+        label: "Change password reset from Selected to All, now that the pilot has proved the configuration"
+        correct: true
+        explain: >
+          The configuration was never wrong - the scope was. SSPR's Selected
+          option takes exactly one group, so a pilot group left in place quietly
+          excludes everyone hired since. The pilot has already validated the two
+          required methods, so moving to All puts every licensed user in scope
+          with one change and no group to maintain. Registration enforcement
+          then does the rest as users sign in.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: id-sspr, status: healthy}
+          - {op: set_label, node: id-sspr, label: "SSPR policy (All users)"}
+          - {op: set_status, node: id-grp-warehouse, status: healthy}
+      - id: fix-nested
+        label: "Create a parent group containing grp-sspr-pilot and grp-warehouse-johor, and point the Selected scope at it"
+        correct: false
+        consequence: >
+          The group looks right in the portal. The pickers get the same error on Monday.
+        explain: >
+          The SSPR selected group is evaluated on direct membership only -
+          nested groups are not expanded. The parent group would contain two
+          group objects and zero users as far as the policy is concerned, so
+          nobody new comes into scope. Nested-group support is not uniform
+          across Entra features, and this is one that does not have it.
+        rep: -8
+      - id: fix-manual-reset
+        label: "Have the service desk reset all 46 warehouse passwords and issue printed temporary credentials"
+        correct: false
+        consequence: >
+          Forty-six eleven-minute calls in one afternoon, and next month the queue is exactly the same length.
+        explain: >
+          This treats the symptom at maximum cost. The reported problem is that
+          users cannot self-serve; resetting passwords for them confirms the
+          gap rather than closing it, and printed temporary credentials on a
+          warehouse floor create a second problem for Marcus to find.
+        rep: -10
+      - id: fix-password-admin
+        label: "Assign the Johor supervisors the Password Administrator role so they can reset their teams locally"
+        correct: false
+        consequence: >
+          Six new privileged accounts, and the reset portal still says the same thing.
+        explain: >
+          Password Administrator is a tenant-wide directory role, not a
+          site-scoped one, so six supervisors gain the ability to reset any
+          non-administrator account at Meridian. It also does not touch the SSPR
+          scope, so self-service remains broken - you have added privilege
+          without removing a single phone call.
+        rep: -12
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: END

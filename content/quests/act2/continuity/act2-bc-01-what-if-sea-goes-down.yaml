@@ -1,0 +1,344 @@
+schema_version: 1
+id: act2-bc-01-what-if-sea-goes-down
+title: "What If Southeast Asia Goes Down"
+act: 2
+chapter: act2-continuity
+domain: az305-d3
+order: 1
+role: associate-architect
+checkpoint: true
+summary: "A competitor's outage made the news and the board wants a number. Numbers first, architecture second."
+entry: e1-tiering
+
+encounters:
+  - id: e1-tiering
+    type: design_decision
+    title: "The board wants a number"
+    speaker: manager
+    objectives: [AZ305-3.1]
+    scenario: |
+      Your promotion came with a laminated title and a standing invitation to
+      meetings you used to hear about secondhand. Associate architect. Desmond
+      congratulated you by forwarding a change request.
+
+      Priya Raman closes the door.
+
+      "A competitor lost a region for nine hours last month. It was in the
+      Business Times. The board read it and asked our chairman what happens if
+      Southeast Asia goes down, and he said he would find out, which means I said
+      I would find out, which means you are finding out."
+
+      She puts up the impact analysis finance ran last week.
+
+      | System | Cost of one hour down | Cost of losing one hour of data |
+      | --- | --- | --- |
+      | Warehouse management (WMS) | SGD 42,000 | SGD 18,000 |
+      | Finance and ERP (Kallang) | SGD 6,000 | SGD 30,000 |
+      | Manifest and photo archive | SGD 400 | SGD 400 |
+
+      "Before you draw anything, tell me what we are actually committing to.
+      Evelyn will fund a recovery design. She will not fund a recovery design
+      that treats the photo archive like the warehouse floor."
+    prompt: "How do you set Meridian's recovery objectives?"
+    options:
+      - id: opt-uniform-zero
+        label: "One company-wide standard: RPO zero and RTO zero for every production system"
+        correct: false
+        consequence: >
+          Evelyn reads the first cost estimate and asks whether the photo archive
+          has been promoted to a revenue stream.
+        explain: >
+          A single objective set is easy to write and impossible to fund. Zero RPO
+          means synchronous replication for everything, including a photo archive
+          worth SGD 400 an hour, and zero RTO means paying for full standby
+          capacity that will never take traffic. Recovery objectives exist to
+          allocate spend against measured impact, and a uniform standard refuses
+          to do the allocating.
+        rep: -8
+      - id: opt-tiers
+        label: "Three tiers derived from the impact numbers: WMS at RPO 15 minutes and RTO 4 hours, ERP at RPO 1 hour and RTO 24 hours, archive at RPO 24 hours and RTO 72 hours"
+        correct: true
+        explain: >
+          Each objective is now traceable to a figure the business produced. WMS
+          loses SGD 18,000 per hour of data, so a fifteen-minute RPO caps that
+          exposure at roughly SGD 4,500 while a tighter one buys little. ERP
+          inverts the ratio - data loss hurts far more than downtime - so it gets
+          a tight RPO and a loose RTO. The archive gets the cheapest thing that
+          works. Tiering is the whole job: it is what turns an opinion into a
+          budget line Evelyn can approve.
+        rep: 10
+      - id: opt-ask-owners
+        label: "Send each system owner a form asking for their required RPO and RTO, and build to the answers"
+        correct: false
+        consequence: >
+          Eleven forms come back. Ten of them say zero. The eleventh is blank.
+        explain: >
+          Every owner asked in isolation, with no cost attached, reports that
+          their system is critical and needs no downtime. Recovery objectives are
+          a negotiation between impact and spend, and the impact analysis in front
+          of you already has the numbers to run it. Ask owners to validate a tier,
+          not to invent one.
+        rep: -5
+      - id: opt-from-current
+        label: "Measure what the current backups already deliver and adopt those figures as the objectives"
+        correct: false
+        explain: >
+          That documents the status quo and calls it a requirement. If nightly
+          backups give a 24-hour RPO, this approach declares 24 hours acceptable
+          for a system losing SGD 18,000 an hour of data, and the gap between what
+          the business needs and what it has never appears on anyone's page.
+          Objectives are set from impact, then compared against current capability
+          to find the gap.
+        rep: -8
+    rewards:
+      skill_points: 1
+    next: e2-region
+
+  - id: e2-region
+    type: design_decision
+    title: "Somewhere that is not here"
+    speaker: mentor
+    objectives: [AZ305-3.1]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2bc-vnet-hub-ea
+          label: "vnet-hub-eastasia (proposed)"
+          kind: vnet
+          status: planned
+      - op: add_edge
+        edge:
+          id: a2bc-e-hub-peer
+          source: vnet-hub-sea2
+          target: a2bc-vnet-hub-ea
+          kind: peering
+          label: "global peering"
+          status: planned
+    scenario: |
+      Desmond has drawn a box on the whiteboard, labelled it "somewhere else,"
+      and sat down.
+
+      "You want a second region. Fine. Tell me which one, and tell me why, and do
+      not say resilience at me."
+
+      The constraints on the board:
+
+      - Everything runs in Southeast Asia today. Primary stays there.
+      - WMS objectives are RPO 15 minutes, RTO 4 hours. Replication is
+        asynchronous either way.
+      - Legal has confirmed manifest data may leave Singapore within Asia. It may
+        not go to Europe or the Americas.
+      - The archive storage account is GRS today, so it already replicates
+        somewhere. Nobody in the room can say where.
+      - Evelyn will not approve cross-region egress that exists to make a diagram
+        look symmetrical.
+
+      "Last thing," Desmond says. "Whatever you pick, the NOC in Manila has to
+      fail over to it at three in the morning. They will not be reading a map."
+    prompt: "Which secondary region do you recommend?"
+    options:
+      - id: opt-east-asia
+        label: "East Asia, the Azure region pair for Southeast Asia"
+        correct: true
+        explain: >
+          The paired region is where the GRS archive is already replicating, so
+          one of the answers on the whiteboard turns out to be East Asia
+          regardless. Pairs also give you the platform behaviors that matter in a
+          real regional event: Azure updates paired regions sequentially rather
+          than simultaneously, and recovery is prioritized across the pair.
+          Latency is around 30 ms, which is irrelevant to asynchronous
+          replication but comfortable for the NOC running a failover by hand.
+        rep: 10
+        diagram_ops:
+          - {op: set_label, node: a2bc-vnet-hub-ea, label: "vnet-hub-eastasia (DR, paired region)"}
+      - id: opt-australia
+        label: "Australia East, far enough away that no single event could plausibly take both regions"
+        correct: false
+        consequence: >
+          Desmond: "So the storage account replicates to Hong Kong and everything
+          else replicates to Sydney. Which one do we fail over to."
+        explain: >
+          Distance is not a stated requirement, and buying it costs you the pair.
+          GRS and GZRS replicate to the fixed paired region, so the archive would
+          still land in East Asia while everything else sat in Australia, leaving
+          two secondaries and no coherent failover target. Round-trip latency also
+          roughly triples, which matters the moment anyone wants synchronous
+          anything later.
+        rep: -8
+      - id: opt-zones
+        label: "Stay in Southeast Asia and spread everything across three availability zones"
+        correct: false
+        consequence: >
+          Priya, reading the draft: "The board's question had the words region and
+          down in it."
+        explain: >
+          Availability zones are the right answer to a different question. They
+          protect against the loss of a datacenter, power domain, or cooling
+          system inside one region, and you will want them anyway - but a regional
+          outage takes every zone with it. This design answers the availability
+          requirement and leaves the disaster recovery requirement unaddressed.
+        rep: -10
+      - id: opt-three-region
+        label: "East Asia as the recovery region plus Japan East as a third site, for defense in depth"
+        correct: false
+        explain: >
+          A third region triples the replication targets, the egress bill, and the
+          number of runbooks the NOC has to keep current, in service of a scenario
+          nobody has asked you to survive. No objective on the page requires
+          tolerating the simultaneous loss of two regions. Additional sites are a
+          real design pattern for global services; here it is spend without a
+          requirement behind it.
+        rep: -5
+    next: e3-pattern
+
+  - id: e3-pattern
+    type: design_decision
+    title: "Cheapest thing that clears the bar"
+    speaker: cfo
+    objectives: [AZ305-3.1, AZ305-3.5]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2bc-wms-dr
+          label: "WMS (East Asia, proposed)"
+          kind: app-service
+          status: planned
+      - op: add_edge
+        edge:
+          id: a2bc-e-wms-dr
+          source: a2bc-vnet-hub-ea
+          target: a2bc-wms-dr
+          kind: dependency
+          status: planned
+    scenario: |
+      Evelyn Koh has the impact analysis and a second sheet she did not share
+      with the board.
+
+      "I approved a disaster recovery budget. I want to be specific about what I
+      am buying, because in my experience a standby environment is a thing we pay
+      for every month and use once, at a drill, badly."
+
+      What is in scope: the WMS tier - eight VMs behind a load balancer, 3 TB of
+      attached data disks, and its Azure SQL database.
+
+      The requirements, agreed:
+
+      - RPO 15 minutes. RTO 4 hours.
+      - The primary WMS costs about SGD 11,000 a month to run.
+      - The design must be executable by NOC Manila from a written plan.
+
+      "So," Evelyn says. "Tell me what the second region costs and what it does
+      for me on a Tuesday when nothing is wrong."
+    prompt: "Which recovery pattern do you recommend for the WMS tier?"
+    options:
+      - id: opt-active-active
+        label: "Active-active: full WMS capacity running in both regions behind Azure Front Door, with traffic split between them"
+        correct: false
+        consequence: >
+          Evelyn circles the monthly figure twice and writes "for what" beside it.
+        explain: >
+          It works, and it delivers an RTO of minutes and an RPO near zero - which
+          is to say it clears a 4-hour and 15-minute bar by a margin nobody asked
+          for, at roughly SGD 11,000 a month of extra compute plus the cost of
+          making the application genuinely multi-region. Over-delivering against a
+          stated objective is a design error with a monthly invoice attached.
+        rep: -10
+      - id: opt-asr-warm
+        label: "Azure Site Recovery replicating the WMS VMs into East Asia with target VMs not running, SQL geo-replication, and a tested recovery plan"
+        correct: true
+        explain: >
+          Site Recovery replicates disk writes continuously and gives crash-
+          consistent recovery points about every 5 minutes, comfortably inside a
+          15-minute RPO, and the recovery plan brings the tier up in tens of
+          minutes rather than hours. Because the target VMs are not running you
+          pay for replicated storage and the ASR licence per instance, not for
+          eight idle machines. That is the cheapest option that actually meets
+          both numbers, which is the answer Evelyn is asking for.
+        rep: 12
+        diagram_ops:
+          - {op: set_label, node: a2bc-wms-dr, label: "WMS (East Asia, ASR warm standby)"}
+          - {op: set_status, node: a2bc-wms-dr, status: planned}
+      - id: opt-backup-restore
+        label: "Nightly Azure Backup to a geo-redundant vault, restored into East Asia by cross-region restore when a disaster is declared"
+        correct: false
+        consequence: >
+          Desmond does the arithmetic on 3 TB out loud and stops halfway through.
+        explain: >
+          This fails both numbers, not one. A nightly backup means up to 24 hours
+          of lost scans against a 15-minute RPO, and a cross-region restore of
+          3 TB plus VM rebuild runs well past 4 hours before anyone logs in.
+          Backup is your protection against deletion and corruption and it belongs
+          in the design - it is simply not a recovery mechanism that meets a
+          four-hour RTO.
+        rep: -8
+      - id: opt-asr-no-plan
+        label: "Azure Site Recovery replicating the VMs, with the DR VNet, load balancer, and DNS cutover built by the NOC at declaration time"
+        correct: false
+        consequence: >
+          Desmond, without looking up: "Have you met three in the morning."
+        explain: >
+          Replication is the easy half. An RTO is measured to the point where the
+          business can work again, which includes network, load balancer, name
+          resolution, and someone deciding it is time - and building that under
+          pressure from memory is how a 30-minute failover becomes a six-hour one.
+          Recovery plans and a pre-built target network exist precisely so RTO is
+          a rehearsed number rather than an optimistic one.
+        rep: -8
+    rewards:
+      skill_points: 1
+    next: e4-check
+
+  - id: e4-check
+    type: knowledge_check
+    title: "Desmond checks the vocabulary"
+    speaker: mentor
+    objectives: [AZ305-3.1]
+    scenario: |
+      Desmond stops you in the corridor with the draft in his hand.
+
+      "One question, because you are about to say these two words at a board and
+      half the people who say them have them backwards."
+
+      He reads from the ops interview notes: the warehouse floor can run on paper
+      tallies for a full shift, which is eight hours, before shipments start
+      missing their cut-off. The pickers will not re-key more than about fifteen
+      minutes of scans by hand, because past that the paper tally and the system
+      disagree and nobody trusts either.
+    question: >
+      Which pair of recovery objectives does that interview describe?
+    options:
+      - id: opt-correct-pair
+        label: "RPO 15 minutes, RTO 8 hours"
+        correct: true
+        explain: >
+          RPO is the data question - how far back the last usable recovery point
+          may sit, which here is bounded by how much re-keying the floor will
+          tolerate, so fifteen minutes. RTO is the time question - how long the
+          service may be unavailable before the business breaks, which is the
+          shift they can work on paper, so eight hours.
+      - id: opt-inverted
+        label: "RTO 15 minutes, RPO 8 hours"
+        correct: false
+        explain: >
+          This is the classic inversion. It commits you to restoring service in
+          fifteen minutes, which is expensive, while accepting the loss of eight
+          hours of scans, which is the thing the pickers explicitly said they
+          would not accept. Objectives derived backwards cost more and deliver
+          less.
+      - id: opt-zero-rpo
+        label: "RPO zero, RTO 8 hours"
+        correct: false
+        explain: >
+          Reading "will not re-key" as "will tolerate no loss" over-reads the
+          interview: they named a tolerance of fifteen minutes. Zero RPO requires
+          synchronous replication and its latency cost, to buy back fifteen
+          minutes the business already said it can absorb.
+      - id: opt-both-tight
+        label: "RPO 15 minutes, RTO 15 minutes"
+        correct: false
+        explain: >
+          Nothing in the interview asks for a fifteen-minute RTO - the floor has a
+          full shift of paper before shipments slip. Collapsing both numbers to
+          the tighter one is the most common way a DR budget doubles without any
+          requirement changing.
+    next: END

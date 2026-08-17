@@ -1,0 +1,372 @@
+schema_version: 1
+id: act2-bc-02-nobody-backed-it-up
+title: "Nobody Backed It Up"
+act: 2
+chapter: act2-continuity
+domain: az305-d3
+order: 2
+role: associate-architect
+checkpoint: true
+summary: "Sunda Freight arrives with forty servers, seven years of tax retention, and no backups at all."
+entry: e1-sunda
+
+encounters:
+  - id: e1-sunda
+    type: design_decision
+    title: "Due diligence, late"
+    speaker: manager
+    objectives: [AZ305-3.2]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2bc-rsv-sea
+          label: "rsv-meridian-sea (proposed)"
+          kind: recovery-vault
+          group: grp-platform
+          status: planned
+    scenario: |
+      Meridian has bought Sunda Freight - two hundred staff, a Jakarta depot
+      network, and a server estate that arrived with the paperwork.
+
+      Priya reads from the due diligence annex in the flat voice of someone who
+      has already read it twice.
+
+      "Forty virtual machines. Lifted into our Production subscription last week
+      as-is. Backup arrangement: their sysadmin took a copy to a USB disk on
+      Fridays. He has left."
+
+      The requirements, from finance and legal:
+
+      | Requirement | Value |
+      | --- | --- |
+      | Recovery point objective | 24 hours |
+      | Operational restore window | any day in the last 30 days |
+      | Statutory retention | month-end copy kept 7 years |
+      | Restore granularity | whole VM and individual files |
+
+      "Evelyn has seen the storage estimate for this and she is watching. Tell me
+      what we turn on."
+    prompt: "How do you protect the forty Sunda VMs?"
+    options:
+      - id: opt-gfs
+        label: "Azure Backup to a Recovery Services vault: daily backup, daily points kept 30 days, and the month-end point kept 7 years"
+        correct: true
+        explain: >
+          This is grandfather-father-son retention expressed as an Azure Backup
+          policy, and it maps one-to-one onto the requirement table. One daily
+          backup satisfies a 24-hour RPO, thirty daily recovery points cover the
+          operational window, and a single monthly point promoted to seven-year
+          retention satisfies the statute at roughly 84 stored points rather than
+          2,555. Azure Backup for VMs also supports both whole-VM restore and file
+          recovery from a recovery point, which covers the granularity row.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2bc-rsv-sea, status: healthy}
+          - {op: set_label, node: a2bc-rsv-sea, label: "rsv-meridian-sea (daily, 7y monthly)"}
+      - id: opt-daily-seven-years
+        label: "Azure Backup to a Recovery Services vault with every daily recovery point retained for 7 years"
+        correct: false
+        consequence: >
+          Evelyn's storage forecast crosses six figures a year and she asks which
+          regulation requires 2,555 copies of a print server.
+        explain: >
+          It meets every requirement, which is exactly why it is dangerous - it is
+          wrong on cost, not on function. Seven years of daily points is around
+          2,555 recovery points per VM against the 84 a monthly long-term policy
+          needs, and vault storage is billed on what you keep. The statute asks for
+          a month-end copy; retaining every day to satisfy it is gold-plating with
+          a recurring invoice.
+        rep: -8
+      - id: opt-snapshots
+        label: "A scheduled automation runbook taking managed disk snapshots every night into the same subscription"
+        correct: false
+        consequence: >
+          Marcus asks who can delete the snapshots. The answer is everyone who can
+          delete the VMs.
+        explain: >
+          Disk snapshots are not a backup solution: they sit in the same
+          subscription and region as the source, they are not application
+          consistent, and nothing ages them out or promotes a month-end copy, so
+          you inherit a retention problem and a bill that grows forever. Crucially,
+          an identity that can destroy the VMs can destroy the snapshots in the
+          same breath, which is the scenario backups exist for.
+        rep: -10
+      - id: opt-asr-as-backup
+        label: "Azure Site Recovery replicating all forty VMs, keeping recovery points as the backup copy"
+        correct: false
+        explain: >
+          Site Recovery keeps recovery points for a limited window - up to fifteen
+          days for Azure-to-Azure replication - so it fails the seven-year
+          retention row outright, and it offers no file-level restore. It is a
+          disaster recovery mechanism, not a retention mechanism. Using it as one
+          costs continuous replication charges for these VMs and still leaves the
+          auditor unanswered.
+        rep: -8
+    rewards:
+      skill_points: 1
+    next: e2-ransomware
+
+  - id: e2-ransomware
+    type: design_decision
+    title: "The item on the risk register"
+    speaker: security
+    objectives: [AZ305-3.2, AZ305-3.1]
+    scenario: |
+      Marcus Lim runs the tabletop exercise in the small meeting room with the
+      broken blind. The scenario he has written is not subtle.
+
+      "An attacker phishes a cloud operator. They sit quietly for two weeks
+      encrypting file shares slowly enough that nobody notices. On day fifteen
+      they drop the note. Before that, they do what every crew does first: they go
+      after the backups, because they know we will not pay if we can restore."
+
+      He writes the requirements on the whiteboard.
+
+      - Backup data must survive an attacker holding a Backup Contributor role.
+      - Retention must not be reducible by a single compromised identity.
+      - Deleted backup data must be recoverable for at least 14 days.
+      - The board wants this closed as a risk register item, with evidence.
+
+      "Soft delete is on. Somebody turned it on last year. That is the entire
+      control set. Tell me what else goes in."
+    prompt: "What do you recommend to protect the vault itself?"
+    options:
+      - id: opt-locked-immutable-mua
+        label: "Lock immutability on the vault, set soft delete to always-on, and require multi-user authorization through a Resource Guard in a separate subscription"
+        correct: true
+        explain: >
+          These three controls fail differently, which is the point. Locked
+          immutability makes retention irreversible even for an owner, so recovery
+          points cannot be aged away. Always-on soft delete cannot be switched off
+          and keeps deleted data recoverable for the retention window. Multi-user
+          authorization puts destructive vault operations behind a Resource Guard
+          in a subscription the attacker's identity has no rights over, so the
+          compromised operator needs a second, separately governed approval. The
+          Resource Guard is also the evidence Marcus takes to the board.
+        rep: 12
+        diagram_ops:
+          - {op: set_label, node: a2bc-rsv-sea, label: "rsv-meridian-sea (immutable, MUA)"}
+      - id: opt-soft-delete-only
+        label: "Keep soft delete at its default 14 days and rely on it, since deleted backups are already recoverable"
+        correct: false
+        consequence: >
+          In the tabletop, Marcus's attacker disables soft delete at 02:00 on day
+          fourteen and the room goes quiet.
+        explain: >
+          Reversible soft delete is a control the attacker's own role can turn
+          off, which fails the requirement that retention not be reducible by a
+          single compromised identity. It protects you against a mistake, not
+          against someone who is deliberately clearing the way. It is a necessary
+          layer and an insufficient one.
+        rep: -8
+      - id: opt-immutable-unlocked
+        label: "Enable immutability on the vault but leave the setting unlocked, so retention can be trimmed if storage costs run high"
+        correct: false
+        consequence: >
+          Marcus: "Explain to the board which of our attackers respects an
+          unlocked setting."
+        explain: >
+          Unlocked immutability is reversible, and anything reversible by a
+          privileged identity is reversible by a stolen one. The unlocked state
+          exists so you can trial the control before committing; leaving it there
+          permanently gives you the compliance label without the protection.
+          Manage cost through the retention policy you lock in, not by keeping the
+          lock open.
+        rep: -10
+      - id: opt-copy-out
+        label: "Run a nightly job copying recovery points to a storage account in a second subscription for an offline copy"
+        correct: false
+        explain: >
+          The copy job needs standing credentials with read access to backups and
+          write access to the target, so you have built a new privileged identity
+          for the attacker to find, and the target is a storage account with no
+          immutability or approval gate on deletion. It is also unsupported
+          plumbing that no auditor will accept as evidence, where a locked
+          immutable vault with multi-user authorization is a documented control.
+        rep: -8
+    next: e3-kallang
+
+  - id: e3-kallang
+    type: design_decision
+    title: "The ERP that is not in Azure"
+    speaker: mentor
+    objectives: [AZ305-3.1, AZ305-3.2]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2bc-mabs
+          label: "Azure Backup Server (Kallang)"
+          kind: vm
+          group: grp-onprem2
+          status: planned
+      - op: add_edge
+        edge:
+          id: a2bc-e-erp-mabs
+          source: erp-kallang
+          target: a2bc-mabs
+          kind: dependency
+          status: planned
+      - op: add_edge
+        edge:
+          id: a2bc-e-mabs-rsv
+          source: a2bc-mabs
+          target: a2bc-rsv-sea
+          kind: replication
+          label: "offsite copy"
+          status: planned
+    scenario: |
+      Desmond has the Kallang rack diagram, which is hand-drawn and older than
+      your employment.
+
+      "The ERP is not in Azure. It is two SQL Server 2019 boxes and a file server
+      in the comms room downstairs, and the migration program says next year,
+      which means the year after. Meanwhile it is tier two on your own tiering
+      sheet."
+
+      The constraints:
+
+      | Item | Value |
+      | --- | --- |
+      | ERP recovery objectives | RPO 1 hour, RTO 24 hours |
+      | Protected data | 4 TB across two SQL instances and a file server |
+      | Link to Azure | 100 Mbps site-to-site VPN, shared with production traffic |
+      | Restore requirement | individual SQL databases, application consistent |
+      | Offsite requirement | a copy must exist outside Kallang |
+
+      "Finance restores a single database about twice a quarter when someone runs
+      a bad month-end job," Desmond adds. "They want it back before lunch."
+    prompt: "How do you protect the Kallang ERP?"
+    options:
+      - id: opt-mabs
+        label: "Azure Backup Server on-premises with local disk staging, SQL transaction log backups every 15 minutes, replicating to the Recovery Services vault"
+        correct: true
+        explain: >
+          Azure Backup Server is application aware, so it takes proper SQL Server
+          backups and can restore an individual database rather than a whole
+          volume. Fifteen-minute log backups put the RPO well inside one hour
+          without pushing 4 TB across a shared 100 Mbps link every cycle, and the
+          local disk copy is what makes a twice-a-quarter database restore finish
+          before lunch. The vault copy satisfies the offsite requirement and picks
+          up the same retention and immutability controls as everything else.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2bc-mabs, status: healthy}
+          - {op: set_edge_status, edge: a2bc-e-mabs-rsv, status: healthy}
+          - {op: set_edge_status, edge: a2bc-e-erp-mabs, status: healthy}
+      - id: opt-mars
+        label: "Install the MARS agent on each server and back up files and folders straight to the vault"
+        correct: false
+        consequence: >
+          The first restore test produces a copy of the SQL data files, mid-write,
+          which the ERP declines to open.
+        explain: >
+          The MARS agent protects files, folders, and system state - it has no
+          knowledge of SQL Server, so it cannot take an application-consistent
+          database backup or restore one database, failing two rows of the table.
+          It also supports at most three backups a day, which cannot reach a
+          one-hour RPO, and every restore pulls from Azure across the shared link
+          rather than from local disk.
+        rep: -10
+      - id: opt-asr-erp
+        label: "Replicate the ERP servers to Azure with Site Recovery and treat the replica as the protected copy"
+        correct: false
+        explain: >
+          Continuous replication buys an RPO of minutes and an RTO of under an
+          hour for a system whose objectives are one hour and twenty-four hours -
+          you are paying for margin nobody asked for. Worse, it does not answer the
+          actual requirement: there is no item-level SQL restore and no long
+          retention, so the twice-a-quarter database restore has no mechanism at
+          all.
+        rep: -8
+      - id: opt-migrate-first
+        label: "Migrate the ERP into Azure now so Azure Backup can protect it natively, and accept no protection until then"
+        correct: false
+        consequence: >
+          Priya: "The risk register entry is due this quarter. The migration is
+          due whenever the ERP vendor answers our email."
+        explain: >
+          Migrating is the right long-term answer to a different question and it
+          is a program, not a control. Choosing it here leaves 4 TB of finance
+          data unprotected for the length of a migration that is already slipping.
+          Design the protection for the estate you have, and let the migration
+          change it later.
+        rep: -8
+    next: e4-vault-redundancy
+
+  - id: e4-vault-redundancy
+    type: design_decision
+    title: "Where the vault lives"
+    speaker: security
+    objectives: [AZ305-3.2]
+    scenario: |
+      The internal auditor's finding is one sentence long and has been sitting in
+      Marcus's inbox since March.
+
+      "Management asserts that Meridian can recover from the loss of the primary
+      region. No evidence of a restore performed from a secondary copy was
+      provided."
+
+      Marcus translates.
+
+      "She is not asking whether the data is replicated. She is asking whether we
+      can get it back, on our own initiative, on a day when Southeast Asia is
+      gone and Microsoft has not declared anything. Your WMS backups are in the
+      vault we just built."
+
+      The requirements:
+
+      - Backup data must survive the loss of the Southeast Asia region.
+      - Meridian must be able to restore into East Asia without waiting for a
+        Microsoft-declared failover.
+      - The design must be demonstrable in a drill, twice a year.
+    prompt: "How do you configure vault redundancy for the WMS backups?"
+    options:
+      - id: opt-grs-crr
+        label: "Geo-redundant vault storage with cross-region restore enabled"
+        correct: true
+        explain: >
+          Geo-redundant storage puts the backup copy in the paired region, East
+          Asia. Cross-region restore is the piece the auditor is actually asking
+          about: it lets Meridian restore from that secondary copy on demand,
+          without a Microsoft-declared regional failover, which is what makes a
+          twice-yearly drill possible. Note that it requires geo-redundancy and
+          must be enabled on the vault before the backups are taken.
+        rep: 12
+        diagram_ops:
+          - {op: set_label, node: a2bc-rsv-sea, label: "rsv-meridian-sea (GRS, cross-region restore)"}
+      - id: opt-grs-only
+        label: "Geo-redundant vault storage, left at its default settings"
+        correct: false
+        consequence: >
+          The drill gets as far as the restore blade and stops. There is no
+          secondary region to pick.
+        explain: >
+          The data is in East Asia and you cannot reach it on your own initiative,
+          which is the precise wording of the finding. Without cross-region
+          restore, recovery from the secondary copy depends on Microsoft
+          declaring a failover for the region. The replication was never the gap;
+          the ability to exercise it was.
+        rep: -8
+      - id: opt-lrs
+        label: "Locally redundant vault storage, since the backups are only a safety net and geo-redundancy costs more"
+        correct: false
+        explain: >
+          Locally redundant storage keeps three copies inside one datacenter, so
+          the backups die with the region they are protecting against. It is a
+          legitimate choice for short-retention non-production data where the cost
+          difference matters; it is not a choice for the tier-one system in a
+          design whose stated purpose is surviving the loss of Southeast Asia.
+        rep: -10
+      - id: opt-zrs
+        label: "Zone-redundant vault storage, which spreads the backup copies across three physical locations"
+        correct: false
+        explain: >
+          Zone redundancy spreads copies across availability zones within one
+          region, which protects against a datacenter or power failure and gives
+          faster restores than geo-redundancy. All three zones are still in
+          Southeast Asia, so it fails the first requirement on the list. Zones
+          answer availability questions; the pair answers regional loss.
+        rep: -8
+    rewards:
+      skill_points: 1
+    next: END

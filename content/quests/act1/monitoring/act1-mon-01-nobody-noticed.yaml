@@ -1,0 +1,337 @@
+schema_version: 1
+id: act1-mon-01-nobody-noticed
+title: "Nobody Noticed"
+act: 1
+chapter: act1-monitoring
+domain: az104-d5
+order: 1
+role: senior-cloud-admin
+checkpoint: true
+summary: "The invoice service was degraded for five hours. The first anyone heard was a customer on the phone."
+entry: e1-blackout
+
+encounters:
+  - id: e1-blackout
+    type: design_decision
+    title: "Five hours, zero signals"
+    speaker: manager
+    objectives: [AZ104-5.2]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: mon-law
+          label: "law-meridian (Log Analytics)"
+          kind: log-analytics
+          group: grp-corp
+          status: healthy
+      - op: add_node
+        node:
+          id: mon-stg-invoices
+          label: "stinvoicesprod"
+          kind: storage-account
+          group: grp-ops
+          status: degraded
+    scenario: |
+      Priya has the customer email printed out, which is never a good sign.
+
+      "Yesterday, between six in the morning and eleven, roughly one invoice PDF
+      in four failed to render. Nobody in this building noticed. A freight
+      forwarder in Penang noticed, and she called our sales director, and he
+      called me."
+
+      The invoice service reads from stinvoicesprod. The storage account is up
+      now. Whatever happened yesterday left no trace you can reach, because the
+      only thing feeding law-meridian today is NSG flow logs from the networking
+      work, and nothing else in the estate has a diagnostic setting on it at all.
+
+      Desmond is leaning on the doorframe. "We have a workspace. We just never
+      pointed anything at it. Before you build a single alert, decide what is
+      going to be in that workspace when the next one of these happens."
+    prompt: "Where do you start?"
+    options:
+      - id: opt-diag-settings
+        label: "Create diagnostic settings on the storage account and the VMs, routing resource logs and platform metrics to law-meridian"
+        correct: true
+        explain: >
+          Platform metrics are retained for 93 days and are queryable straight
+          away, but resource logs are not emitted anywhere until a diagnostic
+          setting says where to send them. That is the gap that made yesterday
+          unreconstructable. Diagnostic settings are per-resource and cost
+          nothing to define, so pointing the estate at the workspace you already
+          have is the cheapest thing that turns the next incident into evidence.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: mon-stg-invoices, status: healthy}
+          - op: add_edge
+            edge:
+              id: mon-e-stg-law
+              source: mon-stg-invoices
+              target: mon-law
+              kind: dependency
+              label: "diagnostic settings"
+          - op: add_edge
+            edge:
+              id: mon-e-wms01-law
+              source: vm-wms01
+              target: mon-law
+              kind: dependency
+              label: "diagnostic settings"
+      - id: opt-buy-tool
+        label: "Evaluate a third-party observability platform, since Azure clearly did not tell us"
+        correct: false
+        consequence: >
+          Evelyn asks what the license costs. Then she asks what it would have
+          collected yesterday, given nothing was configured to send it anything.
+        explain: >
+          Any monitoring platform, Azure's or otherwise, can only report on data
+          a resource was configured to emit. The failure here was that no
+          diagnostic setting existed, and a new tool inherits exactly the same
+          empty pipe. Procure tooling to solve a capability gap, not a
+          configuration gap.
+        rep: -10
+      - id: opt-agents
+        label: "Install the Azure Monitor Agent on every VM first, then worry about the platform services"
+        correct: false
+        explain: >
+          Agents collect guest data - the operating system's own logs and
+          performance counters - and they are worth having. They collect nothing
+          from a storage account, which has no guest to run an agent in. The
+          resource that failed yesterday is a PaaS service, and PaaS telemetry
+          reaches a workspace only through a diagnostic setting.
+        rep: -6
+      - id: opt-storage-target
+        label: "Enable logging on the storage account with an archive to a second storage account, and keep costs off the workspace"
+        correct: false
+        consequence: >
+          The logs exist. Answering "what failed at 06:40" now means downloading
+          blobs and grepping them by hand.
+        explain: >
+          A diagnostic setting can target a storage account, and that is the
+          right choice for cheap long-term archive. It is the wrong choice for
+          investigation, because logs in blobs are not queryable - no KQL, no
+          correlation across resources, no alerting on them. Archive is a
+          retention decision, not a monitoring one.
+        rep: -6
+    next: e2-metrics
+
+  - id: e2-metrics
+    type: design_decision
+    title: "Reading the chart properly"
+    speaker: mentor
+    objectives: [AZ104-5.1]
+    scenario: |
+      Metrics for stinvoicesprod go back 93 days whether anyone was watching or
+      not, so yesterday is still recoverable. Desmond pulls up the metrics
+      explorer and hands you the mouse.
+
+      "Availability on this account, averaged over one hour, reads 99.2 percent
+      for the whole of yesterday morning. Priya will look at that and conclude
+      nothing happened. One request in four failed. Both of those are true."
+
+      He lists what the account emits. Availability. Transactions, which carries
+      a ResponseType dimension with values such as Success, ServerBusy,
+      ClientOtherError. SuccessE2ELatency and SuccessServerLatency, both in
+      milliseconds. UsedCapacity, which the platform emits once an hour.
+
+      "Build me the chart that shows the outage and names it."
+    prompt: "How do you chart it?"
+    options:
+      - id: opt-transactions-split
+        label: "Transactions, aggregation Sum, one-minute granularity, split by the ResponseType dimension"
+        correct: true
+        explain: >
+          Transactions is a count, so Sum is the aggregation that preserves it -
+          and splitting by ResponseType turns one line into one line per outcome,
+          which is what names the failure as ServerBusy throttling rather than a
+          client bug. Dropping to one-minute granularity stops the hourly bucket
+          from averaging a five-hour degradation into a rounding error. Metric
+          interpretation is three choices: the metric, the aggregation, and the
+          dimension you split on.
+        rep: 10
+      - id: opt-availability-avg
+        label: "Availability, aggregation Average, one-hour granularity, over the last seven days for context"
+        correct: false
+        explain: >
+          This is the chart that already misled everyone. Availability is a
+          percentage, so averaging it over an hour smears the failed requests
+          across the successful ones, and a week of context makes each hour a
+          narrower pixel. The aggregation and the time grain decide what a metric
+          chart is capable of showing before you look at it.
+        rep: -8
+      - id: opt-latency
+        label: "SuccessE2ELatency, aggregation Average, one-minute granularity"
+        correct: false
+        consequence: >
+          The line is flat all morning. You spend twenty minutes convinced the
+          storage account was fine.
+        explain: >
+          The metric name is the trap. SuccessE2ELatency is computed only over
+          requests that succeeded, so requests the service rejected never enter
+          it - a total outage would show a perfectly healthy latency line. Always
+          read what population a metric is measured over before you trust its
+          shape.
+        rep: -8
+      - id: opt-capacity
+        label: "UsedCapacity, aggregation Maximum, one-minute granularity, to see whether the account filled up"
+        correct: false
+        explain: >
+          UsedCapacity is emitted once an hour, so asking for one-minute
+          granularity produces a sparse step chart regardless of what happened.
+          Capacity metrics answer growth and cost questions; they do not explain
+          request failures, and a standard account does not reject writes for
+          being large.
+        rep: -6
+    next: e3-insights
+
+  - id: e3-insights
+    type: design_decision
+    title: "One place to look"
+    speaker: manager
+    objectives: [AZ104-5.5]
+    scenario: |
+      Priya has read the postmortem and drawn the conclusion you were hoping she
+      would not.
+
+      "So next time I should chart Transactions with a Sum. I am not going to
+      remember that, and neither is the NOC at three in the morning. I want a
+      page where somebody who is not you can see whether a machine or an account
+      is sick."
+
+      She is specific about what has bitten them before. Memory exhaustion on
+      vm-wms01, which platform metrics do not report because the hypervisor
+      cannot see inside the guest. Logical disks filling on the app tier.
+      Throttling on stinvoicesprod, which you now know how to chart and nobody
+      else does.
+
+      Desmond adds one constraint. "Whatever you pick, I am not maintaining a
+      hand-built dashboard for forty resources."
+    prompt: "What do you turn on?"
+    options:
+      - id: opt-insights
+        label: "Enable VM insights on the VMs through a data collection rule, and use Storage insights for the accounts"
+        correct: true
+        explain: >
+          Azure Monitor Insights are the curated experiences: VM insights
+          deploys the Azure Monitor Agent with a data collection rule that
+          gathers guest performance counters - memory, logical disk free space,
+          the things platform metrics cannot see - plus an optional dependency
+          map, and Storage insights ships a prebuilt view of transactions,
+          availability, latency and capacity across every account. They are
+          configured once and apply at scale, which is exactly the maintenance
+          constraint Desmond set.
+        rep: 10
+        diagram_ops:
+          - op: add_edge
+            edge:
+              id: mon-e-dc01-law
+              source: vm-dc01
+              target: mon-law
+              kind: dependency
+              label: "VM insights"
+      - id: opt-workbook
+        label: "Build a custom workbook with the charts you just learned, and pin it to a shared dashboard"
+        correct: false
+        consequence: >
+          The workbook is beautiful. Six weeks later it still shows the eleven
+          resources that existed when you built it.
+        explain: >
+          Workbooks are the right tool when you need a view Azure does not
+          already provide, but here Azure already provides it. Hand-built views
+          enumerate resources rather than scoping to them, so they drift the
+          moment the estate changes - which is precisely the maintenance burden
+          the team refused to take on.
+        rep: -6
+      - id: opt-activity-log
+        label: "Point the NOC at the Activity Log, which already records everything happening in the subscription"
+        correct: false
+        explain: >
+          The Activity Log records control plane operations - who created,
+          changed, or deleted a resource. It says nothing about whether a VM is
+          out of memory or a storage account is throttling, because those are
+          data plane conditions. Control plane and data plane are separate
+          signals and neither substitutes for the other.
+        rep: -8
+      - id: opt-boot-diag
+        label: "Enable boot diagnostics on every VM so the NOC can see a screenshot when something is wrong"
+        correct: false
+        explain: >
+          Boot diagnostics gives a serial log and a console screenshot, which
+          earns its place when a VM will not start. It is a last-resort look at a
+          single broken machine, not a health view - a VM that is up and slowly
+          running out of memory boots perfectly and screenshots to a normal login
+          prompt.
+        rep: -6
+    next: e4-retention
+
+  - id: e4-retention
+    type: design_decision
+    title: "Evelyn reads the bill"
+    speaker: cfo
+    objectives: [AZ104-5.2]
+    scenario: |
+      Six weeks of diagnostic settings later, Evelyn forwards the invoice with
+      one line highlighted.
+
+      "Log Analytics has gone from nothing to a real number. I am not asking you
+      to switch it off. I am asking you which parts of it are worth what they
+      cost."
+
+      The usage breakdown is lopsided. AzureDiagnostics from the application
+      gateway is over seventy percent of the ingested volume and is read once a
+      quarter, if that. The sign-in and audit tables are a fraction of the volume
+      and Marcus needs two years of them for the ISO evidence pack. Everything
+      else is queried constantly, but almost never past a fortnight.
+
+      The workspace is currently set to one retention period for every table:
+      ninety days.
+    prompt: "What do you propose?"
+    options:
+      - id: opt-table-retention
+        label: "Set retention per table - short interactive retention with archive for the verbose gateway logs, two years for the audit tables - and move the gateway table to the Basic plan"
+        correct: true
+        explain: >
+          Workspace retention is a default, not a mandate: individual tables can
+          override it, and total retention extends beyond the interactive period
+          as cheaper archive that can still be searched or restored when needed.
+          Putting a high-volume, rarely-read table on the Basic plan cuts its
+          ingestion price at the cost of reduced query features and no log alert
+          rules on it - an acceptable trade for data read quarterly, and not one
+          you would make for the audit tables.
+        rep: 10
+      - id: opt-thirty-days
+        label: "Drop the whole workspace to thirty days retention, which is the free allowance"
+        correct: false
+        consequence: >
+          Marcus finds out in November, three weeks before the audit, that his
+          evidence window is now four weeks long.
+        explain: >
+          A single workspace-wide retention setting forces the cheapest table and
+          the most legally significant table to share a policy. Thirty days is
+          included at no retention charge, but the saving here is dominated by
+          ingestion volume, not retention, and it is purchased by destroying the
+          compliance data that costs almost nothing to keep.
+        rep: -12
+      - id: opt-daily-cap
+        label: "Set a daily ingestion cap on the workspace so the bill can never exceed a fixed number"
+        correct: false
+        consequence: >
+          On the busiest day of peak season the cap trips at two in the
+          afternoon. Every signal after that, including the incident, is gone.
+        explain: >
+          A daily cap is a genuine control, but it drops data indiscriminately
+          once hit - and it hits hardest on the days with most activity, which
+          are the days you most need the logs. Caps belong on non-production
+          workspaces or as a runaway-cost backstop, not as the primary way to
+          manage a production bill.
+        rep: -10
+      - id: opt-second-workspace
+        label: "Create a second workspace for the noisy gateway logs so its cost is reported separately"
+        correct: false
+        explain: >
+          Splitting workspaces gives you cleaner cost attribution and nothing
+          else - the same volume is ingested at the same price, and now queries
+          that correlate gateway logs with anything else need cross-workspace
+          syntax. Attribution is a reporting problem; solve it with tags or a
+          dedicated cluster, not by fragmenting the data.
+        rep: -6
+    next: END

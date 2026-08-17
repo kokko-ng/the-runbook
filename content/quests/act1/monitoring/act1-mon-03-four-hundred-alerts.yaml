@@ -1,0 +1,413 @@
+schema_version: 1
+id: act1-mon-03-four-hundred-alerts
+title: "Four Hundred a Night"
+act: 1
+chapter: act1-monitoring
+domain: az104-d5
+order: 3
+role: senior-cloud-admin
+checkpoint: true
+summary: "NOC Manila has stopped reading the CPU alert. Then something real happens on a Tuesday."
+entry: e1-fatigue
+
+encounters:
+  - id: e1-fatigue
+    type: design_decision
+    title: "The alert nobody reads"
+    speaker: noc
+    objectives: [AZ104-5.4, AZ104-5.1]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: mon-alerts
+          label: "Azure Monitor alert rules"
+          kind: monitor
+          group: grp-corp
+          status: warning
+      - op: add_edge
+        edge:
+          id: mon-e-law-alerts
+          source: mon-law
+          target: mon-alerts
+          kind: dependency
+          label: "alert rules"
+    scenario: |
+      Ravi on the Manila night shift joins the call with a spreadsheet he has
+      clearly been keeping for a while.
+
+      "Alert MER-CPU-WMS. Fires when Percentage CPU on vm-wms01 goes over eighty
+      percent, evaluated every minute over a one-minute window. Last night it
+      fired four hundred and eleven times between eleven and four. The night
+      before, three hundred and eighty. It has never once been an incident."
+
+      He explains what it is watching. The nightly stock reconciliation runs from
+      23:00 to 04:00 and pins the machine at ninety-odd percent by design. Every
+      minute it crosses back and forth over eighty, a new alert opens and closes.
+
+      "My team has a rule now. If it says CPU, close it. I would like to not have
+      that rule."
+    prompt: "How do you fix the alert?"
+    options:
+      - id: opt-window-violations
+        label: "Rewrite it as a dynamic threshold on a fifteen-minute aggregation window, firing only when four of the last five evaluations violate"
+        correct: true
+        explain: >
+          Three levers, all of them in the rule. A longer aggregation window
+          stops single-minute spikes from qualifying, the number-of-violations
+          setting requires the condition to persist rather than flicker, and a
+          dynamic threshold learns the nightly reconciliation as normal behavior
+          so it alerts on departures from the pattern instead of a fixed number.
+          The result still catches a genuinely stuck machine at 02:00 - which a
+          raised static threshold would not.
+        rep: 12
+      - id: opt-delete
+        label: "Delete the rule, since it has never once indicated a real incident"
+        correct: false
+        consequence: >
+          Three weeks later a runaway import process pins the machine for six
+          hours and nobody hears anything at all.
+        explain: >
+          The rule has never been right, but that is a property of how it is
+          configured, not of the signal. Deleting a noisy alert converts a
+          false-positive problem into a false-negative one, which is worse
+          because it is silent. Tune first; delete only when the signal itself
+          carries no information.
+        rep: -12
+      - id: opt-raise-threshold
+        label: "Raise the static threshold to ninety-nine percent so the reconciliation window stops tripping it"
+        correct: false
+        consequence: >
+          Volume drops to about forty a night. Ravi's team keeps the rule about
+          closing CPU alerts.
+        explain: >
+          It reduces the noise without addressing why the noise exists, and it
+          blunts the alert everywhere: a machine sitting at ninety-five percent
+          for an hour in the middle of the working day is now invisible. A static
+          threshold that has to survive the busiest window is always wrong for
+          the quiet one.
+        rep: -8
+      - id: opt-severity
+        label: "Change the rule to severity 4 so it lands in the queue without paging anyone"
+        correct: false
+        explain: >
+          Severity changes who is woken, not how often the rule is wrong - four
+          hundred low-severity alerts a night still bury the queue and still
+          train the team to ignore the signal. Severity communicates urgency;
+          it is not a noise control.
+        rep: -8
+    next: e2-action-group
+
+  - id: e2-action-group
+    type: design_decision
+    title: "Who gets told"
+    speaker: manager
+    objectives: [AZ104-5.4]
+    scenario: |
+      Priya has counted the alert rules. There are thirty-one, and every one of
+      them was built by whoever needed it that week.
+
+      "Eleven of them email a distribution list. Four email Desmond personally.
+      Two email a contractor who finished in March. One sends an SMS to a number
+      nobody recognizes. When something fires at four in the morning I would like
+      there to be one answer to who is dealing with it."
+
+      Manila runs the night shift and works a rota. Anything they cannot resolve
+      needs a ticket in the service desk queue with the alert context attached,
+      because tickets are what the morning handover is built from.
+
+      Desmond has one requirement. "Thirty-one rules. Whatever we do, I am not
+      editing notification settings thirty-one times every time the rota
+      changes."
+    prompt: "How do you route the alerts?"
+    options:
+      - id: opt-shared-ag
+        label: "Build two shared action groups - one for the on-call rota, one that opens a service desk ticket by webhook - and attach them to every rule"
+        correct: true
+        explain: >
+          An action group is a reusable, named bundle of notifications and
+          actions that many rules point at, so the rota lives in one object and a
+          change to it applies to all thirty-one rules at once. Splitting by
+          purpose rather than by team keeps the routing legible, and the webhook
+          gives Manila the ticket their handover depends on without anyone
+          retyping the alert.
+        rep: 10
+      - id: opt-one-email
+        label: "Create one action group with every engineer's email address on it and use it everywhere"
+        correct: false
+        consequence: >
+          Everyone gets everything. Within a month the whole team has an inbox
+          rule filing Azure alerts into a folder they do not open.
+        explain: >
+          It solves the maintenance problem and creates a worse one: undirected
+          notification means no individual owns any alert, and email has no
+          acknowledgement or escalation. Note also that action groups rate limit
+          - no more than one hundred emails an hour to a given address - so a
+          storm silently drops the notifications after the first hundred.
+        rep: -8
+      - id: opt-priya
+        label: "Send everything to Priya, who can decide each morning what to hand out"
+        correct: false
+        explain: >
+          It makes a single human the routing layer, which fails at exactly the
+          hours the alerts matter and puts a manager on the critical path of
+          every incident. Routing is a property of the alert, and it should be
+          resolvable without waking anyone up to make a decision.
+        rep: -10
+      - id: opt-autoremediate
+        label: "Attach an automation runbook to every rule so the action group restarts the affected resource automatically"
+        correct: false
+        consequence: >
+          The CPU rule fires during reconciliation and the runbook restarts
+          vm-wms01 halfway through the nightly stock count.
+        explain: >
+          Action groups can trigger runbooks, functions and Logic Apps, and
+          automated remediation is a legitimate pattern - for a specific,
+          well-understood failure with a known-safe action. Applying one blunt
+          remediation to every rule means acting before diagnosis, and a restart
+          is destructive to anything mid-flight.
+        rep: -12
+    next: e3-processing-rule
+
+  - id: e3-processing-rule
+    type: design_decision
+    title: "Sunday, two in the morning"
+    speaker: noc
+    objectives: [AZ104-5.4]
+    scenario: |
+      Manila is back with the second half of the spreadsheet.
+
+      "Patching runs the first Sunday of every month, 02:00 to 04:00 Singapore
+      time, across everything in rg-ops-sea. Every machine reboots, every
+      heartbeat alert fires, every availability alert fires. Roughly ninety
+      alerts, every month, all of them expected."
+
+      The alert rules themselves are correct. Outside the patch window each of
+      those alerts means something. Ravi is careful to say he does not want them
+      weakened - he wants them quiet for two hours a month, at a scope, without
+      anybody remembering to switch something back on afterwards.
+    prompt: "How do you suppress the patch window?"
+    options:
+      - id: opt-apr
+        label: "Create an alert processing rule that suppresses notifications for rg-ops-sea on a recurring monthly schedule, 02:00 to 04:00 on the first Sunday"
+        correct: true
+        explain: >
+          Alert processing rules sit between a fired alert and its actions: they
+          can suppress notifications, or add an action group, across a scope such
+          as a subscription or resource group, on a one-off or recurring
+          schedule. The alerts still fire and still appear in the alerts list for
+          the record - only the notifications are held - and the schedule ends
+          itself, so nothing has to be turned back on.
+        rep: 12
+      - id: opt-disable-rules
+        label: "Disable the affected alert rules at 02:00 on the Sunday and re-enable them at 04:00"
+        correct: false
+        consequence: >
+          In February, someone forgets the second half. The availability alerts
+          stay off for nine days.
+        explain: >
+          Disabling a rule is a real off switch: nothing fires, nothing is
+          recorded, and a genuine failure during the window is invisible even in
+          hindsight. It also depends on a human remembering the reverse step at
+          four in the morning, which is exactly the class of task that gets
+          skipped.
+        rep: -12
+      - id: opt-per-rule-filter
+        label: "Add a time-of-day condition to each affected rule so it cannot fire during the window"
+        correct: false
+        explain: >
+          Metric and log alert rules have no schedule field to hold that
+          condition, so this would mean encoding a time filter into every query
+          and reapplying it to every new rule. Even where it is expressible, the
+          suppression logic belongs in one place at a scope rather than
+          duplicated across dozens of rule definitions.
+        rep: -8
+      - id: opt-empty-ag
+        label: "Point the affected rules at an action group with no receivers during the window"
+        correct: false
+        explain: >
+          It achieves silence by breaking the routing layer, and it has the same
+          flaw as disabling the rules: something has to put the receivers back.
+          Action groups are shared across many rules, so emptying one to quiet a
+          patch window silences every other rule pointing at it too.
+        rep: -10
+    next: e4-silent-tuesday
+
+  - id: e4-silent-tuesday
+    type: troubleshoot
+    title: "P1: Nothing paged during the outage"
+    speaker: noc
+    objectives: [AZ104-5.4]
+    ticket:
+      id: "MER-5233"
+      reporter: "NOC Manila (Ravi, night shift)"
+      priority: "P1"
+      opened: "07:50"
+      body: |
+        vm-wms01 was at 100% CPU from 02:10 to 04:35 this morning. Picking
+        tablets timed out for two and a half hours. We found out from the
+        morning shift supervisor, not from an alert. No notification, no SMS, no
+        ticket in the queue. The CPU rule is enabled and we can see the alert in
+        the portal alerts list, so it fired. It just never reached us.
+    on_enter_diagram_ops:
+      - {op: set_status, node: mon-alerts, status: broken}
+      - {op: set_status, node: vm-wms01, status: warning}
+      - {op: set_edge_status, edge: mon-e-law-alerts, status: broken}
+    scenario: |
+      Tuesday. Not a Sunday, not a patch window, and the rule you rewrote three
+      weeks ago worked perfectly - it detected a genuinely stuck machine at 02:14
+      and raised a severity 2 alert.
+
+      Then nothing happened. No SMS to the rota, no webhook, no ticket. The alert
+      sat in the alerts list on its own for two and a half hours with a state of
+      Fired and nobody looking at it.
+
+      Priya has already been asked by the sales director whether the monitoring
+      project delivered anything. Desmond reads the ticket over your shoulder and
+      says the useful thing.
+
+      "Fired but not delivered. So the rule is fine and the condition was met.
+      Everything between the alert and the phone is suspect."
+    time_budget: 7
+    investigate:
+      - id: inv-ravi
+        label: "Ask Ravi whether anything reached the queue at all last night"
+        speaker: noc
+        reveals: >
+          "Nothing from Azure since about the sixth. We had a disk space alert on
+          the fourth, that came through fine. I assumed it had just been a quiet
+          fortnight, which in hindsight is a stupid assumption to have made."
+      - id: inv-desmond
+        label: "Ask Desmond what sits between a fired alert and an action group"
+        speaker: mentor
+        reveals: >
+          "Processing rules. They are subscription-wide by default if whoever
+          made one was lazy about scope, and a suppression rule with no schedule
+          runs until somebody deletes it. Go and look at what exists, not at what
+          you built."
+      - id: inv-change
+        label: "Search the change record around the sixth"
+        speaker: ticket
+        reveals: >
+          Change MER-5177, closed. "Storage migration cutover - suppress alert
+          noise during the move." Implemented on the sixth. The rollback section
+          is empty and the reviewer's comment reads "will remove after cutover".
+      - id: inv-marcus
+        label: "Ask Marcus whether a security control could be blocking the notifications"
+        speaker: security
+        reveals: >
+          "The webhook endpoint is allow-listed and the SMS goes through Azure,
+          not our network. If we were dropping it you would see it fail, not see
+          it never attempted. Check whether it was attempted."
+    commands:
+      - id: cmd-apr-list
+        label: "List alert processing rules in the subscription"
+        command: "az monitor alert-processing-rule list -o table"
+        output: |
+          Name                  Enabled    Type                Scopes                        Schedule
+          --------------------  ---------  ------------------  ----------------------------  ----------
+          apr-patch-window      True       RemoveAllActionGro  /subscriptions/8f2c/resourc.. Recurring
+          apr-migration-quiet   True       RemoveAllActionGro  /subscriptions/8f2c           None
+        time_cost: 1
+        note: "The second rule is scoped to the whole subscription and has no schedule, so it never stops."
+      - id: cmd-alert-detail
+        label: "Show the fired alert and whether its actions ran"
+        command: "az monitor activity-log alert list -o none; az rest --method get --url 'https://management.azure.com/subscriptions/8f2c/providers/Microsoft.AlertsManagement/alerts?api-version=2019-05-05-preview&timeRange=1d' --query 'value[0].properties.essentials.{name:alertRule, state:monitorCondition, suppressed:actionStatus.isSuppressed}'"
+        output: |
+          {
+            "name": "MER-CPU-WMS",
+            "state": "Fired",
+            "suppressed": true
+          }
+        time_cost: 2
+        note: "The alert itself records that its actions were suppressed. That is the whole answer."
+      - id: cmd-rule-show
+        label: "Show the CPU metric alert rule"
+        command: "az monitor metrics alert show -g rg-ops-sea -n MER-CPU-WMS --query '{enabled:enabled, severity:severity, actions:actions[].actionGroupId}' -o json"
+        output: |
+          {
+            "enabled": true,
+            "severity": 2,
+            "actions": [
+              "/subscriptions/8f2c/resourceGroups/rg-hub-sea/providers/microsoft.insights/actionGroups/ag-noc-oncall"
+            ]
+          }
+        time_cost: 1
+        note: "Enabled, severity 2, correctly attached to the on-call action group. The rule is not the problem."
+      - id: cmd-ag-test
+        label: "Show the on-call action group and its receivers"
+        command: "az monitor action-group show -g rg-hub-sea -n ag-noc-oncall --query '{enabled:enabled, sms:smsReceivers[].name, webhook:webhookReceivers[].name}' -o json"
+        output: |
+          {
+            "enabled": true,
+            "sms": ["noc-rota-primary"],
+            "webhook": ["servicedesk-intake"]
+          }
+        time_cost: 1
+        note: "Enabled with both receivers present. Nothing wrong on this side either."
+      - id: cmd-metrics
+        label: "Confirm the CPU condition was genuinely met overnight"
+        command: "az monitor metrics list --resource /subscriptions/8f2c/resourceGroups/rg-ops-sea/providers/Microsoft.Compute/virtualMachines/vm-wms01 --metric 'Percentage CPU' --aggregation Maximum --interval PT15M --start-time 2026-08-25T02:00Z --end-time 2026-08-25T05:00Z -o table"
+        output: |
+          Timestamp            Name              Maximum
+          -------------------  ----------------  ---------
+          2026-08-25 02:00:00  Percentage CPU    99.8
+          2026-08-25 02:15:00  Percentage CPU    100.0
+          2026-08-25 03:00:00  Percentage CPU    100.0
+          2026-08-25 04:00:00  Percentage CPU    100.0
+          2026-08-25 04:30:00  Percentage CPU    62.1
+        time_cost: 2
+        note: "Sustained, not spiky. The rewritten rule was right to fire."
+    fixes:
+      - id: fix-delete-apr
+        label: "Delete the leftover apr-migration-quiet processing rule, and give any future suppression rule a scope and an end time"
+        correct: true
+        explain: >
+          An alert processing rule with a RemoveAllActionGroups action suppresses
+          notifications for everything in its scope, and this one was scoped to
+          the entire subscription with no schedule - so from the sixth onward
+          every alert in the estate fired, recorded itself, and told nobody. That
+          is why the alert shows suppressed true while the rule and the action
+          group both check out. Removing it restores delivery; scoping and
+          time-bounding future suppressions stops the same rule from outliving
+          its change window.
+        rep: 14
+        diagram_ops:
+          - {op: set_status, node: mon-alerts, status: healthy}
+          - {op: set_status, node: vm-wms01, status: healthy}
+          - {op: set_edge_status, edge: mon-e-law-alerts, status: healthy}
+      - id: fix-recreate-rule
+        label: "Recreate the CPU alert rule from scratch, since something about it is clearly not working"
+        correct: false
+        consequence: >
+          The new rule fires that evening. It is suppressed too.
+        explain: >
+          The rule did its job: the condition was met, the alert fired, and it is
+          in the alerts list. Rebuilding a component that is demonstrably working
+          is expensive and leaves the actual fault in place - and a processing
+          rule scoped to the subscription applies to new rules just as readily as
+          old ones.
+        rep: -10
+      - id: fix-second-ag
+        label: "Add a second action group with a different SMS number so at least one path gets through"
+        correct: false
+        explain: >
+          Suppression is applied to the alert, not to a particular action group,
+          so RemoveAllActionGroups removes all of them - an extra route is
+          suppressed alongside the first. Adding redundancy to a path that is
+          being deliberately cut is effort spent on the wrong side of the fault.
+        rep: -10
+      - id: fix-severity-up
+        label: "Raise the rule to severity 0 so it cannot be filtered out on its way to the NOC"
+        correct: false
+        explain: >
+          Severity is metadata carried with the alert, not a priority that
+          bypasses processing rules - a suppression rule scoped to the
+          subscription with no severity filter removes the actions from a
+          severity 0 alert exactly as it did from a severity 2. Inflating
+          severity to force delivery also devalues the field for every other
+          rule.
+        rep: -8
+    rewards:
+      under_budget_bonus: 5
+      skill_points: 1
+    next: END

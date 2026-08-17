@@ -15,7 +15,7 @@ encounters:
     type: design_decision
     title: "Connecting Kallang"
     speaker: manager
-    objectives: [AZ104-4.7]
+    objectives: [AZ104-4.4]
     scenario: |
       The Kallang site-to-site VPN has been "next quarter" for three quarters.
       Priya has made it this quarter.
@@ -102,7 +102,7 @@ encounters:
     type: troubleshoot
     title: "P2: Kallang reaches the hub but not the warehouse"
     speaker: noc
-    objectives: [AZ104-4.6, AZ104-4.7]
+    objectives: [AZ104-4.4, AZ104-4.5]
     ticket:
       id: "MER-4688"
       reporter: "NOC Manila"
@@ -281,7 +281,7 @@ encounters:
     type: knowledge_check
     title: "Before sign-off"
     speaker: mentor
-    objectives: [AZ104-4.6]
+    objectives: [AZ104-4.4]
     scenario: |
       Cutover signs off at 15:52. Marcus decommissions the jump box at 15:53.
     question: >

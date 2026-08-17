@@ -19,6 +19,10 @@ import type {
 } from '@/engine/types'
 import * as localSave from '@/persistence/localSave'
 import { recordEvent } from '@/api/analytics'
+import { useAccountStore } from './account'
+
+/** A burst of choices should cost one upload, not one per encounter. */
+const SYNC_DEBOUNCE_MS = 2500
 
 /** One rendered line in the narrative feed. */
 export interface FeedEntry {
@@ -35,6 +39,7 @@ export const useGameStore = defineStore('game', () => {
   const started = ref(false)
 
   let feedKey = 0
+  let syncTimer: ReturnType<typeof setTimeout> | null = null
 
   // ------------------------------------------------------------ derived
 
@@ -172,8 +177,40 @@ export const useGameStore = defineStore('game', () => {
     return true
   }
 
+  /**
+   * Autosave. Local storage is written synchronously and is the source of truth
+   * for play; the server copy is a best-effort mirror, debounced so a burst of
+   * choices is one upload rather than several.
+   */
   function save() {
     localSave.write(state.value, new Date().toISOString())
+
+    const account = useAccountStore()
+    if (!account.signedIn) return
+
+    if (syncTimer !== null) clearTimeout(syncTimer)
+    syncTimer = setTimeout(() => {
+      syncTimer = null
+      void account.push(state.value)
+    }, SYNC_DEBOUNCE_MS)
+  }
+
+  /** Adopt a save pulled from the server, replacing what is loaded. */
+  async function adopt(remote: GameState) {
+    state.value = remote
+    started.value = true
+    feed.value = []
+    if (!remote.questId) return
+    quest.value = await loadQuest(remote.questId)
+    if (encounter.value) {
+      push([
+        {
+          type: 'encounter_entered',
+          encounterId: encounter.value.id,
+          encounterType: encounter.value.type,
+        },
+      ])
+    }
   }
 
   function wipe() {
@@ -210,6 +247,7 @@ export const useGameStore = defineStore('game', () => {
     resume,
     continueToNextQuest,
     save,
+    adopt,
     wipe,
     dismissNotice,
   }

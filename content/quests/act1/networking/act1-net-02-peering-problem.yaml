@@ -15,7 +15,7 @@ encounters:
     type: troubleshoot
     title: "P2: Warehouse app cannot authenticate"
     speaker: noc
-    objectives: [AZ104-4.2, AZ104-4.4]
+    objectives: [AZ104-4.2, AZ104-4.5]
     ticket:
       id: "MER-4412"
       reporter: "NOC Manila (overnight shift)"

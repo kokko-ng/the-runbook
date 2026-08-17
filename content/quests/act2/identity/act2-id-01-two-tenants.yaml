@@ -1,0 +1,420 @@
+schema_version: 1
+id: act2-id-01-two-tenants
+title: "Two Tenants, One Company"
+act: 2
+chapter: act2-identity
+domain: az305-d1
+order: 1
+role: associate-architect
+checkpoint: true
+summary: "Meridian bought Sunda Freight. Sunda came with two hundred staff, its own tenant, and its own opinions."
+entry: e1-tenant-strategy
+
+encounters:
+  - id: e1-tenant-strategy
+    type: design_decision
+    title: "One directory or two"
+    speaker: manager
+    objectives: [AZ305-1.5]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2id-entra-sunda
+          label: "Sunda Freight tenant"
+          kind: entra-id
+          group: grp-platform
+          status: planned
+      - op: add_node
+        node:
+          id: a2id-users-sunda
+          label: "Sunda dispatch staff"
+          kind: user
+          group: grp-platform
+          status: planned
+    scenario: |
+      Priya catches you before you have found your new desk. The org chart went
+      out at 08:00 and your title on it reads Associate Architect, which she
+      delivers with the enthusiasm of someone handing over a pager.
+
+      "Board signed Sunda Freight on Friday. Two hundred staff in Jakarta, their
+      own Entra tenant, their own Microsoft 365, their own everything. You are
+      the architect on identity."
+
+      She puts the transition services agreement on the table and taps three
+      clauses.
+
+      Sunda's freight-forwarding application stays in Sunda's tenant for
+      eighteen months and Meridian may not touch it. Mailbox and identity
+      migration cannot start before Q3, because Sunda's finance year closes in
+      June. And from Monday, roughly thirty Sunda dispatchers need to use
+      Meridian's warehouse management system, because the combined Jakarta lane
+      starts whether identity is ready or not.
+
+      "Evelyn funded thirty-five extra Meridian licenses this financial year.
+      Thirty-five. She said the number twice."
+
+      Desmond, who is now your peer and appears to enjoy it, does not look up.
+      "Whatever you write, I implement. So write something I can implement on
+      Monday."
+    prompt: "What identity management strategy do you recommend for the transition?"
+    options:
+      - id: opt-b2b-guests
+        label: "Keep both tenants for now, invite the thirty dispatchers as B2B guests in the Meridian tenant, and plan a tenant-to-tenant migration for Q3"
+        correct: true
+        explain: >
+          B2B collaboration gives exactly the thirty people who need the
+          warehouse system an identity in the Meridian tenant while their home
+          accounts, mailboxes, and the freight-forwarding app stay untouched in
+          Sunda's tenant, which is what the transition agreement requires. Guests
+          authenticate against their home tenant, so Meridian never holds their
+          credentials, and external identities are billed by monthly active user
+          rather than consuming any of the thirty-five funded seats. The
+          migration still happens; it happens in Q3 when the agreement allows it.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: a2id-entra-sunda, status: healthy}
+          - {op: set_status, node: a2id-users-sunda, status: healthy}
+          - op: add_edge
+            edge:
+              id: a2id-e-sunda-b2b
+              source: entra-meridian
+              target: a2id-entra-sunda
+              kind: identity
+              label: "B2B collaboration"
+              status: healthy
+          - op: add_edge
+            edge:
+              id: a2id-e-guests-entra
+              source: a2id-users-sunda
+              target: entra-meridian
+              kind: identity
+              label: "guest accounts"
+              status: healthy
+      - id: opt-big-bang
+        label: "Migrate all two hundred Sunda users into the Meridian tenant this month and decommission the Sunda tenant"
+        correct: false
+        consequence: >
+          Sunda's freight-forwarding vendor sends a letter about the transition
+          agreement. Legal reads it out loud at the Thursday call.
+        explain: >
+          A single-cutover tenant migration is the eventual answer, but it
+          violates two clauses on the page: the freight-forwarding application
+          must remain in Sunda's tenant for eighteen months, and identity and
+          mailbox migration cannot start before Q3. Tenant-to-tenant migration
+          also moves mailboxes, licenses, and device registrations together, and
+          none of those are ready. Sequencing is part of the design.
+        rep: -12
+      - id: opt-two-connectors
+        label: "Run both tenants permanently and point a second Entra Connect Sync server at Sunda's on-premises AD so their users appear in Meridian too"
+        correct: false
+        consequence: >
+          Desmond reads the sync scoping rules for an hour, then sends a
+          two-word message.
+        explain: >
+          Entra Connect Sync will not do this the way the sentence implies. A
+          given on-premises object can be synchronized to exactly one tenant;
+          synchronizing the same users to a second tenant requires splitting the
+          forest by scoping filters so no object appears in both, which defeats
+          the point. It also fails the goal outright, because "permanently" means
+          the Q3 migration never happens and Meridian runs two directories
+          forever.
+        rep: -8
+      - id: opt-cross-tenant-sync
+        label: "Configure cross-tenant synchronization so all two hundred Sunda users are provisioned into the Meridian tenant as members automatically"
+        correct: false
+        consequence: >
+          Evelyn's license report lands the following month. She has highlighted
+          the delta and written the number thirty-five next to it.
+        explain: >
+          Cross-tenant synchronization is a real and useful capability, and for a
+          long-lived multitenant organization it would be a strong answer. Here
+          it provisions two hundred identities when thirty people need access,
+          and synchronized users created as members are treated as internal
+          users for licensing and access purposes. That collides directly with
+          the thirty-five funded seats. Provision the people with the
+          requirement, not the whole directory.
+        rep: -6
+    next: e2-guest-guardrails
+
+  - id: e2-guest-guardrails
+    type: design_decision
+    title: "Guests, and what they can see"
+    speaker: security
+    objectives: [AZ305-1.5, AZ305-1.4]
+    scenario: |
+      Marcus Lim reads your recommendation twice and does not object to it,
+      which is new.
+
+      "Guests are fine. Guests with the default settings are not. Three things
+      before I sign."
+
+      He writes them on the glass.
+
+      One: a Sunda dispatcher must not be able to enumerate Meridian's
+      directory. "Right now a guest can read the full member list, group
+      memberships, and every user's job title. That is a competitor's org chart
+      until the merger completes, and under PDPA it is personal data we have no
+      reason to share."
+
+      Two: every action must be attributable to a named person. Meridian's
+      breach notification obligation assumes the logs say who.
+
+      Three: Sunda already enforces phishing-resistant multifactor
+      authentication on their own tenant, and their IT lead has made it clear
+      they will not enroll thirty people a second time in Meridian's. "I checked.
+      Their posture is better than ours. I am not going to pretend otherwise to
+      win an argument."
+
+      He caps the marker.
+
+      "Design me the guest configuration. Assume I will ask you which setting
+      does which."
+    prompt: "How do you configure guest access for the Sunda dispatchers?"
+    options:
+      - id: opt-trust-and-restrict
+        label: "Trust MFA claims from Sunda's tenant in cross-tenant access settings, set guest permissions to the most restricted level, and scope a Conditional Access policy to guest users"
+        correct: true
+        explain: >
+          Each requirement gets its own control. Inbound trust settings on the
+          cross-tenant access configuration accept the multifactor claim Sunda's
+          tenant already issued, so nobody enrolls twice. The restricted guest
+          permission level removes a guest's ability to read other users and
+          group memberships, which closes the directory enumeration finding. And
+          a Conditional Access policy targeted at guest and external users
+          applies Meridian's own conditions on top. Every guest is still a
+          distinct object with its own sign-in log entries, so attribution holds.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: a2id-users-sunda, status: healthy}
+      - id: opt-direct-connect
+        label: "Use B2B direct connect so Sunda users keep working entirely in their own tenant with no guest objects in Meridian"
+        correct: false
+        explain: >
+          B2B direct connect creates no object in the resource tenant, which
+          sounds like an elegant fit for a temporary arrangement. It only
+          supports Teams shared channels. The warehouse management system is a
+          web application published in the Meridian tenant, and direct connect
+          cannot be used to grant access to it, so the Monday requirement is
+          unmet.
+        rep: -8
+      - id: opt-reenroll-mfa
+        label: "Invite the guests and require each of them to register multifactor authentication again in the Meridian tenant"
+        correct: false
+        consequence: >
+          Sunda's IT lead escalates to Priya. Nine of the thirty dispatchers give
+          up halfway through registration and call the service desk.
+        explain: >
+          This works technically and fails the requirement Marcus stated: Sunda
+          will not enroll thirty people twice, and their existing method is
+          phishing-resistant while a fresh Meridian enrollment likely will not
+          be. Trusting the home tenant's MFA claim is the designed answer for
+          exactly this situation. It also leaves the directory enumeration
+          finding untouched.
+        rep: -8
+      - id: opt-shared-accounts
+        label: "Create five shared Meridian accounts for the Jakarta dispatch desk and let the team share the credentials"
+        correct: false
+        consequence: >
+          Marcus stops writing. "Say the second requirement back to me."
+        explain: >
+          Shared accounts destroy attribution, which was requirement two and is
+          not negotiable under a breach notification obligation. They also cannot
+          hold a per-person multifactor registration, cannot be reviewed when
+          someone leaves Sunda, and turn a leaver into an unrevoked credential.
+          Five accounts is not a cost saving; it is an audit finding with a
+          delay on it.
+        rep: -15
+    next: e3-authn-method
+
+  - id: e3-authn-method
+    type: design_decision
+    title: "How Jakarta signs in"
+    speaker: mentor
+    objectives: [AZ305-1.4]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2id-ad-jakarta
+          label: "AD DS (Jakarta)"
+          kind: on-premises
+          group: grp-onprem2
+          status: planned
+    scenario: |
+      Q3 is closer than it was. Desmond drops into the chair opposite with the
+      Sunda infrastructure inventory.
+
+      "Jakarta has an on-premises Active Directory forest. Two domain
+      controllers in a server room above a car park. When we migrate their
+      identities, something has to decide whether a password is correct.
+      Tell me what."
+
+      He lists what he already knows you will have to work around.
+
+      Meridian's ERP at Kallang and Sunda's Jakarta file servers both
+      authenticate against on-premises AD and will keep doing so until at least
+      2028, so the on-premises directories stay. The Jakarta site's WAN link
+      drops for hours at a time during the monsoon, and it has done so twice
+      this year. Marcus has asked for leaked credential detection on every
+      account, which means Entra needs to be able to evaluate the credential
+      itself. And Desmond has one condition of his own.
+
+      "No new servers in a DMZ. I am not building a federation farm, I am not
+      buying certificates for it, and I am not getting paged at 03:00 because a
+      token-signing certificate rolled over."
+    prompt: "Which sign-in method do you recommend for the migrated Sunda accounts?"
+    options:
+      - id: opt-phs
+        label: "Password hash synchronization with seamless single sign-on, plus Entra Password Protection extended to the on-premises domain controllers"
+        correct: true
+        explain: >
+          Password hash sync sends a hash of a hash to Entra, so authentication
+          is evaluated in the cloud and survives the Jakarta WAN dropping
+          entirely - the monsoon takes out file server access, not sign-in. It
+          is also the only method that lets Entra ID Protection compare
+          credentials against known leaked pairs, which is Marcus's requirement.
+          There is no DMZ component and no certificate to roll. The on-premises
+          forests stay exactly where they are for the ERP and the file servers.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: a2id-ad-jakarta, status: healthy}
+          - op: add_edge
+            edge:
+              id: a2id-e-adjakarta-entra
+              source: a2id-ad-jakarta
+              target: entra-meridian
+              kind: identity
+              label: "password hash sync"
+              status: healthy
+      - id: opt-pta
+        label: "Pass-through authentication with three agents in Jakarta, so passwords are validated by the on-premises domain controllers and never leave the building"
+        correct: false
+        consequence: >
+          The first monsoon outage after cutover takes cloud sign-in down for
+          Jakarta as well as the file shares. The NOC opens a P1 for something
+          the WAN already broke.
+        explain: >
+          Pass-through authentication is attractive when policy forbids any
+          password material in the cloud, and three agents give agent
+          redundancy. Agent redundancy does not help when the WAN link itself is
+          down: every sign-in requires a live path from the agent to a domain
+          controller, so a monsoon outage becomes an authentication outage. It
+          also cannot feed leaked credential detection unless password hash sync
+          is enabled alongside it, which makes the case for hash sync anyway.
+        rep: -8
+      - id: opt-adfs
+        label: "Federate the Meridian tenant with an AD FS farm so both forests keep full control of authentication"
+        correct: false
+        consequence: >
+          Desmond stands up and leaves. He comes back to say "no" and then
+          leaves again.
+        explain: >
+          Federation is the right answer when you need claims rules, smart card
+          authentication, or an existing third-party identity provider. None of
+          those are on the requirement list, and it fails Desmond's stated
+          condition directly: a federation farm means servers in a DMZ, a load
+          balancer, a public certificate, and a token-signing certificate that
+          rolls over. It also puts sign-in back on the same WAN link the monsoon
+          takes down.
+        rep: -10
+      - id: opt-cloud-only
+        label: "Create cloud-only accounts for all Sunda staff and retire the Jakarta domain controllers at cutover"
+        correct: false
+        consequence: >
+          Two weeks after cutover, nobody in Jakarta can reach a file share and
+          the ERP interface at Kallang starts failing its nightly job.
+        explain: >
+          Cloud-only is the destination for a lot of organizations, and it
+          removes the sync question entirely. It fails the constraint on the
+          page: the ERP at Kallang and the Jakarta file servers authenticate
+          against on-premises AD until at least 2028, so retiring the domain
+          controllers breaks applications that were never in scope. Retire the
+          directory after the applications that depend on it, not before.
+        rep: -10
+    next: e4-conditional-access
+
+  - id: e4-conditional-access
+    type: design_decision
+    title: "Conditions of access"
+    speaker: security
+    objectives: [AZ305-1.4]
+    scenario: |
+      Marcus brings the licensing sheet, which is unlike him, and the reason
+      becomes clear in a sentence.
+
+      "Evelyn funded Entra ID P1 for everyone and P2 for sixty people. The sixty
+      are admins and the security team. Design the access policy inside that
+      envelope, because I am not going back to her."
+
+      The population is more varied than it was a year ago. NOC Manila works
+      from a third-party office in Ortigas on laptops Meridian does not own and
+      cannot manage. Drivers use company-owned Android tablets that are
+      Intune-enrolled. Warehouse staff use shared floor terminals. Sunda's
+      dispatchers are guests. And there is a set of applications that still speak
+      legacy protocols, which Desmond has spent a year getting down from nine to
+      two.
+
+      "Two rules from me. Whatever you design must not be able to lock every
+      administrator out of the tenant, because that has happened to a client of
+      mine and it took Microsoft support eleven hours. And administrative access
+      has to come from a device we actually trust. The NOC's laptops are not
+      that."
+    prompt: "What authentication policy design do you recommend?"
+    options:
+      - id: opt-ca-baseline
+        label: "A Conditional Access baseline: MFA for all users, compliant or hybrid-joined device required for privileged roles, legacy authentication blocked, two break-glass accounts excluded, and risk-based policies scoped to the sixty P2 holders"
+        correct: true
+        explain: >
+          Each clause maps to a stated requirement. MFA for all users is covered
+          by P1. Requiring a compliant or hybrid-joined device only for
+          privileged roles keeps the NOC's unmanaged laptops usable for
+          operational work while satisfying the rule about administrative access.
+          Blocking legacy authentication closes the protocols that cannot present
+          a second factor. The two excluded cloud-only break-glass accounts are
+          the answer to the eleven-hour story, and scoping sign-in and user risk
+          policies to the sixty P2 holders keeps the design inside the license
+          envelope.
+        rep: 10
+      - id: opt-security-defaults
+        label: "Turn on security defaults, which enforce MFA for everyone and block legacy authentication with no policy authoring at all"
+        correct: false
+        consequence: >
+          Marcus tries to create the break-glass exclusion and finds the option
+          is not there.
+        explain: >
+          Security defaults are a good baseline for an organization with no
+          Entra ID P1 and no capacity to manage policy, and they do enforce MFA
+          and block legacy authentication. They are also mutually exclusive with
+          Conditional Access and admit no exclusions, so there is no way to
+          exempt break-glass accounts and no way to require a compliant device
+          only for admins. Meridian has bought P1 for everyone; declining to use
+          it fails two named requirements.
+        rep: -8
+      - id: opt-per-user-mfa
+        label: "Enable legacy per-user MFA on every account, which needs no premium licensing at all and frees the P1 budget"
+        correct: false
+        consequence: >
+          Drivers are prompted for a second factor at every warehouse gate scan.
+          Within a week someone has taped a code sheet to a terminal.
+        explain: >
+          Per-user MFA prompts on every authentication regardless of context: it
+          has no concept of device compliance, location, application, or risk, so
+          it cannot satisfy the requirement that administrative access come from
+          a trusted device, and it cannot be relaxed where the context is
+          already strong. It is also the model Conditional Access replaced.
+          Saving licensing you have already bought is not a saving.
+        rep: -10
+      - id: opt-risk-everyone
+        label: "Conditional Access with sign-in risk and user risk policies applied to all users, so every account gets risk-based protection"
+        correct: false
+        consequence: >
+          The licensing report flags four hundred users evaluated under a P2
+          feature. Evelyn asks whether the sixty number meant anything.
+        explain: >
+          It is the strongest posture on the list and it is the one that breaks
+          the constraint that was written down. Risk-based Conditional Access
+          policies require Entra ID P2 for every user in scope, and Meridian has
+          funded sixty. Scoping risk policies to the privileged population and
+          leaving the rest on P1 controls is how you design to an envelope
+          instead of discovering it in a true-up.
+        rep: -6
+    next: END
