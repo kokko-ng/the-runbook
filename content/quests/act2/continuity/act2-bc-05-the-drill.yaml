@@ -1,0 +1,359 @@
+schema_version: 1
+id: act2-bc-05-the-drill
+title: "The Drill"
+act: 2
+chapter: act2-continuity
+domain: az305-d3
+order: 5
+role: associate-architect
+checkpoint: true
+summary: "A recovery plan is a hypothesis until somebody runs it at two in the morning."
+entry: e1-drill-design
+
+encounters:
+  - id: e1-drill-design
+    type: design_decision
+    title: "Evidence of a tested recovery"
+    speaker: manager
+    objectives: [AZ305-3.1]
+    on_enter_diagram_ops:
+      - op: add_edge
+        edge:
+          id: a2bc-e-wmsdr-sqldr
+          source: a2bc-wms-dr
+          target: a2bc-sql-dr
+          kind: dependency
+          status: planned
+    scenario: |
+      The design is signed. The replication is running. The auditor's finding is
+      still open, because the finding was never about replication.
+
+      Priya reads it out one more time.
+
+      "No evidence of a restore performed from a secondary copy was provided.
+      That closes when we run one and write down what happened."
+
+      The constraints on the drill:
+
+      | Requirement | Value |
+      | --- | --- |
+      | Frequency | twice a year, evidenced |
+      | Output | a measured RTO for the WMS tier, not an estimate |
+      | Coverage | the runbook NOC Manila would actually follow, end to end |
+      | Window | the floor runs 24/6; Sunday 02:00 to 06:00 SGT is all there is |
+      | Reversibility | production back in Southeast Asia before the window closes |
+
+      Desmond, who has been waiting for this: "Every DR plan I have ever
+      inherited was tested by reading it."
+    prompt: "How do you design the drill?"
+    options:
+      - id: opt-full-planned
+        label: "A planned failover in the Sunday window: fail the SQL failover group over, run the ASR recovery plan for the WMS tier, cut DNS, have NOC Manila execute the runbook and record timings, then fail back before 06:00"
+        correct: true
+        explain: >
+          A planned failover is the only variant that exercises everything the
+          measured RTO depends on - database, compute, network, name resolution,
+          and the humans reading the runbook - and because it is planned rather
+          than forced, the failover group drains in-flight transactions and
+          completes with no data loss. Running it inside the maintenance window
+          with a fail-back step keeps it reversible. The recorded timings are the
+          evidence the auditor asked for.
+        rep: 12
+      - id: opt-test-failover
+        label: "An Azure Site Recovery test failover into an isolated network, run monthly, with screenshots attached to the audit file"
+        correct: false
+        consequence: >
+          The auditor asks which of the screenshots shows a picker logging in.
+        explain: >
+          Test failover is genuinely valuable and belongs in the design as a
+          routine check - it validates replication and boot without touching
+          production. It also deliberately avoids DNS, the production database,
+          and the cutover decision, so the RTO it produces excludes most of the
+          time a real event would take. It proves the VMs boot, not that Meridian
+          recovers.
+        rep: -5
+      - id: opt-surprise
+        label: "An unannounced failover on a weekday afternoon, so the drill reflects real conditions"
+        correct: false
+        consequence: >
+          Priya asks you to say that sentence again in front of the operations
+          director.
+        explain: >
+          Realism is not the requirement being optimized here; the window row and
+          the reversibility row are, and a weekday failover breaks both. Chaos
+          exercises have a place in mature practices that have already proved the
+          mechanism works. A first drill on a system that has never failed over
+          is a change, and it goes in a change window.
+        rep: -10
+      - id: opt-tabletop
+        label: "A tabletop walkthrough of the runbook with the NOC, documenting each step and the expected duration"
+        correct: false
+        explain: >
+          A tabletop finds gaps in the writing and finds nothing in the
+          infrastructure, so it produces an estimated RTO, which is the exact word
+          the requirement rules out. Every failure in this chapter so far has been
+          a thing that looked correct on paper. Walk the runbook by all means -
+          then run it.
+        rep: -8
+    rewards:
+      skill_points: 1
+    next: e2-drill-fails
+
+  - id: e2-drill-fails
+    type: troubleshoot
+    title: "P1 (drill): WMS in East Asia rejects every write"
+    speaker: noc
+    objectives: [AZ305-3.1, AZ305-3.6]
+    ticket:
+      id: "MER-6104"
+      reporter: "NOC Manila (drill bridge)"
+      priority: "P1"
+      opened: "02:41"
+      body: |
+        Drill in progress. Failover group flipped to East Asia 02:14, reported
+        success. ASR recovery plan completed 02:33, all 8 WMS app servers up.
+        Web tier answers and pages render. Every action that saves anything
+        returns HTTP 500. Runbook step 8 "validate a test pick" FAILED.
+        Fail-back must start 05:00. Requesting cloud team on the bridge.
+    on_enter_diagram_ops:
+      - {op: set_status, node: a2bc-wms-dr, status: broken}
+      - {op: set_edge_status, edge: a2bc-e-wmsdr-sqldr, status: broken}
+      - {op: set_status, node: sql-wms, status: warning}
+    scenario: |
+      Sunday, 02:41. The bridge has nine people on it and four of them are
+      muted in different time zones.
+
+      The failover itself went beautifully. The database is primary in East Asia.
+      Eight application servers came up in twenty-six seconds under the target.
+      The web tier is serving pages. Desmond called it "suspiciously smooth" at
+      02:35 and has been quiet since.
+
+      Then step 8. A picker's test scan, submitted from a laptop in Manila,
+      returns a 500. So does the next one. Reads are fine - the shift roster
+      loads, the pick lists render, delivery history is all there.
+
+      Priya is on the call and has not asked anything yet, which is worse.
+
+      You have until 05:00 before the fail-back has to start regardless.
+    time_budget: 6
+    investigate:
+      - id: inv-noc-steps
+        label: "Ask the NOC to read back the runbook step status"
+        speaker: noc
+        reveals: >
+          "Steps one through seven green. Step eight is the first one that writes
+          anything. We have not tried a write since the failover started, so we
+          do not know when this broke - only that it is broken now."
+      - id: inv-desmond
+        label: "Ask Desmond what he makes of reads working and writes failing"
+        speaker: mentor
+        reveals: >
+          "Reads fine, writes dead. That is not a firewall and it is not routing -
+          those break both. Something in East Asia is happily talking to a copy of
+          the database that will not accept writes. Find out which copy."
+      - id: inv-app-team
+        label: "Ask the WMS application team where the connection string lives"
+        speaker: ticket
+        reveals: >
+          It is baked into the application config on the VM image, unchanged since
+          the vendor installed it. Nobody has ever needed to edit it, because
+          until tonight there has only ever been one database server.
+      - id: inv-security
+        label: "Ask Marcus whether the DR subnet was ever allowed through to SQL"
+        speaker: security
+        reveals: >
+          "Virtual network rules cover both the Southeast Asia and East Asia app
+          subnets. I signed that off when the DR VNet was built, and I have the
+          approval. Do not spend your window on my firewall."
+    commands:
+      - id: cmd-fog
+        label: "Show the SQL failover group state"
+        command: "az sql failover-group show -g rg-data-sea -n fog-wms --server sql-wms-sea --query \"{role:replicationRole, partner:partnerServers[0].id, policy:readWriteEndpoint.failoverPolicy}\" -o table"
+        output: |
+          Role       Partner                                        Policy
+          ---------  ---------------------------------------------  -----------
+          Secondary  /subscriptions/.../servers/sql-wms-eastasia    Manual
+        time_cost: 1
+        note: "sql-wms-sea is now the secondary. The failover did exactly what it was asked to do."
+      - id: cmd-applog
+        label: "Read the WMS application error log on vm-wms-dr01"
+        command: "tail -n 4 /var/log/meridian/wms-api.log"
+        output: |
+          02:39:12 ERROR SqlException 3906: Failed to update database "wms" because the database is read-only.
+          02:39:41 ERROR SqlException 3906: Failed to update database "wms" because the database is read-only.
+          02:40:05 INFO  SELECT pick_list ... 34 rows (18 ms)
+          02:40:22 ERROR SqlException 3906: Failed to update database "wms" because the database is read-only.
+        time_cost: 1
+        note: "Error 3906 is a database in a read-only state, not a connection failure."
+      - id: cmd-connstring
+        label: "Read the connection string from the WMS config on vm-wms-dr01"
+        command: "grep -i 'Server=' /opt/meridian/wms/appsettings.Production.json"
+        output: |
+          "WmsDb": "Server=tcp:sql-wms-sea.database.windows.net,1433;Database=wms;Authentication=Active Directory Managed Identity;"
+        time_cost: 1
+        note: "It names a server, not the failover group listener."
+      - id: cmd-dns
+        label: "Resolve the two SQL names from the DR subnet"
+        command: "nslookup sql-wms-sea.database.windows.net; nslookup fog-wms.database.windows.net"
+        output: |
+          sql-wms-sea.database.windows.net
+            canonical name = southeastasia1-a.control.database.windows.net
+
+          fog-wms.database.windows.net
+            canonical name = sql-wms-eastasia.database.windows.net
+            canonical name = eastasia1-a.control.database.windows.net
+        time_cost: 2
+        note: "The listener follows the primary. The server name never moves."
+      - id: cmd-asr-job
+        label: "Show the Site Recovery job for the recovery plan"
+        command: "az site-recovery job list --vault-name rsv-meridian-sea -g rg-platform-sea --query \"[0].{name:friendlyName, state:state, end:endTime}\" -o table"
+        output: |
+          Name                     State      End
+          -----------------------  ---------  ----------------------
+          Planned failover rp-wms  Succeeded  2026-08-16T18:33:41Z
+        time_cost: 1
+      - id: cmd-connectivity
+        label: "Test connectivity from the DR app subnet to the East Asia SQL endpoint"
+        command: "az network watcher test-connectivity --source-resource vm-wms-dr01 --dest-address sql-wms-eastasia.database.windows.net --dest-port 1433 -o table"
+        output: |
+          ConnectionStatus    AvgLatencyInMs    ProbesFailed    ProbesSent
+          ------------------  ----------------  --------------  ------------
+          Reachable           3                 0               100
+        time_cost: 2
+        note: "The path to the new primary is open. Nothing is choosing to use it."
+    fixes:
+      - id: fix-listener
+        label: "Change the WMS connection string to the failover group read-write listener, fog-wms.database.windows.net, and bake it into the image so both regions use the same endpoint"
+        correct: true
+        explain: >
+          The application was connecting to a specific server name, and after the
+          failover that name resolves to the Southeast Asia server, which is now
+          the read-only geo-secondary - hence error 3906 on writes while reads
+          continued to work perfectly. The read-write listener is a DNS name the
+          service repoints at whichever server currently holds the primary role,
+          which is the entire reason failover groups have one. Fixing it in the
+          image rather than on eight machines means the next failover needs no
+          human to remember this.
+        rep: 14
+        diagram_ops:
+          - {op: set_status, node: a2bc-wms-dr, status: healthy}
+          - {op: set_edge_status, edge: a2bc-e-wmsdr-sqldr, status: healthy}
+          - {op: set_status, node: sql-wms, status: healthy}
+      - id: fix-failback
+        label: "Fail the group back to Southeast Asia now, so the server name the application uses is the primary again"
+        correct: false
+        consequence: >
+          Writes work again at 02:52. The drill report says the recovery
+          succeeded, which is not true, and the auditor's finding stays open.
+        explain: >
+          This makes the symptom disappear by undoing the recovery, which is the
+          one outcome that teaches the organization nothing. The defect is in the
+          application configuration and it will present identically during a real
+          regional outage, when failing back is not available. A drill exists to
+          surface exactly this, and aborting on the first finding wastes the
+          window you paid for.
+        rep: -10
+      - id: fix-force-writable
+        label: "Make the Southeast Asia database writable so the existing connection string works from either region"
+        correct: false
+        consequence: >
+          The bridge spends eleven minutes looking for the setting. There is no
+          setting.
+        explain: >
+          A geo-secondary is read-only by design and there is no switch to change
+          that; the only way it becomes writable is by holding the primary role.
+          Even if there were, two writable copies of the same database accepting
+          different transactions is a split brain, and reconciling warehouse scans
+          afterwards is not a recovery, it is an incident.
+        rep: -12
+      - id: fix-firewall
+        label: "Add the DR application subnet to the SQL server's virtual network rules"
+        correct: false
+        consequence: >
+          The rule already exists. Adding it again changes nothing and burns
+          fourteen minutes of a four-hour window.
+        explain: >
+          Two pieces of evidence rule this out before you touch it: the
+          connectivity test reached the East Asia endpoint on 1433 with no failed
+          probes, and reads from the same application were succeeding throughout.
+          A firewall or network rule problem breaks reads and writes together.
+          Error 3906 describes the state of a database, not the reachability of
+          one.
+        rep: -8
+    rewards:
+      under_budget_bonus: 5
+      skill_points: 1
+    next: e3-postdrill
+
+  - id: e3-postdrill
+    type: design_decision
+    title: "Two hours and forty-seven minutes"
+    speaker: cfo
+    objectives: [AZ305-3.1, AZ305-3.5]
+    scenario: |
+      Fail-back completed at 04:52. The measured RTO for the WMS tier was two
+      hours and forty-seven minutes against a four-hour objective, and about
+      fifty minutes of that was one connection string.
+
+      Evelyn joins the Monday review, which she does not normally do.
+
+      "I have read the drill report. I want to be clear that I consider this the
+      best money I have spent this year, because we found the fault on a Sunday
+      rather than on the day it mattered. I am also told there will be a list of
+      improvements, and I would like the list to be short."
+
+      Priya: "One change. The one that would have prevented the failure we had."
+
+      The facts you have: the endpoint defect is fixed in the image. The runbook
+      had no step that would have caught it, because every step before eight was
+      a read. The next drill is in six months.
+    prompt: "What single change do you put in the design?"
+    options:
+      - id: opt-validation-step
+        label: "Add a write validation step to the recovery plan itself, executed automatically after failover, so any endpoint that is still pointing at the old primary fails the plan rather than the shift"
+        correct: true
+        explain: >
+          The failure was not that the endpoint was wrong; it was that nothing in
+          the recovery sequence checked. A scripted write against the recovered
+          database, run as a step in the recovery plan, converts a silent
+          configuration defect into a plan failure with a name on it, in seconds,
+          every time. It also generalizes: it catches the next component that
+          hard-codes a regional endpoint, which there will be one of.
+        rep: 12
+      - id: opt-monthly-drills
+        label: "Increase drill frequency from twice a year to monthly, so defects surface sooner"
+        correct: false
+        consequence: >
+          Evelyn asks how many Sunday nights that is. It is twelve.
+        explain: >
+          More drills would eventually have found this, at the cost of twelve
+          maintenance windows a year and the operations goodwill that goes with
+          them, and they would still find each defect only after it has been
+          introduced. A validation step inside the plan catches the same class of
+          fault on every failover including real ones, for the price of writing it
+          once.
+        rep: -5
+      - id: opt-alerting
+        label: "Add an alert on the WMS write error rate so the NOC is notified within a minute of writes failing"
+        correct: false
+        explain: >
+          Worth having, and it is not the answer to this question. The NOC knew
+          within two minutes on the night - detection was never the gap. Fifty
+          minutes went into working out why, and an alert saying writes are
+          failing would have contributed none of it. Detection improvements do not
+          substitute for a verification step in the recovery itself.
+        rep: -5
+      - id: opt-active-active
+        label: "Move the WMS to an active-active design so no failover is required and the endpoint problem cannot occur"
+        correct: false
+        consequence: >
+          Evelyn puts her pen down.
+        explain: >
+          It doubles the run cost of a tier that just proved it meets its
+          four-hour objective, and it does not even solve the stated problem - an
+          application hard-coded to a regional database endpoint behaves just as
+          badly when one of two active regions goes away. Architectural escalation
+          in response to a configuration defect is how DR budgets grow without
+          risk falling.
+        rep: -10
+    next: END

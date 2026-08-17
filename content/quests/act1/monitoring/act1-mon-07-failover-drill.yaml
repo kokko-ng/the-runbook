@@ -1,0 +1,493 @@
+schema_version: 1
+id: act1-mon-07-failover-drill
+title: "The Failover Drill"
+act: 1
+chapter: act1-monitoring
+domain: az104-d5
+order: 7
+role: senior-cloud-admin
+checkpoint: true
+summary: "A competitor lost a region for nine hours. The board would like to know what we would do."
+entry: e1-asr-design
+
+encounters:
+  - id: e1-asr-design
+    type: design_decision
+    title: "The board has read the news"
+    speaker: manager
+    objectives: [AZ104-5.11]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: mon-asr-vault
+          label: "rsv-meridian-dr (East Asia)"
+          kind: recovery-vault
+          group: grp-ops
+          status: planned
+      - op: add_node
+        node:
+          id: mon-vm-wms01-dr
+          label: "vm-wms01 replica (East Asia)"
+          kind: vm
+          group: grp-ops
+          status: planned
+    scenario: |
+      Priya arrives with a printed news article, which is worse than a printed
+      customer email.
+
+      "A competitor lost a region on Tuesday. Nine hours. Their freight desk was
+      running on paper and it made the trade press. Our board would like to know
+      what we would do, and I would like to give them an answer that is not the
+      word backup said confidently."
+
+      The requirement she has been given is that the warehouse management system
+      and the directory it authenticates against come back in another region
+      within two hours of a regional failure, with no more than fifteen minutes
+      of data lost.
+
+      Marcus adds the part nobody enjoys. "And I want it demonstrated, not
+      designed. The board will ask when we last tested it."
+    prompt: "How do you meet the requirement?"
+    options:
+      - id: opt-asr
+        label: "Enable Azure Site Recovery replication from Southeast Asia to East Asia into a vault in the target region, and build a recovery plan that brings the directory up before the warehouse system"
+        correct: true
+        explain: >
+          Site Recovery replicates the VMs continuously, giving a recovery point
+          objective measured in seconds to minutes and a recovery time measured
+          in minutes, which is what a two-hour target with fifteen minutes of
+          data loss actually requires. Two details matter: the Recovery Services
+          vault used for Azure-to-Azure replication must be in a region other
+          than the source, and a recovery plan is what encodes boot order, so the
+          domain controller is running before anything tries to authenticate
+          against it.
+        rep: 14
+        diagram_ops:
+          - {op: set_status, node: mon-asr-vault, status: healthy}
+          - op: add_edge
+            edge:
+              id: mon-e-asr-repl
+              source: vm-wms01
+              target: mon-vm-wms01-dr
+              kind: replication
+              label: "continuous replication"
+      - id: opt-crr
+        label: "Use the existing geo-redundant vault and cross-region restore, which already puts the backup data in the paired region"
+        correct: false
+        consequence: >
+          The tabletop timing exercise puts the restore of eight machines at
+          somewhere between six and eleven hours.
+        explain: >
+          Cross-region restore is a genuine capability and the right answer when
+          the requirement is measured in days - but it is a restore, not a
+          failover: it reads yesterday's recovery point and builds machines from
+          it, so the data loss is up to a day and the recovery time is hours.
+          Backup and Site Recovery solve different objectives and most estates
+          need both.
+        rep: -8
+      - id: opt-azcopy
+        label: "Script a nightly copy of the disks into East Asia so the data is already there when it is needed"
+        correct: false
+        explain: >
+          Nightly copies give a twenty-four hour recovery point objective against
+          a fifteen-minute requirement, and copied disks are not a recoverable
+          system - there is no boot order, no network mapping, no way to test it
+          without building everything by hand. Site Recovery exists because the
+          orchestration is the hard part, not the copying.
+        rep: -10
+      - id: opt-zones
+        label: "Redeploy the workloads across availability zones in Southeast Asia, which removes the single point of failure"
+        correct: false
+        consequence: >
+          The board asks what happens if Southeast Asia goes. The answer is
+          unchanged.
+        explain: >
+          Availability zones protect against a datacenter-level failure within a
+          region and are excellent for uptime, but every zone in a region shares
+          the region's fate - which is the exact scenario in the news article.
+          Zone redundancy is a high availability control; regional failure needs
+          a second region.
+        rep: -10
+    next: e2-asr-cost
+
+  - id: e2-asr-cost
+    type: design_decision
+    title: "Evelyn wants the invoice explained"
+    speaker: cfo
+    objectives: [AZ104-5.11]
+    scenario: |
+      Evelyn has the Site Recovery line on the estimate and a pen.
+
+      "Eight machines replicating to a region we do not operate in. Explain to me
+      what I am buying, because from here it looks like I am paying for a second
+      warehouse system that nobody uses."
+
+      She is not opposed. She is asking a fair question and she wants the shape
+      of the bill, not a reassurance. The replica machines exist as disks in East
+      Asia and are not running. The reporting tier is not on the two-hour
+      requirement; only the warehouse system and the directory are.
+    prompt: "What do you tell her, and what do you change?"
+    options:
+      - id: opt-explain-tier
+        label: "Explain that the charge is a per-instance protection fee plus target-region storage, with no compute billed until a failover, and move the reporting tier's replica disks to a cheaper disk type"
+        correct: true
+        explain: >
+          The Site Recovery cost model is worth being able to recite: a
+          per-protected-instance charge, the cache storage account in the source
+          region, and the replica managed disks in the target region. Target
+          compute is only billed once machines are actually running, during a
+          failover or a test failover. That makes replica disk type the main
+          lever, and using a cheaper type for workloads outside the two-hour
+          commitment is a real saving that does not touch the requirement.
+        rep: 12
+      - id: opt-pause
+        label: "Disable replication outside business hours, since nothing changes on the warehouse system overnight"
+        correct: false
+        consequence: >
+          The first re-enable triggers a full initial replication over the
+          working day and saturates the link the pickers are using.
+        explain: >
+          Site Recovery replication is continuous and stateful - stopping it
+          discards the replication relationship, so resuming means seeding the
+          disks again from scratch. You would pay more in re-seeding than you
+          saved, and the estate is unprotected for the entire window plus the
+          re-seed.
+        rep: -12
+      - id: opt-more-retention
+        label: "Increase recovery point retention to seventy-two hours and take application-consistent snapshots every fifteen minutes, so there is more to choose from"
+        correct: false
+        explain: >
+          This is the wrong direction on the wrong axis: longer retention of
+          recovery points and more frequent application-consistent snapshots both
+          increase target-region storage consumption, and app-consistent
+          snapshots also briefly quiesce the source application. Evelyn asked how
+          to spend less, and neither setting affects the recovery objectives that
+          were actually specified.
+        rep: -8
+      - id: opt-dc-only
+        label: "Replicate only the domain controller, and rebuild the warehouse system in East Asia from backup if the region is ever lost"
+        correct: false
+        explain: >
+          It halves the bill and abandons the requirement, because rebuilding the
+          warehouse system from backup is the multi-hour path the two-hour
+          objective was written to avoid. Reducing scope is a legitimate cost
+          lever, but it is a decision for whoever owns the recovery objective,
+          not one to make quietly inside a cost review.
+        rep: -8
+    next: e3-drill-type
+
+  - id: e3-drill-type
+    type: design_decision
+    title: "Demonstrated, not designed"
+    speaker: security
+    objectives: [AZ104-5.12]
+    scenario: |
+      Replication has been healthy for two weeks. Marcus wants the demonstration
+      before the board papers close.
+
+      "I need to be able to write that we failed the warehouse system over to
+      East Asia and it worked. What I cannot write is that we took the live
+      system down on a Saturday to prove a point, because the Saturday shift is
+      the one that loads the Monday containers."
+
+      Desmond has already worked out where this is going. "There are three
+      failover verbs and only one of them leaves production alone. Pick the right
+      verb and say why the other two are wrong, because someone on that board
+      will ask."
+    prompt: "Which failover do you run?"
+    options:
+      - id: opt-test-failover
+        label: "A test failover into an isolated network in East Asia, validated by the app team, then cleaned up"
+        correct: true
+        explain: >
+          Test failover creates the replica machines in a network you nominate
+          without touching the source, without stopping replication, and without
+          committing anything - the cleanup step removes the test machines and
+          lets you record notes against the run. Nominating an isolated network
+          is what stops the test machines from talking to production, which
+          matters most when the workload includes a domain controller.
+        rep: 12
+      - id: opt-planned
+        label: "A planned failover on a Saturday evening, which is the most realistic rehearsal available"
+        correct: false
+        consequence: >
+          The Saturday shift loses the warehouse system for the duration of the
+          rehearsal, which is the outcome Marcus opened by ruling out.
+        explain: >
+          Planned failover deliberately shuts the source machines down to
+          guarantee zero data loss before bringing the target up - it is the
+          right verb for a known event such as an announced datacenter
+          maintenance, and it is a real outage. Realism is not worth causing the
+          incident you are rehearsing for.
+        rep: -12
+      - id: opt-unplanned
+        label: "An unplanned failover, since that is what would actually happen in a regional outage"
+        correct: false
+        consequence: >
+          Production moves to East Asia. Getting it back means reprotecting and
+          failing back, which is a change nobody has planned or approved.
+        explain: >
+          Unplanned failover is for when the source region is already gone: it
+          does not attempt to shut down or sync the source and it commits the
+          workload to the target. Running one as a drill converts a rehearsal
+          into a real migration, with a reprotect and failback to unwind
+          afterwards.
+        rep: -14
+      - id: opt-tabletop
+        label: "Walk the board through the recovery plan on paper, which demonstrates the design without any risk"
+        correct: false
+        explain: >
+          Tabletop exercises are valuable for the decisions and communications
+          around an incident, and Marcus ran one three weeks ago. What they
+          cannot validate is whether the replica boots, whether the network
+          mapping is right, or how long it takes - and those are exactly the
+          things a failover drill exists to discover.
+        rep: -8
+    next: e4-drill-fails
+
+  - id: e4-drill-fails
+    type: troubleshoot
+    title: "P3: Test failover boots, application will not authenticate"
+    speaker: ticket
+    objectives: [AZ104-5.12, AZ104-5.11]
+    ticket:
+      id: "MER-5744"
+      reporter: "App team (drill window)"
+      priority: "P3"
+      opened: "20:15"
+      body: |
+        Test failover completed successfully at 20:04. vm-wms01-test is running
+        in vnet-dr-test in East Asia and we can reach the console. The warehouse
+        application starts and then fails every login with "domain controller
+        unreachable". Same error the pickers saw last year. Drill window closes
+        at 23:00.
+    on_enter_diagram_ops:
+      - {op: set_status, node: mon-vm-wms01-dr, status: broken}
+      - {op: set_status, node: mon-asr-vault, status: warning}
+      - {op: set_edge_status, edge: mon-e-asr-repl, status: degraded}
+    scenario: |
+      The good news arrives first. Site Recovery reports the test failover
+      succeeded in eleven minutes, well inside the two-hour objective, and the
+      machine boots to a login prompt in East Asia.
+
+      Then the application starts and cannot authenticate. The error is one you
+      have seen before in a completely different context - domain controller
+      unreachable - and it is the last error you wanted at twenty past eight on a
+      Thursday with the window closing at eleven.
+
+      Desmond dialed in for this. "You built an isolated network on purpose. Now
+      go and think about what an isolated network means for a machine that needs
+      a domain controller, and what you replicated versus what you needed."
+    time_budget: 6
+    investigate:
+      - id: inv-app
+        label: "Ask the app team exactly what the failure looks like"
+        speaker: ticket
+        reveals: >
+          "It resolves nothing. The login attempt does not get refused, it times
+          out looking for the domain. From inside the test VM, nslookup for the
+          domain name gets no answer at all."
+      - id: inv-desmond
+        label: "Ask Desmond what a recovery plan is supposed to contain"
+        speaker: mentor
+        reveals: >
+          "Every machine the workload needs, in the order it needs them. If the
+          application depends on the directory, the directory is in group one and
+          the application is in group two. A recovery plan with one machine in it
+          is not a recovery plan, it is a bookmark."
+      - id: inv-marcus
+        label: "Ask Marcus whether the test network can simply be peered to production"
+        speaker: security
+        reveals: >
+          "You can, and then your test machines are talking to the live
+          directory, which is how test failovers turn into production incidents.
+          The isolation is the control. Do not remove the control to pass the
+          test."
+      - id: inv-priya
+        label: "Ask Priya what the board actually needs from tonight"
+        speaker: manager
+        reveals: >
+          "A run that worked, and a date. If it does not work tonight I would
+          rather book another window than write something I cannot defend when
+          somebody asks whether it authenticated."
+    commands:
+      - id: cmd-job-list
+        label: "Show the Site Recovery job history for the drill"
+        command: "az site-recovery job list --vault-name rsv-meridian-dr -g rg-dr-eas --query '[0:2].{name:friendlyName, state:state, time:endTime}' -o table"
+        output: |
+          Name             State      Time
+          ---------------  ---------  --------------------
+          Test failover    Succeeded  2026-09-24T20:04:12Z
+          Prerequisites    Succeeded  2026-09-24T19:53:40Z
+        time_cost: 1
+        note: "Site Recovery did what it was asked. The gap is in what it was asked to do."
+      - id: cmd-protected
+        label: "List the items protected by the replication configuration"
+        command: "az site-recovery protected-item list --vault-name rsv-meridian-dr -g rg-dr-eas --fabric-name fab-sea --protection-container-name pc-sea --query '[].{name:properties.friendlyName, health:properties.replicationHealth}' -o table"
+        output: |
+          Name       Health
+          ---------  --------
+          vm-wms01   Normal
+        time_cost: 1
+        note: "One machine is replicating. vm-dc01 was never enrolled."
+      - id: cmd-dns
+        label: "Check name resolution from inside the test VM"
+        command: "az vm run-command invoke -g rg-dr-eas -n vm-wms01-test --command-id RunPowerShellScript --scripts 'Resolve-DnsName meridian.local -ErrorAction SilentlyContinue; Get-DnsClientServerAddress -AddressFamily IPv4 | Select-Object InterfaceAlias,ServerAddresses'"
+        output: |
+          InterfaceAlias   ServerAddresses
+          Ethernet         {10.100.1.10}
+          Resolve-DnsName : meridian.local : DNS request timed out
+        time_cost: 2
+        note: "It is asking the production domain controller's address, from a network that cannot reach it."
+      - id: cmd-vnet-dns
+        label: "Show the DNS servers configured on the isolated test VNet"
+        command: "az network vnet show -g rg-dr-eas -n vnet-dr-test --query '{addressSpace:addressSpace.addressPrefixes, dns:dhcpOptions.dnsServers, peerings:virtualNetworkPeerings[].name}' -o json"
+        output: |
+          {
+            "addressSpace": ["10.101.0.0/16"],
+            "dns": ["10.100.1.10"],
+            "peerings": []
+          }
+        time_cost: 1
+        note: "No peerings, by design, and a DNS server address that only exists in the region you are pretending has failed."
+      - id: cmd-connectivity
+        label: "Test connectivity from the test VM to the production domain controller"
+        command: "az network watcher test-connectivity --source-resource vm-wms01-test --dest-address 10.100.1.10 --dest-port 389 -o table"
+        output: |
+          ConnectionStatus    AvgLatencyInMs    ProbesFailed    ProbesSent
+          ------------------  ----------------  --------------  ------------
+          Unreachable         -                 100             100
+        time_cost: 2
+        note: "Unreachable, which is what an isolated network is supposed to produce."
+      - id: cmd-recovery-plan
+        label: "Show the recovery plan groups"
+        command: "az site-recovery recovery-plan show --vault-name rsv-meridian-dr -g rg-dr-eas -n rp-warehouse --query 'properties.groups[].{group:groupType, items:replicationProtectedItems[].id}' -o json"
+        output: |
+          [
+            {
+              "group": "Boot",
+              "items": ["...replicationProtectedItems/vm-wms01"]
+            }
+          ]
+        time_cost: 1
+        note: "One boot group containing one machine. Nothing brings a directory up first."
+    fixes:
+      - id: fix-protect-dc
+        label: "Enable replication for vm-dc01, put it in boot group one of the recovery plan ahead of vm-wms01, and set the test VNet's DNS to the address the replica domain controller will hold"
+        correct: true
+        explain: >
+          A workload fails over as a set, not as a machine. The application
+          depends on the directory, so the directory has to be replicated, has to
+          start first, and has to be findable - which means the isolated test
+          network's DNS points at the replica rather than at an address that only
+          exists in the region you are simulating the loss of. Recovery plans
+          exist to encode exactly this ordering, and the drill just proved why.
+        rep: 15
+        diagram_ops:
+          - {op: set_status, node: mon-vm-wms01-dr, status: healthy}
+          - {op: set_status, node: mon-asr-vault, status: healthy}
+          - {op: set_edge_status, edge: mon-e-asr-repl, status: healthy}
+      - id: fix-peer-test
+        label: "Peer vnet-dr-test to the production hub so the test machine can reach the live domain controller"
+        correct: false
+        consequence: >
+          The test VM authenticates against production and registers itself in
+          the live directory. Cleaning that up takes longer than the drill did.
+        explain: >
+          It would make tonight's login succeed and it invalidates the entire
+          exercise, because in a real regional failure the hub is exactly what
+          you do not have. It also removes the isolation that keeps a test
+          failover from touching production, which is the reason test failover is
+          the safe verb.
+        rep: -14
+      - id: fix-public-dns
+        label: "Point the test VNet at a public DNS resolver so name resolution starts working"
+        correct: false
+        explain: >
+          A public resolver can answer for internet names and knows nothing about
+          an internal Active Directory domain, so the lookup still fails - and
+          domain join and authentication need far more than DNS from a directory
+          that is not there. The missing component is a domain controller, not a
+          resolver.
+        rep: -10
+      - id: fix-declare-success
+        label: "Record the drill as successful on the grounds that the machine booted in eleven minutes, and note the authentication issue as a separate item"
+        correct: false
+        consequence: >
+          The board is told recovery is proven. The next real failover discovers
+          the same problem, without a window and without Desmond on the phone.
+        explain: >
+          A recovery drill succeeds when the service works, not when a virtual
+          machine boots. Recording a partial result as a pass is how organizations
+          acquire confidence they have not earned - and the whole reason Marcus
+          asked for a demonstration rather than a design was to surface exactly
+          this class of gap.
+        rep: -12
+    rewards:
+      under_budget_bonus: 5
+      skill_points: 2
+    next: e5-close
+
+  - id: e5-close
+    type: design_decision
+    title: "A date on the paper"
+    speaker: manager
+    objectives: [AZ104-5.12]
+    scenario: |
+      The rerun goes at 22:10. The directory replica comes up in boot group one,
+      the warehouse system follows, and the app team logs in at 22:26. Total
+      elapsed time from failover start to a working login is sixteen minutes.
+
+      Priya is writing the board note over your shoulder.
+
+      "I have a date and a number. What I do not have is what happens next
+      quarter, because I know what happens to things that were demonstrated once
+      by a person who was very motivated on the night."
+
+      Desmond, from the next desk, without turning round. "Ask her what the
+      number is worth in March."
+    prompt: "What do you put in the board note?"
+    options:
+      - id: opt-scheduled-drill
+        label: "A scheduled test failover each quarter, run against the recovery plan, with the measured time to a working login recorded each time"
+        correct: true
+        explain: >
+          A recovery capability decays: machines get added, addresses change,
+          dependencies appear, and a plan that worked in September quietly stops
+          working. Test failover is non-disruptive by design, so there is no
+          reason not to run it on a cadence, and recording the measured time to a
+          working service turns the board's number into something that stays
+          true instead of something that was true once.
+        rep: 12
+      - id: opt-monitor-health
+        label: "An alert on Site Recovery replication health, which will tell us immediately if protection degrades"
+        correct: false
+        explain: >
+          Worth configuring, and it monitors the wrong half. Replication health
+          confirms data is arriving in East Asia; it says nothing about whether
+          the recovery plan still brings up a working service, which is what
+          failed tonight while replication health read Normal throughout.
+        rep: -6
+      - id: opt-annual
+        label: "An annual disaster recovery test aligned to the audit cycle, which is what the auditors expect anyway"
+        correct: false
+        explain: >
+          Annual is the cadence of a compliance artifact rather than of an
+          operational control, and twelve months is long enough for the estate to
+          become unrecognizable. Given that a test failover costs an evening and
+          disrupts nothing, the argument for waiting a year is entirely about
+          effort, and the effort is small.
+        rep: -6
+      - id: opt-runbook
+        label: "A written runbook of the failover steps, kept in the wiki, so anyone can execute it under pressure"
+        correct: false
+        consequence: >
+          The runbook is written in October. In February it still describes a
+          recovery plan with one boot group.
+        explain: >
+          Documentation is necessary and is not evidence - an unexecuted runbook
+          drifts silently and gives false confidence to whoever finds it at three
+          in the morning. Write it, and then let a recurring drill be the thing
+          that proves it is still true.
+        rep: -8
+    next: END

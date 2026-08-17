@@ -1,0 +1,275 @@
+schema_version: 1
+id: act2-id-02-shape-of-the-estate-hard
+title: "The Shape of the Estate: Design Review"
+act: 2
+chapter: act2-identity
+domain: az305-d1
+order: 2
+role: associate-architect
+checkpoint: true
+bonus_variant_of: act2-id-02-shape-of-the-estate
+summary: "Chen and Partners brought their own architect. He has read your document and has three questions."
+entry: e1-graft
+
+encounters:
+  - id: e1-graft
+    type: design_decision
+    title: "Grafting a hierarchy onto a hierarchy"
+    speaker: manager
+    objectives: [AZ305-1.9]
+    scenario: |
+      The auditors have sent an architect of their own to the design review. He
+      is polite, he has read the whole document, and his first question is the
+      one you were hoping to skip.
+
+      Sunda did not have a flat estate. They had their own management group
+      hierarchy, five levels deep, built by a consultancy in 2022: a root, then
+      region, then business line, then environment, then a group per product.
+      Their six subscriptions sit at the bottom of it, and their policy
+      assignments are spread across four of the five levels.
+
+      Meridian's own structure puts workload subscriptions three levels below
+      the tenant root: root, then Workloads, then Landing zones, then the
+      subscription.
+
+      "The simplest thing," the auditors' architect says, "would be to attach
+      their root beneath your Transition group and change nothing. Tell me
+      whether that works and tell me why."
+
+      Two facts decide it. Azure supports six levels of management group
+      hierarchy below the tenant root group, and a subscription counts as a
+      level of its own beneath the group it sits in. Sunda's policy assignments
+      also have to remain auditable during the six-month remediation.
+    prompt: "How do you bring Sunda's hierarchy into Meridian's?"
+    options:
+      - id: opt-flatten
+        label: "Flatten Sunda's structure on the way in: move the six subscriptions directly into the Transition group, re-express the assignments that still matter at that group, and retire their old hierarchy"
+        correct: true
+        explain: >
+          Grafting a five-level hierarchy beneath a group that is already two
+          levels down puts the subscriptions past the six-level limit, so the
+          move would fail on depth alone. It is also the wrong instinct
+          regardless: Sunda's levels encode a 2022 consultancy's view of their
+          business, and preserving them means carrying four levels of inherited
+          assignments that nobody at Meridian can explain to an auditor. Moving
+          the subscriptions directly into Transition makes the inheritance chain
+          two assignments long and readable, and re-expressing the assignments
+          that still matter is a deliberate act rather than an inherited
+          accident.
+        rep: 14
+        diagram_ops:
+          - {op: set_status, node: a2id-sub-sunda, status: warning}
+      - id: opt-attach-root
+        label: "Attach Sunda's root management group beneath the Transition group unchanged, so nothing breaks and their existing policy set keeps applying during remediation"
+        correct: false
+        consequence: >
+          The move is rejected. The error mentions a maximum hierarchy depth,
+          and the auditors' architect writes something down.
+        explain: >
+          It preserves continuity and it does not fit: six levels below the
+          tenant root is the ceiling, and root plus Transition plus Sunda's own
+          five levels plus the subscription exceeds it. Even where the depth
+          worked, it would leave assignments at four levels that Meridian did not
+          author, cannot justify, and would have to evaluate before every change
+          - which is the opposite of the readable inheritance the auditors asked
+          to see.
+        rep: -10
+      - id: opt-keep-two-levels
+        label: "Keep Sunda's environment and product levels but drop their region and business line levels, so the depth fits and product teams keep their familiar structure"
+        correct: false
+        consequence: >
+          Six months later the Transition group is empty, and two orphan levels
+          remain in the hierarchy with one subscription between them.
+        explain: >
+          It resolves the depth problem and preserves a structure with a fixed
+          end date. Transition exists for six months; product-level management
+          groups for an estate being absorbed into Meridian's landing zones
+          become empty scaffolding the moment remediation completes, and empty
+          management groups accumulate assignments and confusion. Environment
+          separation is already expressed by Meridian's own landing zone split.
+        rep: -6
+      - id: opt-new-tenant-subs
+        label: "Create six new subscriptions under Transition and move each Sunda resource group across, leaving their hierarchy and subscriptions behind entirely"
+        correct: false
+        consequence: >
+          The first resource group move stalls on a resource type that cannot be
+          moved across subscriptions. There are four more like it.
+        explain: >
+          Moving a subscription between management groups is a metadata
+          operation; moving resources between subscriptions is not. Several
+          resource types cannot be moved at all, others require the source and
+          target to share a region or a network, and every move invalidates
+          resource ids that appear in role assignments, diagnostic settings, and
+          templates. The subscription is the portable unit here, which is exactly
+          why it is the boundary.
+        rep: -10
+    next: e2-resource-groups
+
+  - id: e2-resource-groups
+    type: design_decision
+    title: "What a resource group is for"
+    speaker: mentor
+    objectives: [AZ305-1.9]
+    scenario: |
+      The second question is smaller and catches more people.
+
+      Desmond has drafted the resource group standard for the Indonesia landing
+      zone and wants it reviewed before it becomes a template. His draft groups
+      resources by resource type: one group for all virtual networks, one for
+      all storage accounts, one for all databases, per subscription.
+
+      The requirements the standard has to satisfy are on the same page.
+
+      A workload must be deletable in one operation at the end of a project,
+      because six of Sunda's inherited applications retire during the
+      transition. Delivery teams must be able to be granted rights over their
+      own workload without rights over anyone else's. The disaster recovery
+      design will stand up a parallel copy of a workload in Indonesia and needs
+      the deployment to be repeatable. And the auditors want to know, for any
+      resource, which application it belongs to.
+
+      "I grouped by type because it makes the portal tidy," Desmond says. "That
+      is the whole reason. Tell me if it is a bad one."
+    prompt: "How should resource groups be organized?"
+    options:
+      - id: opt-by-lifecycle
+        label: "By workload and lifecycle: one resource group per application per environment, holding everything that is deployed, secured, and deleted together"
+        correct: true
+        explain: >
+          A resource group is a lifecycle and permission boundary, not a
+          catalog. Grouping everything an application owns together makes
+          retirement a single delete, makes a team's role assignment naturally
+          scoped to their own workload, makes the disaster recovery deployment a
+          repeatable template against one group, and answers the auditors'
+          question by construction. Grouping by resource type breaks all four,
+          because deleting a project means picking its resources out of five
+          shared groups and no role assignment can be scoped without granting
+          access to everyone else's resources of that type.
+        rep: 14
+      - id: opt-by-type
+        label: "Keep the grouping by resource type, and use tags to record which application each resource belongs to"
+        correct: false
+        consequence: >
+          The first retirement takes a day of cross-referencing. One storage
+          account is missed and shows up on the invoice for another eight
+          months.
+        explain: >
+          Tags do answer the ownership question, which is one requirement out of
+          four. They do not make a workload deletable in one operation, they do
+          not give a team a scope to be granted rights over, and they do not make
+          the disaster recovery deployment repeatable against a boundary. Tidy
+          in the portal is not a design constraint; the portal has filters.
+        rep: -10
+      - id: opt-by-region
+        label: "One resource group per region per subscription, since a resource group has a location and resources should sit in the group matching their own region"
+        correct: false
+        explain: >
+          The premise is a common misreading. A resource group's location stores
+          the group's own metadata; the resources inside it can live in any
+          region, and routinely do. Organizing by region therefore buys nothing
+          and costs the same four requirements as grouping by type. The location
+          does matter for one thing worth knowing: if the group's region is
+          unavailable, you may be unable to change the group's metadata even when
+          the resources themselves are healthy.
+        rep: -8
+      - id: opt-one-per-sub
+        label: "A single resource group per subscription, since the subscription is already the isolation boundary and nested groups add nothing"
+        correct: false
+        consequence: >
+          A delete intended for one retired application is scoped to the group
+          that holds production. The lock added afterwards does not undo it.
+        explain: >
+          It collapses the only boundary available below the subscription, so
+          there is no scope to grant a team, nothing to delete per project, and
+          no unit for the disaster recovery template. It also concentrates blast
+          radius: one mis-scoped delete takes the subscription's entire contents,
+          which is precisely the failure the lifecycle boundary exists to
+          contain.
+        rep: -12
+    next: e3-tag-enforcement
+
+  - id: e3-tag-enforcement
+    type: design_decision
+    title: "The policy that blocked a deployment"
+    speaker: mentor
+    objectives: [AZ305-1.9, AZ305-1.10]
+    scenario: |
+      The third question arrives as a defect rather than a question.
+
+      Your mandatory tag policy went to the non-production subscription for a
+      pilot. Within a day, two deployments failed that had nothing obviously
+      wrong with them: a role assignment and a network security group rule, both
+      correctly formed, both rejected for a missing cost-center tag.
+
+      Desmond has already diagnosed it. "Not every resource type supports tags.
+      Child resources and a chunk of Resource Manager's own object types do not
+      take them at all. Your deny policy asks for a tag those types cannot
+      carry, so the deployment can never succeed."
+
+      The requirements have not changed. The four mandatory tags still have to be
+      enforced on new resources, existing resources still have to be remediated,
+      and the pilot has to be back in service today because the Indonesia build
+      runs against that subscription.
+
+      Marcus adds one line. "And I still want to be able to prove the
+      classification tag is on every resource that holds personal data. That was
+      never a nice-to-have."
+    prompt: "How do you fix the tag policy without weakening it?"
+    options:
+      - id: opt-scoped-deny
+        label: "Keep the deny effect but scope the policy rule to the resource types that support tags and are relevant, using a not-applicable condition for the rest, with a modify policy inheriting tags from the resource group alongside it"
+        correct: true
+        explain: >
+          The control is right and its scope was too broad. A policy rule can
+          condition on resource type so that types which cannot carry a tag are
+          simply not evaluated, which keeps deny in force everywhere it can
+          actually be satisfied. Pairing it with a modify effect that inherits
+          the tag from the resource group closes the ordinary case without asking
+          delivery teams to type anything, and remediation tasks cover the
+          existing estate. Marcus's classification proof is unaffected, because
+          the types that hold personal data all support tags.
+        rep: 14
+        diagram_ops:
+          - {op: set_status, node: a2id-policy-tags, status: healthy}
+      - id: opt-audit-instead
+        label: "Change the effect from deny to audit so nothing is blocked, and drive compliance through the monthly report instead"
+        correct: false
+        consequence: >
+          The pilot subscription unblocks immediately. Three months later the
+          untagged count is higher than when the policy was assigned.
+        explain: >
+          It restores service by removing the control, which is the outcome the
+          original quest already established does not work at Meridian - an
+          audit-only tag policy is what left half the estate untagged. The
+          failure was a scoping defect affecting a handful of resource types,
+          not evidence that enforcement is wrong.
+        rep: -10
+      - id: opt-exempt-nonprod
+        label: "Create a policy exemption for the non-production subscription so the pilot can continue, and enforce the tags in production only"
+        correct: false
+        consequence: >
+          The same deployment fails in production the following week, for the
+          same reason, at a worse time.
+        explain: >
+          Exempting the environment where the defect was found removes the only
+          place it could be caught cheaply. The underlying rule still asks
+          untaggable resource types for a tag, so the failure simply relocates to
+          production. Non-production exists to surface exactly this class of
+          problem before it reaches somewhere expensive.
+        rep: -12
+      - id: opt-modify-only
+        label: "Drop the deny entirely and rely on a modify policy that adds the four tags with a default value wherever they are missing"
+        correct: false
+        consequence: >
+          Every untagged resource acquires cost-center unknown. Evelyn's report
+          now has a category with forty percent of the spend in it.
+        explain: >
+          Modify with defaults guarantees the tag exists and guarantees nothing
+          about it being true, which turns a missing value into a wrong one -
+          harder to find and easier to trust. It is materially worse for Marcus's
+          case, because a data-classification tag defaulted to a placeholder
+          asserts something about personal data that nobody checked. Modify
+          belongs where the value is derivable, such as inheriting from the
+          resource group.
+        rep: -8
+    next: END

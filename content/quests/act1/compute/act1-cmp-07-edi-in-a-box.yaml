@@ -1,0 +1,428 @@
+schema_version: 1
+id: act1-cmp-07-edi-in-a-box
+title: "EDI in a Box"
+act: 1
+chapter: act1-compute
+domain: az104-d3
+order: 7
+role: senior-cloud-admin
+checkpoint: true
+summary: "Customers send electronic despatch advices at six in the morning and nothing at midnight. The service that reads them runs on a Windows box that never sleeps."
+entry: e1-registry
+
+encounters:
+  - id: e1-registry
+    type: design_decision
+    title: "Somewhere to keep the images"
+    speaker: security
+    objectives: [AZ104-3.13]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: cmp-acr
+          label: "acrmeridian (container registry)"
+          kind: container-app
+          group: grp-corp
+          status: planned
+    scenario: |
+      The development team has containerized the EDI processor. Two images, built
+      by the pipeline, currently pushed to a personal Docker Hub account belonging
+      to a contractor who finishes in November.
+
+      Marcus has requirements and has written them as a numbered list, which is
+      how you know he means them.
+
+      One: the registry is reachable from the warehouse network without traversing
+      the public internet. Two: no shared username and password anywhere in the
+      pipeline - every pull is attributable to an identity that appears in an
+      access review. Three: images stay in Singapore.
+
+      Priya adds a fourth, from the other end of the building: the build agents
+      are small and slow, and she would rather not buy bigger ones.
+    prompt: "How do you set up the registry?"
+    options:
+      - id: opt-premium-pe
+        label: "A Premium container registry with a private endpoint into the VNet, admin user disabled, and pulls authorized through Microsoft Entra identities holding AcrPull"
+        correct: true
+        explain: >
+          Private endpoints on a registry are a Premium feature, so requirement one
+          sets the tier on its own. Disabling the admin user and granting AcrPull
+          to managed identities gives per-identity authorization that shows up in
+          access reviews and can be revoked without rotating a shared secret. For
+          Priya's build agents, az acr build runs the docker build inside the
+          registry's own compute, so the agent only submits the context.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: cmp-acr, status: healthy}
+      - id: opt-basic-admin
+        label: "A Basic registry with the admin user enabled, storing the registry credentials as a pipeline secret"
+        correct: false
+        consequence: >
+          It works immediately, which is the problem. Eight months later nobody
+          can say which of four systems is using the admin password.
+        explain: >
+          The admin account is a single credential shared by everything that uses
+          it: it cannot be scoped to one repository, every action attributed to it
+          is anonymous, and revoking it breaks every consumer at once. Basic also
+          has no private endpoint support, so requirement one fails as well. The
+          admin user exists for early testing and Azure recommends leaving it off.
+        rep: -12
+      - id: opt-standard-firewall
+        label: "A Standard registry with public access restricted to the office and data center address ranges through the registry firewall"
+        correct: false
+        explain: >
+          Network rules on a registry - IP restrictions and private link alike -
+          are Premium features; Standard differs from Basic mainly in included
+          storage and throughput. Even where available, an address allow list keeps
+          the traffic on the public endpoint and breaks whenever an outbound
+          address changes, which is what a private endpoint avoids by giving the
+          registry an address inside your network.
+        rep: -8
+      - id: opt-dockerhub
+        label: "Keep Docker Hub but move to an organization account owned by Meridian, which is cheaper than any Azure registry"
+        correct: false
+        explain: >
+          It fixes the contractor problem and nothing else on Marcus's list. Pulls
+          traverse the public internet, authorization lives in a system outside
+          your identity provider and outside access reviews, images sit wherever
+          the provider keeps them, and anonymous pull rate limits become an
+          incident on the morning a scale set adds nine instances at once.
+        rep: -10
+    next: e2-aci-or-aca
+
+  - id: e2-aci-or-aca
+    type: design_decision
+    title: "Two workloads, one word"
+    speaker: mentor
+    objectives: [AZ104-3.14, AZ104-3.15]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: cmp-aca-edi
+          label: "ca-edi-intake (container app)"
+          kind: container-app
+          group: grp-ops
+          status: planned
+      - op: add_edge
+        edge:
+          id: cmp-e-acr-aca
+          source: cmp-acr
+          target: cmp-aca-edi
+          kind: dependency
+          status: planned
+    scenario: |
+      Two images, two very different jobs.
+
+      The intake service receives despatch advices over HTTPS. Volume is zero
+      between 22:00 and 05:00, then several thousand documents between 06:00 and
+      09:00 as customers' overnight batches land, then a trickle. Each document
+      takes about 200 milliseconds. Senders retry on failure, so a slow first
+      response is survivable.
+
+      The reconciliation job runs once a night. It loads the day's documents and
+      the warehouse's own movements into memory, compares them, writes a report
+      and exits. It peaks at eleven gigabytes of memory and takes about forty
+      minutes. It is not a service; it has a beginning and an end.
+
+      Priya would prefer one platform for both. Desmond says pick per workload and
+      be able to say why.
+    prompt: "Where do the two workloads run?"
+    options:
+      - id: opt-split
+        label: "The intake service on Azure Container Apps with an HTTP scale rule; the nightly reconciliation on Azure Container Instances as a container group with a restart policy of OnFailure"
+        correct: true
+        explain: >
+          Container Apps is built for services: managed ingress with TLS,
+          revisions, and scaling driven by HTTP concurrency or events, including
+          down to zero replicas overnight. Container Instances is built for a
+          container that runs and exits - you allocate CPU and memory directly, a
+          restart policy of OnFailure means a completed run stays completed, and a
+          Linux container group can be given up to 4 vCPU and 16 GB, which the
+          eleven-gigabyte job needs.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: cmp-aca-edi, status: healthy}
+          - {op: set_edge_status, edge: cmp-e-acr-aca, status: healthy}
+      - id: opt-both-aci
+        label: "Both on Azure Container Instances, so there is one service to learn and one bill to read"
+        correct: false
+        consequence: >
+          The intake container survives the first morning and not the second.
+        explain: >
+          Container Instances has no autoscaling, no managed ingress and no
+          revision model. Running an HTTP service on it means you provision for the
+          06:00 peak and pay for it all night, or you build the scaling yourself
+          with something that creates and deletes container groups. That is the
+          machinery Container Apps already is.
+        rep: -10
+      - id: opt-both-aca
+        label: "Both on Azure Container Apps - the reconciliation becomes a scheduled job in the same environment"
+        correct: false
+        explain: >
+          Genuinely close, and Container Apps jobs are the right home for many
+          scheduled containers. The blocker is the memory: a Consumption workload
+          profile allows up to 4 vCPU and 8 GB per replica, and the reconciliation
+          peaks at eleven. You would have to move to a dedicated workload profile
+          to hold it, which is more machinery than a container group that runs
+          once a night.
+        rep: -6
+      - id: opt-aks
+        label: "Stand up an AKS cluster and run both as a Deployment and a CronJob"
+        correct: false
+        consequence: >
+          Six weeks later the platform team is discussing node pool upgrade
+          windows for two containers.
+        explain: >
+          Kubernetes would do both things well and asks for a cluster in return:
+          node pools, version upgrades, networking, and someone who knows it at
+          three in the morning. Two containers with simple requirements do not
+          justify that operational surface. Reach for a cluster when the workload
+          needs what a cluster provides.
+        rep: -8
+    next: e3-sizing
+
+  - id: e3-sizing
+    type: design_decision
+    title: "Two weeks in"
+    speaker: cfo
+    objectives: [AZ104-3.16]
+    scenario: |
+      Two weeks of production and two observations.
+
+      The reconciliation container group is provisioned at 2 vCPU and 8 GB. It has
+      been killed by the memory limit on nine of the last fourteen nights, always
+      after about thirty minutes. On the nights it survives, the report is late.
+
+      The intake container app is configured with a minimum of one replica and a
+      maximum of four. Evelyn has noticed it is billed for one replica through
+      every hour of the night, when it processes nothing at all, and separately
+      that the 06:00 hour still queues.
+
+      The database behind the intake service is sized for about thirty concurrent
+      writers.
+    prompt: "How do you size and scale the two workloads?"
+    options:
+      - id: opt-size-both
+        label: "Give the container group 4 vCPU and 16 GB; set the container app to minimum 0, maximum 20 replicas, with an HTTP scale rule of 50 concurrent requests per replica"
+        correct: true
+        explain: >
+          Container Instances bills for allocated CPU and memory by the second, so
+          the fix for an eleven-gigabyte peak is to allocate sixteen and stop
+          paying for a nightly failure. On the Container Apps side, a minimum of
+          zero means the overnight cost is nothing and the first morning request
+          pays a cold start, which the senders' retries absorb. The maximum stays
+          below what the database can take, so scaling cannot move the failure
+          downstream.
+        rep: 12
+      - id: opt-min-one
+        label: "Keep the minimum at one replica to avoid cold starts, and raise the container group to 4 vCPU and 16 GB"
+        correct: false
+        explain: >
+          The container group half is right. Holding a replica overnight buys you
+          the elimination of a cold start that this workload does not need: intake
+          is asynchronous, senders retry, and nobody is watching a spinner at
+          04:00. Minimum replicas above zero is for latency-sensitive interactive
+          traffic, and it is the single easiest thing to leave switched on by
+          accident.
+        rep: -6
+      - id: opt-max-300
+        label: "Set the container app to minimum 0 and maximum 300 replicas so the 06:00 burst can never queue"
+        correct: false
+        consequence: >
+          The morning burst scales to ninety replicas, the database refuses
+          connections, and every one of those replicas starts retrying.
+        explain: >
+          Scaling a stateless front end past what its dependencies can absorb does
+          not remove the bottleneck, it relocates it somewhere with worse failure
+          behavior. The maximum replica count is a safety limit as much as a
+          capacity setting, and it belongs just under the constraint you know
+          about - here, thirty concurrent writers.
+        rep: -10
+      - id: opt-32gb
+        label: "Give the container group 4 vCPU and 32 GB so there is headroom for the data set to grow"
+        correct: false
+        consequence: >
+          The deployment is rejected and the reconciliation does not run at all
+          that night.
+        explain: >
+          A Linux container group tops out around 4 vCPU and 16 GB, so the request
+          fails outright rather than being trimmed. Headroom also costs money
+          continuously in a service billed on allocation, and a workload that
+          genuinely outgrows a container group is telling you it wants a different
+          platform rather than a bigger box.
+        rep: -8
+    next: e4-pull-failure
+
+  - id: e4-pull-failure
+    type: troubleshoot
+    title: "P2: New revision will not start"
+    speaker: ticket
+    objectives: [AZ104-3.13, AZ104-3.15]
+    ticket:
+      id: "MER-5088"
+      reporter: "EDI development team"
+      priority: "P2"
+      opened: "08:35"
+      body: |
+        Deployed ca-edi-intake revision 0007 at 08:12 with the fix for the
+        malformed segment handling. It never became active. The portal says
+        provisioning failed. Revision 0006 is still serving so nothing is down,
+        but three customers are waiting on this fix and we have deployed the same
+        way eleven times.
+    on_enter_diagram_ops:
+      - {op: set_status, node: cmp-aca-edi, status: broken}
+      - {op: set_status, node: cmp-acr, status: warning}
+    scenario: |
+      Nothing is down, which buys you time and costs you urgency from everyone
+      else.
+
+      Revision 0007 was built and pushed by the same pipeline that has deployed
+      the last eleven revisions. The image is in the registry. The revision will
+      not provision.
+
+      The only other thing that happened overnight is a quarterly access review,
+      which Marcus ran on Sunday and which removed one hundred and forty stale
+      role assignments across the subscription. He mentioned it in the platform
+      channel and attached the report, which nobody read.
+    time_budget: 6
+    investigate:
+      - id: inv-dev
+        label: "Ask the development team what changed in the build"
+        speaker: ticket
+        reveals: >
+          "Nothing structural. Same Dockerfile, same base image, same pipeline,
+          same registry. The only difference between 0006 and 0007 is about forty
+          lines of parsing code."
+      - id: inv-marcus
+        label: "Ask Marcus what the access review removed"
+        speaker: security
+        reveals: >
+          "One hundred and forty assignments with no sign-in activity in ninety
+          days. Managed identities are included in the review - a workload identity
+          that has not been used recently looks exactly like an abandoned one. The
+          report lists every removal. I did say."
+      - id: inv-desmond
+        label: "Ask Desmond how a container app authenticates to a registry"
+        speaker: mentor
+        reveals: >
+          "Either an admin credential, which Marcus took away from you on day one,
+          or an identity with AcrPull on the registry. Pulling is a data plane
+          action. Whatever you find, check that the role you are looking at grants
+          data actions and not just management ones."
+      - id: inv-noc
+        label: "Ask the NOC whether the registry had an incident overnight"
+        speaker: noc
+        reveals: >
+          "Nothing on the service health dashboard for container registries in
+          Southeast Asia. The nightly reconciliation container pulled its own
+          image from the same registry at 23:05 without trouble."
+    commands:
+      - id: cmd-revisions
+        label: "List the container app revisions"
+        command: "az containerapp revision list -g rg-ops-sea -n ca-edi-intake --query \"[].{name:name,active:properties.active,state:properties.provisioningState,replicas:properties.replicas}\" -o table"
+        output: |
+          Name                  Active    State                Replicas
+          --------------------  --------  -------------------  ----------
+          ca-edi-intake--0006   True      Provisioned          2
+          ca-edi-intake--0007   False     ProvisioningFailed   0
+        time_cost: 1
+      - id: cmd-system-logs
+        label: "Show system logs for the failed revision"
+        command: "az containerapp logs show -g rg-ops-sea -n ca-edi-intake --revision ca-edi-intake--0007 --type system --tail 5"
+        output: |
+          ReplicaSchedulingFailed  Failed to pull image "acrmeridian.azurecr.io/edi-intake:0007":
+          failed to authorize: failed to fetch anonymous token: unexpected status
+          from GET request to https://acrmeridian.azurecr.io/oauth2/token: 401 Unauthorized
+        time_cost: 1
+        note: "An authorization failure, not a missing image and not a network failure."
+      - id: cmd-tags
+        label: "Check the image is actually in the registry"
+        command: "az acr repository show-tags -n acrmeridian --repository edi-intake --orderby time_desc --top 3 -o tsv"
+        output: |
+          0007
+          0006
+          0005
+        time_cost: 1
+        note: "The image is there. The pipeline pushed it with its own identity, which was not part of the review."
+      - id: cmd-role-assignments
+        label: "List role assignments on the registry for the container app's identity"
+        command: "az role assignment list --assignee 4c9b2f18-77a1-4d0e-9f3a-2b6d8e5104aa --scope /subscriptions/8f3d/resourceGroups/rg-corp-sea/providers/Microsoft.ContainerRegistry/registries/acrmeridian -o table"
+        output: |
+          (empty)
+        time_cost: 1
+        note: "No assignment at all. The identity still exists; its permission does not."
+      - id: cmd-acr-config
+        label: "Show the registry's authentication and network configuration"
+        command: "az acr show -n acrmeridian --query \"{sku:sku.name,admin:adminUserEnabled,publicAccess:publicNetworkAccess}\" -o json"
+        output: |
+          {
+            "sku": "Premium",
+            "admin": false,
+            "publicAccess": "Disabled"
+          }
+        time_cost: 1
+        note: "Admin user off, as designed. There is no fallback credential to fall back to."
+      - id: cmd-activity
+        label: "Query the activity log for role assignment deletions"
+        command: "az monitor activity-log list --offset 72h --query \"[?contains(operationName.value,'roleAssignments/delete')].{caller:caller,status:status.value,at:eventTimestamp}\" -o table | head -4"
+        output: |
+          Caller                         Status     At
+          -----------------------------  ---------  --------------------------
+          access-review-quarterly        Succeeded  2026-08-17T03:10:22.418Z
+          access-review-quarterly        Succeeded  2026-08-17T03:10:22.905Z
+        time_cost: 2
+        note: "Sunday at 03:10. The revision deployed on Tuesday is simply the first pull since."
+    fixes:
+      - id: fix-acrpull
+        label: "Re-assign AcrPull to the container app's managed identity scoped to acrmeridian, then restart the failed revision"
+        correct: true
+        explain: >
+          Pulling an image is a data plane action, and AcrPull is the role that
+          grants it. The access review removed the assignment because the identity
+          had not been used inside its window, so the next pull was the first thing
+          to notice. Scoping the assignment to the registry keeps it least
+          privilege, and restarting the revision makes it retry the pull rather
+          than waiting for a new build.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: cmp-aca-edi, status: healthy}
+          - {op: set_status, node: cmp-acr, status: healthy}
+      - id: fix-admin-user
+        label: "Enable the registry admin user and configure the container app with the admin username and password"
+        correct: false
+        consequence: >
+          The revision starts within two minutes. Marcus sees the registry
+          configuration change in his alerts within four.
+        explain: >
+          It restores the pull by reinstating the shared credential the design
+          deliberately removed - anonymous in the audit trail, unscoped, and
+          invisible to the access review that would otherwise have caught it. It
+          also leaves the real fault in place, so the next identity the review
+          touches fails in exactly the same way with the diagnosis buried.
+        rep: -12
+      - id: fix-contributor
+        label: "Grant the container app's identity Contributor on the registry's resource group, which is a superset of anything a pull needs"
+        correct: false
+        consequence: >
+          The assignment is created, the revision is restarted, and the pull fails
+          with the same 401.
+        explain: >
+          Contributor is a management plane role: it can create, update and delete
+          the registry resource and grants no data actions at all. Pulling an image
+          requires the data action that AcrPull carries, which is why a user with
+          Contributor can delete a registry and not read from it. Broader is not
+          the same as stronger.
+        rep: -10
+      - id: fix-rollback
+        label: "Roll traffic back to revision 0006 and have the team rebuild the image tomorrow"
+        correct: false
+        explain: >
+          Revision 0006 is already serving all traffic, so this changes nothing
+          except the time at which the same failure recurs. A rebuilt image will
+          be pulled by the same identity through the same missing assignment. When
+          the failure is authorization, a new artifact is not a remedy.
+        rep: -8
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: END

@@ -1,0 +1,341 @@
+schema_version: 1
+id: act2-bc-06-the-price-of-standing-by
+title: "The Price of Standing By"
+act: 2
+chapter: act2-continuity
+domain: az305-d3
+order: 6
+role: associate-architect
+checkpoint: true
+summary: "Evelyn has the five-month invoice for a region that has served no traffic. She has questions."
+entry: e1-compute-ha
+
+encounters:
+  - id: e1-compute-ha
+    type: design_decision
+    title: "Eight machines, one building"
+    speaker: mentor
+    objectives: [AZ305-3.5]
+    scenario: |
+      Desmond has the availability requirement for the WMS application tier,
+      which is the half of the design nobody has revisited since the vendor
+      installed it.
+
+      "Eight virtual machines behind a standard load balancer. All eight in one
+      datacenter, because that is where the deployment script put them in 2022.
+      The tier is stateless - every bit of state is in the database you already
+      made zone redundant."
+
+      The requirements:
+
+      | Requirement | Value |
+      | --- | --- |
+      | Survive loss of one datacenter in Southeast Asia | yes, automatically |
+      | Availability SLA for the tier | 99.99% |
+      | Data loss for that event | not applicable, tier is stateless |
+      | Vendor application changes | none permitted |
+      | Instance count at normal load | 8 |
+
+      "And before you get excited," Desmond says, "this is the availability
+      conversation, not the disaster recovery one. East Asia is not an answer
+      to this question."
+    prompt: "How do you make the WMS application tier highly available in region?"
+    options:
+      - id: opt-zones
+        label: "Spread the eight instances across three availability zones behind a zone-redundant standard load balancer"
+        correct: true
+        explain: >
+          Two or more instances distributed across two or more availability zones
+          is the configuration that carries the 99.99% virtual machine SLA, and
+          zones are physically separate datacenters with independent power,
+          cooling, and networking, so the loss of one takes roughly a third of the
+          tier and none of the service. The load balancer has to be zone redundant
+          too, or you have moved the single point of failure into the front door.
+          A stateless tier is the easy case: no data has to follow the instances.
+        rep: 12
+        diagram_ops:
+          - {op: set_label, node: wms-sea, label: "Warehouse management system (3 zones)"}
+      - id: opt-availability-set
+        label: "Put the eight instances in an availability set so they are spread across fault domains and update domains"
+        correct: false
+        consequence: >
+          Marcus asks which building the fault domains are in. It is the same
+          building.
+        explain: >
+          Availability sets spread instances across racks, power, and network
+          within one datacenter, and they carry a 99.95% SLA rather than 99.99%.
+          They protect against a rack failure or a host update wave, which is
+          real, and they do nothing about the requirement on the first row - a
+          datacenter-level event takes every fault domain with it. Sets are the
+          answer in regions without zones.
+        rep: -8
+      - id: opt-vmss-single-zone
+        label: "Convert the tier to a virtual machine scale set in a single zone with automatic instance repair enabled"
+        correct: false
+        explain: >
+          Automatic instance repair is a genuine improvement for instance-level
+          failures and it cannot repair a zone. Pinning the scale set to one zone
+          keeps every instance in one datacenter, so this modernizes the
+          deployment while leaving the stated requirement exactly where it was.
+          A scale set spanning zones would be a fine answer; the zone pinning is
+          what breaks it.
+        rep: -8
+      - id: opt-zones-plus-frontdoor
+        label: "Spread across three zones and put Azure Front Door in front, load balancing live traffic between Southeast Asia and East Asia"
+        correct: false
+        consequence: >
+          Desmond: "I said this was not the disaster recovery conversation about
+          ninety seconds ago."
+        explain: >
+          The zone spread is right and the rest is a different requirement
+          answered at full price. Serving live traffic from East Asia means the DR
+          instances are running permanently and the database is being read across
+          30 ms of latency from another region, for an availability requirement
+          that three zones already satisfy. It also quietly changes the DR design
+          that was signed off two quests ago.
+        rep: -5
+    rewards:
+      skill_points: 1
+    next: e2-standby-cost
+
+  - id: e2-standby-cost
+    type: design_decision
+    title: "Five months, zero failovers"
+    speaker: cfo
+    objectives: [AZ305-3.1, AZ305-3.5]
+    scenario: |
+      Evelyn has the East Asia invoice for the five months since the DR design
+      went live, broken down the way she breaks things down.
+
+      | Line item | Monthly | Times used |
+      | --- | --- | --- |
+      | Eight DR application VMs, running continuously | SGD 2,300 | 0 |
+      | Site Recovery licences and replicated storage | SGD 1,400 | 1 drill |
+      | SQL geo-secondary, same tier as primary | SGD 1,600 | 1 drill |
+
+      "The middle line I understand. The bottom line I understand. Explain the
+      top line to me."
+
+      Desmond, evenly: "I pre-created the DR machines so failover would be
+      faster. Nobody asked me to. It seemed prudent."
+
+      The facts on the table:
+
+      - The WMS objective is RTO 4 hours. The drill measured 2 hours 47 minutes,
+        with the pre-created machines already running.
+      - Site Recovery creates and boots the target machines during failover. The
+        recovery plan's own timing for that step was 31 minutes.
+      - Evelyn wants roughly a third off, with no change to any objective.
+    prompt: "Which line do you change?"
+    options:
+      - id: opt-deallocate
+        label: "Delete the pre-created DR virtual machines and let Site Recovery provision them at failover, keeping replication and the geo-secondary untouched"
+        correct: true
+        explain: >
+          Site Recovery replicates the disks continuously and creates the target
+          machines only when the plan runs, which is why the warm standby pattern
+          is affordable in the first place. Adding 31 minutes to a recovery that
+          finished 73 minutes inside its objective leaves the commitment intact
+          and removes the largest line on the invoice. This is the discipline the
+          whole chapter turns on: spend to reach the objective, and not one dollar
+          past it.
+        rep: 14
+        diagram_ops:
+          - {op: set_label, node: a2bc-wms-dr, label: "WMS app tier (East Asia, ASR target - not running)"}
+      - id: opt-reservations
+        label: "Buy three-year reserved instances for the eight DR virtual machines, cutting their cost by around 40%"
+        correct: false
+        consequence: >
+          Evelyn: "So we commit until 2029 to the machines you have just told me
+          we do not need."
+        explain: >
+          A reservation is a discount on consumption you are certain you will have.
+          Applying one to capacity that has served zero requests in five months
+          buys 40% off the wrong thing and removes the option of switching it off
+          for three years. Reservations are the right instrument for the primary
+          region's steady-state footprint, not for idle standby.
+        rep: -10
+      - id: opt-delete-everything
+        label: "Remove the East Asia footprint entirely and rebuild from Bicep with a restore from backup if a disaster is ever declared"
+        correct: false
+        consequence: >
+          Priya reopens the auditor's finding herself, to save the auditor the
+          trouble.
+        explain: >
+          This cuts far more than a third and it breaks both objectives it was
+          built to meet: without replication the RPO becomes the backup interval
+          rather than fifteen minutes, and a deploy-plus-restore of 3 TB does not
+          land inside four hours. Evelyn asked for a saving that changes no
+          objective. Cheap is only correct while the requirement still holds.
+        rep: -12
+      - id: opt-shrink-secondary
+        label: "Drop the SQL geo-secondary to a much smaller compute size, since it only has to keep up with replication"
+        correct: false
+        consequence: >
+          Replication lag on the geo-secondary starts reporting in minutes rather
+          than seconds during the Monday morning peak.
+        explain: >
+          The secondary has to apply the primary's entire transaction log, so
+          undersizing it makes it fall behind under load and the five-second RPO
+          quietly stops being true - the failure mode is invisible until the day
+          it matters. And a database that cannot carry production load the moment
+          it is promoted turns a met RTO into a met RTO with an unusable service
+          at the end of it.
+        rep: -10
+    next: e3-cosmos
+
+  - id: e3-cosmos
+    type: design_decision
+    title: "Track and trace"
+    speaker: manager
+    objectives: [AZ305-3.7]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2bc-cosmos-trace
+          label: "Track and trace (proposed)"
+          kind: cosmos-db
+          group: grp-sea
+          status: planned
+      - op: add_node
+        node:
+          id: a2bc-cosmos-trace-ea
+          label: "Track and trace read region (East Asia, proposed)"
+          kind: cosmos-db
+          status: planned
+      - op: add_edge
+        edge:
+          id: a2bc-e-cosmos-repl
+          source: a2bc-cosmos-trace
+          target: a2bc-cosmos-trace-ea
+          kind: replication
+          status: planned
+    scenario: |
+      Sunda Freight's one genuinely good asset is a track-and-trace API. Their
+      customers check shipment status through it constantly, and it is being
+      rebuilt on Cosmos DB as part of the integration.
+
+      Priya has the requirements from the Sunda product lead and from Evelyn,
+      combined, because they argued.
+
+      | Requirement | Value |
+      | --- | --- |
+      | Shipment events per month | 40 million, semi-structured JSON |
+      | Read to write ratio | roughly 95 reads per 5 writes |
+      | Reads available during loss of Southeast Asia | yes, within 5 minutes |
+      | Writes during loss of Southeast Asia | may pause up to 1 hour |
+      | Additional regions funded | one |
+      | Application handles write conflicts | no, and it will not be changed |
+    prompt: "How do you configure the track-and-trace Cosmos DB account?"
+    options:
+      - id: opt-single-write-multi-read
+        label: "Single write region in Southeast Asia with availability zones, an additional read region in East Asia, and service-managed failover"
+        correct: true
+        explain: >
+          Cosmos replicates to every associated region continuously, so an
+          additional read region in East Asia serves the 95% read traffic
+          throughout a regional outage with no failover step at all, which clears
+          the five-minute row comfortably. Keeping a single write region means the
+          service never has to reconcile competing writes, so no conflict
+          resolution policy is needed. Service-managed failover promotes East Asia
+          to write within the one-hour allowance. Zones cover datacenter loss in
+          the primary.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2bc-cosmos-trace, status: healthy}
+          - {op: set_status, node: a2bc-cosmos-trace-ea, status: healthy}
+          - {op: set_edge_status, edge: a2bc-e-cosmos-repl, status: healthy}
+      - id: opt-multi-write
+        label: "Multi-region writes across Southeast Asia, East Asia, and Japan East, so writes survive any regional loss"
+        correct: false
+        consequence: >
+          Evelyn stops at the word "three" and does not read the rest of the
+          slide.
+        explain: >
+          It breaks two requirements at once. Three regions is two more than are
+          funded, and provisioned throughput is billed per region, so the run cost
+          roughly triples for write availability the requirement explicitly says
+          may pause for an hour. Multi-region writes also make conflicts possible,
+          which means a conflict resolution policy and application logic that the
+          last row rules out.
+        rep: -10
+      - id: opt-backup-restore
+        label: "Single region in Southeast Asia with continuous backup, restored into East Asia if the region is lost"
+        correct: false
+        explain: >
+          Continuous backup gives excellent point-in-time recovery from a bad
+          write or a deletion and belongs in the design for that reason. As a
+          regional recovery mechanism it fails the five-minute read row by a wide
+          margin, because a restore provisions a new account and rehydrates the
+          data before anything can read it. Backup answers corruption; replication
+          answers regional loss.
+        rep: -8
+      - id: opt-zones-only
+        label: "Single region in Southeast Asia with availability zones enabled, which already replicates across three physical locations"
+        correct: false
+        explain: >
+          Zone redundancy inside one region is the correct and cheap answer to
+          datacenter loss, and every one of those zones is in Southeast Asia. When
+          the region goes, the reads the requirement cares about go with it. This
+          is the same substitution the chapter has now punished four times: zones
+          are availability, the region pair is recovery, and neither stands in for
+          the other.
+        rep: -10
+    next: e4-check
+
+  - id: e4-check
+    type: knowledge_check
+    title: "One line for the risk register"
+    speaker: security
+    objectives: [AZ305-3.1, AZ305-3.5]
+    scenario: |
+      Marcus needs one sentence for the board's risk register describing what the
+      WMS design actually delivers. He has drafted four and wants you to pick.
+
+      What is in place: eight application instances across three availability
+      zones behind a zone-redundant load balancer; Azure SQL Business Critical in
+      a zone-redundant configuration; an auto-failover group to East Asia set to
+      customer-managed failover; Site Recovery replicating the application tier.
+      The committed objectives are RPO 15 minutes and RTO 4 hours. The drill
+      measured 2 hours 47 minutes.
+    question: >
+      Which line goes in the risk register?
+    options:
+      - id: opt-correct-line
+        label: "Loss of one Singapore datacenter is absorbed automatically with no data loss; loss of the region requires a declared failover, bounded by RPO 15 minutes and RTO 4 hours"
+        correct: true
+        explain: >
+          It separates the two events, names the mechanism for each, and states the
+          committed numbers only against the event they were written for. Zones
+          handle the datacenter case synchronously and without a decision; the
+          region case is asynchronous and starts with a human declaring a disaster,
+          which is why it carries an RPO at all.
+      - id: opt-conflated
+        label: "Zone redundancy delivers the 15-minute RPO and the region pair delivers the 4-hour RTO"
+        correct: false
+        explain: >
+          This splits one pair of objectives across two unrelated mechanisms. RPO
+          and RTO are both properties of a single recovery scenario, so each
+          scenario has its own pair: near-zero and seconds for zone loss, fifteen
+          minutes and four hours for regional loss. A register line written this
+          way cannot be tested.
+      - id: opt-zero-rpo
+        label: "Because the database replicates continuously to East Asia, the RPO for regional loss is zero"
+        correct: false
+        explain: >
+          Continuous is not synchronous. The failover group replicates
+          asynchronously with a recovery point objective of about five seconds,
+          and Site Recovery produces crash-consistent points roughly every five
+          minutes, so committed transactions can be in flight when the region
+          goes. Only synchronous replication gives a zero RPO, and it is not what
+          is deployed here.
+      - id: opt-restate-rto
+        label: "Since the drill completed in 2 hours 47 minutes, the committed RTO should be restated as 2 hours 47 minutes"
+        correct: false
+        explain: >
+          The measured figure came from a rehearsed Sunday with the full team on a
+          bridge, a known scenario, and no competing incident. Committed objectives
+          carry deliberate margin over measured ones because real events are
+          messier. Use the drill number to prove the commitment is achievable, not
+          to erase the margin that makes it safe.
+    next: END

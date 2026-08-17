@@ -107,6 +107,9 @@ def sample_quest():
                 "title": "An incident",
                 "objectives": ["AZ104-1.2"],
                 "scenario": "The spoke cannot reach the hub.",
+                "on_enter_diagram_ops": [
+                    {"op": "set_status", "node": "vnet-spoke", "status": "broken"}
+                ],
                 "time_budget": 4,
                 "investigate": [
                     {"id": "inv-a", "label": "Ask the NOC", "reveals": "They changed a peering."},
@@ -132,6 +135,9 @@ def sample_quest():
                         "label": "Recreate the peering",
                         "correct": True,
                         "explain": "Peering is two objects.",
+                        "diagram_ops": [
+                            {"op": "set_status", "node": "vnet-spoke", "status": "healthy"}
+                        ],
                     },
                     {
                         "id": "fix-bad",

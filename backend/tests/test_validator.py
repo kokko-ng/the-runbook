@@ -122,6 +122,46 @@ def test_chapter_must_match_domain(write_quest):
     assert any("does not match domain" in p for p in problems_for(root))
 
 
+def test_incident_that_breaks_nothing_on_the_map_rejected(write_quest):
+    """An incident the player cannot see is a missed teaching opportunity."""
+    quest = sample_quest()
+    quest["encounters"][1].pop("on_enter_diagram_ops", None)
+    root = write_quest(quest)
+    assert any("the incident is invisible" in p for p in problems_for(root))
+
+
+def test_incident_with_no_repairing_fix_rejected(write_quest):
+    """Damage no fix clears would be inherited by every later quest."""
+    quest = sample_quest()
+    quest["encounters"][1]["fixes"][0]["diagram_ops"] = []
+    root = write_quest(quest)
+    assert any("leaves node vnet-spoke broken" in p for p in problems_for(root))
+
+
+def test_incident_repaired_by_the_correct_fix_accepted(write_quest):
+    quest = sample_quest()
+    quest["encounters"][1]["on_enter_diagram_ops"] = [
+        {"op": "set_status", "node": "vnet-spoke", "status": "broken"}
+    ]
+    quest["encounters"][1]["fixes"][0]["diagram_ops"] = [
+        {"op": "set_status", "node": "vnet-spoke", "status": "healthy"}
+    ]
+    root = write_quest(quest)
+    assert problems_for(root) == []
+
+
+def test_repair_on_a_wrong_fix_does_not_count(write_quest):
+    """Only the correct resolution may clear the incident."""
+    quest = sample_quest()
+    # Move the repair from the correct fix onto a wrong one.
+    quest["encounters"][1]["fixes"][0]["diagram_ops"] = []
+    quest["encounters"][1]["fixes"][1]["diagram_ops"] = [
+        {"op": "set_status", "node": "vnet-spoke", "status": "healthy"}
+    ]
+    root = write_quest(quest)
+    assert any("leaves node vnet-spoke broken" in p for p in problems_for(root))
+
+
 def test_time_budget_below_cheapest_command_rejected(write_quest):
     quest = sample_quest()
     quest["encounters"][1]["time_budget"] = 1

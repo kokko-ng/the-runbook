@@ -140,7 +140,7 @@ encounters:
           uses, so the column reconciles without translation.
         rep: 10
         diagram_ops:
-          - {op: set_label, node: rg-ops, label: "rg-ops-sea (costcenter CC-4400)"}
+          - {op: set_label, node: rg-ops, label: "rg-ops-sea (WMS production, CC-4400)"}
       - id: opt-many-tags
         label: "Fourteen tags covering everything finance, security, and operations might ever want to slice by"
         correct: false

@@ -1,0 +1,293 @@
+schema_version: 1
+id: act1-cmp-08-where-is-my-pallet
+title: "Where Is My Pallet"
+act: 1
+chapter: act1-compute
+domain: az104-d3
+order: 8
+role: senior-cloud-admin
+checkpoint: true
+summary: "The shipment tracking page runs on an IIS server in Kallang that Marcus has been asking about for two years."
+entry: e1-plan
+
+encounters:
+  - id: e1-plan
+    type: design_decision
+    title: "The cheapest tier that works"
+    speaker: cfo
+    objectives: [AZ104-3.17, AZ104-3.19]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: cmp-asp-track
+          label: "asp-meridian-track (App Service plan)"
+          kind: app-service
+          group: grp-corp
+          status: planned
+      - op: add_node
+        node:
+          id: cmp-app-track
+          label: "app-track (shipment tracking)"
+          kind: app-service
+          group: grp-corp
+          status: planned
+      - op: add_edge
+        edge:
+          id: cmp-e-asp-app
+          source: cmp-asp-track
+          target: cmp-app-track
+          kind: dependency
+          status: planned
+    scenario: |
+      The shipment tracking page - a consignee types a reference, the page tells
+      them where the pallet is - runs on an IIS server in Kallang. It is the only
+      thing Meridian's customers ever see.
+
+      Requirements, collected over a week:
+
+      Marketing want it on track.meridianlogistics.com.sg with a certificate that
+      does not produce a browser warning. Ops want releases tested somewhere real
+      before customers get them. The application needs to query the WMS database
+      on a private address inside the warehouse network. Traffic is around two
+      hundred requests a second during business hours and a fraction of that
+      overnight, and it should grow and shrink on its own.
+
+      Evelyn's instruction is one sentence: the cheapest tier that meets all of
+      it, not the tier you would enjoy operating.
+    prompt: "Which App Service plan do you provision?"
+    options:
+      - id: opt-standard
+        label: "A Linux App Service plan on Standard (S1), with the web app created into it"
+        correct: true
+        explain: >
+          Work up the tiers until every requirement is met. Custom domains with
+          TLS appear at Basic; deployment slots, autoscale and regional virtual
+          network integration all appear at Standard. Standard is therefore the
+          lowest tier that satisfies the whole list, and the plan is the unit you
+          pay for - the app itself costs nothing extra. Note that the plan's
+          operating system and region are fixed when you create it.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: cmp-asp-track, status: healthy}
+          - {op: set_status, node: cmp-app-track, status: healthy}
+          - {op: set_edge_status, edge: cmp-e-asp-app, status: healthy}
+      - id: opt-free
+        label: "Free (F1) to start with, moving up only when the traffic justifies it"
+        correct: false
+        consequence: >
+          The custom domain cannot be bound and the site sleeps after twenty
+          minutes of quiet, which at 03:00 is every night.
+        explain: >
+          Free and Shared tiers run on shared infrastructure with CPU quotas, no
+          Always On, and no TLS binding for a custom domain. They are for
+          experiments and training. Moving up later is easy, but the requirements
+          are known now and none of them are met at F1.
+        rep: -10
+      - id: opt-basic
+        label: "Basic (B2), which supports the custom domain and certificate and costs less than Standard"
+        correct: false
+        consequence: >
+          Ops ask for the staging slot in week two and the answer is a tier change.
+        explain: >
+          This is the closest wrong answer and worth knowing precisely. Basic does
+          give you a custom domain, a TLS binding and dedicated compute. It gives
+          you no deployment slots, no autoscale and no virtual network
+          integration, which is three of the five requirements. Cheapest that
+          meets the requirements is not the same as cheapest.
+        rep: -8
+      - id: opt-premium
+        label: "Premium v3 (P1v3), for the better hardware, more slots and room to grow"
+        correct: false
+        explain: >
+          Premium v3 meets everything and adds zone redundancy, private endpoints,
+          more slots and faster instances - all real, none of them on the list.
+          Choose it when you need inbound private connectivity or zone redundancy,
+          or when the plan is dense enough that the price per unit of compute wins.
+          Here it is a larger invoice for capability nobody asked for.
+        rep: -6
+    next: e2-scaling
+
+  - id: e2-scaling
+    type: design_decision
+    title: "Five o'clock"
+    speaker: manager
+    objectives: [AZ104-3.18]
+    scenario: |
+      Two weeks of real traffic, and the shape is clearer than anyone predicted.
+
+      Flat through the working day. A sharp rise from 16:30 to about 19:30, when
+      consignees get home and check whether the delivery they missed is coming
+      tomorrow, roughly triple the daytime rate. Near zero from midnight.
+
+      An instance takes about ninety seconds from the scale-out decision to
+      serving requests. The plan currently runs two instances and the evening peak
+      is producing queued requests for the first ten minutes of the ramp, every
+      evening, before autoscale catches up.
+
+      The plan also hosts the internal rate calculator, which nobody uses after
+      five.
+    prompt: "How do you configure scaling on the plan?"
+    options:
+      - id: opt-autoscale-schedule
+        label: "Autoscale on the plan: out by 2 above 70 percent CPU over 10 minutes, in by 1 below 30 percent, maximum 6 - plus a scheduled profile raising the minimum to 3 between 16:00 and 20:00"
+        correct: true
+        explain: >
+          Metric rules react to what happens; a scheduled profile prepares for what
+          you already know happens. Raising the minimum before the ramp removes the
+          ten minutes of queuing without paying for the capacity all day, and the
+          CPU rules still handle the evening that does not follow the pattern.
+          Autoscale is configured on the plan, so every app in it scales together.
+        rep: 12
+      - id: opt-scale-up-evening
+        label: "Script a scale up to P2v3 at 16:00 and back down to S1 at 20:00, so the extra capacity arrives on time"
+        correct: false
+        consequence: >
+          The first evening the scale-up runs, every instance restarts and the
+          site drops requests at exactly 16:00.
+        explain: >
+          Scaling up changes the tier and size of the instances, which recycles the
+          workers, and it buys capabilities you are not using along with the extra
+          capacity. Scaling out changes the number of instances and is the elastic
+          lever. Keep tier changes for when the app needs a feature or a bigger
+          single instance.
+        rep: -10
+      - id: opt-queue-length
+        label: "Autoscale on the HTTP queue length metric, since queued requests are exactly the symptom being solved"
+        correct: false
+        explain: >
+          Queue length is a lagging signal: by the time requests are queued, users
+          are already waiting, and you then add ninety seconds of instance start.
+          It earns its place as a secondary rule for traffic that spikes faster
+          than CPU reflects it, alongside a leading signal and a schedule, but not
+          on its own as the primary trigger.
+        rep: -6
+      - id: opt-fixed-six
+        label: "Set the plan to six instances permanently and stop thinking about it"
+        correct: false
+        consequence: >
+          Evelyn asks why the tracking page costs three times what it did in July.
+        explain: >
+          It certainly meets the peak. It also runs six instances through the night
+          for a workload that is near zero, on a tier that was chosen partly
+          because it supports autoscale. Fixed capacity is a reasonable answer for
+          steady traffic; this traffic is the opposite of steady.
+        rep: -8
+    next: e3-networking
+
+  - id: e3-networking
+    type: design_decision
+    title: "The database is not on the internet"
+    speaker: security
+    objectives: [AZ104-3.23]
+    scenario: |
+      The app has been reading from a nightly export because it could not reach
+      the warehouse database. Consignees have been told their pallet was in Johor
+      for up to fourteen hours after it left.
+
+      The database listens on 10.101.1.20 inside snet-wms-app. The tracking site
+      itself must stay reachable by anyone on the public internet, because that is
+      what it is for.
+
+      Marcus has one addition. "The deployment endpoint - the one the pipeline
+      pushes to - should only answer to the build agents. It has a different
+      hostname from the site and people forget it exists."
+    prompt: "How do you configure networking on the app?"
+    options:
+      - id: opt-vnet-integration
+        label: "Enable regional virtual network integration into a new empty subnet delegated to Microsoft.Web/serverFarms, and add access restrictions on the scm site allowing only the build agent addresses"
+        correct: true
+        explain: >
+          Virtual network integration governs outbound traffic: the app's calls are
+          injected into a subnet in your network and can reach private addresses
+          over the peering. The subnet must be empty and delegated to
+          Microsoft.Web/serverFarms, and is sized for the plan's maximum instance
+          count. Access restrictions are configured separately for the main site
+          and the scm site, which is what lets the page stay public while the
+          deployment endpoint does not.
+        rep: 12
+      - id: opt-private-endpoint
+        label: "Create a private endpoint for the web app so it sits inside the virtual network and can reach the database directly"
+        correct: false
+        consequence: >
+          The tracking page stops resolving for customers within the hour and the
+          call center notices before monitoring does.
+        explain: >
+          This is the most common confusion in App Service networking and it is
+          worth fixing permanently. A private endpoint makes inbound traffic
+          private - the app becomes reachable only from the network - and it does
+          nothing for outbound. Outbound access to private addresses is virtual
+          network integration. The site here must stay publicly reachable, so a
+          private endpoint is exactly backward.
+        rep: -12
+      - id: opt-nsg-outbound-ips
+        label: "Leave the app on the public path and allow its outbound IP addresses through the NSG in front of the database"
+        correct: false
+        explain: >
+          The outbound addresses of a multi-tenant plan are shared with other
+          tenants and change when the plan scales across tiers, so the allow list
+          is both too broad and fragile. It also routes warehouse data over the
+          public internet to reach a machine two peerings away. Integration keeps
+          the traffic inside the network and needs no address list.
+        rep: -10
+      - id: opt-ase
+        label: "Move the app into an App Service Environment so it is fully inside the virtual network"
+        correct: false
+        explain: >
+          An App Service Environment does put the whole platform in your network
+          and is the right answer for strict isolation or compliance mandates. It
+          is also a large fixed monthly cost and a heavier thing to operate. The
+          requirement is outbound access to one database plus a restriction on one
+          endpoint, both of which Standard already provides.
+        rep: -8
+    next: e4-plan-check
+
+  - id: e4-plan-check
+    type: knowledge_check
+    title: "What the plan actually is"
+    speaker: mentor
+    objectives: [AZ104-3.17, AZ104-3.18]
+    scenario: |
+      Desmond looks at the plan in the portal, where the tracking app and the
+      internal rate calculator now sit side by side.
+
+      "Before you put anything else in there. People treat a plan like a folder.
+      It is not a folder."
+    question: >
+      asp-meridian-track runs two instances and hosts both apps. Autoscale adds a
+      third instance. What exists on that new instance, and where does the cost
+      sit?
+    options:
+      - id: opt-both-apps
+        label: "Both apps run on all three instances, and the cost is the plan's three instances regardless of how many apps it holds"
+        correct: true
+        explain: >
+          An App Service plan is the set of virtual machines your apps run on.
+          Every app assigned to the plan runs on every instance of it, so scaling
+          the plan scales all of them, and billing follows the plan's tier and
+          instance count rather than the number of apps. The practical consequence:
+          an app that consumes memory or CPU affects its neighbors, and the way to
+          isolate it is to move it to its own plan.
+      - id: opt-triggering-app
+        label: "Only the app whose metric triggered the rule is placed on the new instance; the other stays where it is"
+        correct: false
+        explain: >
+          Instances are not allocated per app. The plan scales as a unit and the
+          platform runs every app in it on each instance, which is why autoscale
+          rules are defined on the plan and not on an individual app.
+      - id: opt-billed-separately
+        label: "Both apps run everywhere, but each app is billed for the share of instance time it uses"
+        correct: false
+        explain: >
+          The first half is right and the billing model is not. You pay for the
+          plan - its tier multiplied by its instance count - whether it hosts one
+          app or ten, and whether those apps are busy or stopped. Stopping an app
+          does not reduce the bill; scaling in or deleting the plan does.
+      - id: opt-one-per-instance
+        label: "The platform distributes apps across instances, one app per instance, and adds instances as apps are added"
+        correct: false
+        explain: >
+          That would be a reasonable design and it is not this one. Apps are not
+          spread across the instances of a plan; they are replicated onto all of
+          them. Adding an app to a busy plan adds load to every instance rather
+          than consuming a spare one.
+    next: END

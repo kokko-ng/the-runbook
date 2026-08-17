@@ -1,0 +1,226 @@
+schema_version: 1
+id: act1-st-05-fourteen-terabytes-hard
+title: "The Invoice After the Migration"
+act: 1
+chapter: act1-storage
+domain: az104-d2
+order: 5
+role: cloud-admin
+checkpoint: true
+bonus_variant_of: act1-st-05-fourteen-terabytes
+summary: "The second wave lands, and Evelyn has learned the words minimum retention period."
+entry: e1-landing-tier
+
+encounters:
+  - id: e1-landing-tier
+    type: design_decision
+    title: "Six terabytes from the depot"
+    speaker: mentor
+    objectives: [AZ104-2.10, AZ104-2.13]
+    scenario: |
+      Wave two is the Tuas depot: 6 TB of scanned bundles sitting on a file
+      server that was lifted into Azure last year and now runs as a VM in
+      snet-wms-app. Same destination account, different container, same six-week
+      pattern.
+
+      Two things are different from the Kallang wave. The source is inside Azure
+      now, so the transfer never touches the internet link, and the archive
+      account has had shared key authorization disabled since the change in May.
+
+      The bundles are read almost never. Nobody expects to open one of these
+      before the next customs audit, which is in November.
+
+      Desmond, reviewing the plan: "Last time you copied fourteen terabytes into
+      the hot tier and then ran a lifecycle rule that changed the tier of every
+      blob. Tell me what that cost, and then tell me how to not do it again."
+    prompt: "How do you run the wave-two transfer?"
+    options:
+      - id: opt-identity-cool
+        label: "Authorize AzCopy with the VM's managed identity using azcopy login --identity, and copy with --block-blob-tier Cool"
+        correct: true
+        explain: >
+          Two savings in one command. Landing the blobs directly in cool avoids
+          paying hot rates for the weeks before a lifecycle rule catches up, and
+          avoids one set-tier write transaction for every one of millions of
+          objects. Using the VM's managed identity avoids a SAS entirely, which
+          matters because service SAS tokens are signed with an account key and
+          the account no longer accepts key-based authorization.
+        rep: 14
+      - id: opt-hot-then-policy
+        label: "Copy with default settings into hot, and let the existing lifecycle rule move everything to cool after 30 days"
+        correct: false
+        consequence: >
+          Evelyn circles the line for set-blob-tier transactions and asks what
+          they are.
+        explain: >
+          This is the wave-one pattern repeated knowingly. Six terabytes spend a
+          month at the hot storage rate for data nobody will read until November,
+          and the policy run then bills a write operation per blob to change each
+          tier. When the destination tier is known at upload time, set it at
+          upload time.
+        rep: -10
+      - id: opt-sas
+        label: "Generate a 30-day service SAS with write permission on the container and pass it to AzCopy"
+        correct: false
+        consequence: >
+          Every transfer attempt returns KeyBasedAuthenticationNotPermitted, and
+          the first night of the window is lost to it.
+        explain: >
+          A service SAS is signed with an account key, and this account has
+          shared key authorization disabled, so the token is refused before any
+          data moves. The available options are Entra authorization or a user
+          delegation SAS. The VM already has an identity, which makes the first
+          one free.
+        rep: -12
+      - id: opt-archive-direct
+        label: "Copy with --block-blob-tier Archive, since nothing will be read before November anyway"
+        correct: false
+        consequence: >
+          The post-migration verification pass cannot read a single blob, and the
+          November audit starts with a rehydration bill.
+        explain: >
+          Uploading straight to archive is supported and skips two problems while
+          creating three: archived blobs cannot be read, so no checksum or spot
+          verification of a migration is possible, and archive carries a 180-day
+          early deletion charge before anything can move. Verify in an online tier
+          first, then let a lifecycle rule archive what survives verification.
+        rep: -10
+    next: e2-last-access
+
+  - id: e2-last-access
+    type: design_decision
+    title: "Tier by when it was read, not when it was written"
+    speaker: cfo
+    objectives: [AZ104-2.16, AZ104-2.13]
+    scenario: |
+      Evelyn has been talking to the claims desk, which is a development you
+      will have feelings about later.
+
+      "Your rules move things by age. The claims desk tells me some of these
+      files get opened repeatedly for eighteen months when a dispute runs long,
+      and your rule has already put those in archive. They then wait an hour for
+      a file they read last Tuesday. That is not a saving, that is a cost you
+      moved onto someone else's afternoon."
+
+      She is right, and there is a feature for it. There is also a trap in it:
+      the annual customs audit sweeps thousands of documents in a week, reads
+      each one once, and then never touches them again.
+
+      "I want the rules to follow what is actually being used," Evelyn says. "And
+      I do not want November's audit to undo eleven months of tiering."
+    prompt: "How do you rebuild the lifecycle policy?"
+    options:
+      - id: opt-last-access-no-autotier
+        label: "Enable last access time tracking on the blob service and key the rules on daysAfterLastAccessTimeGreaterThan, leaving auto-tier-to-hot off"
+        correct: true
+        explain: >
+          Last access time tracking lets lifecycle rules act on reads rather than
+          writes, so a document under active dispute stays online while its
+          neighbors age down. Leaving enableAutoTierToHotFromCool off is the part
+          that survives November: without it, the audit's single read of each
+          document does not drag thousands of blobs back to hot. Note that the
+          tracked timestamp updates at most once every 24 hours, and tracking adds
+          a small per-transaction cost.
+        rep: 14
+      - id: opt-last-access-autotier
+        label: "Enable last access time tracking and turn on auto-tier-to-hot from cool, so anything read comes straight back to the fast tier"
+        correct: false
+        consequence: >
+          The November audit reads 40,000 documents once each, and December's
+          invoice shows 40,000 blobs sitting in hot.
+        explain: >
+          Automatic promotion on read is the right setting for data with genuine
+          hot and cold phases, and the wrong one for a workload with an annual
+          bulk sweep - a single read is not evidence of a phase change. The
+          scenario names the sweep specifically, which is what makes this the trap
+          rather than the answer.
+        rep: -10
+      - id: opt-modification
+        label: "Keep the existing daysAfterModificationGreaterThan rules and lengthen every threshold to eighteen months"
+        correct: false
+        explain: >
+          It fixes the disputed documents by keeping everything else online for
+          eighteen months too, which is the opposite of what Evelyn came to ask
+          for. Modification time cannot distinguish a document being read weekly
+          from one nobody has opened since it landed; that distinction is exactly
+          what last access tracking adds.
+        rep: -8
+      - id: opt-tag-based
+        label: "Have the claims system apply a blob index tag when a dispute opens, and filter the lifecycle rules on that tag"
+        correct: false
+        explain: >
+          Lifecycle rules can filter on blob index tags, and this would work if
+          the claims system reliably tagged and untagged every document - which is
+          a change to an application, a backfill for existing blobs, and a new
+          failure mode when a dispute closes without the tag being cleared. Last
+          access tracking gets most of the benefit with a service setting.
+        rep: -5
+    next: e3-early-deletion
+
+  - id: e3-early-deletion
+    type: design_decision
+    title: "The four terabytes that expire in March"
+    speaker: cfo
+    objectives: [AZ104-2.13]
+    scenario: |
+      One tranche of dashcam footage is awkward. Roughly 4 TB of it reaches the
+      insurer's two-year limit in about sixty days, at which point the lifecycle
+      rule deletes it. It is in cool today. The remaining 7 TB has between eight
+      months and two years left to run.
+
+      A consultant's report has landed on Evelyn's desk recommending that all 11
+      TB move to archive immediately, with a saving calculated on the archive
+      storage rate.
+
+      "It says here we save four thousand dollars a year," Evelyn says. "You have
+      been telling me about minimum retention periods for a month. Is the report
+      wrong, and if it is wrong, how wrong."
+
+      The relevant numbers: archive has a 180-day minimum retention, cool has 30,
+      and moving or deleting a blob before its minimum is up bills the remaining
+      days at the tier's rate anyway.
+    prompt: "What do you tell Evelyn?"
+    options:
+      - id: opt-split-tranche
+        label: "Archive the 7 TB that has months left to run, and leave the 4 TB in cool until the rule deletes it in sixty days"
+        correct: true
+        explain: >
+          Archive's 180-day minimum means the tranche due for deletion in sixty
+          days would be billed for the other 120 days regardless, wiping out the
+          saving on that portion and adding a rehydration problem if anything is
+          needed in the meantime. Splitting by remaining life keeps the consultant's
+          saving where it is real. Minimum retention periods are what make tiering
+          an arithmetic exercise rather than a preference.
+        rep: 14
+      - id: opt-archive-all
+        label: "Archive all 11 TB as the report recommends and let the deletion rule run on schedule"
+        correct: false
+        consequence: >
+          The March invoice carries an early deletion charge for 4 TB times 120
+          days, and the consultant is not available to explain it.
+        explain: >
+          The early deletion charge is not a penalty for changing your mind, it is
+          the balance of the minimum retention billed at once - so short-lived data
+          in archive costs more than leaving it where it was. The report's saving
+          assumed every byte would stay put for at least 180 days.
+        rep: -10
+      - id: opt-keep-cool
+        label: "Leave all 11 TB in cool, since the minimum retention makes archive not worth the complexity"
+        correct: false
+        explain: >
+          Overcorrecting: the 7 TB with eight months to two years of life left
+          comfortably clears the 180-day minimum, and that is where the real
+          saving sits. One awkward tranche is a reason to split the rule, not to
+          abandon the tier.
+        rep: -6
+      - id: opt-cold-all
+        label: "Move all 11 TB to the cold tier instead, which is cheaper than cool with a shorter minimum than archive"
+        correct: false
+        explain: >
+          Cold's minimum retention is 90 days, still longer than the 60 the
+          expiring tranche has left, so the same early deletion problem appears in
+          smaller form. It also leaves the long-lived 7 TB at a dearer rate than
+          archive for data that will not be read. Cold is a real answer for
+          rarely-read data that must stay online, which is not this.
+        rep: -8
+    next: END

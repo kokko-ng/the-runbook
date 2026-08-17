@@ -1,0 +1,480 @@
+schema_version: 1
+id: act2-inf-05-the-firehose
+title: "The Firehose"
+act: 2
+chapter: act2-infrastructure
+domain: az305-d4
+order: 5
+role: associate-architect
+checkpoint: true
+summary: "Eleven thousand containers, each with opinions about its own temperature."
+entry: e1-ingest
+
+encounters:
+  - id: e1-ingest
+    type: design_decision
+    title: "Eleven thousand talking boxes"
+    speaker: manager
+    objectives: [AZ305-4.7]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2inf-evhub
+          label: "Telemetry ingest"
+          kind: monitor
+          group: grp-sea
+          status: planned
+    scenario: |
+      Meridian fits tracking units to its reefer containers. Sunda's fleet
+      doubles the count, and the board's expansion plan doubles it again.
+
+      Priya has the numbers from the telemetry vendor:
+
+      - 22,000 units after the acquisition, each emitting every 30 seconds
+      - Roughly 12,000 events per second sustained, 30,000 at fleet handover peaks
+      - Each event is 1.2 KB: position, door state, temperature, battery
+      - Three consumers today: live map, cold-chain alerting, and a nightly analytics load
+      - Analytics must be able to replay the last 24 hours after a failed load
+      - Events for one container must be processed in the order they were sent
+      - Consumers will be added; the vendor already wants a fourth
+
+      "Whatever you pick," Priya says, "the cold-chain alerting has to see a
+      temperature excursion within a minute, because that is what the insurance
+      policy says."
+    prompt: "What ingest service do you recommend?"
+    options:
+      - id: opt-eventhubs
+        label: "Azure Event Hubs with partitioning on container ID, multiple consumer groups, and Capture to Blob for the analytics load"
+        correct: true
+        explain: >
+          Event Hubs is built for this shape: high-volume telemetry ingest measured
+          in tens of thousands of events per second, where events are a stream
+          rather than discrete commands. Partitioning by container ID gives the
+          per-container ordering the requirement names. Consumer groups let the
+          live map, alerting, and analytics read the same stream independently, and
+          a fourth consumer costs a consumer group rather than a redesign.
+          Retention plus Capture gives analytics the 24-hour replay it needs.
+        rep: 10
+        diagram_ops:
+          - {op: set_label, node: a2inf-evhub, label: "evhns-meridian (Event Hubs, 8 partitions)"}
+          - {op: set_status, node: a2inf-evhub, status: healthy}
+          - op: add_edge
+            edge: {id: a2inf-e-prod-evhub, source: sub-prod2, target: a2inf-evhub, kind: dependency}
+      - id: opt-servicebus
+        label: "Azure Service Bus Premium topics with three subscriptions, one per consumer"
+        correct: false
+        consequence: >
+          The throughput sizing exercise ends with an uncomfortable number of
+          messaging units and a per-operation bill.
+        explain: >
+          Service Bus topics give fan-out and ordering with sessions, and they are
+          designed for discrete business messages with per-message operations,
+          dead-lettering, and transactions - not for a 12,000-per-second telemetry
+          stream. It also has no replay: once a message is completed it is gone,
+          so the 24-hour analytics replay requirement would need a separate copy of
+          the data.
+        rep: -8
+      - id: opt-eventgrid
+        label: "Azure Event Grid with three event subscriptions and a custom topic per fleet region"
+        correct: false
+        explain: >
+          Event Grid is a discrete-event router: it delivers notifications that
+          something happened, at scale, with push semantics and retries. It is not
+          a stream, so there is no offset, no ordered per-key partition, and no
+          replay window - which fails both the ordering and the 24-hour replay
+          requirements. Event Grid is the right choice for reacting to state
+          changes, not for ingesting continuous telemetry.
+        rep: -8
+      - id: opt-iothub
+        label: "Azure IoT Hub, since these are field devices"
+        correct: false
+        explain: >
+          IoT Hub is a defensible answer and worth knowing why it is not the pick
+          here. It adds per-device identity, cloud-to-device commands, and device
+          twins - none of which appear in the requirements, because the vendor
+          owns device management and Meridian only receives the feed. Paying for a
+          device management plane you do not use is cost without a requirement
+          behind it; IoT Hub uses Event Hubs semantics underneath anyway.
+        rep: -5
+    next: e2-messaging
+
+  - id: e2-messaging
+    type: design_decision
+    title: "The order handoff"
+    speaker: mentor
+    objectives: [AZ305-4.6]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2inf-sbus
+          label: "Order messaging"
+          kind: monitor
+          group: grp-sea
+          status: planned
+    scenario: |
+      Separate problem, same week. Sunda's order intake has to hand each
+      confirmed booking to three systems: the WMS, the SAP ERP for invoicing, and
+      the customs filing service.
+
+      Desmond describes the current arrangement without enthusiasm.
+
+      "Right now the intake app calls all three over HTTP in a loop. When SAP is
+      down for its Sunday patch, the loop throws, the order is half-written, and
+      someone in Jakarta fixes it by hand on Monday."
+
+      The requirements finance signed off:
+
+      - No booking may be lost, ever; at-least-once delivery with an audit trail
+      - Intake must accept the booking even when SAP is unavailable for hours
+      - The three systems must each get every booking, independently
+      - Bookings for the same customer account must be invoiced in submission order
+      - A message that cannot be processed after retries must be inspectable, not dropped
+      - Around 40,000 bookings a day, bursty at 09:00 and 17:00
+    prompt: "What messaging architecture do you recommend for the order handoff?"
+    options:
+      - id: opt-sb-topics
+        label: "A Service Bus topic with three subscriptions, sessions keyed on customer account, and dead-letter queues on each subscription"
+        correct: true
+        explain: >
+          Every requirement maps to a Service Bus feature. A topic with three
+          subscriptions gives each downstream system its own independent copy.
+          Sessions keyed on the customer account preserve submission order per
+          account without serializing the whole topic. The broker durably holds
+          messages while SAP is patched, which decouples intake from downstream
+          availability. Dead-letter queues keep poison messages inspectable rather
+          than discarded, which is what the audit trail requirement means in
+          practice.
+        rep: 10
+        diagram_ops:
+          - {op: set_label, node: a2inf-sbus, label: "sb-meridian (Service Bus Premium)"}
+          - {op: set_status, node: a2inf-sbus, status: healthy}
+          - op: add_edge
+            edge: {id: a2inf-e-sbus-wms, source: a2inf-sbus, target: wms-sea, kind: dependency}
+          - op: add_edge
+            edge: {id: a2inf-e-sbus-sap, source: a2inf-sbus, target: a2inf-vm-sap, kind: dependency}
+      - id: opt-storage-queue
+        label: "Three Azure Storage queues, one per downstream system, written by the intake app"
+        correct: false
+        consequence: >
+          A fourth consumer arrives in March. So does a fourth write in the intake
+          code, and a deployment.
+        explain: >
+          Storage queues are durable, cheap, and simple, and they have no topic
+          semantics, no sessions, and no dead-letter queue. The producer would have
+          to write to every queue itself, which puts fan-out back in the
+          application, and there is no ordering guarantee to satisfy the
+          per-account invoicing requirement. Storage queues suit a single
+          consumer, simple work-queue pattern.
+        rep: -8
+      - id: opt-eventgrid
+        label: "Publish a BookingConfirmed event to Event Grid and let each system subscribe"
+        correct: false
+        consequence: >
+          SAP's Sunday patch window outlasts the retry policy. Nine bookings never
+          arrive and nobody knows which.
+        explain: >
+          Event Grid decouples the producer and fans out well, but its delivery
+          model is push with a bounded retry and time-to-live, after which events
+          are dropped or dead-lettered to storage you must build. For a booking
+          that may never be lost and a consumer that may be down for hours, you
+          want a broker that holds the message until a consumer pulls it. Events
+          notify; messages carry work that must be done.
+        rep: -8
+      - id: opt-retry
+        label: "Keep the direct HTTP calls but wrap them in a retry policy with exponential backoff and a circuit breaker"
+        correct: false
+        explain: >
+          Retries improve a transient-failure story and do nothing for a
+          multi-hour outage: the intake request cannot block until SAP's patch
+          window ends, so the booking is still lost or half-written. The stated
+          requirement is that intake accepts bookings while a downstream system is
+          unavailable, and that is a durability property of a broker, not a
+          resilience property of a client.
+        rep: -10
+    next: e3-processing
+
+  - id: e3-processing
+    type: design_decision
+    title: "Who reads the stream"
+    speaker: mentor
+    objectives: [AZ305-4.4]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2inf-func-telemetry
+          label: "Telemetry processor"
+          kind: function-app
+          group: grp-sea
+          status: planned
+      - op: add_edge
+        edge: {id: a2inf-e-evhub-func, source: a2inf-evhub, target: a2inf-func-telemetry, kind: traffic, status: healthy}
+    scenario: |
+      The cold-chain alerting consumer has to read the Event Hub, evaluate each
+      reading against the container's contract temperature, and raise an alert.
+
+      What it has to satisfy:
+
+      - 12,000 events per second sustained, 30,000 at peak, for a few minutes at a time
+      - Excursion to alert within 60 seconds, insurance-mandated
+      - No cold start allowed during peak; the peaks are predictable but sharp
+      - Must reach the Managed Instance and Redis over private endpoints
+      - Per-event work is small: a lookup and a comparison, single-digit milliseconds
+      - The team writing it is two developers who want to write handlers, not infrastructure
+
+      Desmond: "And it runs at three in the morning as much as at three in the
+      afternoon, so whatever it is, it does not get to need me."
+    prompt: "What compute do you recommend for the telemetry processor?"
+    options:
+      - id: opt-func-premium
+        label: "Azure Functions on an Elastic Premium plan with an Event Hubs trigger, pre-warmed instances, and VNet integration"
+        correct: true
+        explain: >
+          The event-driven programming model fits work that is small, stateless,
+          and triggered per batch of events, and the Event Hubs trigger handles
+          checkpointing and partition leases so the developers write handlers.
+          Elastic Premium is the specific tier the requirements force: pre-warmed
+          instances remove cold start before the predictable peak, and VNet
+          integration is what reaches private endpoints. Consumption would satisfy
+          neither.
+        rep: 10
+        diagram_ops:
+          - {op: set_label, node: a2inf-func-telemetry, label: "func-telemetry (Functions, Elastic Premium)"}
+          - {op: set_status, node: a2inf-func-telemetry, status: healthy}
+          - op: add_node
+            node:
+              id: a2inf-cosmos-tracking
+              label: "cosmos-tracking (last known position)"
+              kind: cosmos-db
+              group: grp-sea
+              status: healthy
+          - op: add_edge
+            edge: {id: a2inf-e-func-cosmos, source: a2inf-func-telemetry, target: a2inf-cosmos-tracking, kind: dependency}
+      - id: opt-func-consumption
+        label: "Azure Functions on the Consumption plan, since the workload is event-driven and scales to zero between peaks"
+        correct: false
+        consequence: >
+          The first fleet handover peak produces a four-minute alerting gap. The
+          insurance clause says sixty seconds.
+        explain: >
+          Consumption is the natural instinct for event-driven work and it fails
+          two stated requirements: cold start is unavoidable on scale-out from
+          idle, and the plan has no VNet integration for reaching private
+          endpoints. The workload also never really idles at 12,000 events per
+          second, so the scale-to-zero economics that justify Consumption do not
+          apply here.
+        rep: -8
+      - id: opt-aks
+        label: "Run the consumer as a deployment on the existing AKS cluster with KEDA scaling on Event Hub lag"
+        correct: false
+        explain: >
+          Technically sound - KEDA scales on lag well - and it hands two
+          developers a cluster, a Helm chart, and an upgrade cycle they said they
+          did not want, on a cluster that was justified for a vendor OCR product
+          with a GPU pool. The team-capability and operational-ownership
+          constraints do the deciding here, exactly as they did for the mobile API.
+        rep: -6
+      - id: opt-vmss
+        label: "A virtual machine scale set running the consumer as a service, autoscaling on CPU"
+        correct: false
+        consequence: >
+          CPU sits at eleven percent while the lag grows. The scale rule never
+          fires.
+        explain: >
+          Autoscaling a stream consumer on CPU measures the wrong thing: the
+          backlog grows long before processor utilization does, because the
+          bottleneck is partition concurrency and downstream latency. It also puts
+          patching, image management, and checkpoint handling on a two-person
+          team. Scale event-driven consumers on queue depth or consumer lag, not
+          on CPU.
+        rep: -8
+    next: e4-lag
+
+  - id: e4-lag
+    type: troubleshoot
+    title: "P2: Cold-chain alerts are late"
+    speaker: noc
+    objectives: [AZ305-4.7, AZ305-4.4]
+    ticket:
+      id: "MER-7731"
+      reporter: "NOC Manila (day shift)"
+      priority: "P2"
+      opened: "14:05"
+      body: |
+        Cold-chain alerts arriving 30-40 minutes after the reading timestamp.
+        Insurance threshold is 60 seconds. Live map is also stale for some
+        containers but fine for others. Telemetry processor reports healthy, no
+        exceptions, no failed invocations. Event Hub is accepting events
+        normally. Escalating to architecture.
+    on_enter_diagram_ops:
+      - {op: set_status, node: a2inf-func-telemetry, status: broken}
+      - {op: set_status, node: a2inf-evhub, status: warning}
+      - {op: set_edge_status, edge: a2inf-e-evhub-func, status: degraded}
+    scenario: |
+      The alerting gap is not an outage. Everything reports healthy, which is
+      worse, because there is nothing to restart.
+
+      Some containers are fine. Some are half an hour behind. The pattern is not
+      obvious from the map, and the reefer team has three trailers sitting at
+      Pasir Panjang with rising temperatures and no alert.
+
+      Priya has already been asked whether "the new architecture" is the problem.
+      She has not answered yet, which you appreciate.
+    time_budget: 6
+    investigate:
+      - id: inv-app-team
+        label: "Ask the telemetry app team what shipped recently"
+        speaker: ticket
+        reveals: >
+          "Tuesday. We changed the partition key so all readings from one depot
+          land together - makes the depot dashboards much easier to build. Small
+          change, one line."
+      - id: inv-noc
+        label: "Ask NOC Manila which containers are late"
+        speaker: noc
+        reveals: >
+          "Not random. Everything at Pasir Panjang and Jurong is late. Tuas and
+          the Johor cross-dock are current. It has been like that since Tuesday
+          afternoon."
+      - id: inv-desmond
+        label: "Ask Desmond whether the processor was scaled"
+        speaker: mentor
+        reveals: >
+          "I doubled the instance limit on Wednesday when you were in the review.
+          Made no difference at all, which annoyed me enough that I put it back.
+          More consumers than partitions does nothing."
+      - id: inv-metrics
+        label: "Check whether the Event Hub is throttling"
+        speaker: self
+        reveals: >
+          Namespace throughput units are auto-inflating and sit well under the
+          configured ceiling. Incoming bytes are normal for the hour. Nothing is
+          being throttled at the namespace level.
+    commands:
+      - id: cmd-hub-show
+        label: "Show the event hub configuration"
+        command: "az eventhubs eventhub show -g rg-events-sea --namespace-name evhns-meridian -n telemetry --query \"{partitions:partitionCount, retention:retentionDescription.retentionTimeInHours, status:status}\" -o table"
+        output: |
+          Partitions    Retention    Status
+          ------------  -----------  --------
+          8             24           Active
+        time_cost: 1
+        note: "Eight partitions, which sets the maximum useful consumer concurrency at eight."
+      - id: cmd-metrics
+        label: "Compare incoming and outgoing messages over the last hour"
+        command: "az monitor metrics list --resource $EVHNS --metric IncomingMessages OutgoingMessages --interval PT5M --aggregation Total -o table"
+        output: |
+          Timestamp            Name               Total
+          -------------------  -----------------  ----------
+          2026-08-17T13:10:00  IncomingMessages   3612000
+          2026-08-17T13:10:00  OutgoingMessages   3598400
+          2026-08-17T13:15:00  IncomingMessages   3604800
+          2026-08-17T13:15:00  OutgoingMessages   3591200
+        time_cost: 1
+        note: "Aggregate throughput is keeping up. The problem is not total volume."
+      - id: cmd-partition-lag
+        label: "Query per-partition lag from Application Insights"
+        command: "az monitor app-insights query --app appi-telemetry --analytics-query \"customMetrics | where name == 'EventHubLag' | summarize max(value) by tostring(customDimensions.partition)\" -o table"
+        output: |
+          partition    max_value
+          -----------  -----------
+          0            41
+          1            27
+          2            18
+          3            2841600
+          4            33
+          5            22
+          6            19
+          7            30
+        time_cost: 2
+        note: "Seven partitions are current. Partition 3 is 2.8 million events behind."
+      - id: cmd-consumer-groups
+        label: "List consumer groups on the hub"
+        command: "az eventhubs eventhub consumer-group list -g rg-events-sea --namespace-name evhns-meridian --eventhub-name telemetry -o table"
+        output: |
+          Name          CreatedAt
+          ------------  --------------------
+          $Default      2026-06-02T04:11:09Z
+          coldchain     2026-06-02T04:12:40Z
+          livemap       2026-06-02T04:12:51Z
+          analytics     2026-06-02T04:13:02Z
+        time_cost: 1
+        note: "Four consumer groups, all present. No consumer group is missing or duplicated."
+      - id: cmd-func-scale
+        label: "Show the function app plan and instance count"
+        command: "az functionapp show -g rg-events-sea -n func-telemetry --query \"{sku:sku, state:state, alwaysReady:siteConfig.minimumElasticInstanceCount}\" -o table"
+        output: |
+          Sku            State      AlwaysReady
+          -------------  ---------  -------------
+          ElasticPremium Running    4
+        time_cost: 1
+        note: "The plan and pre-warm settings are as designed."
+      - id: cmd-throttle
+        label: "Check namespace throttled requests"
+        command: "az monitor metrics list --resource $EVHNS --metric ThrottledRequests --interval PT15M --aggregation Total -o table"
+        output: |
+          Timestamp            Name                Total
+          -------------------  ------------------  -------
+          2026-08-17T13:00:00  ThrottledRequests   0
+          2026-08-17T13:15:00  ThrottledRequests   0
+        time_cost: 1
+    fixes:
+      - id: fix-partition-key
+        label: "Revert the partition key to the container ID so events distribute across all eight partitions, and build the depot dashboards by grouping downstream"
+        correct: true
+        explain: >
+          Partition assignment follows the partition key, and a key with eight
+          depot values in it - two of which carry most of the fleet - sends the
+          majority of events to a single partition. One partition is read by one
+          consumer at a time, so partition 3 became a single-threaded bottleneck
+          while the other seven idled, which is exactly the mixed picture the NOC
+          described. Container ID is high-cardinality, spreads evenly, and still
+          preserves per-container ordering, which is the only ordering the
+          requirements ask for. Grouping by depot is a query concern, not a
+          partitioning concern.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2inf-func-telemetry, status: healthy}
+          - {op: set_status, node: a2inf-evhub, status: healthy}
+          - {op: set_edge_status, edge: a2inf-e-evhub-func, status: healthy}
+      - id: fix-scale-out
+        label: "Raise the function app's maximum instance count and pre-warmed instances to clear the backlog faster"
+        correct: false
+        consequence: >
+          Desmond, who already tried this on Wednesday, says nothing, which is
+          worse than if he had.
+        explain: >
+          Consumer concurrency on an event stream is bounded by partition count:
+          with eight partitions, a ninth instance has no partition to lease. Seven
+          of your eight partitions are already current, so adding instances adds
+          idle instances. This is the single most common wrong answer on
+          consumer-lag incidents, and the metric that disproves it is the
+          per-partition lag you already have.
+        rep: -8
+      - id: fix-add-partitions
+        label: "Increase the hub from 8 to 32 partitions so there is more parallelism available"
+        correct: false
+        consequence: >
+          The new partitions receive almost nothing. Partition 3 keeps its share
+          and keeps its backlog.
+        explain: >
+          More partitions only help if the key distributes across them, and this
+          key has a handful of values. The existing skew is preserved: the hash of
+          "PASIR-PANJANG" still lands on exactly one partition. It is also a
+          change that cannot be undone - partition count can be increased on
+          Premium and Dedicated tiers but never reduced - so it permanently
+          reshapes the hub to work around a one-line application change.
+        rep: -10
+      - id: fix-new-consumer-group
+        label: "Create a dedicated consumer group for cold-chain alerting so it stops competing with the live map"
+        correct: false
+        explain: >
+          Consumer groups are already separate - the command output lists
+          coldchain, livemap, and analytics as distinct groups, each with its own
+          offsets. They do not compete for the stream. Adding a fifth changes
+          nothing about the distribution of events across partitions, which is
+          where the backlog actually is.
+        rep: -8
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: END

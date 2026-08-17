@@ -1,0 +1,462 @@
+schema_version: 1
+id: act2-inf-07-the-partner-api
+title: "The Partner API"
+act: 2
+chapter: act2-infrastructure
+domain: az305-d4
+order: 7
+role: associate-architect
+checkpoint: true
+summary: "Forty partners, one tracking endpoint, and a typhoon in the South China Sea."
+entry: e1-api
+
+encounters:
+  - id: e1-api
+    type: design_decision
+    title: "Forty partners and a spreadsheet of keys"
+    speaker: manager
+    objectives: [AZ305-4.8]
+    scenario: |
+      Meridian's shipment tracking API is consumed by forty freight forwarders,
+      three customs brokers, and one retailer whose integration was written in
+      2011. Sunda brings another eleven partners with their own expectations.
+
+      Today the API is a public endpoint on the WMS app service, and
+      authentication is a shared key stored in a spreadsheet.
+
+      What has to be true after the acquisition:
+
+      - Per-partner authentication, and a partner can be revoked without affecting others
+      - Per-partner rate limits and monthly quotas; one broker polls hard enough to be a problem
+      - The 2011 retailer sends SOAP and will not change; everyone else wants REST and JSON
+      - Two API versions must run side by side for six months during the Sunda merge
+      - Partners self-serve documentation and test calls; Priya will not run an onboarding desk
+      - The backend must not be reachable from the internet directly
+      - Response times must stay under 400 ms at the 95th percentile
+
+      Priya: "Forty-one integrations. I want one place where all of them are
+      described, throttled, and switched off."
+    prompt: "How do you design the partner API integration layer?"
+    options:
+      - id: opt-apim
+        label: "Azure API Management fronting the WMS, with subscription keys per partner, rate-limit and quota policies, a SOAP-to-REST policy for the legacy retailer, versioned API revisions, the developer portal, and VNet integration so the backend stays private"
+        correct: true
+        explain: >
+          API Management is the service that answers every one of these
+          requirements in policy rather than in application code. Subscriptions
+          give per-partner credentials that can be revoked individually,
+          rate-limit-by-key and quota-by-key handle the aggressive broker,
+          transformation policies let one partner keep SOAP without the backend
+          knowing, versions and revisions run two contracts side by side, and the
+          developer portal removes the onboarding desk. VNet integration keeps the
+          backend off the internet, which no amount of gateway logic can do on its
+          own.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-apim
+              label: "apim-meridian (partner gateway)"
+              kind: app-gateway
+              group: grp-sea
+              status: healthy
+          - op: add_edge
+            edge: {id: a2inf-e-apim-wms, source: a2inf-apim, target: wms-sea, kind: traffic}
+          - op: add_edge
+            edge: {id: a2inf-e-internet-apim, source: a2inf-internet, target: a2inf-apim, kind: traffic, label: "partners"}
+      - id: opt-agw
+        label: "Application Gateway with WAF in front of the WMS, using path-based routing for versions and IP allowlists per partner"
+        correct: false
+        consequence: >
+          Two partners move to a cloud provider with rotating egress addresses.
+          The allowlist becomes a weekly ticket.
+        explain: >
+          Application Gateway does Layer 7 routing, TLS termination, and WAF well,
+          and it has no concept of a consumer identity - so there are no
+          per-partner quotas, no revocable credentials, no developer portal, and
+          no transformation for the SOAP partner. IP allowlists approximate
+          per-partner control until the partner's addresses change. Use a WAF for
+          protecting a site; use an API gateway for managing consumers.
+        rep: -8
+      - id: opt-code
+        label: "Implement keys, throttling, and versioning as middleware inside the WMS application"
+        correct: false
+        consequence: >
+          The throttling bug ships with the release that also changes the picking
+          logic. Both get rolled back.
+        explain: >
+          Everything on the list is technically buildable, and building it couples
+          cross-cutting partner management to the release cycle of the warehouse
+          application, which is the thing you were trying to protect. It also
+          leaves the backend directly internet-facing, failing that requirement
+          outright. Gateways exist so policy changes at partner speed and code
+          changes at product speed.
+        rep: -10
+      - id: opt-frontdoor
+        label: "Azure Front Door with rules engine routing and a WAF policy per partner"
+        correct: false
+        explain: >
+          Front Door gives global entry, caching, and WAF, and its rules engine
+          can rewrite and route - but like Application Gateway it has no consumer
+          model, so per-partner quotas and revocable subscriptions do not exist.
+          It is a complement to an API gateway rather than a replacement, and it
+          becomes relevant once there is a second region.
+        rep: -8
+    next: e2-cache
+
+  - id: e2-cache
+    type: design_decision
+    title: "Weather in the South China Sea"
+    speaker: mentor
+    objectives: [AZ305-4.9]
+    scenario: |
+      Desmond has the traffic profile from last November, when a typhoon closed
+      the Kaohsiung transshipment window.
+
+      "Normal day: 900 tracking lookups a second. That week: eleven thousand, for
+      four days. Same three hundred consignments, over and over, because every
+      forwarder's customer refreshes the page."
+
+      The measured behavior:
+
+      - 94 percent of lookups in a spike hit the same 2 percent of consignments
+      - The status data changes at most every few minutes; partners tolerate data up to 5 minutes old
+      - The lookup costs one query against sql-wms; at 11,000 per second the database is the bottleneck
+      - Sessions are stateless, but the API also holds partner rate-limit counters that must be shared across instances
+      - Availability target for tracking is 99.9 percent, including during a spike
+      - Evelyn will fund a cache; she will not fund a database tier sized for four days a year
+
+      "So," Desmond says. "Cache it. Tell me what and where."
+    prompt: "What caching solution do you recommend?"
+    options:
+      - id: opt-redis
+        label: "Azure Cache for Redis in a zone-redundant Premium tier, cache-aside for consignment status with a short TTL, and the same instance holding the shared rate-limit counters"
+        correct: true
+        explain: >
+          A distributed cache is required rather than optional here for two
+          reasons: the read pattern is a small hot set read enormously often,
+          which is exactly what cache-aside was designed for, and the rate-limit
+          counters must be shared across API instances, which an in-process cache
+          cannot do. Zone redundancy is what keeps the cache inside the 99.9
+          percent target instead of becoming the single point that breaks it. A
+          short TTL matches the five-minute staleness the partners already accept.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-redis
+              label: "redis-tracking (Azure Cache for Redis)"
+              kind: cosmos-db
+              group: grp-sea
+              status: healthy
+          - op: add_edge
+            edge: {id: a2inf-e-apim-redis, source: a2inf-apim, target: a2inf-redis, kind: dependency}
+      - id: opt-inproc
+        label: "In-process memory caching inside each API instance, which avoids a network hop entirely"
+        correct: false
+        consequence: >
+          Rate limits stop working the moment the app scales to four instances.
+          The aggressive broker gets four times its quota.
+        explain: >
+          In-process caching is the fastest possible read and it cannot hold state
+          that must be consistent across instances, which the rate-limit counter
+          requirement states directly. It also multiplies cache misses by the
+          instance count during a scale-out, which is precisely when the database
+          is under most pressure.
+        rep: -8
+      - id: opt-cdn
+        label: "Cache the tracking responses at the CDN edge with a five-minute cache-control header"
+        correct: false
+        explain: >
+          Edge caching is genuinely effective for public, identical, cacheable
+          responses, and these responses are per-consignment and returned to
+          authenticated partners over an API with per-partner policy. Caching
+          authenticated API responses at a shared edge risks serving one partner's
+          data to another unless the cache key is built very carefully, and it
+          does nothing for the shared counters. Edge caching complements an
+          application cache; it does not replace it here.
+        rep: -6
+      - id: opt-readreplica
+        label: "Add a read replica of sql-wms and point tracking lookups at it"
+        correct: false
+        consequence: >
+          Evelyn asks why the database bill went up permanently to handle four
+          days.
+        explain: >
+          A read replica does move read load off the primary and it scales
+          database capacity, which is the expensive way to serve the same 300 rows
+          eleven thousand times a second. It also fails the stated cost
+          constraint, since the replica is provisioned all year for a spike that
+          lasts days, and it still cannot hold the shared rate-limit counters.
+        rep: -8
+    next: e3-config
+
+  - id: e3-config
+    type: design_decision
+    title: "Where the settings live"
+    speaker: mentor
+    objectives: [AZ305-4.10]
+    scenario: |
+      Merging Sunda's services doubles the number of deployables and triples the
+      number of places a setting can hide.
+
+      Desmond's audit, which he did unprompted and is still annoyed about:
+
+      - 31 services, each with its own app settings, some duplicated, four disagreeing
+      - Two connection strings in plain text in a repository, one of them for the Managed Instance
+      - Feature toggles implemented as commented-out code, requiring a redeploy to flip
+      - Non-production and production settings differ by hand-editing during release
+      - The Jakarta merge needs some features enabled per region for a transition period
+      - Marcus requires secrets to be auditable and rotatable without a redeploy
+      - Config changes must not require a restart of the tracking API during the merge
+
+      "Thirty-one services," he says. "One of them is going to be wrong at the
+      worst possible moment and I would like it to be findable."
+    prompt: "What application configuration management solution do you recommend?"
+    options:
+      - id: opt-appconfig
+        label: "Azure App Configuration with labels per environment and feature flags, Key Vault references for secrets, managed identity for access, and dynamic refresh with a sentinel key"
+        correct: true
+        explain: >
+          App Configuration centralizes settings for all 31 services with labels
+          separating environments, so promoting a release stops meaning
+          hand-editing. Feature flags become runtime state rather than commented
+          code, which is what the per-region transition needs. Secrets stay in Key
+          Vault and are referenced rather than copied, keeping rotation and audit
+          where Marcus wants them, and managed identity removes the credential
+          that would otherwise be the new plain-text string. Dynamic refresh with
+          a sentinel key changes configuration without the restart the tracking
+          API cannot take.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-appcs
+              label: "appcs-meridian (App Configuration)"
+              kind: key-vault
+              group: grp-sea
+              status: healthy
+          - op: add_edge
+            edge: {id: a2inf-e-wms-appcs, source: wms-sea, target: a2inf-appcs, kind: dependency}
+      - id: opt-keyvault-all
+        label: "Put every setting in Key Vault, since it already handles secrets and access control"
+        correct: false
+        consequence: >
+          A page-size setting is now a secret with an access policy, a soft-delete
+          window, and a throttling limit.
+        explain: >
+          Key Vault is a secret store: it is priced and rate-limited for
+          infrequent access to sensitive values, and it has no labels, no feature
+          flags, and no change-notification model for ordinary settings. Reading
+          hundreds of non-secret keys per instance on startup runs into its
+          throttling. Use Key Vault for secrets and reference them from App
+          Configuration, which is the pattern the two services are designed for.
+        rep: -8
+      - id: opt-app-settings
+        label: "Keep settings in each service's app settings, but standardize the names and manage them from the deployment pipeline"
+        correct: false
+        consequence: >
+          Flipping the Jakarta feature flag on requires thirty-one pipeline runs
+          and a restart of each app.
+        explain: >
+          Standardized names and pipeline-managed values are a genuine improvement
+          over hand-editing, and they still bind every configuration change to a
+          deployment and a restart, which the tracking API requirement forbids.
+          They also give no per-region flag control at runtime. Centralization is
+          what turns 31 configuration surfaces into one.
+        rep: -6
+      - id: opt-repo
+        label: "Commit per-environment configuration files to the repository and deploy them with the application"
+        correct: false
+        explain: >
+          Configuration in source control gives history and review, and it also
+          means secrets in a repository - which the audit already found twice -
+          and a redeploy for every change. It couples configuration lifetime to
+          code lifetime, when the point of the requirement is that they must move
+          at different speeds during the merge.
+        rep: -10
+    next: e4-typhoon
+
+  - id: e4-typhoon
+    type: troubleshoot
+    title: "P1: Tracking API failing under weather load"
+    speaker: noc
+    objectives: [AZ305-4.9, AZ305-4.8]
+    ticket:
+      id: "MER-8104"
+      reporter: "NOC Manila (day shift)"
+      priority: "P1"
+      opened: "06:52"
+      body: |
+        Tracking API returning 504 to partners since approximately 06:40.
+        Typhoon Nuri closed the Kaohsiung window overnight, traffic is roughly
+        nine times normal. sql-wms is at 100 percent DTU. Redis reports healthy
+        and low memory. Two forwarders have called the Kallang desk. Escalating.
+    on_enter_diagram_ops:
+      - {op: set_status, node: sql-wms, status: broken}
+      - {op: set_status, node: a2inf-redis, status: warning}
+      - {op: set_edge_status, edge: a2inf-e-apim-redis, status: degraded}
+    scenario: |
+      Typhoon Nuri shut the Kaohsiung transshipment window at 03:00. By 06:40 the
+      tracking API is timing out and the database is flat out.
+
+      This is the spike the cache was designed for, and the cache is not
+      absorbing it. Redis is up, has memory to spare, and reports no errors.
+
+      Priya is on a call with the retailer's integration team, who would like a
+      time. Desmond is already looking at the database.
+    time_budget: 6
+    investigate:
+      - id: inv-tracking-team
+        label: "Ask the tracking team what changed overnight"
+        speaker: ticket
+        reveals: >
+          "We pushed a config change at 06:35. Customers were seeing stale ETAs
+          during the closure, so we dropped the cache TTL from 300 seconds to 5.
+          It went out through App Configuration, no deployment needed."
+      - id: inv-noc
+        label: "Ask NOC Manila when exactly the errors began relative to the traffic rise"
+        speaker: noc
+        reveals: >
+          "Traffic has been climbing since 03:00 and the API was fine at nine
+          times normal until 06:40. The errors start five minutes after your
+          config change, not when the traffic arrived."
+      - id: inv-desmond
+        label: "Ask Desmond what the database is actually doing"
+        speaker: mentor
+        reveals: >
+          "Same query, over and over, on the same three hundred consignments.
+          Eleven thousand a second reaching the database. It is not a bad query.
+          There are just supposed to be almost none of them."
+      - id: inv-marcus
+        label: "Ask Marcus whether anything was blocked or rate limited"
+        speaker: security
+        reveals: >
+          "Nothing from us. The gateway's rate limits are firing normally against
+          the usual two offenders. This is legitimate traffic doing what it always
+          does during weather."
+    commands:
+      - id: cmd-redis-show
+        label: "Show the cache configuration"
+        command: "az redis show -g rg-app-sea -n redis-tracking --query \"{sku:sku.name, capacity:sku.capacity, zones:zones, ver:redisVersion}\" -o table"
+        output: |
+          Sku       Capacity    Zones       Ver
+          --------  ----------  ----------  -----
+          Premium   1           ['1', '2']  6.0
+        time_cost: 1
+        note: "The cache is the tier and zone configuration that was designed. Nothing has changed here."
+      - id: cmd-redis-metrics
+        label: "Compare cache hits and misses over the last hour"
+        command: "az monitor metrics list --resource $REDIS --metric cachehits cachemisses --interval PT5M --aggregation Total -o table"
+        output: |
+          Timestamp            Name          Total
+          -------------------  ------------  ----------
+          2026-08-17T06:25:00  cachehits     3184000
+          2026-08-17T06:25:00  cachemisses   61200
+          2026-08-17T06:45:00  cachehits     1902000
+          2026-08-17T06:45:00  cachemisses   2140000
+        time_cost: 2
+        note: "Hit ratio falls from about 98 percent to under 48 percent at 06:45. Misses go to the database."
+      - id: cmd-redis-load
+        label: "Check cache server load and memory"
+        command: "az monitor metrics list --resource $REDIS --metric serverLoad usedmemorypercentage --interval PT5M --aggregation Average -o table"
+        output: |
+          Timestamp            Name                    Average
+          -------------------  ----------------------  ---------
+          2026-08-17T06:45:00  serverLoad              38.4
+          2026-08-17T06:45:00  usedmemorypercentage    22.1
+        time_cost: 1
+        note: "The cache itself is comfortable. It is not the constrained component."
+      - id: cmd-sql-dtu
+        label: "Check database utilization"
+        command: "az monitor metrics list --resource $SQLWMS --metric dtu_consumption_percent --interval PT5M --aggregation Average -o table"
+        output: |
+          Timestamp            Name                      Average
+          -------------------  ------------------------  ---------
+          2026-08-17T06:25:00  dtu_consumption_percent   34.2
+          2026-08-17T06:45:00  dtu_consumption_percent   99.8
+        time_cost: 1
+      - id: cmd-appconfig
+        label: "Show the tracking cache settings in App Configuration"
+        command: "az appconfig kv list -n appcs-meridian --key \"Tracking:Cache:*\" --label prod --fields key value lastModified -o table"
+        output: |
+          Key                            Value    LastModified
+          -----------------------------  -------  --------------------
+          Tracking:Cache:TtlSeconds      5        2026-08-17T06:35:11Z
+          Tracking:Cache:JitterSeconds   0        2026-06-02T09:41:02Z
+          Tracking:Cache:Enabled         true     2026-06-02T09:41:02Z
+        time_cost: 1
+        note: "TtlSeconds changed at 06:35. Everything else is untouched since June."
+      - id: cmd-apim-latency
+        label: "Show gateway backend latency from Application Insights"
+        command: "az monitor app-insights query --app appi-tracking --analytics-query \"dependencies | where timestamp > ago(1h) | summarize percentile(duration, 95) by bin(timestamp, 5m), target\" -o table"
+        output: |
+          timestamp            target        percentile_duration_95
+          -------------------  ------------  ------------------------
+          2026-08-17T06:25:00  redis         2.1
+          2026-08-17T06:25:00  sql-wms       41.7
+          2026-08-17T06:45:00  redis         2.4
+          2026-08-17T06:45:00  sql-wms       14820.0
+        time_cost: 2
+        note: "Redis is answering in milliseconds. The database calls are the 504s."
+    fixes:
+      - id: fix-ttl
+        label: "Restore the cache TTL to 300 seconds and add TTL jitter, then tell the partners status may be up to five minutes old during the closure"
+        correct: true
+        explain: >
+          A five-second TTL on a hot key read eleven thousand times a second means
+          the entry expires roughly every five seconds and every request that
+          arrives in the gap goes to the database - the cache stopped absorbing
+          reads because it was told to forget them almost immediately. Restoring
+          the 300-second TTL returns the hit ratio, and jitter spreads expiries so
+          the hot set does not all expire on the same tick and produce a
+          synchronized stampede. Five minutes of staleness is what the partners
+          already agreed to; the change at 06:35 traded a documented requirement
+          for a preference.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: sql-wms, status: healthy}
+          - {op: set_status, node: a2inf-redis, status: healthy}
+          - {op: set_edge_status, edge: a2inf-e-apim-redis, status: healthy}
+      - id: fix-scale-sql
+        label: "Scale sql-wms up two service tiers to absorb the read volume"
+        correct: false
+        consequence: >
+          The scale operation takes eleven minutes, during which the API is still
+          returning 504. The bill is permanent; the typhoon is not.
+        explain: >
+          The database is a symptom: it is being asked to serve traffic the cache
+          was designed to absorb, and the metrics show the cache is idle at 38
+          percent server load. Scaling the database buys capacity for a
+          misconfiguration and leaves the hit ratio at 48 percent, so the next
+          weather event costs the same again at a higher tier.
+        rep: -10
+      - id: fix-scale-redis
+        label: "Scale the Redis cache to a larger Premium capacity to handle the load"
+        correct: false
+        consequence: >
+          A bigger cache, still forgetting everything after five seconds.
+        explain: >
+          The cache metrics rule this out directly: server load is 38 percent,
+          memory is 22 percent, and the 95th percentile Redis dependency is 2.4
+          milliseconds. Nothing about the cache is saturated. Scaling a component
+          that is not constrained is the most common instinct under pressure and
+          the easiest to disprove with the metrics you already collected.
+        rep: -8
+      - id: fix-disable-cache
+        label: "Set Tracking:Cache:Enabled to false so requests take a single predictable path while you investigate"
+        correct: false
+        consequence: >
+          Hit ratio goes to zero. The database, already at 99.8 percent, stops
+          answering anything at all.
+        explain: >
+          Removing the cache sends 100 percent of eleven thousand requests per
+          second at a database that is already saturated by less than half of
+          them. Simplifying the path is a reasonable diagnostic instinct in a
+          system that is idle, and it is the wrong move against a component that
+          is the bottleneck.
+        rep: -12
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: END

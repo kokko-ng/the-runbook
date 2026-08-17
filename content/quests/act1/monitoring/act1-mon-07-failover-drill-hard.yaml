@@ -1,0 +1,337 @@
+schema_version: 1
+id: act1-mon-07-failover-drill-hard
+title: "The Failover Drill (Hard)"
+act: 1
+chapter: act1-monitoring
+domain: az104-d5
+order: 7
+role: senior-cloud-admin
+checkpoint: true
+bonus_variant_of: act1-mon-07-failover-drill
+summary: "Southeast Asia was gone for six hours. Getting there was the easy half."
+entry: e1-replication-policy
+
+encounters:
+  - id: e1-replication-policy
+    type: design_decision
+    title: "Two numbers that are not the same number"
+    speaker: security
+    objectives: [AZ104-5.11]
+    scenario: |
+      Marcus has the replication policy open and a question that sounds simple
+      and is not.
+
+      "Recovery point retention is set to twenty-four hours. App-consistent
+      snapshot frequency is set to one hour. Somebody typed those in and I would
+      like to know whether they typed the right things, because Evelyn is asking
+      about the storage line again."
+
+      What the business asked for is fifteen minutes of acceptable data loss and
+      the ability to go back to a known-good point if the failure turns out to be
+      corruption rather than an outage. The warehouse system is transactional and
+      the application team have said that quiescing it briefly is acceptable
+      overnight and unwelcome during a shift.
+    prompt: "What do you set the policy to?"
+    options:
+      - id: opt-tuned
+        label: "Keep crash-consistent points at their default frequency for the fifteen-minute objective, reduce app-consistent snapshots to overnight only, and shorten recovery point retention to the window the corruption case actually needs"
+        correct: true
+        explain: >
+          The two settings answer different requirements. Crash-consistent
+          recovery points are generated continuously and are what a
+          fifteen-minute recovery point objective rests on. App-consistent
+          snapshots quiesce the application to produce a cleaner point, which
+          costs a brief pause and more storage, so hourly during a shift buys
+          little and disrupts something. Retention decides how far back the
+          corruption case can reach, and every extra hour is target-region
+          storage.
+        rep: 14
+      - id: opt-max-everything
+        label: "Raise recovery point retention to seventy-two hours and take app-consistent snapshots every fifteen minutes, so no requirement can be missed"
+        correct: false
+        consequence: >
+          Evelyn's next question is why the disaster recovery storage line has
+          tripled. The app team's question is why the warehouse system stutters
+          four times an hour.
+        explain: >
+          Maximizing every setting is not the same as meeting the requirement. It
+          multiplies stored recovery points in the target region, and frequent
+          application-consistent snapshots pause the live workload each time -
+          paid for during a shift, to satisfy an objective that crash-consistent
+          points already meet.
+        rep: -10
+      - id: opt-crash-only
+        label: "Disable app-consistent snapshots entirely, since crash-consistent points already meet the fifteen-minute objective"
+        correct: false
+        explain: >
+          It is right about the recovery point objective and drops the second
+          requirement. A crash-consistent point is the equivalent of pulling the
+          power - usually recoverable for a transactional system, occasionally
+          not - and the stated need for a known-good point in a corruption
+          scenario is exactly what an application-consistent snapshot provides.
+          Reduce the frequency; do not remove the capability.
+        rep: -8
+      - id: opt-retention-only
+        label: "Leave the snapshot frequency alone and cut retention to two hours, which is where the storage cost is"
+        correct: false
+        explain: >
+          Retention is one of the two storage levers and the smaller one here,
+          and two hours means a corruption discovered on the morning shift has no
+          earlier point to return to. It also leaves the hourly quiesce running
+          through the working day, which is the setting the application team
+          actually objected to.
+        rep: -8
+    next: e2-failback-stuck
+
+  - id: e2-failback-stuck
+    type: troubleshoot
+    title: "P1: Reprotect will not start"
+    speaker: manager
+    objectives: [AZ104-5.12]
+    ticket:
+      id: "MER-5801"
+      reporter: "Priya Raman"
+      priority: "P1"
+      opened: "11:20"
+      body: |
+        Southeast Asia was unavailable from 03:10 to 09:40 this morning. We ran
+        an unplanned failover at 03:40 and the warehouse system has been serving
+        from East Asia since 04:02, which worked. The region is back. I need us
+        home before the night run and the reprotect operation will not start -
+        the option is greyed out in the portal and the CLI returns an error about
+        the item's state. What do you need from me.
+    on_enter_diagram_ops:
+      - {op: set_status, node: mon-asr-vault, status: broken}
+      - {op: set_status, node: mon-vm-wms01-dr, status: warning}
+      - {op: set_edge_status, edge: mon-e-asr-repl, status: broken}
+    scenario: |
+      The failover worked. That is worth saying out loud, because it is the first
+      time it has mattered and the quarterly drills earned their keep at 03:40
+      this morning.
+
+      Southeast Asia came back at 09:40. Priya wants the workload home before the
+      night run, and the operation that reverses replication will not start. The
+      portal shows the option greyed out. The CLI is blunter and says the
+      protected item is not in a state that permits it.
+
+      Nothing about replication health looks wrong. Nothing about the East Asia
+      machines looks wrong - they have been serving the warehouse for seven
+      hours.
+
+      Desmond is already reading the protected item's state field. "You did the
+      failover. There is a step after the failover, and I would bet the drill
+      script never had to do it."
+    time_budget: 6
+    investigate:
+      - id: inv-priya
+        label: "Ask Priya exactly what was run at 03:40 and afterwards"
+        speaker: manager
+        reveals: >
+          "Unplanned failover on the recovery plan, confirmed, watched it come
+          up, told the warehouse they were live at 04:02, and then spent six
+          hours on the phone to customers. Nothing else was run. Nothing was
+          meant to be."
+      - id: inv-desmond
+        label: "Ask Desmond what the failover lifecycle looks like end to end"
+        speaker: mentor
+        reveals: >
+          "Fail over, commit, reprotect, then fail back and commit again.
+          Committing is what discards the other recovery points and finalizes the
+          direction. Until you commit, the platform is still holding the door
+          open for you to pick a different point, and it will not let you reverse
+          replication while that door is open."
+      - id: inv-marcus
+        label: "Ask Marcus whether anything should be checked before going home"
+        speaker: security
+        reveals: >
+          "Yes. Whatever the warehouse wrote in East Asia since 04:02 is the only
+          copy of seven hours of picking. Do not fail back in a way that
+          discards it, and do not do it during a shift if a planned failover
+          means a shutdown."
+      - id: inv-ravi
+        label: "Ask Manila what the East Asia machines have been doing"
+        speaker: noc
+        reveals: >
+          "Serving normally since 04:02. Tablets are on them right now. We have
+          not touched anything and there is nothing in the queue except the
+          customers who noticed the six hours."
+    commands:
+      - id: cmd-item-state
+        label: "Show the protected item's replication state"
+        command: "az site-recovery protected-item show --vault-name rsv-meridian-dr -g rg-dr-eas --fabric-name fab-sea --protection-container-name pc-sea -n vm-wms01 --query 'properties.{state:protectionState, health:replicationHealth, failover:lastSuccessfulFailoverTime}' -o json"
+        output: |
+          {
+            "state": "FailoverCommitPending",
+            "health": "Normal",
+            "failover": "2026-10-02T03:58:44Z"
+          }
+        time_cost: 1
+        note: "The state names the missing step outright."
+      - id: cmd-reprotect-attempt
+        label: "Attempt the reprotect operation and read the error"
+        command: "az site-recovery protection-container-mapping create --vault-name rsv-meridian-dr -g rg-dr-eas --fabric-name fab-eas --protection-container pc-eas -n reverse-map --policy-id /subscriptions/8f2c/.../replicationPolicies/pol-a2a"
+        output: |
+          (InvalidOperation) Operation reprotect is not allowed on the protected
+          item because it is in state FailoverCommitPending. Commit the failover
+          and retry.
+        time_cost: 1
+        note: "The platform is telling you the sequence, not refusing the operation."
+      - id: cmd-jobs
+        label: "List the Site Recovery jobs from this morning"
+        command: "az site-recovery job list --vault-name rsv-meridian-dr -g rg-dr-eas --query '[0:3].{name:friendlyName, state:state, end:endTime}' -o table"
+        output: |
+          Name                  State      End
+          --------------------  ---------  --------------------
+          Unplanned failover    Succeeded  2026-10-02T03:58:44Z
+          Prerequisites         Succeeded  2026-10-02T03:42:10Z
+          Test failover         Succeeded  2026-09-24T22:26:03Z
+        time_cost: 1
+        note: "One failover, no commit. The last thing before it was the September drill."
+      - id: cmd-source-vm
+        label: "Check whether the original VM in Southeast Asia is back"
+        command: "az vm get-instance-view -g rg-ops-sea -n vm-wms01 --query 'instanceView.statuses[1].displayStatus' -o tsv"
+        output: |
+          VM deallocated
+        time_cost: 1
+        note: "The source machine exists again and is stopped, which is what the region coming back looks like."
+      - id: cmd-health
+        label: "Check replication health and current recovery points"
+        command: "az site-recovery protected-item show --vault-name rsv-meridian-dr -g rg-dr-eas --fabric-name fab-sea --protection-container-name pc-sea -n vm-wms01 --query 'properties.{rpo:lastRpoCalculatedTime, points:providerSpecificDetails.recoveryPointId}' -o json"
+        output: |
+          {
+            "rpo": "2026-10-02T03:38:12Z",
+            "points": null
+          }
+        time_cost: 2
+        note: "Nothing has been calculated since the failover, because replication is not running in any direction."
+      - id: cmd-plan
+        label: "Show the recovery plan used this morning"
+        command: "az site-recovery recovery-plan show --vault-name rsv-meridian-dr -g rg-dr-eas -n rp-warehouse --query 'properties.groups[].{group:groupType, count:length(replicationProtectedItems)}' -o json"
+        output: |
+          [
+            { "group": "Boot", "count": 1 },
+            { "group": "Boot", "count": 1 }
+          ]
+        time_cost: 1
+        note: "Two boot groups, the directory first. That part was fixed after the September drill and it held."
+    fixes:
+      - id: fix-commit-reprotect
+        label: "Commit the failover, then reprotect to replicate East Asia back to Southeast Asia, and schedule the planned failover home for after the night run"
+        correct: true
+        explain: >
+          The lifecycle is failover, commit, reprotect, fail back. Committing
+          finalizes the failover and releases the other recovery points, which is
+          why the platform blocks reprotect until it is done - it will not
+          reverse a replication direction that is still provisionally chosen.
+          Reprotect then seeds Southeast Asia from East Asia, and going home is
+          a planned failover, which shuts the source down cleanly for zero data
+          loss and therefore belongs outside a shift.
+        rep: 15
+        diagram_ops:
+          - {op: set_status, node: mon-asr-vault, status: healthy}
+          - {op: set_status, node: mon-vm-wms01-dr, status: healthy}
+          - {op: set_edge_status, edge: mon-e-asr-repl, status: healthy}
+      - id: fix-start-source
+        label: "Start the original vm-wms01 in Southeast Asia now that the region is back, so the workload is home immediately"
+        correct: false
+        consequence: >
+          Two copies of the warehouse system are running, one with seven hours of
+          picking data and one with none, and the tablets are split between them.
+        explain: >
+          The Southeast Asia machine is the pre-failover state and everything the
+          warehouse did after 04:02 exists only in East Asia. Starting it creates
+          a split brain and puts the surviving data at risk of being overwritten
+          during a later reprotect. Going home is a controlled reverse
+          replication, never a restart of the old machine.
+        rep: -15
+      - id: fix-new-replication
+        label: "Disable replication for the item and enable a fresh replication from East Asia back to Southeast Asia"
+        correct: false
+        consequence: >
+          Disabling replication removes the protected item and the failover
+          history along with it. The reseed runs for most of the afternoon.
+        explain: >
+          It arrives at roughly the right end state by throwing away the
+          relationship the platform already has, which means a full initial
+          replication instead of a differential reprotect and the loss of the
+          job history someone will want during the incident review. Reprotect
+          exists for exactly this transition.
+        rep: -10
+      - id: fix-planned-now
+        label: "Run a planned failover back to Southeast Asia straight away, since planned failover guarantees no data loss"
+        correct: false
+        explain: >
+          Planned failover does guarantee no data loss and it is the right verb
+          for going home - later. It cannot run before reprotect has established
+          replication in the reverse direction, there is nothing to fail back to
+          yet, and it shuts the running workload down, which during a shift is an
+          outage the warehouse has already had once today.
+        rep: -10
+    rewards:
+      under_budget_bonus: 5
+      skill_points: 2
+    next: e3-review
+
+  - id: e3-review
+    type: design_decision
+    title: "Six hours, reviewed"
+    speaker: manager
+    objectives: [AZ104-5.12, AZ104-5.11]
+    scenario: |
+      The commit runs at 11:52, reprotect completes by 14:30, and the planned
+      failover home goes at 23:40 with the night run held for twenty minutes.
+
+      Priya has the incident review to write and one honest problem with it.
+
+      "The failover worked and we still lost seven hours getting back, because
+      nobody in this building had done the second half. The drill covered the
+      part that goes well."
+
+      Marcus wants one change proposed, and Evelyn has already said that any
+      proposal involving a permanently running second environment will not be
+      approved.
+    prompt: "What do you change about the drill?"
+    options:
+      - id: opt-full-cycle
+        label: "Extend the quarterly drill to rehearse the full cycle - test failover, then a commit and reprotect exercise on one non-critical protected item, timed and recorded"
+        correct: true
+        explain: >
+          The drill tested the half that was already the well-understood half.
+          Rehearsing commit and reprotect is what turns this morning's seven
+          hours into a known, timed procedure, and doing it on one non-critical
+          item keeps the cost of the rehearsal small. It also needs no standing
+          second environment, which is the constraint Evelyn set.
+        rep: 12
+      - id: opt-runbook-failback
+        label: "Write a detailed failback runbook covering commit, reprotect and planned failover, and circulate it to the on-call rota"
+        correct: false
+        explain: >
+          Necessary and not sufficient, and this chapter has already shown why:
+          documentation that is never executed drifts, and the person reading it
+          at four in the morning has no way to know whether it is still true. The
+          runbook is the artifact; the rehearsal is the evidence.
+        rep: -6
+      - id: opt-stay-eas
+        label: "Stay in East Asia permanently and replicate back to Southeast Asia, since the workload proved it runs fine there"
+        correct: false
+        consequence: >
+          The next incident review asks why a warehouse in Singapore has its
+          systems in another country, and legal joins the call.
+        explain: >
+          It genuinely removes the failback problem, and it changes where the
+          data lives, which is a decision about latency to the warehouse floor,
+          data residency and the customer contracts - not one to make as a side
+          effect of an incident review. Direction of replication is an
+          architectural choice with owners outside this room.
+        rep: -8
+      - id: opt-active-active
+        label: "Run the warehouse system active in both regions so there is never anything to fail back"
+        correct: false
+        explain: >
+          Active-active removes failover entirely and replaces it with a much
+          harder problem - a transactional warehouse system would need
+          multi-region write coordination it was not built for - at roughly
+          double the running cost, which has already been ruled out. It is a
+          different architecture, not a drill improvement.
+        rep: -8
+    next: END

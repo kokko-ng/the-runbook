@@ -1,0 +1,263 @@
+schema_version: 1
+id: act2-bc-03-the-database-question-hard
+title: "The Database Question (Hard)"
+act: 2
+chapter: act2-continuity
+domain: az305-d3
+order: 3
+role: associate-architect
+bonus_variant_of: act2-bc-03-the-database-question
+checkpoint: true
+summary: "Sunda's finance database has agent jobs, cross-database transactions, and a litigation hold. Pick something that survives all three."
+entry: e1-mi-choice
+
+encounters:
+  - id: e1-mi-choice
+    type: design_decision
+    title: "Not everything fits in a single database"
+    speaker: mentor
+    objectives: [AZ305-3.6]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2bc-h-mi-erp
+          label: "Sunda finance database (proposed)"
+          kind: sql-database
+          group: grp-sea
+          status: planned
+    scenario: |
+      Sunda Freight's finance system is SQL Server 2019 Enterprise on two virtual
+      machines in a Jakarta colocation facility. It is coming to Azure in wave
+      two and Desmond has spent a week reading its schema with an expression.
+
+      "Three databases and they transact across each other. Forty-one SQL Agent
+      jobs. Two CLR assemblies the vendor will not remove. Linked server to the
+      old rating engine, which we are also not allowed to remove."
+
+      The requirements:
+
+      | Requirement | Value |
+      | --- | --- |
+      | Data loss on loss of one Singapore datacenter | zero |
+      | Recovery time for that event | under 60 seconds, automatic |
+      | Cross-database transactions and SQL Agent | must keep working unchanged |
+      | Windows failover clustering operated by Meridian | not acceptable, the team is four people |
+      | Cross-region recovery | RPO 5 minutes, RTO 1 hour |
+
+      "Wave two is in nine weeks," Desmond says. "Pick the target now, because
+      everything else in the wave hangs off it."
+    prompt: "Which target platform do you recommend for the Sunda finance databases?"
+    options:
+      - id: opt-mi-bc-zr
+        label: "Azure SQL Managed Instance, Business Critical, zone redundant, with an instance failover group to East Asia"
+        correct: true
+        explain: >
+          Managed Instance keeps the surface area the application depends on - SQL
+          Agent, cross-database transactions, CLR, and linked servers - which the
+          single-database model does not. Business Critical runs an Always On
+          availability group internally, and the zone-redundant configuration puts
+          those replicas in different datacenters, giving synchronous commit, zero
+          data loss, and automatic failover in seconds without Meridian operating
+          a cluster. The instance failover group then covers the regional row at
+          roughly five seconds of replication lag.
+        rep: 14
+        diagram_ops:
+          - {op: set_label, node: a2bc-h-mi-erp, label: "Sunda finance (SQL MI Business Critical, zone redundant)"}
+          - {op: set_status, node: a2bc-h-mi-erp, status: healthy}
+      - id: opt-iaas-ag
+        label: "SQL Server on Azure virtual machines with an Always On availability group spread across three zones and an asynchronous replica in East Asia"
+        correct: false
+        consequence: >
+          Desmond counts the team on his fingers, twice, in case he was wrong the
+          first time.
+        explain: >
+          Technically this meets every data requirement, which is why it is the
+          tempting wrong answer. It fails the fourth row: an availability group on
+          IaaS means Meridian owns the Windows failover cluster, the quorum
+          configuration, the listener, the patching order, and the failover
+          testing, for a four-person team. Choose IaaS when you need something
+          Managed Instance genuinely cannot do, and pay the operational cost
+          knowingly.
+        rep: -8
+      - id: opt-sqldb-pool
+        label: "Azure SQL Database in an elastic pool, one database each, with zone redundancy enabled"
+        correct: false
+        consequence: >
+          The migration assessment returns 41 unsupported objects before it
+          finishes reading the first database.
+        explain: >
+          The single-database model has no SQL Agent, no cross-database
+          transactions, and no CLR, so three of the requirement rows fail on day
+          one and the vendor has already refused to change the application. Elastic
+          pools and zone redundancy are both good answers to questions about cost
+          and availability; neither addresses compatibility, which is the
+          constraint that decides this design.
+        rep: -10
+      - id: opt-mi-single-zone
+        label: "Azure SQL Managed Instance, Business Critical, in its default configuration, using the East Asia failover group to cover datacenter failures as well"
+        correct: false
+        explain: >
+          The platform choice is right and the topology is wrong twice over.
+          Without zone redundancy the Business Critical replicas sit in one
+          datacenter, so a datacenter event takes all of them, and the fallback -
+          a cross-region failover group - replicates asynchronously, so it delivers
+          neither zero data loss nor a sixty-second recovery. Two requirements, two
+          mechanisms; the region pair cannot cover for zones.
+        rep: -10
+    rewards:
+      skill_points: 1
+    next: e2-standby-earns
+
+  - id: e2-standby-earns
+    type: design_decision
+    title: "Making the secondary earn its keep"
+    speaker: cfo
+    objectives: [AZ305-3.6, AZ305-3.1]
+    scenario: |
+      Evelyn has read the Managed Instance quote and found the part she always
+      finds.
+
+      "The recovery instance in East Asia costs the same as the production one.
+      You are asking me to buy the finance system twice."
+
+      The facts:
+
+      - An instance failover group requires the secondary Managed Instance to be
+        the same service tier and at least the same compute size as the primary.
+        Undersizing it is not a supported configuration.
+      - The secondary is readable.
+      - Finance currently runs a nightly consolidation and a set of heavy
+        month-end reports against the production instance. They collide with the
+        Jakarta depots' evening batch and everyone complains about it quarterly.
+      - The regional requirements remain RPO 5 minutes, RTO 1 hour.
+    prompt: "What do you tell Evelyn?"
+    options:
+      - id: opt-read-workload
+        label: "Keep the secondary at matching size as required, and move the finance reporting and nightly consolidation reads onto it, so the standby carries real workload every day"
+        correct: true
+        explain: >
+          The sizing is not negotiable - the failover group needs an equivalent
+          secondary or the recovery is not supported - so the only lever left is
+          utilization. The secondary is readable, and shifting the reporting and
+          consolidation reads onto it removes the contention finance complains
+          about while turning an idle line item into capacity the business uses
+          nightly. It also means someone touches the secondary every day, which is
+          the cheapest early warning that replication has stopped.
+        rep: 14
+      - id: opt-half-size
+        label: "Provision the secondary at half the vCores and scale it up during a failover"
+        correct: false
+        consequence: >
+          The configuration is rejected before it costs anything, which is the
+          best outcome available from this option.
+        explain: >
+          An undersized secondary is not a supported failover group configuration,
+          and the reason is the failure mode: the secondary must apply the
+          primary's entire transaction log, so under-provisioning it makes it fall
+          behind and the five-minute RPO becomes fiction. Scaling up during a
+          declared disaster also adds an unpredictable step to an RTO you have
+          committed to.
+        rep: -10
+      - id: opt-geo-restore-mi
+        label: "Delete the secondary instance and rely on geo-restore of the automated backups into a new Managed Instance when a disaster is declared"
+        correct: false
+        explain: >
+          This is the largest saving on the page and it breaks both regional
+          numbers. Geo-restore recovers from a geo-replicated backup that can be up
+          to an hour behind, against a five-minute RPO, and provisioning a
+          Managed Instance and restoring into it takes hours, not one. It is a
+          reasonable design for a tier-three instance with no stated objectives.
+        rep: -10
+      - id: opt-log-shipping
+        label: "Replace the failover group with nightly log shipping to a SQL Server virtual machine in East Asia, which can be sized freely"
+        correct: false
+        consequence: >
+          Desmond asks who writes the failover script. Everyone looks at the same
+          four people.
+        explain: >
+          Nightly log shipping gives an RPO measured in hours rather than five
+          minutes, and the recovery target is a virtual machine the team would
+          then have to operate, patch, and test - the operational constraint that
+          shaped the platform choice in the first place. Freedom to size the
+          secondary is not worth reintroducing every problem Managed Instance was
+          selected to remove.
+        rep: -8
+    next: e3-litigation
+
+  - id: e3-litigation
+    type: design_decision
+    title: "As it stood on 31 March"
+    speaker: security
+    objectives: [AZ305-3.3]
+    scenario: |
+      Marcus forwards a letter from Meridian's counsel, subject line "Sunda
+      Freight - preservation notice."
+
+      "A Jakarta customer is suing over a 2025 rate dispute. Counsel needs the
+      finance database as it stood at close of business on 31 March, readable by
+      their forensic accountant, and they need it preserved for the duration of
+      the case."
+
+      Today is 12 August.
+
+      | Constraint | Value |
+      | --- | --- |
+      | Point-in-time restore retention on the instance | 35 days |
+      | Long-term retention policy | monthly full backup, kept 7 years |
+      | Delivery deadline | 5 business days |
+      | Effect on production permitted | none |
+      | Duration the copy must exist | until the case closes, at least 18 months |
+      | Non-production Managed Instance | exists, General Purpose, in the same subscription |
+    prompt: "How do you produce the 31 March database?"
+    options:
+      - id: opt-ltr-nonprod
+        label: "Restore the 31 March long-term retention backup as a new database on the non-production Managed Instance"
+        correct: true
+        explain: >
+          Four and a half months is far outside the 35-day point-in-time window,
+          so the monthly long-term retention backup is the only copy that reaches
+          31 March - which is precisely why long-term retention exists alongside
+          point-in-time restore. Restoring it as a new database on the
+          non-production instance keeps production untouched, gives the forensic
+          accountant something isolated to read, and can sit there for eighteen
+          months without competing with finance for compute.
+        rep: 14
+      - id: opt-pitr-march
+        label: "Point-in-time restore the production instance to 31 March 23:59 as a new database"
+        correct: false
+        consequence: >
+          The portal offers a date picker that begins on 8 July.
+        explain: >
+          Point-in-time restore only reaches back as far as its configured
+          retention, with a maximum of 35 days, so 31 March is not selectable at
+          any setting. Confusing the two retention mechanisms is the most common
+          database recovery error at this level: point-in-time restore covers
+          operational mistakes, long-term retention covers obligations measured in
+          years.
+        rep: -10
+      - id: opt-ltr-prod
+        label: "Restore the 31 March long-term retention backup as an additional database on the production Managed Instance"
+        correct: false
+        consequence: >
+          The production instance's reserved storage crosses 80% two weeks later
+          and the evening batch starts timing out.
+        explain: >
+          The right backup and the wrong destination. A forensic copy that must
+          exist for eighteen months would consume production instance storage and
+          share its compute for the whole case, and it hands an external
+          accountant a reason to be connected to the production instance. The
+          restore is correct; put it where its blast radius is nobody's month-end.
+        rep: -8
+      - id: opt-failover-read
+        label: "Point the forensic accountant at the readable secondary in East Asia, which holds the same data without touching production"
+        correct: false
+        explain: >
+          The secondary holds the current data, not the 31 March data - it is a
+          continuously updated replica, so it is exactly as unhelpful for a
+          historical question as the primary. This is the replica-is-not-a-backup
+          confusion wearing a compliance hat: replication answers where the data
+          is, backups answer when it was.
+        rep: -10
+    rewards:
+      skill_points: 1
+    next: END

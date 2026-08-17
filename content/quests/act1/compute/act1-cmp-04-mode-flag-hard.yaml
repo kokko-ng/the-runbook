@@ -1,0 +1,223 @@
+schema_version: 1
+id: act1-cmp-04-mode-flag-hard
+title: "The Mode Flag (exam hard)"
+act: 1
+chapter: act1-compute
+domain: az104-d3
+order: 4
+role: senior-cloud-admin
+checkpoint: true
+bonus_variant_of: act1-cmp-04-mode-flag
+summary: "Batam, and this time the what-if output is the only warning you get."
+entry: e1-read-whatif
+
+encounters:
+  - id: e1-read-whatif
+    type: design_decision
+    title: "Read the diff, not the template"
+    speaker: mentor
+    objectives: [AZ104-3.1, AZ104-3.4]
+    scenario: |
+      Batam goes in on Friday. The resource group already exists because the
+      network team built the VNet there last month, complete with an NSG on the
+      application subnet.
+
+      You run what-if in Incremental mode before anything else, and it prints:
+
+      Scope: /subscriptions/8f3d.../resourceGroups/rg-batam-sea
+
+        ~ Microsoft.Network/virtualNetworks/vnet-batam-sea [2023-09-01]
+          ~ properties.subnets: [
+            - 0:
+                name:                        "snet-app"
+                properties.addressPrefix:    "10.104.1.0/24"
+                properties.networkSecurityGroup.id: ".../nsg-batam-app"
+            + 0:
+                name:                        "snet-app"
+                properties.addressPrefix:    "10.104.1.0/24"
+              ]
+        + Microsoft.Compute/virtualMachines/vm-batam01 [2024-07-01]
+
+      Resource changes: 1 to create, 1 to modify.
+
+      Desmond, reading over your shoulder: "One of those two lines is fine."
+    prompt: "What is the deployment about to do, and what do you change?"
+    options:
+      - id: opt-declare-nsg
+        label: "It will strip the NSG from snet-app, because the template declares the subnet inline without the association - declare the association in the template before deploying"
+        correct: true
+        explain: >
+          What-if shows the subnet array being replaced: the existing element
+          carrying the networkSecurityGroup id is removed and a new element
+          without it is added. Subnets declared inline inside a VNet resource are
+          submitted as the complete list, so anything the template omits is gone.
+          Either declare the association in the template, or move the subnet out to
+          a child Microsoft.Network/virtualNetworks/subnets resource so the parent
+          VNet no longer owns the whole array.
+        rep: 12
+      - id: opt-incremental-safe
+        label: "Nothing to worry about - the mode is Incremental, so existing configuration on the subnet is preserved and only the VM is created"
+        correct: false
+        consequence: >
+          The deployment succeeds, the compliance scan fires on Monday, and the
+          what-if output that predicted it is in your scroll buffer.
+        explain: >
+          Incremental protects resources the template does not declare. The VNet is
+          declared, so its properties are applied as written, and the minus lines
+          in the what-if output are the tool telling you so in advance. Reading the
+          diff rather than trusting the mode is the entire reason to run it.
+        rep: -12
+      - id: opt-complete-mode
+        label: "Switch to Complete mode, since the difference is only in how the two subnets are compared"
+        correct: false
+        explain: >
+          Complete mode changes which resources are deleted, not how a declared
+          resource's properties are applied - so the subnet would still lose its
+          NSG, and now the NSG resource itself is a candidate for deletion because
+          the template does not declare it. The change makes the same outcome worse
+          rather than different.
+        rep: -15
+      - id: opt-reapply-after
+        label: "Deploy as it stands and re-associate the NSG afterward with an az network command"
+        correct: false
+        explain: >
+          It restores the association until the next deployment removes it again,
+          and every run leaves a window where the subnet is unfiltered. Manual
+          repair after an automated deployment means the template no longer
+          describes the environment, which is the drift that infrastructure as code
+          exists to remove.
+        rep: -10
+    next: e2-existing-scope
+
+  - id: e2-existing-scope
+    type: design_decision
+    title: "A reference across a resource group"
+    speaker: self
+    objectives: [AZ104-3.3, AZ104-3.1]
+    scenario: |
+      The site module needs one thing from outside its own resource group: the id
+      of vnet-hub-sea, in rg-hub-sea, so it can create the peering back to the hub.
+
+      Your first attempt was this, inside site.bicep, deployed at the scope of
+      rg-batam-sea:
+
+      resource hubVnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
+        name: 'vnet-hub-sea'
+      }
+
+      Bicep compiles it without complaint. What-if reports a create for
+      vnet-hub-sea in rg-batam-sea, with no address space, which is not what
+      anybody wanted.
+    prompt: "How do you reference the hub VNet correctly?"
+    options:
+      - id: opt-existing-scope
+        label: "Declare it with the existing keyword and a scope: resource hubVnet '...' existing = { name: 'vnet-hub-sea', scope: resourceGroup(hubRgName) }"
+        correct: true
+        explain: >
+          Without existing, a resource declaration is an instruction to deploy that
+          resource - which is why what-if offered to create an empty VNet in the
+          wrong resource group. The existing keyword says the resource is already
+          there and you only want a symbolic reference to it, and scope tells Bicep
+          where to look. The reference then gives you hubVnet.id and its properties
+          with no deployment of its own.
+        rep: 12
+      - id: opt-string-id
+        label: "Build the resource id as a string with concat and pass it where the peering needs it"
+        correct: false
+        explain: >
+          It works and it is what people wrote before existing references were
+          available. The cost is that a hand-built id is not checked at compile
+          time, so a typo in a subscription id or a resource type surfaces as a
+          deployment failure minutes later, and you cannot read any of the target's
+          properties. Prefer resourceId or an existing reference over string
+          concatenation.
+        rep: -5
+      - id: opt-parameter-id
+        label: "Add a hubVnetId parameter and require the caller to pass the full resource id in the parameter file"
+        correct: false
+        explain: >
+          Perfectly serviceable, and it moves a fact that Azure already knows into
+          a file a human has to maintain for every site. Each new environment now
+          needs its hub id looked up and pasted correctly, and nothing validates it
+          until deployment. Parameters are for things that genuinely vary by
+          choice, not for things that can be resolved.
+        rep: -6
+      - id: opt-module-output
+        label: "Deploy the hub template as a module from the site deployment and take the VNet id from its output"
+        correct: false
+        consequence: >
+          The hub template runs against a production resource group as a side
+          effect of building a cross-dock in Batam.
+        explain: >
+          A module is deployed, not consulted. Invoking the hub template to read
+          one value means redeploying the hub every time a site is built, applying
+          whatever that template currently says to the most important resource
+          group you have. Reading and deploying must stay separate operations.
+        rep: -12
+    next: e3-conditional-arm
+
+  - id: e3-conditional-arm
+    type: design_decision
+    title: "Not every site gets one"
+    speaker: manager
+    objectives: [AZ104-3.2]
+    scenario: |
+      Priya, with the last requirement of the week.
+
+      "Batam and Johor are inside the fence at a partner's facility and their
+      security team runs the perimeter, so those two sites do not get their own
+      NSG - the partner would have to manage it and they will not. Penang and
+      Surabaya do. Same template, please, and I do not want a second template
+      called warehouse-with-nsg.json."
+
+      The warehouse template is still ARM JSON. The NSG resource is already
+      declared in it, and the subnet references it through resourceId.
+    prompt: "How do you modify the ARM template?"
+    options:
+      - id: opt-condition-if
+        label: "Add a deployNsg boolean parameter, put \"condition\": \"[parameters('deployNsg')]\" on the NSG resource, and make the subnet's networkSecurityGroup property use an if() expression that returns null when it is false"
+        correct: true
+        explain: >
+          The condition property tells ARM whether to deploy a resource at all, and
+          it is evaluated before dependencies are resolved. The second half matters
+          just as much: a subnet that still references a resource which was not
+          deployed fails the deployment, so the association has to be conditional
+          too. An if() expression returning null for the property is how a template
+          expresses an optional association.
+        rep: 12
+      - id: opt-condition-only
+        label: "Put the condition on the NSG resource and leave the subnet's networkSecurityGroup reference as it is, since resourceId only builds a string"
+        correct: false
+        consequence: >
+          Batam fails at the subnet with a message about a resource that was not
+          found, after the VNet has already been created.
+        explain: >
+          resourceId does only build a string, and ARM validates that the target
+          exists when a resource references it. With the NSG conditioned out, the
+          subnet points at something that was never deployed and the deployment
+          fails partway through. Conditional resources need their referencing
+          properties made conditional in the same change.
+        rep: -10
+      - id: opt-two-templates
+        label: "Keep one template and add a second one that deploys only the NSG, run for the two sites that need it"
+        correct: false
+        explain: >
+          This is defensible and it is how many teams end up organized - it just
+          answers a different question than the one asked. Priya's constraint was
+          one template, and the reason is that two deployment paths mean two things
+          to review and one of them will be forgotten. A condition keeps the
+          variation visible in the parameter file.
+        rep: -5
+      - id: opt-empty-nsg
+        label: "Deploy an NSG at every site but leave it with no rules at the partner facilities, so the template never varies"
+        correct: false
+        consequence: >
+          The partner's security team finds an unmanaged NSG in their perimeter
+          and the account manager hears about it before you do.
+        explain: >
+          An NSG with no custom rules is not inert - the default rules still apply,
+          and it becomes an object nobody at that site is allowed to manage or
+          audit. Deploying a control into an environment governed by someone else
+          creates ownership ambiguity that is worse than not deploying it.
+        rep: -8
+    next: END

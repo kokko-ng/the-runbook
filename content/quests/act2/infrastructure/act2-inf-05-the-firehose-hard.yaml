@@ -1,0 +1,228 @@
+schema_version: 1
+id: act2-inf-05-the-firehose-hard
+title: "The Firehose - Back Pressure"
+act: 2
+chapter: act2-infrastructure
+domain: az305-d4
+order: 5
+role: associate-architect
+bonus_variant_of: act2-inf-05-the-firehose
+checkpoint: true
+summary: "The event architecture, questioned by a reviewer who has built one before."
+entry: e1-fanout
+
+encounters:
+  - id: e1-fanout
+    type: design_decision
+    title: "The fourth consumer"
+    speaker: mentor
+    objectives: [AZ305-4.7]
+    scenario: |
+      The telemetry vendor's fourth consumer arrives: a customer-facing "where is
+      my container" push notification, and it changes the requirements.
+
+      - Notification must fire within 5 seconds of a geofence crossing
+      - Only about 0.4 percent of events cross a geofence; the rest are irrelevant to this consumer
+      - The notification service is a third-party HTTPS endpoint owned by the vendor
+      - The vendor's endpoint returns 503 for minutes at a time during their deploys
+      - A missed notification is acceptable; a duplicate is not, within a 10-minute window
+      - The existing Event Hub, its partitions, and the other three consumers must not change
+      - Meridian must not run infrastructure for this; the vendor pays per notification
+
+      The external reviewer: "You have a stream. They want events. Those are not
+      the same noun."
+    prompt: "How do you deliver geofence notifications to the vendor?"
+    options:
+      - id: opt-filter-then-grid
+        label: "A stream processor reads the hub, evaluates geofences, and publishes a discrete GeofenceCrossed event to Event Grid, which delivers to the vendor endpoint with retry, dead-lettering, and an idempotency key the vendor deduplicates on"
+        correct: true
+        explain: >
+          The two nouns get two services. The hub stays a stream and is unchanged,
+          which the requirements demand, and a processor turns 12,000 events per
+          second into the 0.4 percent that are actually events worth notifying.
+          Event Grid is then the right delivery mechanism for discrete
+          notifications to an external HTTPS endpoint: push delivery with
+          exponential retry and dead-lettering absorbs the vendor's 503 windows
+          without Meridian running a delivery service. At-least-once delivery plus
+          an idempotency key is how the no-duplicates requirement is actually met,
+          because exactly-once across a network boundary is a deduplication
+          problem, not a transport guarantee.
+        rep: 12
+      - id: opt-direct-push
+        label: "Have the telemetry processor call the vendor's HTTPS endpoint directly when it detects a crossing, with retries"
+        correct: false
+        consequence: >
+          The vendor deploys at 14:00. The processor's retries back up behind the
+          503s and consumer lag grows on every partition.
+        explain: >
+          Calling a slow external dependency from inside a stream consumer couples
+          your ingest throughput to somebody else's deploy schedule - the retries
+          occupy the same threads that should be reading the hub. The requirement
+          that the existing consumers not be affected makes this a correctness
+          failure, not just a performance one. Push delivery to unreliable
+          endpoints belongs behind a service that buffers it.
+        rep: -10
+      - id: opt-new-consumer-group
+        label: "Give the vendor a consumer group on the Event Hub and let them read the stream themselves"
+        correct: false
+        explain: >
+          It is cheap and it hands a third party 12,000 events per second when
+          they need 48 - along with every container's position, which is more data
+          than the notification requires. It also makes the vendor responsible for
+          checkpointing and geofence logic, and makes your partition layout part
+          of their integration contract.
+        rep: -8
+      - id: opt-servicebus
+        label: "Publish crossings to a Service Bus queue and have a function drain it to the vendor endpoint"
+        correct: false
+        explain: >
+          This is close and it is the answer to a different requirement. Service
+          Bus is the right choice when the message must not be lost and a consumer
+          may be down for hours - here a missed notification is explicitly
+          acceptable and the requirement is not to run infrastructure. Event Grid
+          delivers to the external endpoint itself with retry and dead-lettering,
+          so no drain function exists to operate.
+        rep: -6
+    next: e2-ordering
+
+  - id: e2-ordering
+    type: design_decision
+    title: "Order, exactly once, and other lies"
+    speaker: mentor
+    objectives: [AZ305-4.6]
+    scenario: |
+      The customs filing consumer on the booking topic has a new constraint from
+      the Indonesian filing authority.
+
+      - Filings for one consignment must be submitted in strict sequence: create, amend, cancel
+      - A cancel processed before its amend is rejected by the authority and incurs a fee
+      - Consignments are independent of each other; there are thousands in flight
+      - The filing call to the authority takes 2 to 9 seconds and occasionally times out with an ambiguous result
+      - Throughput needed: 40,000 bookings a day, bursty
+      - A single-threaded consumer cannot keep up with the burst
+
+      The reviewer again: "Everybody says 'use sessions'. Tell me what sessions
+      actually give you, and what you still have to build."
+    prompt: "How do you guarantee filing order without serializing everything?"
+    options:
+      - id: opt-sessions-idempotent
+        label: "Service Bus sessions keyed on the consignment ID, so one consumer holds one session at a time while different consignments process in parallel, plus an idempotency key on each filing so an ambiguous timeout can be safely retried"
+        correct: true
+        explain: >
+          Sessions give ordered, exclusive processing per session key and
+          concurrency across keys, which is exactly the shape of the requirement:
+          strict order within a consignment, thousands of consignments in
+          parallel. What sessions do not give you is safety around an ambiguous
+          outcome - a timeout where the authority may or may not have accepted the
+          filing - so the retry has to be made idempotent at the application level
+          with a key the authority can deduplicate. That is the part the reviewer
+          was asking about.
+        rep: 12
+      - id: opt-single-consumer
+        label: "One consumer instance with prefetch disabled, processing the queue strictly in order"
+        correct: false
+        consequence: >
+          At nine seconds a filing, the 09:00 burst is still draining at lunchtime.
+        explain: >
+          Global serialization does guarantee order and it guarantees it far more
+          strongly than required - across consignments that the scenario says are
+          independent. With filings taking up to nine seconds, one consumer caps
+          throughput far below 40,000 a day. Ordering requirements are almost
+          always per-key; serializing the whole stream is the expensive way to
+          satisfy a narrow guarantee.
+        rep: -10
+      - id: opt-timestamp
+        label: "Process in parallel and have the consumer sort by the message's enqueued timestamp before submitting"
+        correct: false
+        consequence: >
+          A cancel and its amend are handled by two instances four hundred
+          milliseconds apart. The sort never sees them together.
+        explain: >
+          Sorting works only over a batch that contains all the related messages,
+          and parallel consumers each see a different subset, so there is no point
+          at which the amend and the cancel are in the same sort. Ordering has to
+          be enforced by the broker's delivery model, not reconstructed by
+          consumers after the fact.
+        rep: -10
+      - id: opt-dedupe
+        label: "Enable duplicate detection on the topic and rely on it to prevent the double-filing problem"
+        correct: false
+        explain: >
+          Duplicate detection removes duplicate messages that the producer sent
+          within a time window; it says nothing about the order in which distinct
+          messages are processed, and nothing about a retry of an outbound call
+          whose result was ambiguous. It solves a real problem that is not either
+          of the two stated here.
+        rep: -8
+    next: e3-scale
+
+  - id: e3-scale
+    type: design_decision
+    title: "Two hours of back pressure"
+    speaker: manager
+    objectives: [AZ305-4.4, AZ305-4.7]
+    scenario: |
+      The cold-chain processor writes each reading to Cosmos DB. Cosmos throttles
+      during the fleet handover peak and the processor starts falling behind.
+
+      What is measured:
+
+      - Peak 30,000 events per second for 6 to 9 minutes, three times a day, predictable to the minute
+      - Cosmos DB provisioned throughput sized for the 12,000 per second steady state
+      - Event Hub retention is 24 hours; the peak backlog clears in about 40 minutes
+      - Alerting must still fire within 60 seconds during the peak
+      - Only excursions need to alert; roughly 1 in 900 readings is an excursion
+      - Evelyn will not fund Cosmos capacity sized for three peaks a day
+
+      Desmond: "It catches up on its own. That is not the same as it being fine."
+    prompt: "How do you handle the peak without oversizing the data store?"
+    options:
+      - id: opt-split-path
+        label: "Split the processing: evaluate the excursion rule in the stream and alert immediately, and write the full reading history through a separately scaled path with Cosmos autoscale throughput and retry on throttling"
+        correct: true
+        explain: >
+          The two jobs have different latency requirements and were sharing a
+          bottleneck. Excursion evaluation is in-memory work on the event itself,
+          so it can meet the 60-second alerting requirement regardless of what the
+          data store is doing. History writing is not latency-critical, so it can
+          absorb back pressure, retry on 429, and use autoscale throughput that
+          rises for the nine minutes it is needed. The stream's retention is the
+          buffer that makes the slower path safe.
+        rep: 12
+      - id: opt-provision-peak
+        label: "Provision Cosmos DB throughput for the 30,000 per second peak so throttling never occurs"
+        correct: false
+        consequence: >
+          Evelyn asks what the request units did for the twenty-three and a half
+          hours a day outside the peaks.
+        explain: >
+          Sizing steady-state capacity for a peak that lasts twenty-seven minutes
+          a day is the option the scenario's cost constraint exists to rule out.
+          It also treats throttling as an error to be eliminated rather than a
+          back-pressure signal to be handled, which is what a 429 with a
+          retry-after header is.
+        rep: -8
+      - id: opt-slow-down
+        label: "Reduce the processor's concurrency during peaks so it never exceeds the provisioned throughput"
+        correct: false
+        consequence: >
+          Alert latency during the peak rises to eleven minutes. The insurance
+          clause is still sixty seconds.
+        explain: >
+          Throttling the consumer protects the data store by pushing the delay
+          onto everything the consumer does, including the excursion alerting that
+          has a hard 60-second requirement. Back pressure has to be applied to the
+          path that can tolerate it, which is why the two paths need separating
+          before either can be slowed.
+        rep: -10
+      - id: opt-drop
+        label: "Sample the readings during peaks, storing one in ten, since the fleet reports every 30 seconds anyway"
+        correct: false
+        explain: >
+          Sampling is a legitimate technique for telemetry that exists only for
+          trend analysis, and this history is used for cold-chain claims, where a
+          missing reading is a missing piece of evidence. It also risks discarding
+          the one excursion in nine hundred. Discard data when a requirement says
+          the data is disposable; nothing here does.
+        rep: -10
+    next: END

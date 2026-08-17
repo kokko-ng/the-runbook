@@ -1,0 +1,249 @@
+schema_version: 1
+id: act2-data-06-finance-warehouse-hard
+title: "Month End, Every Month (Design Review)"
+act: 2
+chapter: act2-data
+domain: az305-d2
+order: 6
+role: associate-architect
+checkpoint: true
+bonus_variant_of: act2-data-06-finance-warehouse
+summary: "The warehouse is approved. Now the three decisions that determine whether it is fast, affordable, and legal."
+entry: e1-distribution
+
+encounters:
+  - id: e1-distribution
+    type: design_decision
+    title: "Sixty distributions"
+    speaker: mentor
+    objectives: [AZ305-2.10]
+    scenario: |
+      Desmond has been reading the dedicated SQL pool documentation with the
+      expression of a man who has found a footgun.
+
+      "It splits every table across sixty distributions. If you pick that wrong,
+      it moves data between them on every query, and then your five-second
+      dashboard is a forty-second dashboard and I get the ticket."
+
+      The model as designed:
+
+      - fact_consignment: 900 million rows, 300 GB. Grows by about 700,000 rows
+        a night.
+      - dim_customer: 120,000 rows, 40 MB. dim_container: 12,000 rows, 3 MB.
+        dim_date: 3,700 rows.
+      - Almost every query joins fact_consignment to all three dimensions and
+        groups by customer_key.
+      - customer_key has 120,000 distinct values and no customer accounts for
+        more than 3 percent of rows.
+      - ship_month has 60 distinct values across the five years of history.
+      - Nightly loads land in a staging table first, then merge into the fact.
+    prompt: "What distribution strategy do you recommend?"
+    options:
+      - id: opt-hash-replicate
+        label: "Hash-distribute fact_consignment on customer_key, replicate the three dimensions, round-robin the staging table"
+        correct: true
+        explain: >
+          Hashing the fact on the column it is joined and grouped by means rows
+          for a customer already sit on the distribution that will aggregate
+          them, so the join and the group-by run without data movement -
+          120,000 values with no value over 3 percent gives an even spread.
+          Replicating small dimensions puts a full copy on every compute node,
+          which removes the broadcast on every join. Round-robin is right for
+          staging because loading should be fast and nothing joins to it.
+        rep: 14
+      - id: opt-roundrobin-all
+        label: "Round-robin everything; it distributes perfectly evenly and needs no analysis"
+        correct: false
+        consequence: >
+          The first month-end dashboard takes fifty-one seconds and the
+          execution plan is almost entirely shuffle operations.
+        explain: >
+          Round-robin guarantees even storage and guarantees data movement:
+          because placement is arbitrary, every join has to shuffle rows across
+          distributions before it can match them. It is the correct choice for
+          staging tables and for facts with no obvious join key, and the wrong
+          default for a star schema whose queries all join on the same column.
+        rep: -10
+      - id: opt-hash-month
+        label: "Hash-distribute fact_consignment on ship_month, keeping each month's data together"
+        correct: false
+        consequence: >
+          Fifty-nine distributions idle while one works, and the current month
+          is always the one everybody queries.
+        explain: >
+          Sixty distinct values across sixty distributions is the textbook skew
+          case: at best one month per distribution, so any query about a single
+          month runs single-threaded while the rest of the pool watches. A
+          distribution key needs high cardinality and even spread first, and
+          query alignment second - ship_month fails the first test.
+        rep: -12
+      - id: opt-replicate-fact
+        label: "Replicate all four tables so no query ever needs to move data"
+        correct: false
+        explain: >
+          Replication copies the whole table to every compute node, which is
+          why it is limited to small dimensions - a 300 GB fact would be
+          duplicated across every node, and the cache would be rebuilt after
+          every nightly load. Replicated tables are a technique for tables under
+          roughly 2 GB that change rarely, not a way to avoid thinking about
+          distribution.
+        rep: -10
+    next: e2-workload-cost
+
+  - id: e2-workload-cost
+    type: design_decision
+    title: "Three quiet weeks and one loud one"
+    speaker: cfo
+    objectives: [AZ305-2.7]
+    scenario: |
+      Evelyn has the first full month of warehouse telemetry and a specific
+      complaint.
+
+      "It cost what you said. I want to know why it cost that on the eleventh,
+      when nobody opened a dashboard."
+
+      What the month looked like:
+
+      - Month-end window: five working days, 16 concurrent analysts, dashboards
+        must hold under five seconds.
+      - The other three weeks: a handful of ad-hoc queries a day, mostly the
+        same ones repeated.
+      - The nightly load runs at 01:00 and takes 40 minutes. Twice last month
+        it overlapped with an early analyst and both were slow.
+      - Compute is billed while the pool is resumed, regardless of query
+        activity. Storage is billed separately and always.
+      - The pool is currently left resumed continuously because nobody wanted
+        to be the reason a dashboard failed.
+      - Evelyn will accept a first-query delay after a pause. She will not
+        accept a failed month-end refresh.
+    prompt: "How do you bring the run rate down without risking month end?"
+    options:
+      - id: opt-pause-wlm-cache
+        label: "Schedule resume and pause around the load and business hours, keep the pool resumed through the five-day month-end window, isolate the load into its own workload group, and enable result set caching"
+        correct: true
+        explain: >
+          Each piece answers one stated problem. Pausing outside the load and
+          business hours stops paying for compute nobody is using, which is the
+          eleventh-of-the-month charge. Keeping it resumed for the five-day
+          window removes any chance of a pause colliding with month end.
+          Workload isolation reserves resources for the nightly load so an early
+          analyst cannot starve it or be starved by it. Result set caching makes
+          the repeated ad-hoc queries in the quiet weeks nearly free.
+        rep: 14
+      - id: opt-scale-up
+        label: "Scale the pool up permanently so month end is never slow, and accept the cost as the price of reliability"
+        correct: false
+        consequence: >
+          Evelyn asks whether the eleventh is now more expensive or less. It is
+          more.
+        explain: >
+          It buys performance for five days by paying for it for thirty, and it
+          does not touch the actual finding, which is spend during hours with no
+          users. It also leaves the load-versus-analyst collision in place -
+          a larger pool with no workload isolation still lets one workload
+          consume the concurrency slots of the other.
+        rep: -8
+      - id: opt-serverless-switch
+        label: "Abandon the dedicated pool for serverless SQL over the lake, so there is nothing to pause"
+        correct: false
+        explain: >
+          It removes idle compute charges and reintroduces the reasons the
+          dedicated pool was chosen: no distributions, no result caching of the
+          kind BI dashboards rely on, and per-terabyte-scanned billing at 16
+          concurrent users during exactly the week that matters most. Solving an
+          idle-cost problem by giving up the performance envelope is not a
+          balance, it is a swap.
+        rep: -8
+      - id: opt-manual
+        label: "Ask the analysts to pause the pool when they finish for the day and resume it when they need it"
+        correct: false
+        consequence: >
+          It works for eleven days. On the twelfth nobody resumes it before the
+          01:00 load, which fails, and nobody notices until the dashboards are
+          a day stale.
+        explain: >
+          It puts a cost control on the goodwill of people whose job is
+          something else, and it makes the nightly load depend on a human
+          action taken the previous evening. Anything that must happen every day
+          belongs in a schedule or an automation rule, not in a request.
+        rep: -8
+    next: e3-rls
+
+  - id: e3-rls
+    type: design_decision
+    title: "What Sunda finance may see"
+    speaker: security
+    objectives: [AZ305-2.10]
+    scenario: |
+      Marcus and Evelyn arrive together, which has not happened before.
+
+      "The four analysts from Sunda," Marcus says. "Until the legal entities
+      merge, their access is governed by the acquisition agreement. They see
+      Sunda consignments. They do not see Meridian's, and 'we asked them not
+      to' is not a control."
+
+      The requirements:
+
+      - Every fact row carries a legal_entity_key. Two values today, likely
+        three when the Johor entity is folded in.
+      - Meridian finance sees both entities. Sunda finance sees one. Group
+        reporting needs both in the same model.
+      - Enforcement must be demonstrable to an auditor from one place, not
+        inferred from a set of report definitions.
+      - All 16 analysts use Power BI against the warehouse and sign in with
+        their Entra ID identity.
+      - Two of the Sunda analysts also have workspace admin rights in their own
+        Power BI workspace, granted before the acquisition closed.
+    prompt: "How do you enforce the entity boundary?"
+    options:
+      - id: opt-rls-warehouse
+        label: "Row-level security in the warehouse: a security predicate on legal_entity_key evaluated against the caller's identity, with Power BI using DirectQuery and single sign-on"
+        correct: true
+        explain: >
+          The predicate is enforced by the engine on every query, so it applies
+          to Power BI, to a SQL client, and to anything built next year, and it
+          is one object an auditor can be shown. Single sign-on carries each
+          analyst's own identity to the warehouse rather than a shared service
+          principal, which is what makes the predicate meaningful. Adding the
+          Johor entity later is a row in a mapping table, not a change to
+          sixteen reports.
+        rep: 14
+      - id: opt-powerbi-rls
+        label: "Row-level security defined in the Power BI semantic model, with roles mapped to Entra groups"
+        correct: false
+        consequence: >
+          A Sunda workspace admin connects to the dataset over XMLA and reads
+          everything.
+        explain: >
+          Model-level security only binds users who arrive through the report.
+          Anyone with sufficient workspace rights - and the scenario says two
+          Sunda analysts have them - can query the underlying model directly or
+          reach the warehouse with their own credentials. It is a usability
+          feature layered over a data boundary, not the boundary itself.
+        rep: -10
+      - id: opt-separate-workspaces
+        label: "Give each entity its own Power BI workspace with an import model filtered to its own rows"
+        correct: false
+        explain: >
+          It works on the day it is built and degrades from there: every new
+          measure has to be applied twice, the filters live in refresh
+          definitions rather than in one enforceable place, and group reporting
+          needs a third model that combines both. The auditor's question -
+          show me where this is enforced - has three answers, which means it has
+          none.
+        rep: -8
+      - id: opt-separate-warehouse
+        label: "Build a second dedicated SQL pool holding only Sunda data and point their analysts at it"
+        correct: false
+        consequence: >
+          Evelyn is handed a second warehouse line item in the same meeting
+          where she asked why the first one cost money on the eleventh.
+        explain: >
+          Physical separation is the strongest boundary and the wrong tool for
+          two values in a column: it doubles compute, storage, and load
+          pipelines, and it makes group reporting - an explicit requirement -
+          a cross-warehouse problem. Reach for a separate warehouse when the
+          data cannot legally coexist, not when a predicate can express the
+          rule.
+        rep: -8
+    next: END
