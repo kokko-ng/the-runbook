@@ -162,6 +162,25 @@ def test_repair_on_a_wrong_fix_does_not_count(write_quest):
     assert any("leaves node vnet-spoke broken" in p for p in problems_for(root))
 
 
+def test_en_gb_spelling_rejected(content_root):
+    """The game matches the Azure documentation a player will search next."""
+    path = content_root / "quests" / "test-quest.yaml"
+    path.write_text(path.read_text().replace("Something happened", "Behaviour changed"), "utf-8")
+    assert any("en-GB spelling" in p for p in problems_for(content_root))
+
+
+def test_em_dash_rejected(content_root):
+    path = content_root / "quests" / "test-quest.yaml"
+    path.write_text(path.read_text().replace("Because it is.", "Because it is - well, mostly — yes."), "utf-8")
+    assert any("em-dash" in p for p in problems_for(content_root))
+
+
+def test_emoji_rejected(content_root):
+    path = content_root / "quests" / "test-quest.yaml"
+    path.write_text(path.read_text().replace("The right call", "The right call 🚀"), "utf-8")
+    assert any("emoji" in p for p in problems_for(content_root))
+
+
 def test_time_budget_below_cheapest_command_rejected(write_quest):
     quest = sample_quest()
     quest["encounters"][1]["time_budget"] = 1

@@ -422,7 +422,7 @@ encounters:
           The swap back is the fastest possible remediation - it is the same nine
           second routing change - and it returns both slots to the configuration
           they had at 09:01. Marking the connection string as a deployment slot
-          setting makes it stay with the slot instead of travelling with the
+          setting makes it stay with the slot instead of traveling with the
           content, which is what the flag is for. Then the release can go live
           again, correctly, with each environment on its own database.
         rep: 15

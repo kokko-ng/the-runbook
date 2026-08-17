@@ -228,7 +228,7 @@ encounters:
           Runbook rb-decom-stale-vms ran at 03:41. It selects VMs with the tag
           lifecycle equal to retire. vm-wms01 was tagged lifecycle retire in
           March when the hardware refresh was planned and the tag was never
-          removed after the plan was cancelled.
+          removed after the plan was canceled.
       - id: inv-marcus
         label: "Ask Marcus what the auditors will need to see at nine"
         speaker: security
