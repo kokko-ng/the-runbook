@@ -1,0 +1,311 @@
+schema_version: 1
+id: act1-net-05-route-to-nowhere
+title: "The Route to Nowhere"
+act: 1
+chapter: act1-networking
+domain: az104-d4
+order: 5
+role: cloud-admin
+checkpoint: true
+summary: "Kallang finally gets its VPN. Then half the traffic stops coming back."
+entry: e1-gateway-choice
+
+encounters:
+  - id: e1-gateway-choice
+    type: design_decision
+    title: "Connecting Kallang"
+    speaker: manager
+    objectives: [AZ104-4.7]
+    scenario: |
+      The Kallang site-to-site VPN has been "next quarter" for three quarters.
+      Priya has made it this quarter.
+
+      "Kallang runs the ERP that the warehouse app posts to. Right now that goes
+      over the internet with a VPN client on a jump box, which Marcus describes
+      as 'a temporary arrangement from 2021.' We want a proper tunnel."
+
+      The requirements, as far as anyone will commit to them: around 200 Mbps of
+      steady traffic, one on-premises firewall at Kallang with a static public
+      IP, and enough resilience that a single Azure-side failure does not stop
+      trucks. Evelyn has approved a gateway but asked, in writing, what it costs
+      per month.
+
+      The GatewaySubnet you reserved in your first week is still empty.
+    prompt: "What do you deploy to connect Kallang to the hub VNet?"
+    options:
+      - id: opt-vpn-gw
+        label: "A route-based VPN gateway in the hub's GatewaySubnet, active-active, with a site-to-site connection to the Kallang firewall"
+        correct: true
+        explain: >
+          A route-based VPN gateway is the standard fit for a site-to-site tunnel
+          to a single on-premises firewall, and route-based is what supports the
+          selectors and coexistence scenarios you will want later. Active-active
+          gives two gateway instances with two public IPs so a single instance
+          failure does not drop the site. It sits in the hub so every spoke can
+          use it rather than each building its own.
+        rep: 8
+        diagram_ops:
+          - op: add_node
+            node:
+              id: vgw-hub
+              label: "vgw-hub-sea (active-active)"
+              kind: vpn-gateway
+              group: grp-corp
+              status: healthy
+          - op: add_edge
+            edge:
+              id: e-vgw-snetgateway
+              source: vgw-hub
+              target: snet-gateway
+              kind: dependency
+          - op: add_edge
+            edge:
+              id: e-vgw-kallang
+              source: vgw-hub
+              target: dc-kallang
+              kind: vpn
+              label: "site-to-site"
+      - id: opt-expressroute
+        label: "An ExpressRoute circuit to Kallang for guaranteed bandwidth and no internet dependency"
+        correct: false
+        consequence: >
+          Evelyn's reply contains the phrase "per month" twice and no other words.
+        explain: >
+          ExpressRoute is the right answer for large, latency-sensitive, or
+          contractually private connectivity - but it means a circuit from a
+          provider, a lead time measured in weeks, and a monthly cost far above a
+          VPN gateway, for 200 Mbps that a gateway handles. Reach for it when the
+          requirement justifies it.
+        rep: -8
+      - id: opt-policy-based
+        label: "A policy-based VPN gateway, since Kallang has a single firewall and one address space"
+        correct: false
+        explain: >
+          Policy-based gateways exist mainly for legacy on-premises devices that
+          cannot do route-based, and they carry hard limits - a single tunnel, no
+          active-active, and no coexistence with other connection types. Choosing
+          one here trades away the resilience Priya asked for and boxes in every
+          future connection.
+        rep: -8
+      - id: opt-spoke-gw
+        label: "A VPN gateway in vnet-warehouse-sea, since the warehouse app is what needs Kallang"
+        correct: false
+        explain: >
+          It connects the one spoke that needs it today and leaves every other
+          spoke needing its own gateway, each billed hourly. Shared connectivity
+          belongs in the hub, where spokes reach it through peering with gateway
+          transit - that is what the hub is for.
+        rep: -5
+    next: e2-transit
+
+  - id: e2-transit
+    type: troubleshoot
+    title: "P2: Kallang reaches the hub but not the warehouse"
+    speaker: noc
+    objectives: [AZ104-4.6, AZ104-4.7]
+    ticket:
+      id: "MER-4688"
+      reporter: "NOC Manila"
+      priority: "P2"
+      opened: "14:20"
+      body: |
+        Post-cutover checks after the VPN went live. From Kallang: vm-dc01 in the
+        hub responds to ping and LDAP. vm-wms01 in the warehouse spoke does not
+        respond at all. Tunnel shows Connected. Warehouse-to-hub traffic inside
+        Azure is fine. Requesting cloud team review before we sign off cutover.
+    scenario: |
+      The tunnel came up on the first attempt, which Desmond called "suspicious."
+
+      Kallang can reach the hub. Kallang cannot reach the warehouse spoke, where
+      the ERP integration actually needs to post. The tunnel itself reports
+      Connected and has not flapped once.
+
+      Cutover sign-off is at 16:00 and the fallback is the 2021 jump box, which
+      Marcus has already announced he will be decommissioning "either way."
+    time_budget: 6
+    investigate:
+      - id: inv-noc
+        label: "Ask the NOC exactly which flows they tested"
+        speaker: noc
+        reveals: >
+          "From 10.10.5.20 at Kallang: ICMP and 389 to 10.100.1.10 both fine.
+          ICMP and 8443 to 10.101.2.4 both time out. Same source machine, same
+          minute. So the tunnel carries traffic, just not to that range."
+      - id: inv-desmond
+        label: "Ask Desmond what he suspects"
+        speaker: mentor
+        reveals: >
+          "Hub reachable, spoke not. The tunnel terminates in the hub. Ask
+          yourself what the spoke knows about Kallang's address space, and what
+          the gateway knows about the spoke's. Peering doesn't share a gateway
+          unless you tell it to - twice, once on each side."
+      - id: inv-kallang
+        label: "Ask the Kallang network engineer what the firewall advertises"
+        speaker: ticket
+        reveals: >
+          "Our side has 10.100.0.0/16 and 10.101.0.0/16 both in the tunnel
+          selectors. We're sending traffic for the warehouse range down the
+          tunnel. It goes in and nothing comes back."
+      - id: inv-change
+        label: "Re-read the peering configuration from your first week"
+        speaker: narrator
+        reveals: >
+          Both peerings were created with defaults: AllowVirtualNetworkAccess
+          true, AllowForwardedTraffic false, AllowGatewayTransit false,
+          UseRemoteGateways false. At the time there was no gateway to transit.
+    commands:
+      - id: cmd-peering-detail
+        label: "Show the hub-to-warehouse peering settings"
+        command: "az network vnet peering show -g rg-hub-sea --vnet-name vnet-hub-sea -n hub-to-warehouse --query '{state:peeringState,gwTransit:allowGatewayTransit,useRemote:useRemoteGateways,forwarded:allowForwardedTraffic}' -o json"
+        output: |
+          {
+            "state": "Connected",
+            "gwTransit": false,
+            "useRemote": false,
+            "forwarded": false
+          }
+        time_cost: 1
+        note: "The hub does not offer gateway transit to the spoke."
+      - id: cmd-spoke-peering-detail
+        label: "Show the warehouse-to-hub peering settings"
+        command: "az network vnet peering show -g rg-ops-sea --vnet-name vnet-warehouse-sea -n warehouse-to-hub --query '{state:peeringState,gwTransit:allowGatewayTransit,useRemote:useRemoteGateways}' -o json"
+        output: |
+          {
+            "state": "Connected",
+            "gwTransit": false,
+            "useRemote": false
+          }
+        time_cost: 1
+        note: "And the spoke is not asking to use the hub's gateway."
+      - id: cmd-spoke-routes
+        label: "Show effective routes on the warehouse app NIC"
+        command: "az network nic show-effective-route-table -g rg-ops-sea -n nic-wms01 -o table"
+        output: |
+          Source                 State    Address Prefix    Next Hop Type            Next Hop IP
+          ---------------------  -------  ----------------  -----------------------  -------------
+          Default                Active   10.101.0.0/16     VnetLocal
+          Default                Active   10.100.0.0/16     VNetPeering
+          Default                Active   0.0.0.0/0         Internet
+          Default                Active   10.0.0.0/8        None
+        time_cost: 2
+        note: "No route for 10.10.0.0/16 - the spoke has never heard of Kallang."
+      - id: cmd-conn-status
+        label: "Check the VPN connection status"
+        command: "az network vpn-connection show -g rg-hub-sea -n cn-kallang --query '{status:connectionStatus,ingress:ingressBytesTransferred,egress:egressBytesTransferred}' -o json"
+        output: |
+          {
+            "status": "Connected",
+            "ingress": 48211904,
+            "egress": 51338240
+          }
+        time_cost: 1
+        note: "Tunnel is healthy and passing traffic in both directions."
+      - id: cmd-gw-routes
+        label: "Show the routes the gateway has learned"
+        command: "az network vnet-gateway list-learned-routes -g rg-hub-sea -n vgw-hub-sea -o table"
+        output: |
+          Network          Origin    SourcePeer     AsPath    Weight
+          ---------------  --------  -------------  --------  --------
+          10.100.0.0/16    Default   10.100.254.4             32768
+          10.10.0.0/16     Static    203.0.113.40             32768
+        time_cost: 2
+        note: "The gateway knows the hub and Kallang. Nothing about 10.101.0.0/16."
+      - id: cmd-nsg-check
+        label: "Check whether the app tier NSG permits the Kallang range"
+        command: "az network watcher test-ip-flow -g rg-ops-sea --vm vm-wms01 --direction Inbound --protocol TCP --local 10.101.2.4:8443 --remote 10.10.5.20:52310 -o table"
+        output: |
+          Access    RuleName
+          --------  ------------------
+          Allow     allow-erp-in
+        time_cost: 2
+        note: "NSGs would permit the flow if it ever arrived."
+    fixes:
+      - id: fix-gateway-transit
+        label: "Enable AllowGatewayTransit on the hub peering and UseRemoteGateways on the spoke peering"
+        correct: true
+        explain: >
+          Gateway transit is what lets a spoke use the hub's VPN gateway, and it
+          must be set on both halves of the peering: the hub offers transit with
+          AllowGatewayTransit, the spoke accepts it with UseRemoteGateways. Once
+          both are set, the spoke's effective routes gain 10.10.0.0/16 via the
+          gateway and the gateway learns to send the spoke's range back down the
+          tunnel. Peering is two objects - this quest keeps proving it.
+        rep: 10
+        diagram_ops:
+          - {op: set_edge_status, edge: peer-hub-warehouse, status: healthy}
+          - {op: set_edge_status, edge: e-vgw-kallang, status: healthy}
+          - {op: set_status, node: vgw-hub, status: healthy}
+      - id: fix-udr-only
+        label: "Add a user-defined route on snet-wms-app sending 10.10.0.0/16 to the gateway's private IP"
+        correct: false
+        consequence: >
+          The route appears. Traffic from the warehouse reaches the gateway and
+          Kallang's replies still have nowhere to go.
+        explain: >
+          Without gateway transit the spoke is not entitled to use the hub's
+          gateway, and the gateway has no route back to 10.101.0.0/16 regardless
+          of what the spoke's route table says. A UDR steers traffic within
+          connectivity that exists; the transit relationship is what creates it
+          in both directions.
+        rep: -8
+      - id: fix-second-gw
+        label: "Deploy a second VPN gateway in vnet-warehouse-sea with its own tunnel to Kallang"
+        correct: false
+        consequence: >
+          Evelyn now has two gateway line items and a question about the first one.
+        explain: >
+          It would work, at the cost of a second hourly-billed gateway, a second
+          tunnel for Kallang's firewall to maintain, and the same problem again
+          for the next spoke. Gateway transit exists so one hub gateway serves
+          every spoke.
+        rep: -10
+      - id: fix-forwarded
+        label: "Enable AllowForwardedTraffic on both peerings"
+        correct: false
+        explain: >
+          AllowForwardedTraffic governs whether a VNet accepts traffic that did
+          not originate in the peered VNet, which matters when routing through an
+          appliance. It does not grant the spoke use of the hub's gateway, and the
+          spoke's route table stays empty of Kallang's range.
+        rep: -8
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: e3-check
+
+  - id: e3-check
+    type: knowledge_check
+    title: "Before sign-off"
+    speaker: mentor
+    objectives: [AZ104-4.6]
+    scenario: |
+      Cutover signs off at 15:52. Marcus decommissions the jump box at 15:53.
+    question: >
+      A subnet has a user-defined route for 10.10.0.0/16 with next hop the
+      Azure Firewall, and the gateway is also advertising 10.10.0.0/16 into the
+      VNet via BGP. Which path does traffic take, and why?
+    options:
+      - id: opt-udr
+        label: "The user-defined route - UDRs take precedence over BGP and system routes for the same prefix"
+        correct: true
+        explain: >
+          Azure evaluates route sources in order of precedence: user-defined
+          routes first, then BGP-learned routes, then system routes. For an
+          identical prefix the UDR wins, which is exactly how you force traffic
+          through a firewall or appliance. When prefixes differ, longest prefix
+          match applies first.
+      - id: opt-bgp
+        label: "The BGP route - dynamically learned routes are preferred because they reflect current reachability"
+        correct: false
+        explain: >
+          BGP sits below user-defined routes in Azure's precedence order. If BGP
+          could override UDRs, forcing traffic through an appliance would stop
+          working the moment a gateway advertised the same prefix.
+      - id: opt-split
+        label: "Traffic is load-balanced across both paths since the prefixes are identical"
+        correct: false
+        explain: >
+          Azure does not split traffic across route sources for an identical
+          prefix. One route is selected by precedence, and here that is the
+          user-defined route.
+    next: END

@@ -1,0 +1,283 @@
+schema_version: 1
+id: act1-net-03-locked-out
+title: "Locked Out at 40 Degrees"
+act: 1
+chapter: act1-networking
+domain: az104-d4
+order: 3
+role: junior-cloud-admin
+checkpoint: true
+summary: "Security tightened the rules on Friday. The scanners stopped on Monday."
+entry: e1-asg-design
+
+encounters:
+  - id: e1-asg-design
+    type: design_decision
+    title: "Marcus wants the rules tightened"
+    speaker: security
+    objectives: [AZ104-4.3]
+    scenario: |
+      Marcus Lim, Meridian's security officer, sends a calendar invite titled
+      "15 min - NSG cleanup" that runs for fifty.
+
+      "Right now snet-wms-app allows 443 inbound from the whole web subnet. That
+      was fine when the web subnet held two machines. It now holds the picking
+      portal, the driver portal, and a reporting box that a contractor built and
+      nobody owns. I want the app tier reachable by the picking portal and the
+      driver portal. Not the reporting box."
+
+      He is right, and the reporting box is genuinely alarming.
+
+      "The web subnet scales. Machines come and go. I do not want to be editing
+      IP addresses in NSG rules every time Ops adds a front end, because I will
+      forget, and then you will be in a ticket at 40 degrees on the warehouse
+      floor explaining why the scanners stopped."
+    prompt: "How do you express 'these two front ends, not that third one' in the NSG?"
+    options:
+      - id: opt-asg
+        label: "Create an application security group for the portals, assign both NICs to it, and source the rule from the ASG"
+        correct: true
+        explain: >
+          Application security groups let a rule name a logical group of NICs
+          instead of an address range. New portal machines get the policy by being
+          added to the ASG, the reporting box simply is not in it, and the rule
+          text never changes when the subnet grows. This is exactly the case ASGs
+          exist for.
+        rep: 8
+        diagram_ops:
+          - op: add_node
+            node:
+              id: asg-portals
+              label: "asg-wms-portals"
+              kind: nsg
+              group: grp-ops
+              status: healthy
+          - op: add_edge
+            edge:
+              id: e-asgportals-snetweb
+              source: asg-portals
+              target: snet-web
+              kind: dependency
+              label: "members"
+      - id: opt-ips
+        label: "Replace the subnet source with the two portal IP addresses"
+        correct: false
+        consequence: >
+          It works until Ops scales the picking portal to three instances on Thursday.
+        explain: >
+          Pinning rules to individual addresses is precisely the maintenance
+          burden Marcus described. Every scale-out, rebuild, or address change
+          becomes an NSG edit, and the one that gets forgotten becomes an outage.
+        rep: -8
+      - id: opt-split
+        label: "Move the reporting box to its own subnet and keep sourcing the rule from the web subnet"
+        correct: false
+        explain: >
+          Defensible, and sometimes the right call - but it solves today's
+          instance rather than the pattern. The next untrusted machine someone
+          puts in the web subnet inherits access again, and you are back here.
+          The ASG expresses the intent directly instead of relying on subnet
+          hygiene holding forever.
+        rep: -5
+      - id: opt-nsgnic
+        label: "Attach a separate NSG to each portal NIC with its own allow rules"
+        correct: false
+        explain: >
+          NIC-level NSGs multiply the number of rule sets to audit and their
+          effect combines with the subnet NSG in ways that are easy to get wrong.
+          Fewer, subnet-associated NSGs that reference ASGs is the more
+          maintainable shape.
+        rep: -5
+    next: e2-incident
+
+  - id: e2-incident
+    type: troubleshoot
+    title: "P1: Handheld scanners cannot submit"
+    speaker: noc
+    objectives: [AZ104-4.3, AZ104-4.4]
+    ticket:
+      id: "MER-4530"
+      reporter: "Kallang shift supervisor"
+      priority: "P1"
+      opened: "06:04"
+      body: |
+        Morning shift started. Handheld scanners scan a pallet and hang on
+        submit. All 60 units, both floors. Web portal on desktops works fine.
+        We are recording movements on paper. Trucks start loading at 07:30.
+    scenario: |
+      06:04 on a Monday. The scanners talk to a submission endpoint on the app
+      tier over TCP 8443 - a detail nobody wrote down anywhere.
+
+      Marcus's NSG cleanup went in on Friday evening. Marcus is on a flight and
+      unreachable for three hours. Desmond is awake and unimpressed.
+
+      Trucks load at 07:30 whether or not the system knows what is on the pallets.
+    time_budget: 5
+    investigate:
+      - id: inv-supervisor
+        label: "Ask the shift supervisor what the scanners do differently from the desktops"
+        speaker: ticket
+        reveals: >
+          "Desktops go through the web portal, same as always. Scanners talk
+          straight to the app - they always have. Vendor set them up in 2019 and
+          the box says port 8443 on a sticker."
+      - id: inv-change
+        label: "Read Friday's change record"
+        speaker: narrator
+        reveals: >
+          MER-4498, "NSG cleanup - snet-wms-app". Replaced the broad
+          allow-web-in rule with allow-portals-in sourced from asg-wms-portals on
+          port 443. Tested by loading the picking portal, which worked.
+      - id: inv-desmond
+        label: "Call Desmond"
+        speaker: mentor
+        reveals: >
+          "Friday's change tightened one rule and deleted another. Look at what
+          the rule set allows now versus what the scanners actually need - and
+          look at the whole effective set, not just the rule with the obvious
+          name."
+      - id: inv-noc
+        label: "Ask the NOC whether anything else broke over the weekend"
+        speaker: noc
+        reveals: >
+          "Quiet weekend. No alerts. Warehouse runs a skeleton shift Sunday and
+          they were on paper anyway - so this could have been broken since Friday
+          and nobody would have noticed until this morning."
+    commands:
+      - id: cmd-effective-nsg
+        label: "Show effective NSG rules on the app tier NIC"
+        command: "az network nic list-effective-nsg -g rg-ops-sea -n nic-wms01 -o table"
+        output: |
+          Name                    Direction    Priority    Access    Protocol    Source                  DestinationPortRange
+          ----------------------  -----------  ----------  --------  ----------  ----------------------  ----------------------
+          allow-portals-in        Inbound      100         Allow     Tcp         asg-wms-portals         443
+          allow-dc-out            Outbound     100         Allow     *           *                       *
+          DenyAllInBound          Inbound      65500       Deny      *           *                       *
+          AllowVnetOutBound       Outbound     65000       Allow     *           VirtualNetwork          *
+        time_cost: 1
+        note: "Nothing permits 8443 inbound. DenyAllInBound catches it at 65500."
+      - id: cmd-ip-flow
+        label: "Verify the traffic flow with Network Watcher"
+        command: "az network watcher test-ip-flow -g rg-ops-sea --vm vm-wms01 --direction Inbound --protocol TCP --local 10.101.2.4:8443 --remote 10.101.1.20:51204 -o table"
+        output: |
+          Access    RuleName
+          --------  ----------------
+          Deny      DefaultInboundDenyAll
+        time_cost: 1
+        note: "Denied by the default rule, meaning no explicit allow matched."
+      - id: cmd-portal-flow
+        label: "Verify the desktop portal flow for comparison"
+        command: "az network watcher test-ip-flow -g rg-ops-sea --vm vm-wms01 --direction Inbound --protocol TCP --local 10.101.2.4:443 --remote 10.101.1.10:49802 -o table"
+        output: |
+          Access    RuleName
+          --------  ------------------
+          Allow     allow-portals-in
+        time_cost: 1
+        note: "443 is allowed, which is why the desktops never noticed."
+      - id: cmd-app-listen
+        label: "Confirm the app is still listening on 8443"
+        command: "az vm run-command invoke -g rg-ops-sea -n vm-wms01 --command-id RunShellScript --scripts 'ss -lntp | grep 8443'"
+        output: |
+          LISTEN 0  4096  0.0.0.0:8443  0.0.0.0:*  users:(("wms-intake",pid=1184,fd=7))
+        time_cost: 2
+        note: "The service is up and listening. Nothing wrong on the host."
+      - id: cmd-flow-logs
+        label: "Query NSG flow logs for denied traffic since Friday"
+        command: "az monitor log-analytics query -w law-meridian --analytics-query 'AzureNetworkAnalytics_CL | where FlowStatus_s == \"D\" | summarize count() by DestPort_d' -o table"
+        output: |
+          DestPort_d    count_
+          ------------  --------
+          8443          19472
+          22            41
+        time_cost: 2
+        note: "Nineteen thousand denied attempts on 8443, starting Friday evening."
+    fixes:
+      - id: fix-add-8443
+        label: "Add an inbound allow for TCP 8443 from asg-wms-portals to the app tier"
+        correct: true
+        explain: >
+          Friday's cleanup replaced a broad rule with a narrow one and the
+          scanners' port was never in the narrow one. Adding 8443 sourced from the
+          same ASG restores the scanners while keeping Marcus's intent: named
+          sources, named ports, and the reporting box still excluded. Document the
+          port this time, since its only record was a sticker.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: nsg-app, status: healthy}
+          - {op: set_status, node: vm-wms01, status: healthy}
+      - id: fix-revert
+        label: "Roll back Friday's change and restore the original allow-web-in rule"
+        correct: false
+        consequence: >
+          The scanners come back. So does the contractor's reporting box, with
+          full access to the app tier, and Marcus lands to find his change reverted.
+        explain: >
+          Rollback is a legitimate instinct under a P1, but here it reopens a
+          known security gap to fix a missing port, when adding the port is just
+          as fast and does not undo the improvement. Prefer the narrow fix when it
+          is no slower than the broad one.
+        rep: -8
+      - id: fix-any-port
+        label: "Change allow-portals-in to allow all ports from asg-wms-portals"
+        correct: false
+        explain: >
+          It restores service and keeps the ASG source, but it discards the port
+          restriction across the entire app tier rather than adding the one port
+          that was missed. The failure was an incomplete inventory of required
+          ports; the answer is to complete it, not to stop enforcing ports.
+        rep: -8
+      - id: fix-nsg-remove
+        label: "Disassociate nsg-wms-app from the subnet until Marcus is reachable"
+        correct: false
+        consequence: >
+          The app tier sits with no network filtering at all for three hours,
+          during business hours, on a subnet reachable from the hub.
+        explain: >
+          Removing the NSG removes every rule, not the one that is wrong, leaving
+          the tier exposed to anything routable. The flow logs and effective rules
+          already identify the missing port precisely enough to fix it without
+          waiting for anyone.
+        rep: -15
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: e3-check
+
+  - id: e3-check
+    type: knowledge_check
+    title: "Desmond, later"
+    speaker: mentor
+    objectives: [AZ104-4.4]
+    scenario: |
+      Trucks load at 07:41, eleven minutes late, which the supervisor describes
+      as "basically on time."
+
+      Desmond finds you writing the change record.
+    question: >
+      An NSG is associated to the subnet and a second NSG is associated to the
+      NIC of a machine in it. Inbound traffic arrives that the subnet NSG allows
+      and the NIC NSG does not permit. What happens?
+    options:
+      - id: opt-blocked
+        label: "The traffic is dropped - inbound is evaluated at the subnet first, then the NIC, and both must allow it"
+        correct: true
+        explain: >
+          For inbound, Azure evaluates the subnet NSG and then the NIC NSG, and
+          traffic must be allowed by both to reach the machine. Outbound runs the
+          other way: NIC first, then subnet. This is why stacking NSGs makes
+          effective rules hard to reason about, and why list-effective-nsg exists.
+      - id: opt-allowed
+        label: "The traffic is allowed - the subnet NSG is the more specific association and takes precedence"
+        correct: false
+        explain: >
+          NSGs do not override one another by specificity. Both associations apply
+          in sequence and each can drop the traffic; there is no precedence rule
+          that lets one grant what the other denies.
+      - id: opt-priority
+        label: "Whichever NSG holds the rule with the lower priority number wins"
+        correct: false
+        explain: >
+          Priority orders rules within a single NSG. It does not arbitrate between
+          two different NSGs - each is evaluated independently and both must
+          permit the flow.
+    next: END

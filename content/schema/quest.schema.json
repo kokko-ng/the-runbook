@@ -1,0 +1,313 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-runbook.app/schema/quest.schema.json",
+  "title": "Quest",
+  "description": "One quest: 3-6 encounters of design decisions, troubleshooting incidents, and knowledge checks. Every player input is a choice id.",
+  "type": "object",
+  "required": ["schema_version", "id", "title", "act", "chapter", "domain", "entry", "encounters"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "id": { "$ref": "#/$defs/slug" },
+    "title": { "type": "string", "minLength": 1 },
+    "act": { "type": "integer", "minimum": 1, "maximum": 2 },
+    "chapter": { "$ref": "#/$defs/slug" },
+    "domain": {
+      "description": "Objective registry domain id this quest sits under.",
+      "$ref": "#/$defs/slug"
+    },
+    "order": {
+      "description": "Sort order within the chapter.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "role": {
+      "description": "Career ladder rung the player holds during this quest; narrative only.",
+      "type": "string",
+      "enum": [
+        "junior-cloud-admin",
+        "cloud-admin",
+        "senior-cloud-admin",
+        "associate-architect",
+        "solutions-architect"
+      ]
+    },
+    "checkpoint": {
+      "description": "Snapshot game state on entering this quest; a PIP restart returns here.",
+      "type": "boolean",
+      "default": true
+    },
+    "bonus_variant_of": {
+      "description": "Quest id this is an exam-hard variant of. Bonus quests unlock at reputation >= 80 and never carry sole objective coverage.",
+      "$ref": "#/$defs/slug"
+    },
+    "summary": {
+      "description": "One-line quest description for the chapter list.",
+      "type": "string"
+    },
+    "entry": { "$ref": "#/$defs/slug" },
+    "encounters": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/encounter" }
+    }
+  },
+  "$defs": {
+    "encounter": {
+      "type": "object",
+      "required": ["id", "type", "objectives", "next"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "type": {
+          "type": "string",
+          "enum": ["design_decision", "troubleshoot", "knowledge_check"]
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "objectives": {
+          "description": "Objective ids this encounter teaches; clearing it lights their skill tree clusters.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/objectiveId" }
+        },
+        "on_enter_diagram_ops": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/diagramOp" },
+          "default": []
+        },
+        "rewards": { "$ref": "#/$defs/rewards" },
+        "next": {
+          "description": "Encounter id to advance to, or END to finish the quest.",
+          "type": "string",
+          "pattern": "^([a-z0-9][a-z0-9-]*|END)$"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "design_decision" } } },
+          "then": {
+            "required": ["scenario", "options"],
+            "properties": {
+              "scenario": { "$ref": "#/$defs/prose" },
+              "speaker": { "$ref": "#/$defs/speaker" },
+              "prompt": { "type": "string" },
+              "options": { "$ref": "#/$defs/options" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "knowledge_check" } } },
+          "then": {
+            "required": ["question", "options"],
+            "properties": {
+              "scenario": { "$ref": "#/$defs/prose" },
+              "speaker": { "$ref": "#/$defs/speaker" },
+              "question": { "type": "string", "minLength": 1 },
+              "options": { "$ref": "#/$defs/options" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "troubleshoot" } } },
+          "then": {
+            "required": ["scenario", "time_budget", "investigate", "commands", "fixes"],
+            "properties": {
+              "scenario": { "$ref": "#/$defs/prose" },
+              "speaker": { "$ref": "#/$defs/speaker" },
+              "ticket": { "$ref": "#/$defs/ticket" },
+              "time_budget": {
+                "description": "Time units available for diagnosis; each command costs some.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 20
+              },
+              "investigate": {
+                "description": "Phase 1: free dialogue-style actions that reveal authored facts.",
+                "type": "array",
+                "minItems": 2,
+                "items": { "$ref": "#/$defs/investigateAction" }
+              },
+              "commands": {
+                "description": "Phase 2: curated az CLI / portal checks with authored output.",
+                "type": "array",
+                "minItems": 2,
+                "items": { "$ref": "#/$defs/command" }
+              },
+              "fixes": {
+                "description": "Phase 3: candidate resolutions; exactly one is correct.",
+                "$ref": "#/$defs/options"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ticket": {
+      "type": "object",
+      "required": ["id", "reporter", "body"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "reporter": { "type": "string", "minLength": 1 },
+        "priority": { "type": "string", "enum": ["P1", "P2", "P3", "P4"] },
+        "opened": { "type": "string" },
+        "body": { "type": "string", "minLength": 1 }
+      }
+    },
+    "investigateAction": {
+      "type": "object",
+      "required": ["id", "label", "reveals"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "label": { "type": "string", "minLength": 1 },
+        "speaker": { "$ref": "#/$defs/speaker" },
+        "reveals": { "type": "string", "minLength": 1 },
+        "time_cost": { "type": "integer", "minimum": 0, "maximum": 5, "default": 0 }
+      }
+    },
+    "command": {
+      "type": "object",
+      "required": ["id", "command", "output", "time_cost"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "label": {
+          "description": "Menu label; defaults to the command text when omitted.",
+          "type": "string"
+        },
+        "command": { "type": "string", "minLength": 1 },
+        "output": { "type": "string", "minLength": 1 },
+        "time_cost": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "note": {
+          "description": "Optional mentor aside shown under the output.",
+          "type": "string"
+        }
+      }
+    },
+    "options": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/option" }
+    },
+    "option": {
+      "type": "object",
+      "required": ["id", "label", "correct", "explain"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "label": { "type": "string", "minLength": 1 },
+        "correct": { "type": "boolean" },
+        "explain": {
+          "description": "Teaching explanation. Required on every option, right or wrong.",
+          "type": "string",
+          "minLength": 1
+        },
+        "consequence": {
+          "description": "In-fiction fallout shown before the explanation on a wrong pick.",
+          "type": "string"
+        },
+        "rep": {
+          "description": "Explicit reputation delta; falls back to encounter or engine defaults.",
+          "type": "integer",
+          "minimum": -20,
+          "maximum": 20
+        },
+        "diagram_ops": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/diagramOp" },
+          "default": []
+        }
+      }
+    },
+    "rewards": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rep_bonus": { "type": "integer", "minimum": 0, "maximum": 20 },
+        "rep_penalty": { "type": "integer", "minimum": 0, "maximum": 20 },
+        "under_budget_bonus": { "type": "integer", "minimum": 0, "maximum": 20 },
+        "time_penalty": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "skill_points": { "type": "integer", "minimum": 0, "maximum": 3 }
+      }
+    },
+    "diagramOp": {
+      "type": "object",
+      "required": ["op"],
+      "oneOf": [
+        {
+          "required": ["op", "node", "status"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "set_status" },
+            "node": { "$ref": "#/$defs/slug" },
+            "status": { "$ref": "#/$defs/status" }
+          }
+        },
+        {
+          "required": ["op", "edge", "status"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "set_edge_status" },
+            "edge": { "$ref": "#/$defs/slug" },
+            "status": { "$ref": "#/$defs/status" }
+          }
+        },
+        {
+          "required": ["op", "node"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "add_node" },
+            "node": { "$ref": "diagram.schema.json#/$defs/node" }
+          }
+        },
+        {
+          "required": ["op", "edge"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "add_edge" },
+            "edge": { "$ref": "diagram.schema.json#/$defs/edge" }
+          }
+        },
+        {
+          "required": ["op", "node"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "remove_node" },
+            "node": { "$ref": "#/$defs/slug" }
+          }
+        },
+        {
+          "required": ["op", "edge"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "remove_edge" },
+            "edge": { "$ref": "#/$defs/slug" }
+          }
+        },
+        {
+          "required": ["op", "node", "label"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "set_label" },
+            "node": { "$ref": "#/$defs/slug" },
+            "label": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "speaker": {
+      "description": "Recurring cast member delivering this beat.",
+      "type": "string",
+      "enum": ["manager", "mentor", "cfo", "security", "noc", "ticket", "self", "narrator"]
+    },
+    "prose": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["healthy", "warning", "broken", "degraded", "planned"]
+    },
+    "objectiveId": { "type": "string", "pattern": "^AZ[0-9]{3}-[0-9]+\\.[0-9]+$" },
+    "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }
+  }
+}

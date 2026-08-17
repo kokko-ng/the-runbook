@@ -1,0 +1,291 @@
+schema_version: 1
+id: act1-net-01-first-week
+title: "First Week, First Subnet"
+act: 1
+chapter: act1-networking
+domain: az104-d4
+order: 1
+role: junior-cloud-admin
+checkpoint: true
+summary: "Meridian's warehouse app needs somewhere to live. Address space first, apologies later."
+entry: e1-intro
+
+encounters:
+  - id: e1-intro
+    type: design_decision
+    title: "Address space"
+    speaker: mentor
+    objectives: [AZ104-4.1]
+    scenario: |
+      Desmond Toh has been Meridian's senior cloud admin for six years and looks
+      like he has slept through none of them. He drops a printout on your desk on
+      your third morning.
+
+      "New warehouse management system. Ops wants it in Azure by month end.
+      You're building the network. I'm reviewing it, which means I'm going to find
+      something wrong, so make it something small."
+
+      The printout is a spreadsheet of every network Meridian runs. On-premises
+      uses 10.10.0.0/16 in Kallang and 10.20.0.0/16 in the Johor cross-dock. The
+      hub VNet in Azure is 10.100.0.0/16. There is a site-to-site VPN planned
+      between Kallang and the hub before the end of the quarter.
+
+      "Warehouse app needs room for about forty machines today," Desmond says,
+      "and Ops will ask for more, because Ops always asks for more. Pick the
+      address space for the new spoke VNet."
+    prompt: "Which address space do you assign to vnet-warehouse-sea?"
+    options:
+      - id: opt-overlap
+        label: "10.10.0.0/16 - matches the Kallang scheme, so it will be familiar to the network team"
+        correct: false
+        consequence: >
+          Desmond puts the printout back on your desk without sitting down.
+        explain: >
+          Overlapping address space is the one networking mistake Azure cannot
+          route around. VNet peering and site-to-site VPN both require
+          non-overlapping ranges; peering will refuse to be created and the VPN
+          would blackhole traffic between the sites. Familiarity is not worth an
+          address space you can never connect to anything.
+        rep: -10
+      - id: opt-tight
+        label: "10.101.0.0/26 - exactly 64 addresses, sized to the 40 machines requested"
+        correct: false
+        consequence: >
+          It fits. For about five weeks.
+        explain: >
+          A /26 yields 64 addresses, and Azure reserves five per subnet, leaving
+          59 usable across the whole VNet with no room for additional subnets.
+          You cannot shrink an address space in use, and growing one means adding
+          ranges and re-peering. Size for the ask plus the next two asks; address
+          space in a private range costs nothing.
+        rep: -5
+      - id: opt-correct
+        label: "10.101.0.0/16 - non-overlapping with on-premises and the hub, with room to subnet"
+        correct: true
+        explain: >
+          Non-overlapping with 10.10.0.0/16, 10.20.0.0/16, and the 10.100.0.0/16
+          hub, which keeps both peering and the planned VPN viable, and large
+          enough to carve subnets for app, data, and management tiers without
+          revisiting the address space. Private address space is free; running out
+          of it is not.
+        rep: 8
+        diagram_ops:
+          - {op: set_label, node: vnet-warehouse, label: "vnet-warehouse-sea (10.101.0.0/16)"}
+      - id: opt-public
+        label: "172.16.0.0/16 - a different private range entirely, to avoid any chance of collision"
+        correct: false
+        consequence: >
+          Desmond circles it. "And when we buy the Penang company that runs 172.16?"
+        explain: >
+          The range is valid and non-overlapping today, but Meridian's entire
+          estate is documented in 10.x. Introducing a second private range for one
+          spoke fragments the addressing scheme and route tables for no benefit.
+          Consistency inside an existing plan beats novelty.
+        rep: -5
+    next: e2-subnetting
+
+  - id: e2-subnetting
+    type: design_decision
+    title: "Carving subnets"
+    speaker: mentor
+    objectives: [AZ104-4.1]
+    scenario: |
+      With the address space settled, Desmond wants the subnet layout before you
+      touch the portal.
+
+      "Warehouse app is three tiers. Web front end the pickers hit on tablets, an
+      app tier, and a database. Security will want them separated - Marcus Lim
+      will ask you about lateral movement in the review and he will not accept
+      'they're all in one subnet' as an answer."
+
+      He writes 10.101.0.0/16 on the whiteboard.
+
+      "One more thing. Eventually this VNet gets a gateway so the Kallang site can
+      reach it. Plan for that now, because retrofitting it is a change request
+      and a Saturday."
+    prompt: "How do you lay out the subnets?"
+    options:
+      - id: opt-single
+        label: "One subnet, 10.101.0.0/16, with NSG rules separating the tiers by IP"
+        correct: false
+        consequence: >
+          Marcus, reading over your shoulder: "So the rules are the only thing between the tablets and the database."
+        explain: >
+          NSGs can filter by IP inside a subnet, but the rules become a per-address
+          maintenance burden and any machine that lands on the wrong address gets
+          the wrong policy. Subnets are the natural boundary for tier separation
+          because an NSG associated to a subnet applies to everything in it,
+          including machines built after you wrote the rule.
+        rep: -8
+      - id: opt-tiers
+        label: "Three /24 subnets for web, app, and data, plus a GatewaySubnet of /27"
+        correct: true
+        explain: >
+          Each tier gets its own subnet so a subnet-associated NSG covers every
+          current and future machine in that tier, and the GatewaySubnet exists
+          before the gateway does. The gateway subnet must be named exactly
+          GatewaySubnet and /27 leaves room for an active-active or ExpressRoute
+          upgrade later, where /29 would not.
+        rep: 8
+        diagram_ops:
+          - op: add_node
+            node:
+              id: snet-web
+              label: "snet-wms-web (10.101.1.0/24)"
+              kind: subnet
+              group: grp-ops
+              status: healthy
+          - op: add_node
+            node:
+              id: snet-data
+              label: "snet-wms-data (10.101.3.0/24)"
+              kind: subnet
+              group: grp-ops
+              status: healthy
+          - op: add_edge
+            edge:
+              id: e-vnetwarehouse-snetweb
+              source: vnet-warehouse
+              target: snet-web
+              kind: dependency
+          - op: add_edge
+            edge:
+              id: e-vnetwarehouse-snetdata
+              source: vnet-warehouse
+              target: snet-data
+              kind: dependency
+      - id: opt-gwsmall
+        label: "Three /24 subnets for web, app, and data, and add a gateway subnet when the VPN project starts"
+        correct: false
+        consequence: >
+          "And on the Saturday you need it, the only free range is in the middle of the data tier."
+        explain: >
+          The tier split is right, but deferring the GatewaySubnet means carving
+          it out later from whatever is left, and a gateway subnet cannot be
+          resized once a gateway sits in it. Reserving the range now costs nothing
+          because unused subnets are free.
+        rep: -5
+      - id: opt-tiny
+        label: "Three /29 subnets, one per tier, to conserve address space for future spokes"
+        correct: false
+        explain: >
+          A /29 leaves three usable addresses after Azure's five reserved per
+          subnet, which will not hold a scale set, a load balancer, and a few
+          extra machines. You are conserving a resource - private address space -
+          that you have 65,000 of and cannot sell.
+        rep: -5
+    next: e3-peering-decision
+
+  - id: e3-peering-decision
+    type: design_decision
+    title: "Reaching the hub"
+    speaker: manager
+    objectives: [AZ104-4.2]
+    scenario: |
+      Priya Raman, your manager, catches you at the coffee machine with the
+      particular cheerfulness of someone about to add scope.
+
+      "The warehouse app authenticates against the domain controller. That's
+      vm-dc01, and it lives in the hub VNet. Different VNet, so right now the app
+      tier can't see it at all."
+
+      She is right. vnet-warehouse-sea and vnet-hub-sea are two separate networks
+      in the same subscription and the same region, with no connection between
+      them.
+
+      "Desmond says there's a few ways to do this and one of them is the one he'd
+      sign off on. Cost matters - Evelyn asks about every line item over fifty
+      dollars, and she has a spreadsheet."
+    prompt: "How do you connect the warehouse spoke to the hub?"
+    options:
+      - id: opt-peering
+        label: "Create VNet peering between vnet-warehouse-sea and vnet-hub-sea"
+        correct: true
+        explain: >
+          Peering is the direct answer for two VNets in the same region: traffic
+          stays on the Microsoft backbone, there is no gateway to deploy or pay an
+          hourly rate for, and latency is effectively that of a single VNet.
+          Remember peering is not transitive - a second spoke would need its own
+          peering to the hub.
+        rep: 8
+        diagram_ops:
+          - op: add_edge
+            edge:
+              id: peer-hub-warehouse
+              source: vnet-hub
+              target: vnet-warehouse
+              kind: peering
+              label: "peering"
+              status: healthy
+      - id: opt-vpn
+        label: "Deploy VPN gateways in both VNets and build a VNet-to-VNet connection"
+        correct: false
+        consequence: >
+          Evelyn's spreadsheet gains a row, highlighted.
+        explain: >
+          A VNet-to-VNet VPN works, but it means two gateways billed hourly,
+          encryption overhead, and gateway throughput limits between two networks
+          that are in the same region and could simply be peered. Gateways earn
+          their cost when you need to reach somewhere Azure's backbone does not
+          go, such as Kallang.
+        rep: -8
+      - id: opt-public
+        label: "Give vm-dc01 a public IP and have the app tier authenticate over the internet"
+        correct: false
+        consequence: >
+          Marcus Lim appears at your desk within the hour. He has printed the ticket.
+        explain: >
+          Exposing a domain controller to the internet is a serious security
+          finding regardless of the NSG rules layered on top: the attack surface
+          becomes every host on the internet rather than one peered VNet. Domain
+          traffic belongs on private connectivity.
+        rep: -15
+      - id: opt-merge
+        label: "Move the warehouse subnets into vnet-hub-sea so everything is in one VNet"
+        correct: false
+        explain: >
+          It removes the connectivity problem by removing the boundary, which is
+          exactly the boundary Marcus asked for. A hub-and-spoke topology exists so
+          workload networks can be governed, peered, and torn down independently of
+          shared services. Collapsing it also means renumbering the whole app.
+        rep: -8
+    next: e4-check
+
+  - id: e4-check
+    type: knowledge_check
+    title: "Desmond checks your work"
+    speaker: mentor
+    objectives: [AZ104-4.2]
+    scenario: |
+      Desmond signs off the design, then pauses at the door.
+
+      "One question, because it comes up in every design review and half the team
+      still gets it wrong."
+    question: >
+      The Johor cross-dock is getting its own spoke VNet, peered to the hub. Once
+      it is, will vnet-johor-sea be able to reach vm-dc01 in the hub, and will it
+      be able to reach vm-wms01 in the warehouse spoke?
+    options:
+      - id: opt-both
+        label: "It reaches both - peering to the hub makes the whole hub-and-spoke network reachable"
+        correct: false
+        explain: >
+          This is the transitivity trap. Peering connects exactly the two VNets it
+          is created between. Johor would reach the hub, but hub-to-warehouse
+          peering does not extend to Johor.
+      - id: opt-hub-only
+        label: "It reaches the hub only - peering is not transitive"
+        correct: true
+        explain: >
+          Peering is strictly between two VNets. Spoke-to-spoke traffic needs
+          either its own peering, or routing through a network virtual appliance
+          or Azure Firewall in the hub with user-defined routes, or Azure Virtual
+          WAN. This is why hub-and-spoke designs put shared services in the hub.
+      - id: opt-neither
+        label: "It reaches neither until user-defined routes are configured on both spokes"
+        correct: false
+        explain: >
+          Peering creates the routes for the peered pair automatically. UDRs are
+          how you force spoke-to-spoke traffic through an appliance, but they are
+          not required for the peered pair itself to communicate.
+    next: END
