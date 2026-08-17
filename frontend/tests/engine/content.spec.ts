@@ -21,10 +21,25 @@ const quests: Quest[] = readdirSync(join(GENERATED, 'quests'))
   .filter((name) => name.endsWith('.json'))
   .map((name) => JSON.parse(readFileSync(join(GENERATED, 'quests', name), 'utf-8')))
 
-/** Quests in the order a player meets them, which is how the diagram accumulates. */
+/**
+ * Quests in the order a player meets them, which is how the diagram accumulates.
+ * Chapter order comes from the manifest (the exam's own order), not from sorting
+ * chapter slugs alphabetically.
+ */
+const chapterRank = new Map(manifest.chapters.map((chapter, index) => [chapter.id, index]))
+
 const inPlayOrder = [...quests].sort(
-  (a, b) => a.act - b.act || a.chapter.localeCompare(b.chapter) || a.order - b.order,
+  (a, b) =>
+    a.act - b.act ||
+    (chapterRank.get(a.chapter) ?? 999) - (chapterRank.get(b.chapter) ?? 999) ||
+    a.order - b.order ||
+    a.id.localeCompare(b.id),
 )
+
+/** Acts start from their own base diagram, so they accumulate separately. */
+function questsForAct(act: number) {
+  return inPlayOrder.filter((quest) => quest.act === act)
+}
 
 /** Play a quest to completion by always picking the correct option. */
 function playThrough(quest: Quest, from?: GameState): GameState {
@@ -115,12 +130,12 @@ describe('compiled content', () => {
     expect(lit.sort()).toEqual(expected.sort())
   })
 
-  it('builds a connected diagram when the chapter is played end to end', () => {
+  it.each([1, 2])('builds a connected diagram when act %i is played end to end', (act) => {
     // Quests accumulate the diagram in play order, so a node one quest deploys
     // is there for the next. The Python linter enforces that ordering at author
     // time; this asserts the compiled artifact the browser loads honours it.
     let state: GameState | undefined
-    for (const quest of inPlayOrder) {
+    for (const quest of questsForAct(act)) {
       state = playThrough(quest, state)
     }
 
@@ -129,25 +144,28 @@ describe('compiled content', () => {
       expect(ids).toContain(edge.source)
       expect(ids).toContain(edge.target)
     }
-    // Every add_node op across the chapter landed, so nothing was silently dropped.
-    expect(ids).toContain('snet-web')
-    expect(ids).toContain('agw-portal')
+    // Nodes the story deploys are still there at the end, so no add_node was
+    // silently dropped along the way.
+    expect(ids.length).toBeGreaterThan(manifest.diagrams[String(act)]!.nodes.length)
   })
 
-  it('leaves the estate healthy when every quest is solved correctly', () => {
-    // An incident that reddens the map must have a fix that repairs it. Without
-    // this, a quest can leave a permanently broken node and every later quest
-    // inherits the damage.
+  it.each([1, 2])('leaves nothing broken in act %i when played correctly', (act) => {
+    // Nothing may be left `broken`: that means an unresolved outage, and every
+    // later quest would inherit it. `warning` and `degraded` are allowed,
+    // because the story deliberately leaves acknowledged debt on the map - the
+    // finale's dated interim workload is the clearest example. That an incident
+    // is actually repaired by its correct fix is enforced by the content linter,
+    // which checks it per encounter rather than in aggregate.
     let state: GameState | undefined
-    for (const quest of inPlayOrder) {
+    for (const quest of questsForAct(act)) {
       state = playThrough(quest, state)
     }
 
-    const unhealthy = state!.diagram.nodes.filter((node) => node.status !== 'healthy')
-    const brokenEdges = state!.diagram.edges.filter((edge) => edge.status !== 'healthy')
+    const broken = state!.diagram.nodes.filter((node) => node.status === 'broken')
+    const brokenEdges = state!.diagram.edges.filter((edge) => edge.status === 'broken')
 
-    expect(unhealthy.map((node) => `${node.id}=${node.status}`)).toEqual([])
-    expect(brokenEdges.map((edge) => `${edge.id}=${edge.status}`)).toEqual([])
+    expect(broken.map((node) => node.id)).toEqual([])
+    expect(brokenEdges.map((edge) => edge.id)).toEqual([])
   })
 
   it('breaks something on the map during every troubleshooting incident', () => {
@@ -165,10 +183,15 @@ describe('compiled content', () => {
   })
 
   it('carries diagram changes forward from one quest to the next', () => {
-    const first = playThrough(inPlayOrder[0]!)
-    const second = playThrough(inPlayOrder[1]!, first)
+    // The networking chapter labels the warehouse spoke with its address space
+    // in its first quest; the label must survive into the second.
+    const networking = inPlayOrder.filter((quest) => quest.chapter === 'act1-networking')
+    let state: GameState | undefined
+    for (const quest of networking.slice(0, 2)) {
+      state = playThrough(quest, state)
+    }
 
-    const labels = second.diagram.nodes.map((node) => node.label)
+    const labels = state!.diagram.nodes.map((node) => node.label)
     expect(labels.some((label) => label.includes('10.101.0.0/16'))).toBe(true)
   })
 })

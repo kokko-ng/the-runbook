@@ -1,0 +1,321 @@
+schema_version: 1
+id: act1-mon-03-four-hundred-alerts-hard
+title: "Four Hundred a Night (Hard)"
+act: 1
+chapter: act1-monitoring
+domain: az104-d5
+order: 3
+role: senior-cloud-admin
+checkpoint: true
+bonus_variant_of: act1-mon-03-four-hundred-alerts
+summary: "Manila wants an alert for the machines that stop talking. Absence is harder to alert on than presence."
+entry: e1-absence
+
+encounters:
+  - id: e1-absence
+    type: design_decision
+    title: "Alerting on something that did not happen"
+    speaker: noc
+    objectives: [AZ104-5.4, AZ104-5.3]
+    scenario: |
+      Ravi has a harder request than the CPU one.
+
+      "Every warehouse VM writes a Heartbeat row every minute. I want to be told
+      when a machine stops writing them for fifteen minutes. Not when a machine
+      is busy - when a machine goes quiet."
+
+      He has already tried and hit the wall everyone hits. A log search alert
+      evaluates a query and fires on what the query returns, and a machine that
+      has gone silent returns nothing. Zero rows is indistinguishable from
+      everything being fine.
+
+      Desmond is enjoying this more than he should. "The platform will happily
+      alert you on rows. It cannot alert you on rows that do not exist unless you
+      write a query that manufactures one."
+    prompt: "How do you build the rule?"
+    options:
+      - id: opt-materialize
+        label: "A log search alert whose query joins the expected machine list against recent heartbeats and emits a row per silent machine, split by the Computer dimension"
+        correct: true
+        explain: >
+          Log search alerts fire on the rows a query returns, so absence has to be
+          turned into presence: start from a list of machines you expect - a
+          materialized set or a longer heartbeat window - left-anti-join the last
+          fifteen minutes, and each machine that fails the join becomes a row.
+          Splitting by Computer then produces one alert per silent machine rather
+          than one alert saying several are missing, which is what makes the
+          notification actionable.
+        rep: 14
+      - id: opt-metric-heartbeat
+        label: "A metric alert on the Heartbeat metric with a static threshold of less than one over fifteen minutes"
+        correct: false
+        consequence: >
+          The rule is created and never fires, including the weekend a machine is
+          off for two days.
+        explain: >
+          Metric alerts with a static threshold evaluate the time series that
+          arrives, and a resource that has stopped reporting sends no data points
+          at all - by default there is nothing to compare against the threshold.
+          Handling this needs an explicit choice about how missing data is
+          treated, and even then the metric route is weaker than a query that
+          knows which machines should exist.
+        rep: -8
+      - id: opt-count-query
+        label: "A log search alert on Heartbeat | where TimeGenerated > ago(15m) | count, firing when the result is less than the expected number of machines"
+        correct: false
+        explain: >
+          It does detect a shortfall, and it cannot say which machine, so every
+          alert starts with someone running a second query to find out. It also
+          breaks quietly every time a machine is legitimately added or
+          decommissioned, because the expected number is hard-coded into the
+          condition rather than derived from the data.
+        rep: -8
+      - id: opt-vm-availability
+        label: "Use Resource Health alerts on each VM, since an unresponsive machine will show as unavailable"
+        correct: false
+        explain: >
+          Resource Health reports the platform's view of the virtual machine -
+          host failures, planned maintenance, deallocations. It is worth having
+          and it does not see inside the guest, so an operating system that has
+          hung, lost its agent, or been isolated by a firewall change still reads
+          as Available. Heartbeat silence and resource unavailability are
+          different signals.
+        rep: -6
+    next: e2-duplicate-firing
+
+  - id: e2-duplicate-firing
+    type: troubleshoot
+    title: "P2: The heartbeat alert fires every five minutes forever"
+    speaker: noc
+    objectives: [AZ104-5.4, AZ104-5.3]
+    ticket:
+      id: "MER-5390"
+      reporter: "NOC Manila (Ravi)"
+      priority: "P2"
+      opened: "06:40"
+      body: |
+        The new heartbeat alert works, in the sense that it noticed vm-rpt02
+        going quiet at 02:15. It then fired again at 02:20, 02:25, 02:30, and has
+        continued every five minutes since - 53 notifications for one machine.
+        The machine came back at 02:50 and the alerts did not stop. This is worse
+        than the CPU rule was.
+    on_enter_diagram_ops:
+      - {op: set_status, node: mon-alerts, status: broken}
+      - {op: set_edge_status, edge: mon-e-law-alerts, status: degraded}
+    scenario: |
+      Fifty-three notifications for one four-machine incident, and thirty-five of
+      them arrived after the machine was back.
+
+      The rule you wrote runs every five minutes. The query it runs is the one
+      that worked in the query editor, and in the query editor you were looking
+      at the last twenty-four hours because that is how you convinced yourself
+      the join was right.
+
+      Ravi is diplomatic about it. "It is better than not knowing. It is not
+      better by much."
+
+      Desmond does not look at the rule definition. He looks at the query. "You
+      tested it over a day and shipped it over five minutes. Read your own where
+      clause and then tell me what window this rule is actually evaluating."
+    time_budget: 5
+    investigate:
+      - id: inv-ravi
+        label: "Ask Ravi exactly when the notifications started and stopped"
+        speaker: noc
+        reveals: >
+          "Started 02:15, first time we saw the machine miss. Never stopped.
+          The machine has been up since 02:50 and we are still getting them at
+          06:40, one every five minutes, same alert text."
+      - id: inv-desmond
+        label: "Ask Desmond how a log alert decides what window to look at"
+        speaker: mentor
+        reveals: >
+          "The rule has an evaluation frequency and a lookback period, and the
+          lookback is what the query is meant to run over. If your query carries
+          its own time filter, that filter wins - and if it is wider than the
+          lookback, every evaluation re-reads the same old rows and calls them
+          new."
+      - id: inv-marcus
+        label: "Ask Marcus whether alert storms hit any rate limit that would mask this"
+        speaker: security
+        reveals: >
+          "The webhook has no limit worth mentioning, and the SMS receiver rate
+          limits at roughly one every five minutes anyway - so the phone looks
+          calmer than the queue does. Do not tune this by looking at the phone."
+      - id: inv-priya
+        label: "Ask Priya what she needs before this goes back to the night shift"
+        speaker: manager
+        reveals: >
+          "One notification when it starts, one when it clears, and nothing in
+          between. If a machine is down for six hours I do not want seventy-two
+          messages about it."
+    commands:
+      - id: cmd-rule-show
+        label: "Show the scheduled query rule definition"
+        command: "az monitor scheduled-query show -g rg-ops-sea -n MER-HEARTBEAT-WMS --query '{freq:evaluationFrequency, window:windowSize, autoMitigate:autoMitigate, query:criteria.allOf[0].query}' -o json"
+        output: |
+          {
+            "freq": "PT5M",
+            "window": "PT5M",
+            "autoMitigate": false,
+            "query": "Heartbeat | where TimeGenerated > ago(24h) | summarize last_seen = max(TimeGenerated) by Computer | where last_seen < ago(15m)"
+          }
+        time_cost: 1
+        note: "The rule's window is five minutes. The query asks for twenty-four hours."
+      - id: cmd-run-query
+        label: "Run the rule's query against the workspace now"
+        command: "az monitor log-analytics query -w law-meridian --analytics-query 'Heartbeat | where TimeGenerated > ago(24h) | summarize last_seen = max(TimeGenerated) by Computer | where last_seen < ago(15m)' -o table"
+        output: |
+          Computer     last_seen
+          -----------  --------------------
+          vm-rpt02     2026-08-28T02:14:51Z
+        time_cost: 1
+        note: "Still returns a row at 06:40, hours after the machine recovered, because the 24-hour window still contains the gap."
+      - id: cmd-heartbeat-now
+        label: "Check whether vm-rpt02 is currently sending heartbeats"
+        command: "az monitor log-analytics query -w law-meridian --analytics-query 'Heartbeat | where Computer == \"vm-rpt02\" | summarize Latest = max(TimeGenerated), LastHour = countif(TimeGenerated > ago(1h))' -o table"
+        output: |
+          Latest                LastHour
+          --------------------  ----------
+          2026-08-28T06:39:12Z  60
+        time_cost: 1
+        note: "Sixty heartbeats in the last hour. The machine is fine and has been since 02:50."
+      - id: cmd-alert-history
+        label: "Count the alerts raised by this rule overnight"
+        command: "az monitor log-analytics query -w law-meridian --analytics-query 'AlertsManagementResources | where AlertRuleName == \"MER-HEARTBEAT-WMS\" | summarize Alerts = count(), Distinct = dcount(AffectedResource) by bin(TimeGenerated, 1h)' -o table"
+        output: |
+          TimeGenerated    Alerts    Distinct
+          ---------------  --------  ----------
+          2026-08-28 02:00     9         1
+          2026-08-28 03:00    12         1
+          2026-08-28 04:00    12         1
+          2026-08-28 05:00    12         1
+        time_cost: 1
+        note: "One affected resource, twelve alerts an hour. Every evaluation raises a new one."
+      - id: cmd-ag
+        label: "Confirm the action group is not the source of the duplication"
+        command: "az monitor action-group show -g rg-hub-sea -n ag-noc-oncall --query '{sms:smsReceivers[].name, webhook:webhookReceivers[].name}' -o json"
+        output: |
+          {
+            "sms": ["noc-rota-primary"],
+            "webhook": ["servicedesk-intake"]
+          }
+        time_cost: 1
+        note: "One receiver each. The duplication is upstream of the action group."
+    fixes:
+      - id: fix-window-automitigate
+        label: "Remove the query's own time filter so it runs over the rule's lookback window, widen the lookback to fifteen minutes, and enable auto-mitigate so the alert resolves when the condition clears"
+        correct: true
+        explain: >
+          A scheduled query rule runs its query over the configured lookback
+          period, but an explicit time filter inside the query overrides it -
+          so this rule re-read the same twenty-four hours every five minutes and
+          found the same gap forever. Letting the lookback define the window
+          makes each evaluation see only new data. Auto-mitigate is the second
+          half: without it the alert is stateless and every evaluation raises a
+          fresh one instead of resolving the existing alert when it clears.
+        rep: 15
+        diagram_ops:
+          - {op: set_status, node: mon-alerts, status: healthy}
+          - {op: set_edge_status, edge: mon-e-law-alerts, status: healthy}
+      - id: fix-frequency
+        label: "Reduce the evaluation frequency to once an hour, so at worst there are twenty-four notifications a day"
+        correct: false
+        consequence: >
+          Manila now learns about a silent machine up to an hour late, and still
+          gets told about it every hour until someone deletes the alert.
+        explain: >
+          Lowering the frequency divides the symptom without touching the cause:
+          the query still matches historical data, so it still re-fires forever,
+          and detection latency gets worse. Frequency is a cost and
+          responsiveness setting, not a duplicate-suppression mechanism.
+        rep: -10
+      - id: fix-suppression-rule
+        label: "Create an alert processing rule that suppresses notifications from this rule after the first one each night"
+        correct: false
+        explain: >
+          Alert processing rules suppress on scope and schedule, not on a
+          per-condition first-occurrence basis, so this cannot express what is
+          wanted - and it would be treating a broken query as an alert routing
+          problem. Suppression belongs on known noise you have decided to accept,
+          not on a rule that is producing wrong results.
+        rep: -10
+      - id: fix-dimension
+        label: "Split the rule by the Computer dimension, so each machine gets its own alert instead of one repeating alert"
+        correct: false
+        explain: >
+          Dimension splitting is already the right pattern for this rule and it
+          is orthogonal to the fault - one machine is silent, so splitting
+          produces exactly one alert stream, which is the one repeating every
+          five minutes. Splitting controls how alerts are grouped; it does not
+          control what window the query evaluates.
+        rep: -8
+    rewards:
+      under_budget_bonus: 5
+      skill_points: 2
+    next: e3-at-scale
+
+  - id: e3-at-scale
+    type: design_decision
+    title: "Forty machines, one rule"
+    speaker: mentor
+    objectives: [AZ104-5.4, AZ104-5.1]
+    scenario: |
+      With the heartbeat rule behaving, Desmond points at the alert rule list and
+      the maintenance problem sitting inside it.
+
+      "Disk space. Every VM in rg-ops-sea, alert when the free space on a logical
+      disk drops below ten percent. Forty machines, several disks each, and the
+      estate grows every quarter."
+
+      He has seen the obvious answer before and does not want it. "If your
+      proposal has the word forty in it, it is wrong by next April. And I want
+      the alert to say which disk on which machine, not that something somewhere
+      is full."
+    prompt: "How do you build it?"
+    options:
+      - id: opt-scope-dimensions
+        label: "One metric alert rule scoped to the resource group, on the guest free-space metric, split by the machine and disk dimensions"
+        correct: true
+        explain: >
+          A metric alert rule can take a resource group or subscription as its
+          scope for a supported resource type, evaluating every matching resource
+          under one rule and picking up new ones automatically. Splitting by
+          dimension then evaluates each machine and each disk separately and puts
+          both values in the alert, so the notification names the disk. One rule,
+          no list to maintain, and the detail preserved.
+        rep: 12
+      - id: opt-forty-rules
+        label: "Forty rules generated from a template and deployed by pipeline, so the list is at least maintained in code"
+        correct: false
+        explain: >
+          Infrastructure as code is the right instinct applied to the wrong
+          layer. It keeps forty objects consistent rather than removing the need
+          for forty objects, and the pipeline still has to run before a newly
+          built machine is covered - which is the gap that bites during a growth
+          quarter.
+        rep: -6
+      - id: opt-log-alert-nosplit
+        label: "A log search alert over the performance table that returns any disk below ten percent, firing when the result count is above zero"
+        correct: false
+        explain: >
+          It scales and it collapses every affected disk into a single alert,
+          because without dimension splitting the condition is one number. That
+          means one notification for the first full disk and silence about the
+          next four, and a responder who has to run the query themselves to find
+          out what to fix.
+        rep: -8
+      - id: opt-platform-metric
+        label: "A subscription-scoped metric alert on the platform disk metrics, which need no agent and already exist for every VM"
+        correct: false
+        consequence: >
+          The rule reports healthy throughput on a disk that has been ninety-nine
+          percent full for a week.
+        explain: >
+          Platform disk metrics describe the virtual disk's behavior - IOPS,
+          throughput, queue depth - because that is what the host can observe.
+          Free space is a property of the file system inside the guest, so it
+          only exists as a metric if an agent and a data collection rule are
+          gathering it.
+        rep: -10
+    next: END

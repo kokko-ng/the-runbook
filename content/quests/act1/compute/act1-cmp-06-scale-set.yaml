@@ -1,0 +1,424 @@
+schema_version: 1
+id: act1-cmp-06-scale-set
+title: "Elastic"
+act: 1
+chapter: act1-compute
+domain: az104-d3
+order: 6
+role: senior-cloud-admin
+checkpoint: true
+summary: "The warehouse app tier is one machine that gets bigger every peak season. Priya would like it to be several machines that come and go."
+entry: e1-vmss-design
+
+encounters:
+  - id: e1-vmss-design
+    type: design_decision
+    title: "Three machines by breakfast, twelve by noon"
+    speaker: manager
+    objectives: [AZ104-3.12, AZ104-3.11]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: cmp-vmss-wms
+          label: "vmss-wms-app (app tier)"
+          kind: vmss
+          group: grp-ops
+          status: planned
+      - op: add_edge
+        edge:
+          id: cmp-e-snetapp-vmss
+          source: snet-app
+          target: cmp-vmss-wms
+          kind: dependency
+          status: planned
+    scenario: |
+      Your title changed on Monday. The work changed on Tuesday.
+
+      "The app tier," says Priya. "Every peak season we make vm-wms01 bigger, and
+      every January we forget to make it smaller. Load starts at 06:00 when the
+      first shift scans in, doubles at 09:00, halves after 16:00, and is nothing
+      overnight. The application is stateless - sessions are in the cache tier,
+      nothing is written to local disk. Ops want to stop thinking about it."
+
+      Marcus adds one line to the thread: whatever replaces it should survive a
+      data center failure without a conversation.
+
+      The build is baked into a custom image already, because the Johor template
+      needed one.
+    prompt: "What do you build for the app tier?"
+    options:
+      - id: opt-flexible-zones
+        label: "A Virtual Machine Scale Set in Flexible orchestration, spread across zones 1, 2 and 3, from the custom image, with autoscale attached"
+        correct: true
+        explain: >
+          A scale set gives you one model that Azure instantiates as many times as
+          the policy says, which is the whole of Ops' request. Spreading instances
+          across three zones means a data center failure removes a third of the
+          fleet rather than the fleet. Flexible orchestration is the current
+          default: instances are ordinary VMs you can see and manage
+          individually, fault domains are explicit, and it supports mixing sizes
+          and adding existing VMs later.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: cmp-vmss-wms, status: healthy}
+          - {op: set_edge_status, edge: cmp-e-snetapp-vmss, status: healthy}
+      - id: opt-uniform
+        label: "A Virtual Machine Scale Set in Uniform orchestration, since every instance is identical anyway"
+        correct: false
+        explain: >
+          Uniform is the older model and it is not wrong - it is built for very
+          large fleets of genuinely identical instances and still has its place.
+          For a fleet of three to twelve it costs you flexibility: instances are
+          not full VM resources, you cannot attach an existing VM, and per-instance
+          operations are limited. Flexible is the recommended orchestration mode
+          for new workloads at this scale.
+        rep: -5
+      - id: opt-manual-vms
+        label: "Build six VMs in an availability set from the image and script them on in the morning and off at night"
+        correct: false
+        consequence: >
+          The script works for five weeks. On the sixth it half-runs, and there
+          are three machines serving nine hundred scanners.
+        explain: >
+          It reproduces the mechanical part of a scale set and none of the
+          resilient part: no automatic instance repair, no model to update in one
+          place, no autoscale reacting to load rather than to the clock, and an
+          availability set that cannot span zones. Six VMs are also six sets of
+          patching, six extensions and six things to forget.
+        rep: -10
+      - id: opt-bigger-vm
+        label: "One much larger VM in a zone, sized for the 09:00 peak, since it is a single stateless workload"
+        correct: false
+        explain: >
+          It handles the peak and pays for the peak twenty-four hours a day, which
+          is the January problem Priya described. It also keeps a single instance
+          in the path: any reboot, patch or host failure is a full outage of the
+          app tier, and a zone protects against the data center failing rather
+          than against the machine failing.
+        rep: -8
+    next: e2-autoscale
+
+  - id: e2-autoscale
+    type: design_decision
+    title: "The rules"
+    speaker: mentor
+    objectives: [AZ104-3.12]
+    scenario: |
+      The scale set is up with three instances. Desmond reviews the autoscale
+      settings before they go live, which he describes as "the part where people
+      invent a machine that breathes."
+
+      What you know: load ramps over about twenty minutes at 06:00 and again at
+      09:00, and drains slowly after 16:00. An instance takes roughly four minutes
+      from creation to serving traffic. The database behind the tier starts
+      refusing connections somewhere above fifteen application instances.
+
+      The application writes no metrics of its own. The only telemetry available
+      without installing anything is what the platform reports about the hosts.
+    prompt: "What autoscale rules do you configure?"
+    options:
+      - id: opt-asymmetric
+        label: "Scale out by 2 when average CPU exceeds 70 percent over 10 minutes; scale in by 1 when it falls below 30 percent over 10 minutes; minimum 3, maximum 12, cooldown 10 minutes"
+        correct: true
+        explain: >
+          Three things make this stable. The thresholds are far apart, so removing
+          an instance cannot immediately push the remainder over the scale-out
+          line. Out is aggressive and in is gentle, because being slow to add
+          capacity hurts users and being slow to remove it only costs money. And
+          the maximum sits below the fifteen instances the database can take, so
+          autoscale cannot scale the tier into a different outage.
+        rep: 12
+      - id: opt-tight-thresholds
+        label: "Scale out by 1 above 60 percent and in by 1 below 55 percent, both over 5 minutes, so the fleet tracks load closely"
+        correct: false
+        consequence: >
+          By 09:20 the scale set has added and removed instances eleven times and
+          the average response time is worse than it was on one machine.
+        explain: >
+          This is flapping, and the thresholds cause it. Remove an instance at 54
+          percent and the remaining instances immediately carry more, crossing 60
+          percent, which triggers a scale-out that drops the average back below 55.
+          The gap between the two thresholds has to be wide enough that the change
+          in load caused by the action cannot trigger the opposite action.
+        rep: -12
+      - id: opt-schedule-only
+        label: "Use scheduled profiles only - three instances at 05:30, eight at 08:30, three again at 16:30 - since the shift pattern is known"
+        correct: false
+        explain: >
+          Schedules are genuinely useful, and a scheduled minimum before a known
+          ramp is better than waiting for a metric to notice it. On their own they
+          cannot respond to the day the ferry is late or a customer sends forty
+          thousand consignments at once. The usual answer is both: a schedule that
+          pre-warms, and metric rules that handle the days that do not match the
+          pattern.
+        rep: -6
+      - id: opt-memory-metric
+        label: "Scale on available memory percentage, since the application is memory-bound and CPU understates the pressure"
+        correct: false
+        consequence: >
+          The rule is created, reports no data, and never fires. The tier stays at
+          three instances through the 09:00 ramp.
+        explain: >
+          Memory is a guest metric. The host knows how much memory it allocated to
+          a VM, not how much the operating system inside is using, so autoscaling
+          on it requires the Azure Monitor agent and a data collection rule on
+          every instance first. CPU percentage is a host metric available with
+          nothing installed, which is why it is the default starting point.
+        rep: -8
+    next: e3-repair-loop
+
+  - id: e3-repair-loop
+    type: troubleshoot
+    title: "P2: The scale set is eating instances"
+    speaker: cfo
+    objectives: [AZ104-3.12]
+    ticket:
+      id: "MER-5031"
+      reporter: "Evelyn Koh, finance"
+      priority: "P2"
+      opened: "10:20"
+      body: |
+        The cost anomaly alert I set up has fired on rg-ops-sea. It says the
+        subscription has created fifty-one virtual machines since 04:00. I am told
+        we run three. I would like to understand which of those two numbers is
+        wrong before the month closes.
+    on_enter_diagram_ops:
+      - {op: set_status, node: cmp-vmss-wms, status: broken}
+      - {op: set_status, node: snet-app, status: warning}
+    scenario: |
+      Evelyn's alert is correct and so is Ops. There are three instances in the
+      scale set right now. There have been three instances all morning. They are
+      just not the same three.
+
+      Every instance comes up, runs for about thirty-five minutes, and is deleted
+      and replaced. Users are seeing intermittent connection resets as instances
+      vanish underneath them, which the NOC has been logging as a network problem
+      since 06:00.
+
+      Last night's release moved the application's listener from port 8080 to
+      8081, because 8080 collided with the monitoring agent the platform team
+      rolled out on Friday.
+    time_budget: 7
+    investigate:
+      - id: inv-evelyn
+        label: "Ask Evelyn what her alert actually measured"
+        speaker: cfo
+        reveals: >
+          "Virtual machine create operations, counted from the activity log. It is
+          a blunt instrument and I am not sorry - it has now found something twice."
+      - id: inv-ops
+        label: "Ask the application team what changed last night"
+        speaker: ticket
+        reveals: >
+          "The listener moved from 8080 to 8081. It is in the release notes. The
+          load balancer probe was updated in the same change and the application
+          responds correctly on the new port - we tested it from a jump box this
+          morning."
+      - id: inv-desmond
+        label: "Ask Desmond why a scale set would delete a healthy instance"
+        speaker: mentor
+        reveals: >
+          "It would not. It deletes instances it believes are unhealthy, if you
+          have told it to. Two different things report health to a scale set and
+          people configure one of them and forget the other. Go and find out what
+          the scale set thinks health means."
+      - id: inv-noc
+        label: "Ask the NOC about the connection resets they have been logging"
+        speaker: noc
+        reveals: >
+          "They cluster in bursts every few minutes, always affecting one instance
+          at a time, and the affected instance never comes back - a different one
+          appears with a different name. We assumed the network. It looks less
+          like the network the longer I describe it."
+    commands:
+      - id: cmd-instances
+        label: "List the scale set instances and their creation times"
+        command: "az vmss list-instances -g rg-ops-sea -n vmss-wms-app --query \"[].{id:instanceId,name:name,state:provisioningState}\" -o table"
+        output: |
+          Id    Name                    State
+          ----  ----------------------  ----------
+          49    vmss-wms-app_49         Succeeded
+          50    vmss-wms-app_50         Creating
+          51    vmss-wms-app_51         Succeeded
+        time_cost: 1
+        note: "Instance ids in the fifties on a fleet of three. They are being recreated, not scaled."
+      - id: cmd-health
+        label: "Show the health state of one instance"
+        command: "az vmss get-instance-view -g rg-ops-sea -n vmss-wms-app --instance-id 49 --query \"vmHealth.status\" -o json"
+        output: |
+          {
+            "code": "HealthState/unhealthy",
+            "displayStatus": "The VM is unhealthy",
+            "time": "2026-08-19T10:14:02Z"
+          }
+        time_cost: 1
+      - id: cmd-extension
+        label: "Show the application health extension settings"
+        command: "az vmss extension show -g rg-ops-sea --vmss-name vmss-wms-app -n ApplicationHealthLinux --query \"settings\" -o json"
+        output: |
+          {
+            "protocol": "http",
+            "port": 8080,
+            "requestPath": "/health",
+            "intervalInSeconds": 15,
+            "numberOfProbes": 2
+          }
+        time_cost: 1
+        note: "The extension still probes 8080. Last night's change updated the load balancer probe and not this one."
+      - id: cmd-repairs
+        label: "Show the automatic instance repair policy"
+        command: "az vmss show -g rg-ops-sea -n vmss-wms-app --query \"{repairs:automaticRepairsPolicy, upgrade:upgradePolicy.mode}\" -o json"
+        output: |
+          {
+            "repairs": {
+              "enabled": true,
+              "gracePeriod": "PT30M",
+              "repairAction": "Replace"
+            },
+            "upgrade": "Manual"
+          }
+        time_cost: 1
+        note: "Repairs are on, with a thirty-minute grace period. That matches the thirty-five minute instance lifetime almost exactly."
+      - id: cmd-curl
+        label: "Curl both ports on a live instance"
+        command: "az vm run-command invoke -g rg-ops-sea -n vmss-wms-app_49 --command-id RunShellScript --scripts 'curl -s -o /dev/null -w \"8080 %{http_code}\\n\" http://127.0.0.1:8080/health ; curl -s -o /dev/null -w \"8081 %{http_code}\\n\" http://127.0.0.1:8081/health'"
+        output: |
+          8080 000
+          8081 200
+        time_cost: 2
+        note: "Nothing on 8080, a healthy answer on 8081. The application is fine and the probe is asking the wrong door."
+      - id: cmd-autoscale
+        label: "Show the autoscale settings on the scale set"
+        command: "az monitor autoscale show -g rg-ops-sea -n autoscale-vmss-wms --query \"{min:profiles[0].capacity.minimum,max:profiles[0].capacity.maximum,rules:profiles[0].rules[].{metric:metricTrigger.metricName,op:metricTrigger.operator,threshold:metricTrigger.threshold,dir:scaleAction.direction}}\" -o json"
+        output: |
+          {
+            "min": "3",
+            "max": "12",
+            "rules": [
+              {"metric": "Percentage CPU", "op": "GreaterThan", "threshold": 70.0, "dir": "Increase"},
+              {"metric": "Percentage CPU", "op": "LessThan", "threshold": 30.0, "dir": "Decrease"}
+            ]
+          }
+        time_cost: 2
+        note: "Capacity has not moved off three all morning. Autoscale is not the thing creating machines."
+    fixes:
+      - id: fix-extension-port
+        label: "Update the Application Health extension to probe port 8081, matching the application's current listener"
+        correct: true
+        explain: >
+          Automatic instance repair acts on the health signal the scale set is
+          given, and that signal comes from the Application Health extension or a
+          load balancer probe - whichever is configured. Last night's release
+          updated the load balancer probe and left the extension pointing at 8080,
+          so every instance reported unhealthy, sat out its thirty-minute grace
+          period, and was replaced. Correcting the port makes instances report
+          healthy and the replacement loop stops.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: cmp-vmss-wms, status: healthy}
+          - {op: set_status, node: snet-app, status: healthy}
+      - id: fix-disable-repairs
+        label: "Disable automatic instance repairs so the scale set stops deleting instances"
+        correct: false
+        consequence: >
+          The recycling stops within a minute. Every instance in the fleet is
+          still reporting unhealthy, and now nothing will ever do anything about
+          it.
+        explain: >
+          It removes the symptom by removing a safety feature. Automatic repair
+          was doing exactly what it is for - replacing instances that report
+          unhealthy - and the fault is that the health signal is lying. Turning
+          off the alarm because it is inconvenient leaves you without it on the
+          day an instance is genuinely broken.
+        rep: -10
+      - id: fix-rollback-port
+        label: "Roll the application back to port 8080 so the existing probe configuration is correct again"
+        correct: false
+        consequence: >
+          The port collision with the monitoring agent comes back and the
+          monitoring agent stops reporting on the whole fleet.
+        explain: >
+          The port change was deliberate and had its own reason. Undoing a
+          justified application change to avoid editing one extension setting
+          trades a two-minute fix for a redeployment of the fleet, and reopens the
+          collision that caused the change in the first place.
+        rep: -8
+      - id: fix-grace-period
+        label: "Raise the automatic repair grace period to PT2H so instances survive longer while you investigate"
+        correct: false
+        explain: >
+          It slows the loop from every thirty-five minutes to every two hours and
+          a bit, which looks like improvement on a graph and changes nothing. The
+          instances still report unhealthy and are still replaced; you have simply
+          made the evidence rarer. Grace periods exist to let a genuinely slow
+          application finish starting, not to delay a wrong verdict.
+        rep: -8
+    rewards:
+      under_budget_bonus: 5
+      skill_points: 1
+    next: e4-shape-of-fleet
+
+  - id: e4-shape-of-fleet
+    type: design_decision
+    title: "Twelve small or three large"
+    speaker: cfo
+    objectives: [AZ104-3.9, AZ104-3.12]
+    scenario: |
+      The fleet settles. Evelyn's anomaly alert goes quiet and she sends a single
+      question, which from her is a compliment.
+
+      "The tier now runs between three and twelve of a four-vCPU machine. For the
+      same money we could run between one and three of a sixteen-vCPU machine.
+      Same total capacity at the top, fewer things to manage. Why is your version
+      better, or is it."
+
+      The application is stateless, holds no local cache worth preserving, and
+      takes about four minutes from instance creation to serving traffic.
+    prompt: "What do you tell Evelyn?"
+    options:
+      - id: opt-more-smaller
+        label: "Keep the smaller size: the failure domain is a twelfth of capacity rather than a third, and autoscale can add capacity in smaller, cheaper steps"
+        correct: true
+        explain: >
+          For a stateless tier, instance count buys resilience and granularity.
+          Losing one of twelve instances costs eight percent of capacity; losing
+          one of three costs a third. Autoscale steps are also finer, so the fleet
+          tracks the actual ramp instead of overshooting by five vCPUs at a time,
+          and zone spreading is more even across three zones with twelve instances
+          than with three.
+        rep: 10
+      - id: opt-fewer-larger
+        label: "Move to three large instances - fewer operating systems to patch, fewer instances to monitor, and less per-instance overhead"
+        correct: false
+        explain: >
+          The management argument is weaker than it sounds, because a scale set
+          patches and monitors from one model regardless of instance count. What
+          you give up is real: a coarser scale step, a third of capacity lost per
+          instance failure, and a minimum size that idles overnight. Larger
+          instances win when the workload cannot be spread - a single memory-bound
+          process, for instance - and this one can.
+        rep: -8
+      - id: opt-burstable-fleet
+        label: "Keep twelve instances but move them to a burstable B-series size, since each one is idle much of the day"
+        correct: false
+        consequence: >
+          The fleet is fine until 09:15, when every instance runs out of credits
+          within the same three minutes.
+        explain: >
+          Burstable sizes suit machines that are idle most of the time with
+          occasional short bursts. Behind a load balancer every instance sees the
+          same traffic pattern at the same time, so credits deplete in unison and
+          the whole tier is throttled together. Autoscale would then add more
+          instances that also have no credits.
+        rep: -10
+      - id: opt-mixed-sizes
+        label: "Resize individual instances in the portal when they look busy, leaving the rest as they are"
+        correct: false
+        explain: >
+          Flexible orchestration does let you operate on instances individually,
+          which makes this technically possible and operationally unwise. Every
+          instance you touch by hand drifts from the scale set model, so the next
+          instance the platform creates is the model size and the fleet becomes
+          unpredictable. Change the model and let the scale set apply it.
+        rep: -8
+    next: END

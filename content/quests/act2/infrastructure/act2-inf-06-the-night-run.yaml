@@ -1,0 +1,308 @@
+schema_version: 1
+id: act2-inf-06-the-night-run
+title: "The Night Run"
+act: 2
+chapter: act2-infrastructure
+domain: az305-d4
+order: 6
+role: associate-architect
+checkpoint: true
+summary: "Nine hundred routes, four hours, and a cost ceiling Evelyn wrote in ink."
+entry: e1-batch
+
+encounters:
+  - id: e1-batch
+    type: design_decision
+    title: "Nine hundred routes before 05:00"
+    speaker: manager
+    objectives: [AZ305-4.5]
+    scenario: |
+      Meridian's route optimizer runs once a night. It takes the next day's
+      consignments and produces a plan for every truck. Sunda's fleet takes it
+      from 400 routes to 900, and the current server can no longer finish before
+      the drivers arrive.
+
+      The requirements, from the planning team and Evelyn between them:
+
+      - Input arrives at 22:30 when the last cut-off closes; the plan must be published by 05:00
+      - Each route is solved independently; 900 tasks, no communication between them
+      - A task takes 6 to 40 minutes on 4 vCPUs and holds about 8 GB of memory
+      - Tasks are idempotent and safely restartable from the beginning
+      - Compute must be zero-cost between 05:00 and 22:30
+      - Ceiling: 900 SGD a month, and Evelyn wrote the number rather than saying it
+      - No steady operator; NOC Manila must be able to see a failed run, not debug one
+
+      Priya: "Desmond's position is that anything running at four in the morning
+      should not need a person. Design for that."
+    prompt: "What compute platform do you recommend for the nightly optimization?"
+    options:
+      - id: opt-batch
+        label: "Azure Batch with a pool that autoscales from zero, one task per route, and the job's task retry and dependency handling doing the orchestration"
+        correct: true
+        explain: >
+          Azure Batch is the managed service for exactly this shape: a large set of
+          independent, restartable tasks that need a pool of compute for a few
+          hours and none for the rest of the day. Autoscaling from zero satisfies
+          the zero-cost-between-runs requirement without a scheduler you have to
+          write. Per-task retry, task state, and job completion events give NOC
+          Manila a run to look at rather than a process to debug, and per-task
+          isolation matches work that never communicates.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-batch-pool
+              label: "Batch pool - route optimization"
+              kind: vmss
+              group: grp-sea
+              status: healthy
+          - op: add_edge
+            edge: {id: a2inf-e-prod-batch, source: sub-prod2, target: a2inf-batch-pool, kind: dependency}
+      - id: opt-functions
+        label: "Azure Functions on Consumption, one invocation per route, fanned out from a queue"
+        correct: false
+        consequence: >
+          The longest routes hit the ten-minute limit and disappear. The plan is
+          published missing eleven trucks.
+        explain: >
+          Fan-out over a queue is a good pattern and the runtime limits kill it
+          here: a Consumption function's execution timeout maxes out at ten
+          minutes, and the scenario states tasks run 6 to 40 minutes. The 8 GB
+          working set also exceeds what the Consumption plan offers per instance.
+          Serverless functions suit short, small units of work, and these are not.
+        rep: -10
+      - id: opt-aks
+        label: "Run the routes as Kubernetes Jobs on the existing AKS cluster, with the autoscaler adding nodes overnight"
+        correct: false
+        consequence: >
+          The nightly run and the OCR GPU job discover each other at 23:15.
+        explain: >
+          Kubernetes Jobs express this workload correctly, and the cluster in
+          question was justified for a vendor OCR product with its own GPU pool
+          and its own nightly window. Sharing it couples two unrelated batch
+          workloads to one control plane and one upgrade schedule, and the
+          scenario says nobody is available to operate this at 04:00. Batch gives
+          the same fan-out with no cluster to own.
+        rep: -6
+      - id: opt-bigvm
+        label: "One large virtual machine with enough cores to run the routes in parallel, started and stopped by an automation runbook"
+        correct: false
+        consequence: >
+          A crash at 02:00 loses the whole run. The restart begins at 900 routes.
+        explain: >
+          Start and stop automation does address the cost requirement, and a single
+          machine makes the whole run one failure domain: there is no per-task
+          retry, so an interruption costs the entire night rather than one route.
+          It also forces you to size for the worst night in advance, where a pool
+          that autoscales adapts to the actual task count.
+        rep: -8
+    next: e2-spot
+
+  - id: e2-spot
+    type: design_decision
+    title: "The cost ceiling"
+    speaker: cfo
+    objectives: [AZ305-4.5, AZ305-4.2]
+    scenario: |
+      Evelyn Koh has the first pool costing and is doing the arithmetic out loud,
+      which is how she thinks.
+
+      "Nine hundred tasks, average twenty minutes, four vCPUs each. That is three
+      hundred compute hours a night on dedicated F4s v2. At list price you are
+      four times my number."
+
+      What is on the table:
+
+      - Tasks are idempotent and restartable, and Batch retries a failed task automatically
+      - The run has a 6.5 hour window and needs about 4 hours of it, so there is slack
+      - Southeast Asia has had Spot eviction rates around 5 to 10 percent for this size at night
+      - The plan must still be published by 05:00 on every night, including bad ones
+      - Evelyn will fund a small dedicated capacity floor if you can justify it
+
+      "I am not against risk," she says. "I am against surprises. Tell me which
+      one this is."
+    prompt: "How do you compose the Batch pool to hit the cost ceiling?"
+    options:
+      - id: opt-mixed-pool
+        label: "A mostly Spot pool with a small dedicated floor, task retry left on, and autoscale formulas that grow the dedicated count if the deadline is at risk"
+        correct: true
+        explain: >
+          Spot fits this workload precisely because every property that makes Spot
+          dangerous is absent: the tasks are idempotent, restartable, and
+          individually short, and Batch requeues a task whose node is evicted. The
+          dedicated floor is what turns a risk into a bounded one - progress
+          continues through an eviction wave - and the slack in the window absorbs
+          the retries. That combination is what makes it a discount rather than a
+          surprise, which is the distinction Evelyn asked for.
+        rep: 10
+        diagram_ops:
+          - {op: set_label, node: a2inf-batch-pool, label: "Batch pool - Spot + dedicated floor, scales to zero"}
+      - id: opt-all-spot
+        label: "An entirely Spot pool, since the tasks retry and the discount is the largest available"
+        correct: false
+        consequence: >
+          On the third Tuesday, capacity in the region tightens at 01:00 and the
+          pool goes to zero nodes. The plan is published at 07:40.
+        explain: >
+          Spot has no capacity guarantee at all: an eviction event can take every
+          node in the pool at once and leave nothing running until capacity
+          returns. Task retry handles individual evictions, not a pool-wide one.
+          The requirement says the plan must be published by 05:00 on every night,
+          which needs some capacity that cannot be reclaimed.
+        rep: -8
+      - id: opt-all-dedicated
+        label: "An entirely dedicated pool with reserved instances to bring the hourly rate down"
+        correct: false
+        consequence: >
+          Evelyn points out that reservations bill twenty-four hours a day for a
+          pool that exists for four.
+        explain: >
+          Reserved instances discount continuous consumption, and this pool is
+          deliberately at zero nodes for eighteen and a half hours a day, so the
+          reservation would be paid for capacity that is not running. Reservations
+          suit steady-state workloads such as the SAP application tier. Bursty,
+          interruptible compute is what Spot pricing exists for.
+        rep: -8
+      - id: opt-fewer-cores
+        label: "Halve the vCPUs per task to halve the compute hours"
+        correct: false
+        explain: >
+          Compute hours are task duration multiplied by cores, and halving the
+          cores on a parallelizable solver roughly doubles the duration - the same
+          total, with less headroom against the 05:00 deadline. Cost optimization
+          on batch comes from the price of the compute-hour and from not paying
+          for idle, not from arithmetic that the workload undoes.
+        rep: -6
+    next: e3-orchestration
+
+  - id: e3-orchestration
+    type: design_decision
+    title: "Who starts it"
+    speaker: mentor
+    objectives: [AZ305-4.4, AZ305-4.5]
+    scenario: |
+      The pool exists. Something has to decide when to run, assemble the input,
+      submit the job, wait, and publish the result.
+
+      Desmond has the sequence written out:
+
+      1. Wait for the 22:30 cut-off file to land in Blob storage - it is late roughly one night in five
+      2. Pull the vehicle availability from the WMS database
+      3. Submit 900 Batch tasks and wait for job completion, typically 3 to 4 hours
+      4. Validate the output, then publish the plan and notify the depot systems
+      5. If the job fails or the file never arrives by 00:30, raise an alert and stop
+
+      "Steps three and four are the problem. Whatever runs this has to survive
+      waiting four hours, and it has to survive its own host restarting halfway
+      through, because everything restarts eventually."
+    prompt: "What orchestrates the nightly run?"
+    options:
+      - id: opt-durable
+        label: "A Durable Functions orchestration on the Elastic Premium plan, triggered by a timer, using durable timers and an event-based wait for job completion"
+        correct: true
+        explain: >
+          Durable Functions is the serverless answer to long-running coordination:
+          the orchestrator's state is checkpointed to storage after every step, so
+          a host restart at hour three replays to where it was rather than
+          starting again. Durable timers and external event waits cost nothing
+          while waiting, which is the difference between orchestrating a four-hour
+          job and occupying compute for four hours. The retry and error semantics
+          give the stop-and-alert branch a natural place to live.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-func-orchestrator
+              label: "func-nightrun (Durable Functions)"
+              kind: function-app
+              group: grp-sea
+              status: healthy
+          - op: add_edge
+            edge: {id: a2inf-e-orch-batch, source: a2inf-func-orchestrator, target: a2inf-batch-pool, kind: dependency}
+          - op: add_edge
+            edge: {id: a2inf-e-batch-sql, source: a2inf-batch-pool, target: sql-wms, kind: dependency}
+      - id: opt-plain-function
+        label: "A single timer-triggered function that submits the job and polls for completion in a loop"
+        correct: false
+        consequence: >
+          The host recycles at 01:40. The job finishes at 02:15 and nobody
+          publishes the plan.
+        explain: >
+          A regular function is stateless and bounded: it has an execution timeout
+          and no memory of where it was if the host recycles, which the scenario
+          says must be survivable. Polling in a loop also bills for the wait. This
+          is the exact gap Durable Functions was built to close.
+        rep: -10
+      - id: opt-logic-app
+        label: "A Logic App with a recurrence trigger, a Blob condition, and a call to the Batch connector"
+        correct: false
+        explain: >
+            Logic Apps handles long-running waits well and is a strong fit for
+            connector-heavy integration flows. It is the weaker fit here because
+            the work is code - assembling input, validating solver output, deciding
+            whether a plan is publishable - and expressing that in a designer
+            workflow puts logic somewhere the developers cannot unit test. Logic
+            Apps wins when the value is in the connectors; this run's value is in
+            the code between them.
+        rep: -5
+      - id: opt-cron
+        label: "A cron job on the existing SAP application server, since it is already running at night"
+        correct: false
+        consequence: >
+          Marcus finds an unmanaged scheduled task with database credentials on an
+          ERP host, during the acquisition audit.
+        explain: >
+          Borrowing an unrelated server for scheduling creates an undocumented
+          dependency between the ERP and the route plan, puts credentials
+          somewhere they do not belong, and gives NOC Manila nothing to observe.
+          It also fails the audit posture the acquisition brought with it.
+          Scheduling is a platform concern, not a spare-capacity concern.
+        rep: -10
+    next: e4-check
+
+  - id: e4-check
+    type: knowledge_check
+    title: "The review board's favorite question"
+    speaker: mentor
+    objectives: [AZ305-4.5]
+    scenario: |
+      Desmond is prepping you for the architecture review, which he claims not to
+      care about.
+
+      "They ask a version of this every time. Get it wrong and they will spend
+      forty minutes on batch instead of the migration."
+    question: >
+      The route optimizer is being extended so that each route's solve depends on
+      the depot-level consolidation that runs first, and a final scoring step
+      runs only after all 900 routes complete. Where does that dependency
+      structure belong?
+    options:
+      - id: opt-orchestrator-code
+        label: "In the orchestrator, by submitting the routes only after consolidation returns and the scoring step only after the job reports complete"
+        correct: false
+        explain: >
+          It works, and it moves the dependency graph into code that has to be
+          right about 900 completions. Batch models task dependencies natively -
+          task dependency IDs and job manager tasks - so the scheduler enforces
+          ordering and the orchestrator does not have to track per-task state.
+          Prefer the platform's own primitive when it exists.
+      - id: opt-task-dependencies
+        label: "In the Batch job itself, using task dependencies so the scheduler enforces the ordering"
+        correct: true
+        explain: >
+          Azure Batch supports task dependencies within a job: a task can declare
+          the task IDs it waits on, and a task can wait on the whole preceding
+          task range. The scheduler then holds tasks in a waiting state until
+          their dependencies succeed, retries them under the job's policy, and
+          fails the job if a dependency cannot complete. The orchestrator stays
+          responsible for the run, not for 900 pieces of bookkeeping.
+      - id: opt-three-jobs
+        label: "As three separate Batch jobs submitted in sequence, so each stage is independently visible"
+        correct: false
+        explain: >
+          Three jobs is a legitimate structure when the stages are operationally
+          separate, and here it costs you the pool warm-up between stages and puts
+          the sequencing back in the orchestrator anyway. It also splits one
+          business run across three job records, which makes the "did tonight
+          work" question harder for NOC Manila rather than easier.
+    next: END

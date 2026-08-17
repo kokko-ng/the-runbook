@@ -1,0 +1,481 @@
+schema_version: 1
+id: act2-id-07-quarterly-evidence
+title: "Quarterly Evidence"
+act: 2
+chapter: act2-identity
+domain: az305-d1
+order: 7
+role: solutions-architect
+checkpoint: true
+summary: "Marcus needs a compliance report every quarter. Your guardrails need to produce it without stopping Jakarta from shipping."
+entry: e1-compliance-reporting
+
+encounters:
+  - id: e1-compliance-reporting
+    type: design_decision
+    title: "Evidence, four times a year"
+    speaker: security
+    objectives: [AZ305-1.10]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2id-defender
+          label: "Defender for Cloud - regulatory compliance"
+          kind: monitor
+          group: grp-platform
+          status: planned
+    scenario: |
+      The title on the invitation says Solutions Architect, which happened
+      quietly last week and has already stopped being interesting. What is
+      interesting is that Marcus now brings you problems before he has solved
+      them.
+
+      "The board's audit committee meets quarterly. They want a report showing
+      where the estate stands against ISO 27001, plus the controls we wrote
+      ourselves for PDPA. Last quarter Desmond built it and it took him six
+      days."
+
+      The report has to cover Meridian's subscriptions and the Sunda ones in the
+      Transition group, because the auditors do not accept a scope that excludes
+      the acquisition. It has to show movement between quarters - a single
+      snapshot tells the committee nothing about whether anything is improving.
+      And it has to be produced without six days of anyone's time.
+
+      Evelyn has already answered the question you were going to ask. "No new
+      tooling budget this year. The Defender for Cloud plans are funded because
+      Marcus argued for them in the acquisition case, and that is the extent of
+      it."
+
+      Desmond, from across the room, without looking up: "Six days. I counted."
+    prompt: "How do you produce the quarterly compliance report?"
+    options:
+      - id: opt-defender-compliance
+        label: "Enable Defender for Cloud across the subscriptions, add the ISO 27001 standard and a custom initiative for the PDPA controls to the regulatory compliance dashboard, and continuously export compliance state to the central workspace for trend reporting"
+        correct: true
+        explain: >
+          The regulatory compliance dashboard is the part that maps Azure
+          assessments onto named framework controls, which is what the committee
+          reads - policy compliance alone reports on resources rather than on
+          controls. Adding a custom initiative brings Meridian's own PDPA
+          controls into the same view instead of a second document. Continuous
+          export to the Log Analytics workspace is what turns a live dashboard
+          into a quarter-over-quarter trend, because the dashboard shows now and
+          the workspace keeps the history. Applying it at the management group
+          scope covers the Transition subscriptions as well.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2id-defender, status: healthy}
+          - op: add_edge
+            edge:
+              id: a2id-e-defender-law
+              source: a2id-defender
+              target: law-meridian2
+              kind: dependency
+              label: "continuous export"
+              status: healthy
+      - id: opt-policy-only
+        label: "Assign the relevant Azure Policy initiatives and export the policy compliance state to the workspace, then build the report from a workbook"
+        correct: false
+        consequence: >
+          The committee asks which ISO control the twelve non-compliant storage
+          accounts relate to. The workbook does not know.
+        explain: >
+          Policy compliance state is genuinely the underlying data and it is
+          expressed in policy definitions, not framework controls, so somebody
+          has to maintain the mapping from each definition to an ISO control by
+          hand. That mapping is exactly what the regulatory compliance dashboard
+          maintains for you, and rebuilding it in a workbook recreates several of
+          Desmond's six days every time the standard is revised.
+        rep: -6
+      - id: opt-manual
+        label: "Keep the manual evidence pack but split it across four people so no single person loses six days"
+        correct: false
+        consequence: >
+          Four partial packs arrive in three formats. Marcus spends two days
+          reconciling them, which is the number nobody was measuring.
+        explain: >
+          It redistributes the effort rather than removing it, and the
+          requirement stated was that the report be produced without six days of
+          anyone's time. Manual evidence collection also has no trend: each
+          quarter's pack is built from whatever was true that week, so the
+          committee cannot compare quarters, which was the second requirement.
+        rep: -8
+      - id: opt-grc-platform
+        label: "Procure a governance, risk, and compliance platform that ingests Azure findings and produces framework-mapped reporting out of the box"
+        correct: false
+        consequence: >
+          Evelyn reads the first year's licensing figure and asks what Defender
+          for Cloud was bought for.
+        explain: >
+          A dedicated compliance platform is a reasonable answer for an
+          organization with many clouds and many frameworks, and it fails the
+          stated constraint that there is no new tooling budget this year. It
+          also duplicates a capability Meridian has already paid for, since the
+          Defender plans were funded in the acquisition case specifically for
+          this kind of assurance.
+        rep: -8
+    next: e2-policy-design
+
+  - id: e2-policy-design
+    type: design_decision
+    title: "Effects, and who gets blocked"
+    speaker: mentor
+    objectives: [AZ305-1.10, AZ305-1.9]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2id-policy-guardrails
+          label: "Meridian guardrails initiative"
+          kind: policy
+          group: grp-platform
+          status: planned
+    scenario: |
+      The control list has four items on it and Desmond has opinions about all
+      of them.
+
+      Storage accounts must not allow public blob access. Platform services must
+      be reachable only through private endpoints. Minimum TLS version is 1.2.
+      And every resource must send diagnostic logs to the workspace, because a
+      resource that logs nowhere is invisible to everything you designed last
+      month.
+
+      The complication is Sunda. Their inherited estate violates three of the
+      four, and the remediation plan runs six months because two of the
+      applications need code changes their team has to schedule.
+
+      Priya's constraint is the one that decides the design. "Jakarta ships
+      freight every day. Whatever you assign cannot stop their team deploying
+      while they are fixing it. And I want to be able to tell the auditors
+      exactly when the exception ends."
+
+      Desmond has the operational one. "Diagnostic settings on four hundred
+      resources. I am not clicking that four hundred times, and I am not writing
+      a script that runs once and rots."
+    prompt: "How do you design the guardrail initiative?"
+    options:
+      - id: opt-mixed-effects
+        label: "One initiative assigned at the root management group using deny for the controls that must never be violated on new resources, deployIfNotExists with remediation tasks for diagnostic settings, audit for the rest, and a time-bound policy exemption on the Transition group with a stated expiry and owner"
+        correct: true
+        explain: >
+          Effects are chosen per control rather than per initiative. Deny stops
+          new violations of the things that must never happen, without touching
+          resources that already exist. DeployIfNotExists with a remediation task
+          is what configures diagnostic settings on the four hundred existing
+          resources and on everything created afterwards, which answers Desmond's
+          objection to a script that runs once. Audit covers controls where
+          blocking would be disproportionate. The exemption is the part Priya
+          asked for: it is recorded against the scope, it carries an expiry date
+          and a documented owner, and it appears in the compliance data as an
+          exemption rather than as silence.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2id-policy-guardrails, status: healthy}
+          - op: add_edge
+            edge:
+              id: a2id-e-root-guardrails
+              source: mg-meridian
+              target: a2id-policy-guardrails
+              kind: dependency
+              status: healthy
+      - id: opt-deny-all
+        label: "Assign the whole initiative with deny effects at the root management group immediately, so the standard is unambiguous from day one"
+        correct: false
+        consequence: >
+          Jakarta's next deployment fails at 06:40 local time. So does the one
+          after it.
+        explain: >
+          An unambiguous standard that halts an operating business is not a
+          standard anyone keeps. It breaks Priya's constraint directly, and it
+          confuses two different jobs: deny protects the future, while an
+          acquired estate with a six-month remediation plan needs a recorded,
+          time-bound exception. It also cannot configure diagnostic settings,
+          because deny prevents non-compliance and never creates anything.
+        rep: -12
+      - id: opt-audit-all
+        label: "Assign everything with audit effects for now and convert to deny once the Sunda estate is fully remediated in six months"
+        correct: false
+        consequence: >
+          A new storage account with public blob access is created in Singapore
+          production in week three. It is audited, accurately, for five months.
+        explain: >
+          Auditing everything protects nobody during the six months, and the
+          controls on the list are not aspirational - public blob access on a
+          new production storage account is the failure mode the control exists
+          for. Meridian's own estate is ready for deny today; only the Transition
+          scope is not. Scope the exception to the estate that needs it rather
+          than lowering the effect everywhere.
+        rep: -10
+      - id: opt-exclude-sunda
+        label: "Assign the initiative with deny at the root and exclude the Transition management group from the assignment entirely until remediation completes"
+        correct: false
+        consequence: >
+          At the quarterly review, the Transition scope reports nothing at all.
+          The auditors ask whether it was assessed. Nobody can show that it was.
+        explain: >
+          An exclusion and an exemption look interchangeable and behave very
+          differently for evidence. An exclusion removes the scope from the
+          assignment: no compliance data, no expiry, no recorded owner, and
+          nothing to review. An exemption keeps the scope in the assignment, is
+          itself an auditable object with a category, an expiry date, and a
+          justification, and shows up in compliance reporting as an accepted
+          exception rather than as absence.
+        rep: -8
+    next: e3-locked-out-jakarta
+
+  - id: e3-locked-out-jakarta
+    type: troubleshoot
+    title: "P1: nothing deploys in Indonesia"
+    speaker: ticket
+    objectives: [AZ305-1.10]
+    ticket:
+      id: "MER-6104"
+      reporter: "Sunda platform team (Jakarta)"
+      priority: "P1"
+      opened: "06:52"
+      body: |
+        Every deployment into the Indonesia production subscription has failed
+        since approximately 22:00 last night. Storage accounts, App Services,
+        the lot. Error mentions policy. Nothing changed in our templates - the
+        same template deployed successfully to the Singapore non-production
+        subscription an hour ago. Go-live is Friday.
+    on_enter_diagram_ops:
+      - {op: set_status, node: a2id-sub-prod-idn, status: broken}
+      - {op: set_status, node: a2id-policy-guardrails, status: warning}
+    scenario: |
+      Your guardrail initiative went to the root management group at 21:40 last
+      night. It is now 06:52 and the Indonesia production subscription accepts
+      no deployments at all.
+
+      The Singapore subscriptions are fine. Non-production is fine. Only
+      Indonesia, only since the assignment, and the go-live that the board has
+      already been told about is on Friday.
+
+      Priya has not asked yet. She will.
+
+      This is the part of the job Desmond warned you about when you took the
+      title: the recommendation was yours, the implementation was his, and the
+      thing that is broken is a design decision rather than a fat-fingered
+      command.
+    time_budget: 6
+    investigate:
+      - id: inv-jakarta
+        label: "Ask the Sunda platform team exactly what they deployed and where"
+        speaker: ticket
+        reveals: >
+          "Same Bicep file, same parameters, two subscriptions. Singapore
+          non-production succeeded at 05:40. Indonesia production fails in under
+          two seconds every time. It does not even start creating anything."
+      - id: inv-desmond
+        label: "Ask Desmond what the assignment looked like when he applied it"
+        speaker: mentor
+        reveals: >
+          "I assigned what you specified, at the root, with the parameters from
+          your document. Including the allowed locations list, which you inherited
+          from the Act 1 landing zone standard. I did not edit it. That was
+          deliberate."
+      - id: inv-marcus
+        label: "Ask Marcus whether the Indonesia subscription is in scope for anything unusual"
+        speaker: security
+        reveals: >
+          "Nothing unusual. It sits under Workloads like the others. And before
+          you ask - no, the residency clause does not forbid deploying there. It
+          requires it."
+      - id: inv-noc
+        label: "Check with NOC Manila whether anything else changed overnight"
+        speaker: noc
+        reveals: >
+          "One change record in the window. MER-6088, policy initiative
+          assignment at the root management group, approved, applied 21:40,
+          closed clean. Nothing else touched Indonesia."
+    commands:
+      - id: cmd-deployment-error
+        label: "Read the error on the last failed deployment"
+        command: "az deployment group show -g rg-wms-idn -n wms-idn-20260817 --query properties.error -o json"
+        output: |
+          {
+            "code": "InvalidTemplateDeployment",
+            "message": "Resource 'stwmsidn001' was disallowed by policy.",
+            "details": [
+              {
+                "code": "RequestDisallowedByPolicy",
+                "target": "stwmsidn001",
+                "message": "Resource 'stwmsidn001' was disallowed by policy. Policy identifiers: '[{\"policyAssignment\":{\"name\":\"meridian-guardrails\"},\"policyDefinition\":{\"name\":\"Allowed locations\"},\"policyAssignmentScope\":\"/providers/Microsoft.Management/managementGroups/mg-meridian\"}]'."
+              }
+            ]
+          }
+        time_cost: 1
+        note: "The error names the assignment, the definition inside it, and the scope it was assigned at."
+      - id: cmd-assignment-list
+        label: "List policy assignments at the root management group"
+        command: "az policy assignment list --scope /providers/Microsoft.Management/managementGroups/mg-meridian -o table"
+        output: |
+          Name                 DisplayName                    EnforcementMode    Scope
+          -------------------  -----------------------------  -----------------  -----------------------------------
+          meridian-guardrails  Meridian guardrails initiative  Default            /providers/.../mg-meridian
+        time_cost: 1
+      - id: cmd-assignment-params
+        label: "Show the parameters on the guardrails assignment"
+        command: "az policy assignment show --name meridian-guardrails --scope /providers/Microsoft.Management/managementGroups/mg-meridian --query parameters -o json"
+        output: |
+          {
+            "listOfAllowedLocations": {
+              "value": [
+                "southeastasia",
+                "eastasia"
+              ]
+            },
+            "minimumTlsVersion": {
+              "value": "TLS1_2"
+            }
+          }
+        time_cost: 2
+        note: "The list was written when Meridian had one region. Indonesia Central is not in it."
+      - id: cmd-exemptions
+        label: "List policy exemptions on the Indonesia production subscription"
+        command: "az policy exemption list --scope /subscriptions/8c1f-idn-prod -o table"
+        output: |
+          (empty)
+        time_cost: 1
+      - id: cmd-locations
+        label: "Confirm the Indonesia Central region is available to the subscription"
+        command: "az account list-locations --query \"[?name=='indonesiacentral'].{name:name, display:displayName, type:metadata.regionType}\" -o table"
+        output: |
+          Name              Display            Type
+          ----------------  -----------------  ----------
+          indonesiacentral  Indonesia Central  Physical
+        time_cost: 1
+        note: "The region is available. Nothing about the platform is refusing the deployment."
+      - id: cmd-compliance
+        label: "Check the compliance state of the Indonesia resource group"
+        command: "az policy state list --resource-group rg-wms-idn --filter \"complianceState eq 'NonCompliant'\" --query \"[].{policy:policyDefinitionName, resource:resourceId}\" -o table"
+        output: |
+          (empty)
+        time_cost: 2
+        note: "Nothing non-compliant, because nothing was ever created."
+    fixes:
+      - id: fix-add-location
+        label: "Update the listOfAllowedLocations parameter on the root assignment to include indonesiacentral"
+        correct: true
+        explain: >
+          The control is doing exactly what it was told to do, and what it was
+          told was written when Meridian ran one region. Indonesia Central is an
+          approved landing zone with a board-funded expansion behind it, so the
+          allowed locations list is stale rather than the policy being wrong.
+          Updating the assignment parameter restores deployments in minutes and
+          keeps the residency guardrail intact everywhere else, which is the
+          control the transition agreement actually depends on. The wider lesson
+          is that a location allow-list is a parameter that must be part of every
+          new-region design, not something discovered at 06:52.
+        rep: 14
+        diagram_ops:
+          - {op: set_status, node: a2id-sub-prod-idn, status: healthy}
+          - {op: set_status, node: a2id-policy-guardrails, status: healthy}
+      - id: fix-exemption
+        label: "Create a policy exemption for the Indonesia production subscription so the guardrails do not apply there"
+        correct: false
+        consequence: >
+          Deployments succeed by lunchtime. Six weeks later a storage account in
+          Jakarta is created with public blob access and nothing objects.
+        explain: >
+          An exemption removes every control in the initiative from that scope,
+          not just the location one, so TLS, public blob access, and diagnostic
+          settings all stop being enforced in the newest and least mature part of
+          the estate. It also exempts the subscription from a residency control
+          that exists to satisfy the transition agreement. Exemptions are for
+          accepted, time-bound exceptions with a documented owner, not for
+          parameters that are simply out of date.
+        rep: -10
+      - id: fix-audit-effect
+        label: "Change the allowed locations policy effect from deny to audit across the initiative"
+        correct: false
+        consequence: >
+          Deployments succeed everywhere, including a test environment somebody
+          spins up in a region Meridian has no agreement covering.
+        explain: >
+          Weakening the effect estate-wide to unblock one region trades a
+          preventive control for a report, and the control being weakened is the
+          one that keeps Indonesian data in Indonesia under the transition
+          agreement. The list of permitted regions was wrong; the decision to
+          enforce it was not. Fix the data the control uses rather than the
+          control.
+        rep: -12
+      - id: fix-move-mg
+        label: "Move the Indonesia production subscription into the Sandbox management group, where the guardrails initiative is not assigned"
+        correct: false
+        consequence: >
+          The move completes. The deployment fails again with the same policy
+          identifier, and now the subscription is in the group with no
+          connectivity and no production controls.
+        explain: >
+          The assignment is at the root management group, and every subscription
+          in the tenant hierarchy is a descendant of the root - there is no group
+          you can move to that escapes it. Beyond that, moving a production
+          subscription into Sandbox to dodge a policy puts the estate's newest
+          production workload under the least restrictive control set, which is
+          the opposite of what the auditors were shown.
+        rep: -12
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: e4-final-check
+
+  - id: e4-final-check
+    type: knowledge_check
+    title: "Priya asks one question"
+    speaker: manager
+    objectives: [AZ305-1.9]
+    scenario: |
+      Jakarta deploys again by 08:15. Priya finds you afterwards with a coffee
+      she did not need to bring you, which is how she opens difficult
+      conversations.
+
+      "Good recovery. Now the question the audit committee will ask, and I want
+      to hear you answer it before they do."
+
+      A deny policy assigned at the root management group blocks public IP
+      addresses. A separate audit policy at the Landing zones group reports on
+      them. The lead engineer for the freight portal holds an Owner role
+      assignment on the production subscription.
+    question: >
+      Can that engineer, as subscription Owner, create a public IP address in
+      the production subscription?
+    options:
+      - id: opt-owner-wins
+        label: "Yes - Owner is the highest privilege role and includes the ability to override a policy assignment at a higher scope"
+        correct: false
+        explain: >
+          Azure RBAC and Azure Policy answer different questions and neither
+          overrides the other. RBAC decides whether the caller is permitted to
+          attempt an operation; policy decides whether the resulting resource
+          state is allowed. Owner grants no capability to bypass a deny effect.
+          Changing or exempting the assignment requires rights at the scope where
+          it was assigned, which for a root assignment means the root.
+      - id: opt-denied
+        label: "No - policy is evaluated on the request regardless of the caller's role, and a deny at any scope in the chain blocks it"
+        correct: true
+        explain: >
+          Resource Manager evaluates every applicable assignment from the root
+          management group down to the resource, and a deny anywhere in that
+          chain rejects the request no matter how privileged the caller is. The
+          audit policy at Landing zones does not soften it - effects are not
+          averaged or overridden by proximity, and the most restrictive
+          applicable effect governs. This is precisely why the initiative was
+          assigned at the root and why the exemption, not an exclusion, is the
+          documented way to make an exception.
+      - id: opt-closest-scope
+        label: "Yes - the audit policy at the Landing zones group is closer to the resource, so it takes precedence over the deny at the root"
+        correct: false
+        explain: >
+          Policy has no nearest-scope-wins rule. All applicable assignments are
+          evaluated together and a deny is decisive; a closer assignment cannot
+          relax a broader one. That behavior is deliberate, because it is what
+          makes a control assigned at the root a guarantee rather than a default.
+      - id: opt-warning
+        label: "Yes, with a warning - the deployment succeeds and the resource is immediately flagged as non-compliant"
+        correct: false
+        explain: >
+          That is the behavior of the audit effect, not deny. Audit permits the
+          request and records non-compliance; deny rejects the request outright
+          with RequestDisallowedByPolicy, which is the error the Jakarta
+          deployments returned this morning.
+    next: END

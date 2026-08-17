@@ -1,0 +1,303 @@
+schema_version: 1
+id: act1-cmp-09-go-live-hard
+title: "Go Live (exam hard)"
+act: 1
+chapter: act1-compute
+domain: az104-d3
+order: 9
+role: senior-cloud-admin
+checkpoint: true
+bonus_variant_of: act1-cmp-09-go-live
+summary: "Three hostnames, one wildcard certificate, and a staging slot that nobody thought to check in a browser."
+entry: e1-three-names
+
+encounters:
+  - id: e1-three-names
+    type: design_decision
+    title: "Three names and a rotation"
+    speaker: security
+    objectives: [AZ104-3.20, AZ104-3.21]
+    scenario: |
+      The tracking site has grown. Three hostnames now have to answer on the same
+      app: track.meridianlogistics.com.sg for consignees, api.meridianlogistics.com.sg
+      for the driver application, and partners.meridianlogistics.com.sg for the
+      three freight forwarders who poll it.
+
+      The network team already buys a wildcard certificate for
+      *.meridianlogistics.com.sg from a commercial authority, rotates it every
+      twelve months, and stores the current PFX in kv-meridian-certs. They would
+      like to keep doing exactly that.
+
+      Marcus: "One certificate, one rotation, and I do not want a human copying a
+      PFX into App Service every year. That is how 2024 happened."
+    prompt: "How do you configure certificates for the three hostnames?"
+    options:
+      - id: opt-kv-import
+        label: "Import the wildcard certificate from kv-meridian-certs into the app, bind it to all three hostnames with SNI SSL, and let App Service track the Key Vault secret so a rotation is picked up automatically"
+        correct: true
+        explain: >
+          An App Service certificate imported from Key Vault is a reference rather
+          than a copy: the platform periodically re-reads the secret and picks up a
+          new version, so the network team's existing rotation keeps working with
+          no human step. One wildcard binds to as many hostnames as it covers, and
+          SNI SSL means all three share the same inbound address. The app's
+          identity needs read access to the vault's secrets and certificates.
+        rep: 12
+      - id: opt-managed-certs
+        label: "Create three App Service managed certificates, one per hostname, since they are free and renew themselves"
+        correct: false
+        explain: >
+          Managed certificates renew themselves and are the right answer when you
+          have no certificate authority relationship to honor. Here the
+          organization already has one, and managed certificates do not issue
+          wildcards, so you would be running two certificate lifecycles for the
+          same zone with two different owners and two different failure modes.
+          Marcus asked for one.
+        rep: -6
+      - id: opt-upload-pfx
+        label: "Upload the wildcard PFX to the app each year and bind it to the three hostnames"
+        correct: false
+        consequence: >
+          It works for eleven months. The person who does the upload changes teams
+          in month ten.
+        explain: >
+          An uploaded certificate is a copy with no link to its source, so every
+          rotation is a manual task that must be remembered and performed
+          correctly. That is precisely the 2024 failure Marcus keeps referring to,
+          and the Key Vault import removes it for the same amount of initial work.
+        rep: -10
+      - id: opt-ip-ssl
+        label: "Bind the wildcard with IP-based SSL so each hostname has a dedicated address and the freight forwarders can allow-list it"
+        correct: false
+        explain: >
+          IP-based SSL exists for clients that cannot send SNI, and it allocates a
+          dedicated inbound address per binding - which means new DNS records and
+          new addresses whenever a binding is recreated. Modern clients all send
+          SNI. If partners need a stable address to allow-list, that is an argument
+          for a front end with a static address, not for changing how the
+          certificate is bound.
+        rep: -8
+    next: e2-staging-cert
+
+  - id: e2-staging-cert
+    type: troubleshoot
+    title: "P2: Certificate warning on the staging slot"
+    speaker: ticket
+    objectives: [AZ104-3.20, AZ104-3.24]
+    ticket:
+      id: "MER-5166"
+      reporter: "EDI development team"
+      priority: "P2"
+      opened: "14:20"
+      body: |
+        Partner integration testing is blocked. The freight forwarder's client
+        refuses to connect to our staging endpoint with a certificate name
+        mismatch. Browser shows the same warning. Production on
+        partners.meridianlogistics.com.sg is fine with the same certificate. We
+        cannot ask a partner to click through a warning.
+    on_enter_diagram_ops:
+      - {op: set_status, node: cmp-slot-staging, status: broken}
+    scenario: |
+      The staging slot was given its own hostname last week so partners could test
+      against it without a special client configuration. The name chosen, by
+      committee, was track.staging.meridianlogistics.com.sg, because it read
+      nicely in the integration document.
+
+      The wildcard certificate from kv-meridian-certs is bound to that hostname on
+      the slot and App Service accepted the binding without complaint. Production
+      serves three hostnames from the same certificate with no warning at all.
+
+      The freight forwarder's client reports: certificate name does not match
+      host.
+    time_budget: 5
+    investigate:
+      - id: inv-dev
+        label: "Ask the development team what they configured on the slot"
+        speaker: ticket
+        reveals: >
+          "Added the hostname to the staging slot, added the CNAME and the asuid
+          TXT record, bound the same certificate we use in production. App Service
+          took all of it. It just does not work in a client."
+      - id: inv-desmond
+        label: "Ask Desmond to look at the hostname"
+        speaker: mentor
+        reveals: >
+          "Read the name out loud, one label at a time. Now read what the
+          certificate covers, one label at a time. A wildcard is not a
+          rubber stamp for a whole zone, it is a stand-in for exactly one label."
+      - id: inv-marcus
+        label: "Ask Marcus whether the certificate itself is healthy"
+        speaker: security
+        reveals: >
+          "The certificate is valid until next April and the chain is complete. It
+          is the same file production is serving right now to three hostnames
+          without a murmur. Nothing wrong with the certificate."
+    commands:
+      - id: cmd-openssl
+        label: "Inspect the certificate the staging hostname serves"
+        command: "openssl s_client -connect track.staging.meridianlogistics.com.sg:443 -servername track.staging.meridianlogistics.com.sg < /dev/null 2>/dev/null | openssl x509 -noout -subject -ext subjectAltName"
+        output: |
+          subject=CN = *.meridianlogistics.com.sg
+          X509v3 Subject Alternative Name:
+              DNS:*.meridianlogistics.com.sg, DNS:meridianlogistics.com.sg
+        time_cost: 1
+        note: "The names on the certificate are the apex and one wildcard label. The host has two labels below the apex."
+      - id: cmd-hostnames
+        label: "List the hostnames bound to the staging slot"
+        command: "az webapp config hostname list -g rg-web-sea --webapp-name app-track --slot staging -o table"
+        output: |
+          Name                                          SslState    Thumbprint
+          --------------------------------------------  ----------  ------------------------------------------
+          app-track-staging.azurewebsites.net           Disabled
+          track.staging.meridianlogistics.com.sg        SniEnabled  9F2C4A1B77E0D3856AB1C09E4F27D5A3B8E10C44
+        time_cost: 1
+        note: "The binding exists and is enabled. App Service does not check that the certificate covers the name."
+      - id: cmd-prod-hostnames
+        label: "List the hostnames bound to production for comparison"
+        command: "az webapp config hostname list -g rg-web-sea --webapp-name app-track -o table"
+        output: |
+          Name                                          SslState    Thumbprint
+          --------------------------------------------  ----------  ------------------------------------------
+          track.meridianlogistics.com.sg                SniEnabled  9F2C4A1B77E0D3856AB1C09E4F27D5A3B8E10C44
+          api.meridianlogistics.com.sg                  SniEnabled  9F2C4A1B77E0D3856AB1C09E4F27D5A3B8E10C44
+          partners.meridianlogistics.com.sg             SniEnabled  9F2C4A1B77E0D3856AB1C09E4F27D5A3B8E10C44
+          app-track.azurewebsites.net                   Disabled
+        time_cost: 1
+        note: "Same thumbprint everywhere. Three single-label hostnames, all matching the wildcard."
+      - id: cmd-cert-list
+        label: "List certificates available to the app"
+        command: "az webapp config ssl list -g rg-web-sea --query \"[].{name:name,subject:subjectName,expiry:expirationDate,source:keyVaultId!=null}\" -o table"
+        output: |
+          Name                              Subject                       Expiry                Source
+          --------------------------------  ----------------------------  --------------------  --------
+          meridianlogistics-wildcard        *.meridianlogistics.com.sg    2027-04-12T00:00:00Z  True
+        time_cost: 1
+        note: "One certificate, sourced from Key Vault, valid for another eight months."
+      - id: cmd-dns
+        label: "Check the DNS records for the staging hostname"
+        command: "dig +short track.staging.meridianlogistics.com.sg CNAME && dig +short asuid.track.staging.meridianlogistics.com.sg TXT"
+        output: |
+          app-track-staging.azurewebsites.net.
+          "8b31f0a9c4d2e75f61bb0439ea7c2d18f5a04e6c"
+        time_cost: 1
+        note: "DNS is correct and verification passed, which is why the binding was accepted."
+    fixes:
+      - id: fix-rename-host
+        label: "Move the staging hostname to a single label under the zone - track-staging.meridianlogistics.com.sg - and rebind the wildcard to it"
+        correct: true
+        explain: >
+          A wildcard matches exactly one label in the position it occupies, so
+          *.meridianlogistics.com.sg covers track and partners and does not cover
+          track.staging, which is one level deeper. Flattening the name to a single
+          label brings it inside the certificate's coverage with no new
+          certificate, no new rotation and no change to the partner's client
+          beyond the address. App Service accepts a binding without checking
+          coverage, which is why the mismatch only appears in a client.
+        rep: 15
+        diagram_ops:
+          - {op: set_status, node: cmp-slot-staging, status: healthy}
+      - id: fix-second-wildcard
+        label: "Ask the network team to buy a second wildcard for *.staging.meridianlogistics.com.sg and bind that to the slot"
+        correct: false
+        consequence: >
+          Procurement takes nine days. Partner testing is blocked for all of them.
+        explain: >
+          It would work and it buys a second certificate, a second rotation and a
+          second thing to forget, all to preserve a hostname chosen because it read
+          nicely. When a naming choice is the only thing forcing an extra
+          certificate, change the name.
+        rep: -8
+      - id: fix-managed-cert
+        label: "Create an App Service managed certificate for the staging hostname, since it is free and issued immediately"
+        correct: false
+        explain: >
+          This does resolve the mismatch, and it is a reasonable fallback if the
+          hostname genuinely cannot change. It also introduces a second certificate
+          authority relationship for a single test endpoint and splits the
+          certificate story that Marcus deliberately consolidated. Fix the cause
+          before adding a certificate to work around it.
+        rep: -5
+      - id: fix-disable-tls
+        label: "Serve the staging hostname over HTTP only while testing, and turn HTTPS Only off on the slot"
+        correct: false
+        consequence: >
+          Partner credentials are sent in clear text across the internet for the
+          duration of the test cycle, and Marcus finds the configuration change in
+          his alerts.
+        explain: >
+          Integration testing against a partner involves the same credentials and
+          the same payloads as production. Turning off transport security to avoid
+          a name mismatch trades a warning nobody can click through for an exposure
+          nobody can see, and the slot's setting would then need remembering
+          before go-live.
+        rep: -15
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: e3-slot-networking
+
+  - id: e3-slot-networking
+    type: design_decision
+    title: "The slot cannot see the database"
+    speaker: mentor
+    objectives: [AZ104-3.23, AZ104-3.24]
+    scenario: |
+      With the hostname fixed, partner testing runs for an hour and then stops.
+      The staging slot cannot reach sql-wms-test on its private address. It times
+      out; production reaches its own database without trouble.
+
+      Production has regional virtual network integration into
+      snet-appsvc, delegated to Microsoft.Web/serverFarms, sized for the plan's
+      six instances. The connection string on staging is correctly marked as a
+      deployment slot setting and points at the test database's private endpoint.
+
+      Desmond: "You have been thinking about a slot as a copy of the app. Think
+      about what it actually is in the resource model."
+    prompt: "What do you do?"
+    options:
+      - id: opt-integrate-slot
+        label: "Enable regional virtual network integration on the staging slot as well, into a subnet with enough addresses for the slot's instances"
+        correct: true
+        explain: >
+          A deployment slot is a separate app that happens to share a plan, and
+          network configuration belongs to the slot rather than to the app - it is
+          one of the settings that does not move during a swap, which is exactly
+          what you want, because staging and production may integrate with
+          different networks. Each integrated app consumes addresses from its
+          subnet according to its instance count, so plan the address space for the
+          slots as well as the production app.
+        rep: 12
+      - id: opt-expect-inherit
+        label: "Restart the slot - virtual network integration is configured on the app and the slot should inherit it once the workers recycle"
+        correct: false
+        consequence: >
+          The slot restarts in forty seconds and still times out. Partner testing
+          loses another half hour.
+        explain: >
+          Slots do not inherit configuration from the production slot; they hold
+          their own. Some settings swap and some do not, and networking - virtual
+          network integration, private endpoints, access restrictions and TLS
+          settings - stays with the slot. That is a feature, not an oversight,
+          because a staging environment usually needs a different network position.
+        rep: -8
+      - id: opt-public-test-db
+        label: "Give the test database a public endpoint and let the staging slot reach it over the internet, since it holds no real data"
+        correct: false
+        explain: >
+          It restores testing this afternoon and makes staging behave differently
+          from production in the one dimension you are trying to test, so a
+          connectivity fault would only ever appear after a swap. Test databases
+          also drift toward holding copies of real data, and a public endpoint
+          outlives the reason it was created.
+        rep: -12
+      - id: opt-swap-networking
+        label: "Configure integration on production only, and rely on the swap to carry it into the slot when releases happen"
+        correct: false
+        explain: >
+          The swap does not move network configuration, so the slot would remain
+          unintegrated and testing would still fail. It also misreads what a swap
+          does: it exchanges the content and the non-sticky settings between two
+          running apps, and anything the platform holds per slot stays where it
+          is.
+        rep: -10
+    next: END

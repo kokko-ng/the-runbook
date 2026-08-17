@@ -1,0 +1,232 @@
+schema_version: 1
+id: act2-inf-02-migration-waves-hard
+title: "Waves - The Awkward Ones"
+act: 2
+chapter: act2-infrastructure
+domain: az305-d4
+order: 2
+role: associate-architect
+bonus_variant_of: act2-inf-02-migration-waves
+checkpoint: true
+summary: "The three workloads that did not fit the wave plan, reviewed at exam altitude."
+entry: e1-oracle
+
+encounters:
+  - id: e1-oracle
+    type: design_decision
+    title: "The database nobody mentioned"
+    speaker: mentor
+    objectives: [AZ305-4.15]
+    scenario: |
+      A fourth database turns up during wave planning. Sunda's customs
+      declaration engine runs on PostgreSQL 11, and the assessment missed it
+      because it lives on a machine named PRINT02.
+
+      What the review established:
+
+      - PostgreSQL 11, 1.4 TB, on-premises, single instance
+      - The application uses two extensions: postgis and pg_cron
+      - Write throughput is modest; read throughput spikes during customs windows
+      - Maximum downtime the customs broker will accept is 30 minutes
+      - Target must support point-in-time restore to 35 days for the audit
+      - The team has no PostgreSQL operational experience and does not want any
+      - Version 11 is out of community support; the app vendor certifies up to 16
+
+      Desmond: "Three people have already told me 'just use Flexible Server'.
+      Nobody has told me how we get there."
+    prompt: "How do you migrate the customs declaration database?"
+    options:
+      - id: opt-flex-online
+        label: "Azure Database for PostgreSQL Flexible Server with the required extensions allowlisted, migrated online with the Azure Database Migration Service, upgrading the major version as a separate, tested step"
+        correct: true
+        explain: >
+          Flexible Server is the managed target and it only works if the
+          extensions are supported, which is why allowlisting postgis and pg_cron
+          is part of the recommendation rather than an assumption. Online
+          migration keeps the cutover inside the 30-minute ceiling by replicating
+          while the source stays live. Separating the major version upgrade from
+          the migration is the part most answers miss: changing platform and
+          engine version in one cutover means a failure has two candidate causes
+          and no clean rollback.
+        rep: 12
+      - id: opt-flex-inplace
+        label: "Upgrade on-premises to PostgreSQL 16 first, then dump and restore into Flexible Server during the 30-minute window"
+        correct: false
+        consequence: >
+          The dump of 1.4 TB is still running when the customs window opens.
+        explain: >
+          Upgrading first is defensible sequencing, and pg_dump and pg_restore of
+          1.4 TB will not complete inside 30 minutes, so the downtime requirement
+          fails regardless of the version order. Offline logical migration is
+          appropriate for small databases or generous windows; this has neither.
+        rep: -8
+      - id: opt-iaas
+        label: "Rehost PostgreSQL 11 onto an Azure VM with Site Recovery, keeping the engine and extensions exactly as they are"
+        correct: false
+        explain: >
+          It meets the downtime requirement and hands a team that explicitly does
+          not want PostgreSQL operations a self-managed PostgreSQL instance, plus
+          the point-in-time restore requirement to implement themselves, on an
+          engine version that is out of community support. Rehost when a
+          compatibility blocker exists; the blockers here are two extensions that
+          the managed service supports.
+        rep: -10
+      - id: opt-cosmos
+        label: "Migrate to Azure Cosmos DB for PostgreSQL to get distributed scale for the customs window read spikes"
+        correct: false
+        explain: >
+          Cosmos DB for PostgreSQL is a distributed, sharded engine aimed at
+          workloads that outgrow a single node, and nothing in the requirements
+          says this one has: the writes are modest and the read spikes are
+          bounded. It adds distribution-column design and a different operational
+          model to a team that wants less operational surface, in exchange for
+          scale that is not asked for.
+        rep: -8
+    next: e2-archive
+
+  - id: e2-archive
+    type: design_decision
+    title: "The other twelve terabytes"
+    speaker: cfo
+    objectives: [AZ305-4.16]
+    scenario: |
+      A second unstructured data set surfaces: 12 TB of container inspection
+      video, held for insurance claims.
+
+      Evelyn Koh has the retention policy and a question.
+
+      - 12 TB today, growing 400 GB a month
+      - Retained three years; a claim can be raised any time in the first two
+      - Claims access roughly 40 clips a month, and the claims handler needs them within an hour
+      - After three years the footage must be deleted, provably, on schedule
+      - Access is by object key from a claims web app; no SMB requirement
+      - Data must not be readable from the internet
+      - Evelyn's rule: the cheapest tier that meets the stated access time, not the cheapest tier
+
+      "An hour," she says. "That is the number in the insurance contract. Not
+      'quickly'. Not 'the same day'."
+    prompt: "How do you store the inspection video?"
+    options:
+      - id: opt-cool-lifecycle
+        label: "Blob storage with a lifecycle policy: cool for the first two years, then archive for the third, with a container-level deletion rule at three years and a private endpoint"
+        correct: true
+        explain: >
+          Tiering follows the access pattern the contract describes. The first two
+          years are the claims window, so the data must be online - cool is the
+          tier for infrequent access that still has to return in milliseconds when
+          it is asked for. Year three has no claims access, so archive is
+          appropriate. A lifecycle management policy moves and then deletes on
+          schedule without anyone remembering to, which is what "provably, on
+          schedule" needs, and a private endpoint removes internet reachability.
+        rep: 12
+      - id: opt-archive-all
+        label: "Archive tier from the start, with high-priority rehydration when a claim is raised"
+        correct: false
+        consequence: >
+          The first claim of the quarter is a 40 GB clip. High priority does not
+          promise an hour on an object that size.
+        explain: >
+          Archive rehydration is measured in hours for standard priority, and
+          high-priority rehydration targets under an hour only for objects under a
+          few hundred megabytes - it is a target, not a guarantee, and inspection
+          video is large. The insurance contract states one hour as a hard number,
+          so the two-year claims window has to sit in an online tier.
+        rep: -10
+      - id: opt-hot
+        label: "Hot tier throughout with soft delete enabled, deleting manually after three years"
+        correct: false
+        consequence: >
+          Evelyn compares hot and cool pricing for 12 TB and asks how often the
+          data is actually read.
+        explain: >
+          Hot is priced for frequently accessed data and this is read forty times
+          a month across twelve terabytes. It satisfies the access requirement
+          expensively, which is precisely what Evelyn's stated rule excludes.
+          Manual deletion also fails the provable-schedule requirement: it depends
+          on a person remembering in three years.
+        rep: -8
+      - id: opt-files
+        label: "Azure Files with a standard share and snapshots, so the claims app can mount it directly"
+        correct: false
+        explain: >
+          The scenario states access is by object key from a web app with no SMB
+          requirement, so a file share buys nothing and costs more per terabyte
+          than blob at this volume. It also has no lifecycle tiering to archive and
+          no equivalent of blob's tier-and-delete policy for the retention rule.
+        rep: -8
+    next: e3-cutover
+
+  - id: e3-cutover
+    type: design_decision
+    title: "One wave, two directions"
+    speaker: manager
+    objectives: [AZ305-4.14]
+    scenario: |
+      The last wave has a shape the earlier ones did not.
+
+      Sunda's freight billing has to move to Azure. Meridian's own billing, which
+      already runs in Azure, has to absorb Sunda's customer master data at the
+      same time. Both must be correct on the same Monday morning.
+
+      Constraints:
+
+      - Sunda billing migrates to Managed Instance; Meridian billing already runs there
+      - The two systems will be merged into one in a later project; not this weekend
+      - During the weekend, Sunda's data must be loaded into Meridian's customer master
+      - If either half fails, both must be recoverable independently
+      - Finance signs off on a reconciliation report before either system opens Monday
+      - The window is 48 hours and cannot be extended; the next one is a month away
+
+      Priya: "Two changes, one weekend, one signature. Tell me how you keep them
+      from becoming one change."
+    prompt: "How do you structure the final wave?"
+    options:
+      - id: opt-decoupled
+        label: "Migrate Sunda billing first and verify it independently, then run the master data load as a separate, separately reversible step gated on that verification, with a reconciliation checkpoint before each gate"
+        correct: true
+        explain: >
+          Two changes in one window are safe only if each has its own success
+          criterion and its own reversal. Sequencing them with a verification gate
+          means a failure in the migration never reaches the master data load, and
+          a failure in the load leaves the migrated system intact and rollable
+          back on its own. The reconciliation checkpoints turn finance's single
+          signature into evidence gathered during the window rather than a
+          judgement made at the end of it.
+        rep: 12
+      - id: opt-parallel
+        label: "Run the migration and the master data load in parallel to make the most of the 48 hours"
+        correct: false
+        consequence: >
+          Saturday 22:00: the reconciliation report disagrees with both systems
+          and nobody can say which change caused it.
+        explain: >
+          Parallel execution uses the window efficiently and destroys
+          attributability: when the numbers do not reconcile, two changes are
+          candidates and neither can be reversed without disturbing the other.
+          The requirement that both halves be recoverable independently is a
+          requirement about sequencing, not about capacity.
+        rep: -10
+      - id: opt-merge-now
+        label: "Merge the two billing systems this weekend as well, since both are already being touched"
+        correct: false
+        explain: >
+          Combining a migration with an application merge is how a 48-hour window
+          becomes a four-day incident. The scenario explicitly defers the merge to
+          a later project, and adding it removes any possibility of independent
+          rollback. Migration windows are for moving things; changing what they
+          are belongs to a project with its own window.
+        rep: -12
+      - id: opt-delay
+        label: "Migrate Sunda billing this weekend and defer the master data load to the next window a month later"
+        correct: false
+        consequence: >
+          For a month, Meridian's billing has no record of Sunda's customers.
+          Invoices go out incomplete.
+        explain: >
+          Deferring is the right instinct when two changes are genuinely
+          separable, and these are not: the scenario states both must be correct
+          on the same Monday, because the migrated system is the source of the
+          master data the other one needs. Sequencing with gates achieves the
+          separation you want inside the window you have.
+        rep: -8
+    next: END

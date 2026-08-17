@@ -1,0 +1,248 @@
+schema_version: 1
+id: act2-bc-06-the-price-of-standing-by-hard
+title: "The Price of Standing By (Hard)"
+act: 2
+chapter: act2-continuity
+domain: az305-d3
+order: 6
+role: associate-architect
+bonus_variant_of: act2-bc-06-the-price-of-standing-by
+checkpoint: true
+summary: "Capacity you have not reserved, failovers that lose writes, and one line Evelyn is allowed to cut."
+entry: e1-capacity
+
+encounters:
+  - id: e1-capacity
+    type: design_decision
+    title: "Everyone else fails over too"
+    speaker: manager
+    objectives: [AZ305-3.5, AZ305-3.1]
+    scenario: |
+      The board's risk committee has come back with a question nobody on the
+      design team asked.
+
+      Priya reads it out. "If Southeast Asia is lost, every organization with a
+      recovery plan pointed at East Asia executes it in the same hour. What
+      assurance do we have that the capacity we need will be there?"
+
+      The facts:
+
+      | Item | Value |
+      | --- | --- |
+      | WMS DR footprint | 8 instances of a memory-optimized size |
+      | Minimum viable footprint | 4 instances, degraded but workable for a shift |
+      | Current arrangement | Site Recovery provisions the instances at failover |
+      | Committed RTO | 4 hours |
+      | Budget available for assurance | modest, and Evelyn will ask what it buys |
+
+      Desmond: "Site Recovery asks for the instances when the plan runs. If the
+      region is full, it asks and does not get them, and our four-hour number
+      becomes however long it takes someone else to finish."
+    prompt: "How do you give the risk committee an answer?"
+    options:
+      - id: opt-capacity-reservation
+        label: "Buy an on-demand capacity reservation in East Asia for four instances of the required size, and point the recovery plan at it"
+        correct: true
+        explain: >
+          An on-demand capacity reservation holds compute capacity in a region and
+          zone for you whether or not anything is running in it, which is the only
+          construct that actually answers the committee's question. Reserving the
+          minimum viable four rather than the full eight halves the cost while
+          guaranteeing the shift can work; the remaining four are provisioned
+          best-effort and are a degradation, not an outage. This is the chapter's
+          rule again: buy the smallest thing that meets the requirement.
+        rep: 14
+      - id: opt-reserved-instances
+        label: "Buy three-year reserved virtual machine instances in East Asia for the eight DR sizes"
+        correct: false
+        consequence: >
+          Evelyn approves it in four minutes, which should have been the warning.
+        explain: >
+          This is the distinction the question is really testing. A reserved
+          instance is a billing commitment that discounts compute you consume - it
+          reserves money, not machines, and confers no capacity guarantee whatever.
+          On the morning the region is lost, a reservation gives you a cheaper
+          quota error. Reservations and capacity reservations sound alike and solve
+          different problems; they can be combined, and only one of them answers
+          the committee.
+        rep: -10
+      - id: opt-nothing
+        label: "Change nothing and document the risk as accepted, since Site Recovery has always been able to provision the instances in drills"
+        correct: false
+        explain: >
+          Drills run on ordinary Sundays when East Asia has spare capacity, so
+          every successful drill is evidence about the easy case. The committee is
+          asking about the correlated one, where a whole market's recovery plans
+          fire together. Accepting a risk is a legitimate answer when it is priced;
+          accepting it because the evidence you have does not test it is not.
+        rep: -8
+      - id: opt-run-them
+        label: "Keep all eight DR instances running permanently in East Asia, which guarantees the capacity is ours"
+        correct: false
+        consequence: >
+          The line item Evelyn removed last quarter reappears, doubled.
+        explain: >
+          It does guarantee the capacity, at the cost of eight running machines
+          rather than four reserved ones, and it undoes the saving the design just
+          made. A capacity reservation is billed at the equivalent compute rate for
+          exactly the capacity you hold, so this buys the same assurance for twice
+          the footprint plus the operating system licences and patching of eight
+          machines that serve nothing.
+        rep: -10
+    rewards:
+      skill_points: 1
+    next: e2-cosmos-failover
+
+  - id: e2-cosmos-failover
+    type: design_decision
+    title: "Which kind of failover"
+    speaker: mentor
+    objectives: [AZ305-3.7]
+    scenario: |
+      The track-and-trace account is live: write region Southeast Asia, read
+      region East Asia, session consistency, service-managed failover enabled.
+
+      Priya wants it included in the next drill and has written the success
+      criterion herself.
+
+      "Move writes to East Asia and back, in the window, and lose nothing. Not
+      almost nothing."
+
+      Desmond has read the documentation properly, which is not always the case.
+
+      "Two different operations share one word. A manual failover, where we ask
+      for it and the source region is still healthy, is planned: Cosmos drains the
+      replication queue before switching, and no committed write is lost. A
+      service-managed failover happens when the region is genuinely gone, and
+      anything still in that queue is not coming back. Those are different
+      numbers and the runbook currently pretends they are the same."
+
+      Requirements: the drill must lose nothing; a real outage may pause writes
+      for up to an hour; only one additional region is funded; the application
+      cannot resolve write conflicts.
+    prompt: "How do you configure and document the Cosmos failover?"
+    options:
+      - id: opt-both-documented
+        label: "Keep service-managed failover enabled for genuine outages, use a manual failover for the drill, and document the two recovery point objectives separately in the runbook"
+        correct: true
+        explain: >
+          The drill needs the planned path, which completes with no data loss
+          because the source region is still there to drain. Real outages need the
+          automatic path, whose recovery point is bounded by the replication lag at
+          the moment the region vanished, which is small but not zero. Publishing
+          one number for both is how an organization ends up believing it has a
+          zero RPO. Two scenarios, two mechanisms, two documented figures.
+        rep: 14
+      - id: opt-disable-managed
+        label: "Disable service-managed failover so that every failover is a manual one and therefore lossless"
+        correct: false
+        consequence: >
+          At 03:00 on the real night, the runbook's first step is to ask a region
+          that no longer answers to drain its queue.
+        explain: >
+          A manual failover is lossless because the source region cooperates. When
+          the region is actually gone there is nothing to cooperate, so disabling
+          the automatic path does not make the loss go away - it just adds a human
+          decision and however long it takes to reach that human to the write
+          recovery time. Keep both paths and be honest about what each delivers.
+        rep: -10
+      - id: opt-multi-write
+        label: "Enable multi-region writes so both regions accept writes and no failover is needed at all"
+        correct: false
+        explain: >
+          Removing the failover removes the drill's subject and breaks two stated
+          constraints: provisioned throughput is billed per write region, and
+          multi-region writes require a conflict resolution policy in an
+          application that the requirement says will not be changed. It also
+          answers a write-availability requirement the business has already priced
+          at one hour.
+        rep: -8
+      - id: opt-strong-consistency
+        label: "Change the consistency level from session to strong, so writes are committed in both regions before they are acknowledged"
+        correct: false
+        explain: >
+          Strong consistency does bound the unreplicated window, and it charges for
+          it: every write waits for the second region, which raises write latency
+          and roughly doubles the request units a write consumes, on an account
+          whose stated tolerance for lost writes during an outage was already an
+          hour of paused writing. Buying a zero RPO nobody asked for is the same
+          error as buying an active-active tier nobody asked for.
+        rep: -8
+    next: e3-final-cut
+
+  - id: e3-final-cut
+    type: design_decision
+    title: "One line, and it has to be a safe one"
+    speaker: cfo
+    objectives: [AZ305-3.1]
+    scenario: |
+      Evelyn's budget round lands in September and the continuity line is SGD
+      2,000 a month over. She has the whole portfolio in front of her and she has
+      already read every requirement table in this chapter, which she will
+      mention.
+
+      | Candidate cut | Monthly saving |
+      | --- | --- |
+      | Non-production landing zone: retention 30 days to 7, vault GRS to LRS | SGD 2,100 |
+      | WMS database: point-in-time retention 30 days to 7 | SGD 2,400 |
+      | Archive: read-access geo-zone-redundant down to geo-zone-redundant | SGD 2,600 |
+      | Site Recovery: replicate 4 of the 8 WMS instances, rebuild the rest from image | SGD 2,200 |
+
+      "I am not asking you to be brave," Evelyn says. "I am asking which of these
+      does not break something we have promised. If the answer is none of them,
+      say so and I will find the money elsewhere, but I would rather you found it
+      here."
+    prompt: "Which line do you cut?"
+    options:
+      - id: opt-nonprod
+        label: "Non-production: cut retention to 7 days and move its vault to locally redundant storage"
+        correct: true
+        explain: >
+          Non-production is the only row with no committed objective attached to
+          it. Nothing in the tiering sheet promises a restore window or a regional
+          recovery for a landing zone whose contents are redeployed from source
+          control, so seven days of local backup is proportionate rather than
+          negligent. Every other candidate on the list is priced against a
+          requirement someone signed. Find savings where no promise is attached.
+        rep: 14
+      - id: opt-pitr-cut
+        label: "WMS database: reduce point-in-time retention from 30 days to 7"
+        correct: false
+        consequence: >
+          The first delivery dispute after the change arrives on day nineteen.
+        explain: >
+          Operations asked for thirty days because that is how long a customer
+          takes to dispute a delivery, and that requirement is on the page in this
+          chapter. Cutting to seven does not change an abstract setting; it removes
+          the ability to answer three weeks of disputes. A saving that quietly
+          retires a stated requirement is a scope change, and it needs the person
+          who set the requirement in the room.
+        rep: -10
+      - id: opt-archive-cut
+        label: "Archive: drop read-access geo-zone-redundant storage to geo-zone-redundant"
+        correct: false
+        explain: >
+          The read-access option is not a durability upgrade you can trim - it is
+          the entire reason customer service can open delivery photographs during a
+          regional outage, which is a requirement they argued for specifically.
+          Dropping it leaves the data replicated and unreachable without a
+          disruptive account failover. The cheap-looking cuts are usually the ones
+          that remove the only feature answering a requirement.
+        rep: -10
+      - id: opt-partial-asr
+        label: "Site Recovery: replicate 4 of the 8 WMS instances and rebuild the remaining 4 from the image at failover"
+        correct: false
+        consequence: >
+          Desmond: "So half the tier is a tested recovery and half is a hope."
+        explain: >
+          The measured RTO of 2 hours 47 minutes came from a drill of the whole
+          tier through the recovery plan. Half of it would now follow an untested
+          path involving image deployment and configuration under pressure, which
+          is exactly the failure class the drill exists to find - and the committed
+          four-hour number would no longer be evidenced. Partial protection of a
+          single tier gives you the cost of both approaches and the assurance of
+          neither.
+        rep: -10
+    rewards:
+      skill_points: 1
+    next: END

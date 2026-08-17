@@ -1,0 +1,319 @@
+schema_version: 1
+id: act2-inf-08-the-second-region
+title: "The Second Region"
+act: 2
+chapter: act2-infrastructure
+domain: az305-d4
+order: 8
+role: associate-architect
+checkpoint: true
+summary: "The board funded two regions. Nobody said which traffic goes to which one."
+entry: e1-global
+
+encounters:
+  - id: e1-global
+    type: design_decision
+    title: "Two regions, one hostname"
+    speaker: manager
+    objectives: [AZ305-4.21]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2inf-vnet-hub-ea
+          label: "vnet-hub-eastasia"
+          kind: vnet
+          status: planned
+      - op: add_node
+        node:
+          id: a2inf-wms-ea
+          label: "WMS (East Asia)"
+          kind: app-service
+          status: planned
+    scenario: |
+      The expansion is funded. East Asia becomes Meridian's second region, paired
+      with Southeast Asia, serving the Hong Kong and Taiwan transshipment
+      business the acquisition opened up.
+
+      Priya has the traffic requirements signed off by the business:
+
+      - Customers in Singapore, Jakarta, Hong Kong, and Taipei; route each to the closer region
+      - Tracking portal and partner API are HTTP, stateless, and will run active-active
+      - The WMS is active-passive behind a SQL failover group; RTO 15 minutes
+      - Failover away from an unhealthy region must happen in well under a minute
+      - WAF must apply at the edge, once, not twice in two regions
+      - Static assets - maps, tile images, the partner documentation - should be cached near users
+      - The EDI AS2 listener is not HTTP; it is a TCP service on port 10443 and it also needs two regions
+
+      "One hostname," Priya says. "tracking.meridian.example. I do not want to
+      explain to forty partners which region they are supposed to use."
+    prompt: "What global load-balancing and routing design do you recommend?"
+    options:
+      - id: opt-afd-plus-crl
+        label: "Azure Front Door Premium for the HTTP workloads - anycast entry, latency-based routing, WAF and caching at the edge, Private Link origins - and a cross-region load balancer for the TCP AS2 listener"
+        correct: true
+        explain: >
+          The requirements split cleanly by protocol, so the design does too. Front
+          Door is anycast and terminates at the edge, which gives latency-based
+          routing, one WAF policy applied once, static caching near users, and
+          health-probe failover measured in seconds because no DNS record has to
+          expire. The AS2 listener is not HTTP, so it needs a Layer 4 answer: the
+          cross-region load balancer provides a global anycast frontend for TCP
+          with regional backends.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-afd
+              label: "Azure Front Door Premium (global)"
+              kind: load-balancer
+              status: healthy
+          - {op: set_status, node: a2inf-wms-ea, status: healthy}
+          - {op: set_status, node: a2inf-vnet-hub-ea, status: healthy}
+          - op: add_edge
+            edge: {id: a2inf-e-internet-afd, source: a2inf-internet, target: a2inf-afd, kind: traffic}
+          - op: add_edge
+            edge: {id: a2inf-e-afd-wmssea, source: a2inf-afd, target: wms-sea, kind: traffic}
+          - op: add_edge
+            edge: {id: a2inf-e-afd-wmsea, source: a2inf-afd, target: a2inf-wms-ea, kind: traffic}
+      - id: opt-traffic-manager
+        label: "Azure Traffic Manager with performance routing and endpoint monitoring across both regions"
+        correct: false
+        consequence: >
+          A region degrades at 11:20. Clients with a cached DNS answer keep
+          resolving to it until their resolvers expire the record.
+        explain: >
+          Traffic Manager routes by DNS, so a client only learns about a failover
+          when its resolver's cached record expires - which is bounded by TTL and
+          by resolvers that ignore short TTLs, not by your health probe. That fails
+          the stated sub-minute failover requirement. It also cannot carry a WAF,
+          cannot cache, and never sees the request, because it answers a name
+          query and steps out of the path.
+        rep: -8
+      - id: opt-agw-per-region
+        label: "An Application Gateway with WAF in each region, and a DNS record changed by the on-call engineer during a regional failure"
+        correct: false
+        consequence: >
+          The stated RTO is fifteen minutes. The first step of the runbook is
+          "wake someone up".
+        explain: >
+          Regional gateways are the right building block inside each region, and
+          this design has no global tier: routing users to the closer region
+          becomes a manual DNS decision, failover becomes a human, and the WAF
+          policy is maintained twice and drifts. It fails the sub-minute failover
+          requirement and the single-WAF requirement together.
+        rep: -10
+      - id: opt-crl-only
+        label: "A cross-region load balancer for everything, so HTTP and AS2 share one global entry point"
+        correct: false
+        explain: >
+          One entry point is appealing and the cross-region load balancer operates
+          at Layer 4: it cannot terminate TLS, apply a WAF, cache static assets, or
+          route by path or header. Those are four stated requirements for the HTTP
+          workloads. It is exactly right for the AS2 listener and exactly
+          insufficient for the website.
+        rep: -8
+    next: e2-perf
+
+  - id: e2-perf
+    type: design_decision
+    title: "The circuit is not the problem"
+    speaker: mentor
+    objectives: [AZ305-4.19]
+    scenario: |
+      Two weeks after the SAP cutover, Jakarta complains. SAP GUI is sluggish and
+      the nightly cross-region replication overruns.
+
+      Desmond has done the measurements before coming to you, which is his way of
+      saying he has already ruled out the obvious.
+
+      - ExpressRoute circuit: 1 Gbps, peak utilization 22 percent, no drops at the provider
+      - Latency Jakarta to the Southeast Asia edge: 21 ms, stable
+      - ExpressRoute gateway: Standard SKU, sitting at 96 percent of its throughput ceiling at peak
+      - Both SAP GUI sessions and the replication stream degrade at the same moments
+      - SAP VMs are D-series sizes that support accelerated networking; it is not enabled
+      - Cross-region traffic to East Asia currently leaves through the hub's public path
+
+      "The circuit is a fifth full," Desmond says. "So do not tell me to buy more
+      circuit."
+    prompt: "What do you recommend to fix network performance?"
+    options:
+      - id: opt-fastpath
+        label: "Move to a zone-redundant higher-throughput ExpressRoute gateway and enable FastPath so data-plane traffic bypasses the gateway, enable accelerated networking on the SAP VMs, and use global VNet peering for the cross-region path"
+        correct: true
+        explain: >
+          The measurements name the bottleneck: a circuit at 22 percent and a
+          gateway at 96 percent means the gateway is the constrained hop, and
+          FastPath is the feature that takes the data plane out of it by sending
+          traffic straight from the edge to the virtual network. Accelerated
+          networking bypasses the host virtual switch and cuts per-packet latency
+          and jitter, which is what an interactive protocol like SAP GUI feels.
+          Global VNet peering keeps the cross-region replication on the Microsoft
+          backbone rather than a public path.
+        rep: 10
+        diagram_ops:
+          - {op: set_label, node: a2inf-ergw, label: "ExpressRoute gateway (FastPath, zone-redundant)"}
+          - op: add_edge
+            edge: {id: a2inf-e-hub-peer-ea, source: vnet-hub-sea2, target: a2inf-vnet-hub-ea, kind: peering, label: "global peering"}
+      - id: opt-bigger-circuit
+        label: "Upgrade the ExpressRoute circuit from 1 Gbps to 10 Gbps"
+        correct: false
+        consequence: >
+          The circuit is now a fiftieth full. The gateway is still at 96 percent.
+        explain: >
+          Buying capacity at the hop that is not saturated is the classic
+          performance mistake, and the scenario hands you the numbers that rule it
+          out. Circuit bandwidth and gateway throughput are separately sized and
+          separately billed; a gateway SKU caps what reaches the virtual network
+          regardless of what the provider delivers to the edge.
+        rep: -8
+      - id: opt-second-circuit
+        label: "Add a second ExpressRoute circuit at a different peering location for resilience and additional capacity"
+        correct: false
+        explain: >
+          A second circuit at a second peering location is genuinely good design
+          and answers an availability requirement that nobody in this scenario
+          raised. It does not raise the throughput of the gateway that traffic
+          still has to pass through, so the measured bottleneck is unchanged, and
+          it adds a recurring cost against a problem it does not solve.
+        rep: -6
+      - id: opt-move-workload
+        label: "Move the SAP application tier to a region closer to Jakarta to cut the latency"
+        correct: false
+        consequence: >
+          The application tier is now 21 ms from its own database.
+        explain: >
+          The measured latency to the edge is 21 ms and stable, so latency is not
+          what the users are feeling - saturation is, which shows up as jitter and
+          queueing at peak. Splitting an ERP's application and database tiers
+          across regions also breaks the proximity requirement the SAP contractor
+          set when the machines were sized.
+        rep: -10
+    next: e3-egress
+
+  - id: e3-egress
+    type: design_decision
+    title: "Which way is out"
+    speaker: security
+    objectives: [AZ305-4.17, AZ305-4.19]
+    scenario: |
+      East Asia needs its own outbound design and Marcus has views, because the
+      first draft routed everything back to Singapore.
+
+      What is on the table:
+
+      - East Asia spokes need inspected, filtered egress with fixed source addresses, as Southeast Asia already has
+      - East Asia workloads pull about 3 TB a month of container images, updates, and vendor feeds
+      - Inter-region traffic between the two hubs is billed per gigabyte in both directions
+      - The Hong Kong regulator expects local traffic to have a documented local egress path
+      - Marcus wants one firewall policy, not two that drift apart
+      - Cross-region access to PaaS services must not traverse public endpoints
+
+      "Central policy, local enforcement," Marcus says. "That is the sentence I
+      want to be able to say to the regulator."
+    prompt: "How do you design internet connectivity for the second region?"
+    options:
+      - id: opt-local-egress
+        label: "A second Azure Firewall in the East Asia hub with local egress and its own public IP prefix, both firewalls inheriting a shared parent firewall policy, and private endpoints for cross-region PaaS access"
+        correct: true
+        explain: >
+          Egress is enforced where the traffic is, which keeps 3 TB a month off the
+          inter-region meter and gives the regulator a documented local path with
+          local source addresses. Firewall policy is hierarchical, so a shared
+          parent policy carries the common rules to both instances and each keeps
+          only its regional additions, which is exactly Marcus's central-policy,
+          local-enforcement sentence. Private endpoints keep cross-region PaaS
+          access off public endpoints.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-fw-ea
+              label: "azfw-hub-eastasia (child policy)"
+              kind: firewall
+              status: healthy
+          - op: add_edge
+            edge: {id: a2inf-e-hubea-fw, source: a2inf-vnet-hub-ea, target: a2inf-fw-ea, kind: dependency}
+          - op: add_edge
+            edge: {id: a2inf-e-fwea-internet, source: a2inf-fw-ea, target: a2inf-internet, kind: traffic, label: "local inspected egress"}
+      - id: opt-hairpin
+        label: "Route all East Asia egress back through the Southeast Asia hub firewall so there is exactly one inspection point"
+        correct: false
+        consequence: >
+          Three terabytes a month crosses to Singapore and back. Evelyn finds the
+          inter-region line before the quarter closes.
+        explain: >
+          A single inspection point is operationally tidy and it fails three stated
+          requirements: it pays inter-region egress on 3 TB a month, it adds a
+          round trip to Singapore to every outbound call from Hong Kong, and it
+          gives the regulator a foreign egress path. Firewall policy inheritance
+          gives you the single-source-of-truth benefit without the hairpin.
+        rep: -8
+      - id: opt-default
+        label: "Let East Asia spokes use default outbound access for now, and add a firewall when the workloads are busier"
+        correct: false
+        consequence: >
+          The second region launches with the exact posture the first region spent
+          a quarter removing.
+        explain: >
+          This reintroduces implicit public addressing with no filtering, no fixed
+          source range, and no log - the problem the Sunda landing zone already
+          solved, in a region with a regulator that has asked about it. Default
+          outbound access is also being retired for new deployments, so the
+          temporary state has an end date set by someone else.
+        rep: -10
+      - id: opt-nat-only
+        label: "NAT gateways on the East Asia spoke subnets, with the firewall kept in Southeast Asia for inspection"
+        correct: false
+        explain: >
+          This is two designs fighting: NAT gateway would provide the local fixed
+          source addresses, but if inspection still happens in Singapore the
+          traffic either hairpins anyway or bypasses inspection entirely. Egress
+          filtering and egress addressing have to terminate at the same place, or
+          one of the two requirements is only nominally met.
+        rep: -6
+    next: e4-check
+
+  - id: e4-check
+    type: knowledge_check
+    title: "Priya rehearses the board question"
+    speaker: manager
+    objectives: [AZ305-4.21]
+    scenario: |
+      Priya reads back the design and stops on the routing slide.
+
+      "A board member is going to ask why we are paying for a global service when
+      we already have load balancers. Give me the one-sentence version for each
+      of the four."
+    question: >
+      Front Door, Traffic Manager, Application Gateway, and the Azure Load
+      Balancer. What is the distinction that decides between them?
+    options:
+      - id: opt-global-regional
+        label: "Global versus regional on one axis, and Layer 7 versus Layer 4 on the other: Front Door is global Layer 7, Traffic Manager is global DNS-based, Application Gateway is regional Layer 7, and Load Balancer is Layer 4"
+        correct: true
+        explain: >
+          That two-axis split is the one that answers most design questions.
+          Global Layer 7 - Front Door - terminates HTTP at the edge and can do WAF,
+          caching, path routing, and fast failover. Global DNS - Traffic Manager -
+          only answers name queries, so it works for any protocol but fails over at
+          DNS speed. Regional Layer 7 - Application Gateway - does the same request
+          inspection inside one region. Layer 4 - Load Balancer, regional or
+          cross-region - distributes connections without reading them.
+      - id: opt-cost
+        label: "They are ordered by capability and price, so you pick the cheapest one that carries your traffic volume"
+        correct: false
+        explain: >
+          They are not a ladder. Traffic Manager can front protocols Front Door
+          cannot touch, and a Layer 4 load balancer does things a WAF is not for.
+          Choosing by price assumes the services are substitutes, and the reason
+          this design uses two of them at once is that they are not.
+      - id: opt-redundant
+        label: "Front Door replaces the other three, so a design that uses it should not need Application Gateway or Load Balancer"
+        correct: false
+        explain: >
+          Front Door handles internet-facing HTTP globally; it does not balance
+          traffic inside a virtual network, it does not front non-HTTP protocols,
+          and it is not the entry point for private, non-internet workloads. Real
+          estates layer them - Front Door at the edge, a regional Layer 7 or Layer
+          4 balancer behind it - which is what the AS2 listener made explicit here.
+    next: END

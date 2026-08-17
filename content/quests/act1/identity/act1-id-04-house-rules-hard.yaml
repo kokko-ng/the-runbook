@@ -1,0 +1,234 @@
+schema_version: 1
+id: act1-id-04-house-rules-hard
+title: "House Rules (Hard)"
+act: 1
+chapter: act1-identity
+domain: az104-d1
+order: 4
+role: junior-cloud-admin
+checkpoint: true
+bonus_variant_of: act1-id-04-house-rules
+summary: "Seven policies, one legitimate exception, and a deployment nobody can explain."
+entry: e1-initiative
+
+encounters:
+  - id: e1-initiative
+    type: design_decision
+    title: "Seven policies and counting"
+    speaker: security
+    objectives: [AZ104-1.9]
+    scenario: |
+      The costcenter policy worked, so now there are seven of them waiting:
+      require costcenter, require environment, require owner, allow only
+      southeastasia and eastasia, deny public IP addresses on warehouse
+      subnets, deny storage accounts without secure transfer, and audit VMs
+      without managed disks.
+
+      Marcus wants them all live before the vendor subscription is created.
+
+      What you know. A policy definition contains one rule and one effect. An
+      initiative - a policy set definition - groups definitions and exposes
+      their parameters at the set level, and an initiative assignment reports
+      compliance as a single figure with per-definition detail underneath it.
+      Exclusions, enforcement mode, and the managed identity are properties of
+      the assignment, so each separate assignment carries its own copy.
+
+      "I would like one thing to point at when someone asks what the rules
+      are," Marcus says.
+    prompt: "How do you deploy the seven policies?"
+    options:
+      - id: opt-initiative
+        label: "Build an initiative containing the seven definitions with their values parameterized, and assign the initiative once at the management group"
+        correct: true
+        explain: >
+          One assignment means one exclusion list, one enforcement mode, one
+          identity, and one compliance figure with the seven results underneath
+          it. Parameterizing at the set level lets the same initiative be
+          assigned to production with Deny values and to the vendor subscription
+          with Audit values, which is what makes it reusable rather than a
+          bundle you can only use once.
+        rep: 12
+      - id: opt-seven-assignments
+        label: "Assign the seven built-in definitions individually at the management group"
+        correct: false
+        consequence: >
+          Four months later two of them have exclusions the others do not, and nobody can say which.
+        explain: >
+          It works on day one and diverges from day two: seven assignments means
+          seven exclusion lists, seven enforcement modes, and seven compliance
+          numbers to reconcile. Every exception request then has to be applied
+          seven times or, more realistically, once. The grouping construct
+          exists because this is what happens without it.
+        rep: -8
+      - id: opt-one-definition
+        label: "Write one custom definition whose rule contains all seven conditions, so there is a single thing to assign"
+        correct: false
+        explain: >
+          A definition carries one effect, so all seven conditions would share
+          it - you could not run Deny on tags and Audit on managed disks. You
+          would also lose per-rule compliance, so the report says non-compliant
+          without saying which of the seven failed, and the rule becomes a
+          single untestable expression. An initiative gives you one thing to
+          assign while keeping seven things to report on.
+        rep: -10
+      - id: opt-benchmark
+        label: "Assign the built-in Microsoft cloud security benchmark initiative, which already contains hundreds of controls"
+        correct: false
+        consequence: >
+          The compliance view shows four hundred controls at sixty-one percent and nobody can find the tag rules in it.
+        explain: >
+          A broad built-in initiative is valuable as an audit baseline and is
+          the wrong instrument for enforcing seven specific organizational
+          rules. It does not contain Meridian's cost center requirement, its
+          effects are largely Audit, and its size buries the signal Marcus
+          asked for. Use it alongside a small purpose-built initiative, not
+          instead of one.
+        rep: -6
+    next: e2-exemption
+
+  - id: e2-exemption
+    type: design_decision
+    title: "The one resource group that cannot comply"
+    speaker: manager
+    objectives: [AZ104-1.9, AZ104-1.11]
+    scenario: |
+      One resource group will not pass. rg-erp-integration holds the connectors
+      between the on-premises ERP and Azure, deployed from a template the ERP
+      vendor owns and re-issues once a quarter. The template writes no tags and
+      the vendor has quoted eleven weeks to change it.
+
+      Priya has the ERP program manager on the line and would like an answer
+      that is not "they have to change the template."
+
+      Four mechanisms are available to you.
+
+      A policy exemption applies to a specific scope, has a category of Waiver
+      or Mitigated, takes an optional expiry date, and appears in compliance
+      reporting as an exempt resource rather than a compliant one.
+
+      An excluded scope on the assignment removes the scope from evaluation
+      entirely, with no category, no expiry, and no trace in the compliance
+      view.
+
+      Changing the assignment effect changes it for everything the assignment
+      covers.
+
+      Enforcement mode is an assignment-level property: DoNotEnforce evaluates
+      and records compliance but applies no effect, across the whole assignment.
+    prompt: "How do you handle rg-erp-integration?"
+    options:
+      - id: opt-exemption
+        label: "Create a Waiver exemption on rg-erp-integration with an expiry date set past the vendor's delivery, and tag the resource group itself so cost still attributes"
+        correct: true
+        explain: >
+          An exemption keeps the exception visible: it shows in compliance
+          reporting as exempt rather than silently disappearing, it records why,
+          and the expiry date means the exception ends by itself instead of
+          outliving the reason for it. Tagging the resource group does not tag
+          the resources, but it does give cost analysis a grouping key for the
+          whole group while the resources stay untagged.
+        rep: 12
+      - id: opt-notscope
+        label: "Add rg-erp-integration to the assignment's excluded scopes"
+        correct: false
+        consequence: >
+          Two years later nobody remembers why that resource group is in the exclusion list, so nobody removes it.
+        explain: >
+          An excluded scope achieves the same immediate outcome and loses
+          everything that makes an exception governable: no reason, no expiry,
+          and no appearance in the compliance report - the resources simply are
+          not evaluated. Exclusions are for scopes a policy was never meant to
+          apply to; exemptions are for scopes it applies to and that need
+          temporary relief.
+        rep: -8
+      - id: opt-audit
+        label: "Change the tag policy's effect from Deny to Audit until the vendor ships the new template"
+        correct: false
+        consequence: >
+          Eleven weeks of untagged resources across the whole subscription, and Evelyn's report loses another quarter.
+        explain: >
+          The effect belongs to the assignment, so relaxing it for one resource
+          group relaxes it everywhere the assignment reaches. This trades
+          enforcement across the entire estate for an exception affecting one
+          group, which is the wrong ratio by roughly the size of the
+          subscription.
+        rep: -10
+      - id: opt-donotenforce
+        label: "Set the assignment's enforcement mode to DoNotEnforce so the ERP deployments succeed while compliance is still measured"
+        correct: false
+        explain: >
+          Enforcement mode is an assignment-level property, not a per-scope one,
+          so DoNotEnforce switches off the effect for everything the assignment
+          covers while continuing to report. It is designed for evaluating a new
+          policy's impact before turning it on, not for carving out one resource
+          group.
+        rep: -8
+    next: e3-precedence
+
+  - id: e3-precedence
+    type: design_decision
+    title: "The deployment that should have failed"
+    speaker: mentor
+    objectives: [AZ104-1.9]
+    scenario: |
+      A colleague deploys a storage account from a template with no tags at all
+      and it succeeds. The Deny policy is live. Desmond wants to know why before
+      you go anywhere near the assignment.
+
+      Three assignments reach the subscription:
+
+      An Append assignment that adds costcenter with the value taken from the
+      resource group when the tag is absent.
+
+      The Deny assignment requiring the costcenter tag.
+
+      An Audit assignment recording resources without an owner tag.
+
+      Azure Policy evaluates effects in a defined order rather than
+      simultaneously: Disabled first, then Append and Modify, then Deny, then
+      Audit. Append and Modify are deliberately evaluated before Deny.
+    prompt: "Why did the untagged deployment succeed, and is the Deny policy working?"
+    options:
+      - id: opt-order
+        label: "The Append ran first and added costcenter, so by the time Deny evaluated the request it carried the tag; the Deny policy is working exactly as specified"
+        correct: true
+        explain: >
+          Effect ordering is the whole explanation. Append and Modify are
+          evaluated ahead of Deny precisely so a request the platform can fix is
+          fixed rather than rejected, and Deny then sees the amended request.
+          Nothing is broken - but it is worth knowing, because the storage
+          account is now tagged with whatever the Append supplies, and that is a
+          separate conversation about whether the value is meaningful.
+        rep: 12
+      - id: opt-deny-wins
+        label: "Deny should always win over other effects, so the assignment must be misconfigured or still propagating"
+        correct: false
+        consequence: >
+          You spend an afternoon re-creating a correct assignment.
+        explain: >
+          Deny takes precedence over an allow in Azure RBAC; that intuition does
+          not transfer to Azure Policy, where effects run in a documented order
+          and Append and Modify are placed before Deny on purpose. Assignments
+          do take up to thirty minutes to take effect, but that would not
+          produce a request that succeeds with the tag present.
+        rep: -8
+      - id: opt-nondeterministic
+        label: "Multiple assignments on the same request evaluate in an undefined order, so this outcome is not reproducible"
+        correct: false
+        explain: >
+          The order is defined and documented: Disabled, then Append and Modify,
+          then Deny, then Audit. Treating policy evaluation as unpredictable
+          leads to layering redundant assignments in the hope that one of them
+          catches the request, which produces exactly the tangle that is hard to
+          reason about later.
+        rep: -6
+      - id: opt-remediate
+        label: "The request was denied and then repaired by a remediation task, which is why the resource exists"
+        correct: false
+        explain: >
+          A denied request creates nothing, so there would be no resource for a
+          remediation task to repair. Remediation tasks act on resources that
+          already exist and are driven by Modify or DeployIfNotExists
+          assignments; they play no part in evaluating a request in flight.
+        rep: -8
+    next: END

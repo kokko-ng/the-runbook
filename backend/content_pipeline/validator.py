@@ -321,10 +321,69 @@ def _check_quest(
     return problems
 
 
+def _status_changes(ops: list[dict[str, Any]]) -> dict[tuple[str, str], str]:
+    """Final status per target after applying ops in order: {(kind, id): status}."""
+    result: dict[tuple[str, str], str] = {}
+    for op in ops:
+        if op["op"] == "set_status":
+            result[("node", op["node"])] = op["status"]
+        elif op["op"] == "set_edge_status":
+            result[("edge", op["edge"])] = op["status"]
+        elif op["op"] == "add_node":
+            result[("node", op["node"]["id"])] = op["node"].get("status", "healthy")
+        elif op["op"] == "add_edge":
+            result[("edge", op["edge"]["id"])] = op["edge"].get("status", "healthy")
+    return result
+
+
+def _check_incident_repairs(
+    item: LoadedFile, encounter: dict[str, Any], where: str
+) -> list[Problem]:
+    """An incident that reddens the map must have a fix that clears it.
+
+    Without this, a quest leaves permanent damage that every later quest
+    inherits, and the living map stops meaning anything.
+    """
+    problems: list[Problem] = []
+
+    broken = {
+        target: status
+        for target, status in _status_changes(encounter.get("on_enter_diagram_ops", [])).items()
+        if status in {"broken", "warning", "degraded"}
+    }
+    if not broken:
+        problems.append(
+            Problem(
+                item.path,
+                "troubleshoot encounter changes nothing on the map; the incident is invisible",
+                where,
+            )
+        )
+        return problems
+
+    correct = next((fix for fix in encounter.get("fixes", []) if fix["correct"]), None)
+    if correct is None:
+        return problems
+
+    repaired = _status_changes(correct.get("diagram_ops", []))
+    for target, status in sorted(broken.items()):
+        kind, target_id = target
+        if repaired.get(target) != "healthy":
+            problems.append(
+                Problem(
+                    item.path,
+                    f"the fix leaves {kind} {target_id} {status}; "
+                    "the correct fix must return everything the incident broke to healthy",
+                    where,
+                )
+            )
+    return problems
+
+
 def _check_troubleshoot(
     item: LoadedFile, encounter: dict[str, Any], where: str
 ) -> list[Problem]:
-    problems: list[Problem] = []
+    problems: list[Problem] = _check_incident_repairs(item, encounter, where)
     budget = encounter["time_budget"]
     commands = encounter.get("commands", [])
 

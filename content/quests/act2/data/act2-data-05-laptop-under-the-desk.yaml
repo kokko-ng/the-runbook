@@ -200,7 +200,7 @@ encounters:
         correct: false
         consequence: >
           In month four the Jakarta office moves floors and the laptop is packed
-          into a box labelled MISC.
+          into a box labeled MISC.
         explain: >
           It is the only option that leaves the stated problem in place for nine
           months, which is the requirement it fails. A self-hosted runtime is

@@ -1,0 +1,318 @@
+schema_version: 1
+id: act1-st-03-the-key-in-the-script-hard
+title: "The Broker's Token"
+act: 1
+chapter: act1-storage
+domain: az104-d2
+order: 3
+role: cloud-admin
+checkpoint: true
+bonus_variant_of: act1-st-03-the-key-in-the-script
+summary: "A second integration, a harder brief, and the week Meridian stops using account keys at all."
+entry: e1-broker-credential
+
+encounters:
+  - id: e1-broker-credential
+    type: design_decision
+    title: "Everything the partner brief did not say"
+    speaker: security
+    objectives: [AZ104-2.2, AZ104-2.3]
+    scenario: |
+      The customs broker's new platform is nothing like Tan Chuan Freight's.
+
+      Marcus reads the requirements out, because he wrote half of them. The
+      broker's service reads declaration bundles from the edi-outbound container.
+      It authenticates to its own issuing API before every run and can fetch a
+      fresh credential each time. It egresses from one known address,
+      203.0.113.44. Meridian must be able to cut its access within minutes, at
+      any hour, without coordinating with the broker and without disturbing any
+      other consumer of the account.
+
+      There is one more line, added after last month's incident: "The credential
+      must survive routine rotation of the storage account access keys, which now
+      happens every ninety days."
+
+      Desmond raises an eyebrow. "That last one rules out most of the answers you
+      gave me in March."
+    prompt: "What credential do you issue the broker?"
+    options:
+      - id: opt-user-delegation
+        label: "A user delegation SAS, scoped to the container with read permission, signed IP 203.0.113.44, HTTPS only, reissued by the broker's client each run"
+        correct: true
+        explain: >
+          A user delegation SAS is signed with a key obtained from Microsoft
+          Entra rather than an account key, so quarterly key rotation does not
+          invalidate it. Revocation is immediate and independent of other
+          consumers: revoking the user delegation keys kills tokens signed with
+          them and leaves service SAS tokens alone. The seven-day maximum
+          lifetime is a fit here precisely because this client can fetch a fresh
+          token before every run, and the signed IP and protocol restrictions
+          narrow it further.
+        rep: 14
+      - id: opt-service-sas-policy
+        label: "A service SAS referencing a stored access policy, which is how the Tan Chuan Freight integration works"
+        correct: false
+        consequence: >
+          The broker's reads fail at the first key rotation, ninety days later,
+          on a Sunday.
+        explain: >
+          This was the right answer for a client that cannot refresh a token, and
+          the requirements have changed underneath it. A service SAS is signed
+          with an account key, so it dies at every rotation, and the stored access
+          policy governs permissions and expiry but not the signature. Revocation
+          by deleting the policy also hits every other token issued under it.
+        rep: -10
+      - id: opt-account-sas
+        label: "An account SAS with read permission on the blob service, restricted by signed IP and expiring in ninety days"
+        correct: false
+        explain: >
+          Account SAS is both too broad and still key-signed: it spans the whole
+          blob service rather than one container, cannot reference a stored access
+          policy at all, and is invalidated by the very key rotation the brief
+          says the credential must survive. The IP restriction is the only part of
+          this that helps.
+        rep: -12
+      - id: opt-rbac-identity
+        label: "Create a Microsoft Entra service principal for the broker and assign it Storage Blob Data Reader on the container"
+        correct: false
+        explain: >
+          Granting a directory identity to an external organization is a bigger
+          commitment than the requirement needs - a credential in Meridian's
+          tenant, a secret or certificate to manage for a third party, and an
+          identity that shows up in every access review. A user delegation SAS
+          gives the same Entra-backed revocation without the broker holding a
+          Meridian identity.
+        rep: -6
+    next: e2-disable-shared-key
+
+  - id: e2-disable-shared-key
+    type: design_decision
+    title: "Ninety days is still a window"
+    speaker: mentor
+    objectives: [AZ104-2.4]
+    scenario: |
+      Desmond has been reading the account inventory, which is his idea of a
+      quiet afternoon.
+
+      "Rotating keys every ninety days is a control that assumes the key gets
+      stolen and you would like the theft to expire. It is better than nothing.
+      It is not better than not having a key."
+
+      The inventory says every consumer of stmeridianedi now authenticates with
+      Entra: the export job runs as a managed identity, you and Marcus use your
+      own accounts through the portal and the CLI, and the broker will hold a
+      user delegation SAS. The only remaining shared key usage in the logs is a
+      Logic App connection string from 2025, which the integration team say they
+      will move "at some point."
+
+      "So there is a switch," Desmond says. "Tell me what it does before you
+      touch it, because it will break something."
+    prompt: "What do you propose for the account's key posture?"
+    options:
+      - id: opt-disable-shared-key
+        label: "Set allowSharedKeyAccess to false once the Logic App is migrated, and enforce it across the subscription with an Azure Policy deny effect"
+        correct: true
+        explain: >
+          Disabling shared key authorization makes the account refuse any request
+          authorized with an account key or with a SAS signed by one, which
+          removes an entire credential class rather than shortening its life.
+          Entra-authorized requests and user delegation SAS keep working, because
+          neither depends on the account key. Enforcing it with policy stops the
+          next account being created the old way, which is where these findings
+          come from.
+        rep: 14
+      - id: opt-key-expiry-policy
+        label: "Set a key expiration policy of 90 days on the account so the portal flags keys that are overdue for rotation"
+        correct: false
+        explain: >
+          A key expiration policy is a useful compliance signal and nothing more:
+          it does not block requests made with an expired key, it only reports the
+          account as out of policy. When every consumer can already use Entra, a
+          reporting control on a credential you no longer need is a weaker choice
+          than removing the credential.
+        rep: -6
+      - id: opt-rotate-faster
+        label: "Rotate the keys every 30 days instead of every 90 to shrink the exposure window"
+        correct: false
+        consequence: >
+          The rotation runbook triples in frequency and the Logic App breaks
+          monthly instead of quarterly.
+        explain: >
+          Faster rotation shortens the window and multiplies the operational
+          risk, since every rotation is a chance to miss a consumer - exactly the
+          failure that took the partner uploads down. Rotation is the mitigation
+          you use while keys are still in play, not the destination.
+        rep: -8
+      - id: opt-vault-keys
+        label: "Move both account keys into Key Vault and have every consumer read them from there"
+        correct: false
+        explain: >
+          Centralizing the secret improves distribution and leaves the underlying
+          problem: a credential granting full control of the account, presented by
+          callers the storage logs cannot tell apart. Anything that can
+          authenticate to Key Vault already has an Entra identity, which storage
+          can accept directly.
+        rep: -8
+    next: e3-logic-app-broken
+
+  - id: e3-logic-app-broken
+    type: troubleshoot
+    title: "P2: Manifest summary job failing since the change window"
+    speaker: noc
+    objectives: [AZ104-2.4, AZ104-2.2]
+    ticket:
+      id: "MER-4903"
+      reporter: "NOC Manila (overnight shift)"
+      priority: "P2"
+      opened: "23:47"
+      body: |
+        The manifest summary job that runs at 23:40 has failed twice. Error in
+        the run history is 403 with code KeyBasedAuthenticationNotPermitted
+        against stmeridianedi. Customs broker's morning bundle depends on this
+        output. Change MER-4899 closed at 21:00 tonight.
+    on_enter_diagram_ops:
+      - {op: set_status, node: st-edi-drop, status: broken}
+    scenario: |
+      The integration team's "at some point" was not before 21:00 tonight.
+
+      Your change disabled shared key authorization on stmeridianedi. Everything
+      you inventoried kept working. The Logic App did not, because it is still
+      holding a connection string with an account key in it, and it is the only
+      thing that produces the broker's morning bundle.
+
+      Desmond is asleep. The integration team's on-call is a phone number that
+      goes to voicemail in Bahasa Indonesia.
+
+      You have the Logic App's resource id, contributor rights on it, and until
+      about 05:00.
+    time_budget: 5
+    investigate:
+      - id: inv-noc-error
+        label: "Ask NOC Manila for the full error from the run history"
+        speaker: noc
+        reveals: >
+          "403, KeyBasedAuthenticationNotPermitted, message says key based
+          authentication is not permitted on this storage account. Same on both
+          attempts, one second after the connection opens."
+      - id: inv-change
+        label: "Re-read change MER-4899 and its consumer inventory"
+        speaker: narrator
+        reveals: >
+          The inventory lists four consumers and marks the Logic App as "pending
+          migration, integration team." Nothing in the change made that a
+          blocker, and nothing in the change made the flip conditional on it.
+      - id: inv-marcus
+        label: "Page Marcus and ask whether reverting the setting is acceptable"
+        speaker: security
+        reveals: >
+          "Reverting reopens the whole account to key auth for a job that should
+          not have been using it in the first place. If there is a fix that takes
+          the Logic App off keys tonight, do that. If there genuinely is not, wake
+          me before you revert anything."
+      - id: inv-logicapp
+        label: "Open the Logic App's connection configuration"
+        speaker: narrator
+        reveals: >
+          The blob connection uses authentication type Access Key, with the
+          account name and key stored in the connection resource. The Logic App
+          has a system-assigned managed identity, enabled in 2025 and never used
+          for anything.
+    commands:
+      - id: cmd-shared-key
+        label: "Confirm the account's shared key setting"
+        command: "az storage account show -n stmeridianedi -g rg-ops-sea --query '{sharedKey:allowSharedKeyAccess,defaultToEntra:defaultToOAuthAuthentication}' -o json"
+        output: |
+          {
+            "defaultToEntra": true,
+            "sharedKey": false
+          }
+        time_cost: 1
+      - id: cmd-role-assignments
+        label: "List role assignments on the storage account"
+        command: "az role assignment list --scope /subscriptions/.../resourceGroups/rg-ops-sea/providers/Microsoft.Storage/storageAccounts/stmeridianedi --query '[].{principal:principalName,role:roleDefinitionName}' -o table"
+        output: |
+          Principal                          Role
+          ---------------------------------  ------------------------------
+          vm-wms01                           Storage Blob Data Contributor
+          you@meridianlogistics.com          Storage Blob Data Contributor
+          marcus.lim@meridianlogistics.com   Storage Blob Data Reader
+        time_cost: 1
+        note: "The Logic App's identity holds nothing at all."
+      - id: cmd-test-key
+        label: "Try a listing with the account key"
+        command: "az storage blob list -c edi-outbound --account-name stmeridianedi --account-key REDACTED -o table"
+        output: |
+          HttpResponseError: (KeyBasedAuthenticationNotPermitted) Key based
+          authentication is not permitted on this storage account.
+        time_cost: 1
+      - id: cmd-test-sas
+        label: "Try a listing with a freshly issued service SAS"
+        command: "az storage blob list -c edi-outbound --account-name stmeridianedi --sas-token 'sv=2024-11-04&sr=c&sp=rl&sig=REDACTED' -o table"
+        output: |
+          HttpResponseError: (KeyBasedAuthenticationNotPermitted) Key based
+          authentication is not permitted on this storage account.
+        time_cost: 1
+        note: "A service SAS is signed with the account key, so it falls under the same block."
+      - id: cmd-test-entra
+        label: "Try a listing with your own Entra credentials"
+        command: "az storage blob list -c edi-outbound --account-name stmeridianedi --auth-mode login -o table"
+        output: |
+          Name                              Blob Type    Blob Tier    Length
+          --------------------------------  -----------  -----------  ---------
+          bundle-2027-05-11.zip             BlockBlob    Hot          4194304
+          bundle-2027-05-12.zip             BlockBlob    Hot          4283904
+        time_cost: 1
+        note: "The data plane is healthy for Entra-authorized callers."
+    fixes:
+      - id: fix-managed-identity
+        label: "Assign Storage Blob Data Contributor to the Logic App's system-assigned managed identity and switch its blob connection to managed identity authentication"
+        correct: true
+        explain: >
+          The identity already exists and has simply never been given anything to
+          do. Granting it a scoped data-plane role and repointing the connection
+          removes the key from the integration entirely, which is the outcome the
+          change was for, and it takes minutes rather than waiting for a team in
+          another time zone. Role assignments can take a few minutes to propagate,
+          so retest rather than assuming the first run proves it.
+        rep: 14
+        diagram_ops:
+          - {op: set_status, node: st-edi-drop, status: healthy}
+      - id: fix-revert
+        label: "Re-enable shared key authorization on the account and reschedule the change once the integration team has migrated"
+        correct: false
+        consequence: >
+          Marcus, woken as agreed, points out that the fix took eleven minutes
+          when you finally did it two days later.
+        explain: >
+          Reverting restores service and gives back the credential class you just
+          removed for every caller, not only the failing one, and the migration
+          that was already overdue slips again. Reverting is the correct call when
+          no targeted fix exists inside the window - here one did, on a resource
+          you have rights over.
+        rep: -10
+      - id: fix-service-sas
+        label: "Issue a service SAS scoped to edi-outbound and put it in the Logic App connection instead of the key"
+        correct: false
+        consequence: >
+          The next run fails with the identical error, and you have burned twenty
+          minutes of a five-hour window.
+        explain: >
+          Service and account SAS tokens are signed with the account key, so
+          disabling shared key authorization blocks them too - as the test listing
+          shows. Only Entra-authorized requests and user delegation SAS survive
+          that setting. Knowing which credential types are key-derived is the
+          whole point of the control.
+        rep: -12
+      - id: fix-connection-string-vault
+        label: "Move the connection string into Key Vault and have the Logic App read it from there at run time"
+        correct: false
+        explain: >
+          Where the key is stored has no bearing on whether the service accepts
+          it. The account refuses key-based authorization regardless of how
+          carefully the key was retrieved, so the run fails at the same point.
+          This is a good habit applied to a problem it cannot solve.
+        rep: -10
+    rewards:
+      under_budget_bonus: 5
+      skill_points: 2
+    next: END

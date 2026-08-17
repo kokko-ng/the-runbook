@@ -1,0 +1,490 @@
+schema_version: 1
+id: act2-data-06-finance-warehouse
+title: "Month End, Every Month"
+act: 2
+chapter: act2-data
+domain: az305-d2
+order: 6
+role: associate-architect
+checkpoint: true
+summary: "Finance has been querying production for four years. On the first month end after the merger, production notices."
+entry: e1-monthend
+
+encounters:
+  - id: e1-monthend
+    type: troubleshoot
+    title: "P1: Scanners timing out on the last day of the month"
+    speaker: noc
+    objectives: [AZ305-2.3, AZ305-2.10]
+    ticket:
+      id: "MER-7781"
+      reporter: "NOC Manila (day shift)"
+      priority: "P1"
+      opened: "09:47"
+      body: |
+        Scanner sessions timing out at Kallang and at the Johor cross-dock
+        since approximately 09:40. Tracking API responding normally. WMS
+        vendor reports the application tier is healthy and all timeouts are
+        at the database. No deployments in the last 72 hours. No change
+        records open. Requesting cloud team.
+    on_enter_diagram_ops:
+      - {op: set_status, node: a2data-sqlmi, status: degraded}
+      - {op: set_status, node: wms-sea, status: broken}
+      - {op: set_edge_status, edge: a2data-e-wms-sqlmi, status: degraded}
+    scenario: |
+      It is the thirty-first. Wave planning finished at 08:40 and the floor has
+      been picking since. At 09:40 the scanners started hanging on save.
+
+      Priya is on a call with the board about integration milestones and has
+      asked you, by message, to make this not be about the merger.
+
+      Desmond is at the Johor cross-dock and can only see what you send him.
+
+      Everything you designed is in place: Business Critical, eight vCores, a
+      read scale-out replica carrying the shipment-tracking API, telemetry
+      living in its own store. The tracking API is fine. The pickers are not.
+    time_budget: 6
+    investigate:
+      - id: inv-noc
+        label: "Ask NOC Manila what changed at 09:40"
+        speaker: noc
+        reveals: >
+          "Nothing changed. No release, no config, no failover event. The
+          instance did not restart. First scanner timeout logged 09:41:12 and
+          they have been climbing since - about forty a minute now."
+      - id: inv-finance
+        label: "Ask the finance team what they are doing this morning"
+        speaker: cfo
+        reveals: >
+          Evelyn's month-end analyst answers on Evelyn's behalf. "The margin
+          pack. I refresh it from Excel against the warehouse database on the
+          last working day, same as the last four years. It usually takes
+          twenty minutes. It has been running for over an hour today. This is
+          the first month it covers Sunda's consignments too."
+      - id: inv-desmond
+        label: "Message Desmond at the cross-dock"
+        speaker: mentor
+        reveals: >
+          "Read scale-out only routes a session if the connection string says
+          ApplicationIntent=ReadOnly. Nobody has ever checked what Excel sends.
+          Before you change anything, go and look at which replica her session
+          is actually on."
+      - id: inv-vendor
+        label: "Escalate to the WMS vendor"
+        speaker: ticket
+        reveals: >
+          Vendor support confirms application tier response times are normal
+          and every failing scanner call is a database command timeout at 30
+          seconds. They ask whether anything else is using the database.
+    commands:
+      - id: cmd-cpu
+        label: "Read CPU on the managed instance"
+        command: "az monitor metrics list --resource /subscriptions/.../providers/Microsoft.Sql/managedInstances/sqlmi-meridian-sea --metric avg_cpu_percent --interval PT5M -o table"
+        output: |
+          Timestamp            Name              Average
+          -------------------  ----------------  ---------
+          2027-01-31 09:25:00  avg_cpu_percent   31.4
+          2027-01-31 09:35:00  avg_cpu_percent   38.9
+          2027-01-31 09:40:00  avg_cpu_percent   97.6
+          2027-01-31 09:45:00  avg_cpu_percent   99.1
+          2027-01-31 09:50:00  avg_cpu_percent   99.4
+        time_cost: 1
+        note: "The step is at 09:40, not a ramp. Something arrived rather than something grew."
+      - id: cmd-requests
+        label: "List the longest-running requests on the primary"
+        command: "sqlcmd -S sqlmi-meridian-sea.public.<dnszone>.database.windows.net,3342 -G -Q \"SELECT session_id, total_elapsed_time/1000 AS sec, cpu_time, wait_type, LEFT(text,60) AS stmt FROM sys.dm_exec_requests r CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) ORDER BY total_elapsed_time DESC\""
+        output: |
+          session_id  sec    cpu_time  wait_type       stmt
+          ----------  -----  --------  --------------  -------------------------------------
+          214         4118   2871004   PAGEIOLATCH_SH  SELECT c.consignment_id, c.gross_wei
+          388         31     28        LCK_M_S         UPDATE pick_line SET picked_qty = @p
+          401         29     19        LCK_M_S         UPDATE pick_line SET picked_qty = @p
+          402         28     22        LCK_M_S         UPDATE pick_line SET picked_qty = @p
+        time_cost: 2
+        note: "One session, 68 minutes, scanning. Everything else is queued behind it for resource."
+      - id: cmd-updateability
+        label: "Check which replica session 214 is connected to"
+        command: "sqlcmd -S sqlmi-meridian-sea.public.<dnszone>.database.windows.net,3342 -G -Q \"SELECT DATABASEPROPERTYEX('wms','Updateability') AS updateability, @@SERVERNAME AS srv\""
+        output: |
+          updateability  srv
+          -------------  ---------------------
+          READ_WRITE     sqlmi-meridian-sea
+        time_cost: 1
+        note: "READ_WRITE means the primary. The finance session never reached the replica."
+      - id: cmd-replica
+        label: "Read CPU on the read-only replica"
+        command: "az monitor metrics list --resource /subscriptions/.../providers/Microsoft.Sql/managedInstances/sqlmi-meridian-sea --metric avg_cpu_percent --dimension ReplicaType --interval PT5M -o table"
+        output: |
+          Timestamp            ReplicaType  Average
+          -------------------  -----------  ---------
+          2027-01-31 09:40:00  Primary      97.6
+          2027-01-31 09:40:00  ReadOnly     4.2
+          2027-01-31 09:50:00  Primary      99.4
+          2027-01-31 09:50:00  ReadOnly     4.8
+        time_cost: 2
+        note: "The replica you are already paying for is idle at five percent."
+      - id: cmd-sku
+        label: "Confirm the instance tier and size"
+        command: "az sql mi show -g rg-data-sea -n sqlmi-meridian-sea --query \"{tier:sku.tier, vCores:vCores, storageGB:storageSizeInGB}\" -o table"
+        output: |
+          Tier             VCores    StorageGB
+          ---------------  --------  -----------
+          BusinessCritical  8         1024
+        time_cost: 1
+      - id: cmd-storage
+        label: "Read data IO utilization on the primary"
+        command: "az monitor metrics list --resource /subscriptions/.../providers/Microsoft.Sql/managedInstances/sqlmi-meridian-sea --metric io_bytes_read --interval PT5M -o table"
+        output: |
+          Timestamp            Name           Total
+          -------------------  -------------  --------------
+          2027-01-31 09:35:00  io_bytes_read  1841203712
+          2027-01-31 09:45:00  io_bytes_read  57329418240
+        time_cost: 2
+        note: "A thirty-fold jump in bytes read. Consistent with a scan, not with scanner traffic."
+    fixes:
+      - id: fix-readonly-routing
+        label: "Move the finance connection to the read-only replica with ApplicationIntent=ReadOnly, and make read-intent routing mandatory for every reporting client"
+        correct: true
+        explain: >
+          The evidence points one way: a single 68-minute scanning session on
+          the primary at 97 percent CPU while the read-only replica sits at 4
+          percent. Read scale-out only routes sessions whose connection string
+          declares ApplicationIntent=ReadOnly, and Excel was not sending it, so
+          the reporting workload has been landing on the write path for four
+          years - it simply never mattered until Sunda tripled the row count.
+          Moving it isolates reporting compute from scanner compute using
+          capacity already paid for, and it takes effect on the next refresh.
+        rep: 15
+        diagram_ops:
+          - {op: set_status, node: a2data-sqlmi, status: healthy}
+          - {op: set_status, node: wms-sea, status: healthy}
+          - {op: set_edge_status, edge: a2data-e-wms-sqlmi, status: healthy}
+      - id: fix-scaleup
+        label: "Scale the instance to 24 vCores to absorb month-end load"
+        correct: false
+        consequence: >
+          The scale operation triggers a failover partway through, the scanners
+          drop their sessions, and Evelyn receives a bill she was not consulted
+          about.
+        explain: >
+          It buys headroom for a workload that is scanning tens of gigabytes,
+          so next month it saturates 24 vCores instead of 8, and reporting is
+          still contending with the write path on the same node. The replica at
+          4 percent utilization is the evidence that the problem is placement,
+          not size - and paying three times over for the same contention is the
+          expensive way to not fix it.
+        rep: -10
+      - id: fix-kill
+        label: "Kill session 214 and instruct finance not to run reports during operating hours"
+        correct: false
+        consequence: >
+          The scanners recover in ninety seconds. On the last day of February
+          the analyst starts her refresh at 06:00 and the wave planning job
+          collides with it instead.
+        explain: >
+          Killing the session is a legitimate first move to stop the bleeding,
+          and stopping there is what makes it a wrong answer: nothing has
+          changed, so the same refresh reproduces the same outage next month.
+          It also turns month-end close into a scheduling negotiation between
+          two teams, which is a process where a design should be.
+        rep: -8
+      - id: fix-index
+        label: "Add a covering index on the consignment table for the margin pack's query"
+        correct: false
+        consequence: >
+          The index takes forty minutes to build, on the primary, during the
+          incident.
+        explain: >
+          It would speed up this one query and leave the next ad-hoc workbook
+          to scan something else, because the actual problem is that unreviewed
+          analytical queries run on the transactional primary at all. Every
+          index also adds write cost to the scanner path you spent a month
+          protecting. Tuning a symptom query is not a place to put a reporting
+          workload.
+        rep: -8
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: e2-warehouse
+
+  - id: e2-warehouse
+    type: design_decision
+    title: "Somewhere for Finance to live"
+    speaker: cfo
+    objectives: [AZ305-2.10]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2data-synapse
+          label: "Finance warehouse (undecided)"
+          kind: sql-database
+          group: grp-landing
+          status: planned
+    scenario: |
+      Evelyn's position has changed, which for Evelyn takes an outage.
+
+      "I have been told for four years that finance should not query the
+      production system. I now understand why. Build the reporting thing.
+      Tell me what it costs and do not tell me it is free."
+
+      The requirements, agreed with her and with Priya:
+
+      - 12 Meridian analysts plus 4 from Sunda finance. Peak concurrency around
+        16 at month end, near zero for the other three weeks.
+      - A curated star schema: three fact tables, the largest reaching about
+        900 million rows and 300 GB across five years of history.
+      - Dashboards must return in under five seconds during month end.
+      - The WMS purges closed consignments after 24 months, so anything older
+        than that exists only if the warehouse keeps it.
+      - The data team is two people whose language is T-SQL. No Spark, and no
+        hiring this year.
+      - Nightly load is acceptable. Nobody needs intraday finance data.
+      - SGD 3,000 per month, and Evelyn expects the design to spend less than
+        that in the three quiet weeks.
+    prompt: "What do you recommend as the analytics platform?"
+    options:
+      - id: opt-dedicated-pool
+        label: "An Azure Synapse Analytics dedicated SQL pool, loaded nightly and paused outside month-end and business hours"
+        correct: true
+        explain: >
+          A dedicated SQL pool is a massively parallel relational warehouse
+          addressed entirely in T-SQL, which matches both the star schema and
+          the only skill set on offer. Distributed tables and columnstore keep
+          900 million rows inside a five-second dashboard budget at 16 concurrent
+          users, and it holds five years of history independently of the WMS
+          purge. Compute is billed only while the pool is resumed, so pausing it
+          in the quiet weeks is what brings the run rate under Evelyn's ceiling.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2data-synapse, status: healthy}
+          - {op: set_label, node: a2data-synapse, label: "Finance warehouse (Synapse dedicated SQL pool)"}
+          - op: add_edge
+            edge:
+              id: a2data-e-adf-synapse
+              source: a2data-adf
+              target: a2data-synapse
+              kind: dependency
+              label: "nightly load"
+      - id: opt-databricks
+        label: "Azure Databricks SQL warehouses over Delta tables in the lake"
+        correct: false
+        consequence: >
+          Three months later the two-person data team has produced one notebook
+          and a support ticket.
+        explain: >
+          It is a strong platform and it fails the constraint the scenario
+          states twice: the team is two people with T-SQL and there is no
+          hiring. Lakehouse designs pay off where there is engineering capacity
+          to own clusters, table maintenance, and file layout. Skills are a
+          design constraint exactly like latency, and this one is written down.
+        rep: -8
+      - id: opt-serverless
+        label: "Synapse serverless SQL pools querying Parquet in the data lake, so there is no compute to pause"
+        correct: false
+        consequence: >
+          The first month-end invoice arrives itemized by terabytes scanned and
+          Evelyn asks which analyst pressed refresh eleven times.
+        explain: >
+          No infrastructure and no idle cost is genuinely attractive, and it
+          fails both remaining requirements. Serverless bills per terabyte
+          scanned with no indexes or precomputed distributions, so 16 analysts
+          refreshing dashboards against a 300 GB fact table is neither
+          sub-five-second nor predictable. Serverless SQL is for exploration and
+          one-off loads, not a concurrent BI serving layer.
+        rep: -6
+      - id: opt-powerbi-import
+        label: "Skip the warehouse: build a Power BI import model refreshed nightly from the read scale-out replica"
+        correct: false
+        explain: >
+          It solves the outage and loses the history. The WMS purges closed
+          consignments at 24 months, so a model sourced only from the OLTP
+          replica can never hold the five years the requirement asks for, and
+          the data is gone before anyone notices. Power BI belongs in this
+          design as the presentation layer over the warehouse, not as a
+          substitute for having one.
+        rep: -6
+    next: e3-loading
+
+  - id: e3-loading
+    type: design_decision
+    title: "Getting the telemetry in without paying twice"
+    speaker: mentor
+    objectives: [AZ305-2.10, AZ305-2.9]
+    scenario: |
+      Desmond has read the warehouse design and found the part that touches
+      something he operates.
+
+      "Your fact tables are fine. Then there is this one - dwell time per
+      container per leg. That is telemetry. Which means every night your
+      warehouse load reaches into the store the ops console depends on."
+
+      The constraints:
+
+      - Container telemetry lives in Cosmos DB for NoSQL, partitioned by
+        container ID, with autoscale throughput sized for the ops console and
+        the driver app.
+      - The dwell-time fact needs 90 days of telemetry aggregated by container
+        and leg, refreshed nightly.
+      - Analytical reads must not consume the transactional request units. The
+        ops console has a 20 ms 99th-percentile budget and no headroom to give.
+      - The warehouse also needs WMS relational facts and proof-of-delivery
+        photo counts - metadata only, never the images.
+      - Nightly is acceptable for all of it.
+    prompt: "How does telemetry reach the finance warehouse?"
+    options:
+      - id: opt-synapselink
+        label: "Enable the Cosmos DB analytical store with Azure Synapse Link, and load the WMS facts and blob metadata nightly with Data Factory"
+        correct: true
+        explain: >
+          The analytical store is a column-oriented copy of the container that
+          Cosmos DB maintains automatically and bills separately from
+          provisioned throughput, so an analytical scan costs zero transactional
+          request units - which is precisely the requirement. Synapse Link
+          exposes it to the warehouse without a pipeline to build or a
+          replication lag to reason about, and Data Factory already exists in
+          the estate for the relational and blob-metadata halves.
+        rep: 12
+        diagram_ops:
+          - op: add_edge
+            edge:
+              id: a2data-e-cosmos-synapse
+              source: a2data-cosmos-telemetry
+              target: a2data-synapse
+              kind: replication
+              label: "Synapse Link"
+      - id: opt-adf-cosmos
+        label: "A nightly Data Factory copy activity running a cross-partition SQL query against the Cosmos container"
+        correct: false
+        consequence: >
+          The first nightly run throttles the driver app in Jakarta, where it is
+          not night.
+        explain: >
+          It works and it charges the cost to the wrong budget: a cross-partition
+          scan of 90 days of telemetry consumes provisioned request units, and
+          the scenario states the ops console has no headroom to give. There is
+          no quiet hour to hide in either, because the fleet is on three time
+          zones. Analytical scans against a transactional store is the pattern
+          the analytical store exists to remove.
+        rep: -10
+      - id: opt-raise-ru
+        label: "Raise the autoscale maximum on the Cosmos container and run the extraction at 03:00 Singapore time"
+        correct: false
+        explain: >
+          It buys throughput to survive an anti-pattern and leaves the
+          contention in place - the ops console and the extraction still share
+          one throughput pool, so a slow night degrades a 20 ms budget. It also
+          assumes a quiet window that a Singapore, Jakarta, and Manila operation
+          does not have, and pays autoscale peak rates for it every night.
+        rep: -8
+      - id: opt-restore
+        label: "Restore the Cosmos account nightly into a second account and extract from the copy"
+        correct: false
+        consequence: >
+          The first restore takes six hours and produces an account nobody
+          budgeted for.
+        explain: >
+          Restore is a recovery operation, not a data pipeline: it is slow, it
+          is priced per restore, and it produces a second document store that
+          still has to be scanned cross-partition to be useful. You would be
+          building an expensive copy of the analytical store Cosmos DB will
+          maintain for you as a setting.
+        rep: -8
+    next: e4-telemetry-analysis
+
+  - id: e4-telemetry-analysis
+    type: design_decision
+    title: "Questions asked during an incident"
+    speaker: manager
+    objectives: [AZ305-2.10]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2data-adx
+          label: "Telemetry analytics (undecided)"
+          kind: log-analytics
+          group: grp-sea
+          status: planned
+    scenario: |
+      Priya brings the last item on the data platform list, and it is not from
+      finance.
+
+      "Ops asked me a question yesterday I could not answer. Which reefers went
+      above eight degrees for more than twenty minutes in the last thirty days,
+      and did it correlate with a door event. They were not asking for a
+      report. They were asking during a claim call."
+
+      What that workload looks like:
+
+      - Ad-hoc queries over the raw 90-day telemetry, which is roughly 4.7 TB.
+      - Question shapes are time-series: sliding windows, gap filling, session
+        detection, anomaly detection over a sensor series.
+      - Interactive latency. Seconds, while somebody is on the phone.
+      - Asked by ops engineers, a few dozen times a week, unpredictably.
+      - Must not consume the Cosmos DB request units the ops console needs.
+      - The finance warehouse holds curated nightly aggregates and is paused
+        for most of the month.
+    prompt: "Where do the ops engineers ask these questions?"
+    options:
+      - id: opt-adx
+        label: "An Azure Data Explorer cluster ingesting the telemetry stream, with a 90-day hot cache"
+        correct: true
+        explain: >
+          Data Explorer is built for exactly this: high-volume append-only
+          telemetry, interactive scans over a hot cache, and a query language
+          whose native operators are time-series ones - summarize by bin,
+          make-series, series_decompose_anomalies. It is a separate cluster from
+          both the transactional store and the warehouse, so an ops engineer
+          exploring during a claim call costs nobody else latency. Curated
+          nightly aggregates still belong in the warehouse; raw exploration does
+          not.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2data-adx, status: healthy}
+          - {op: set_label, node: a2data-adx, label: "adx-telemetry (Azure Data Explorer)"}
+          - op: add_edge
+            edge:
+              id: a2data-e-cosmos-adx
+              source: a2data-cosmos-telemetry
+              target: a2data-adx
+              kind: replication
+              label: "telemetry ingest"
+      - id: opt-warehouse-raw
+        label: "Load the raw telemetry into the finance warehouse as an additional fact table"
+        correct: false
+        consequence: >
+          The nightly load grows by 34 million rows a day and the pool can no
+          longer be paused, which Evelyn notices first.
+        explain: >
+          It fails on three of the stated requirements at once. A dedicated SQL
+          pool has no native time-series operators, so window and gap-filling
+          logic becomes hand-written T-SQL; 4.7 TB of raw telemetry destroys the
+          nightly load window and the pause economics; and a warehouse that is
+          paused most of the month cannot answer a question asked during a phone
+          call.
+        rep: -10
+      - id: opt-cosmos-query
+        label: "Let ops engineers query the Cosmos DB container directly with aggregate SQL API queries"
+        correct: false
+        consequence: >
+          The second engineer to try it throttles the ops console she was trying
+          to explain.
+        explain: >
+          These questions filter by time and temperature, not by container ID,
+          so every one of them is a cross-partition scan billed in the same
+          provisioned request units the ops console needs - the requirement the
+          scenario states explicitly. The API also has no time-series operators,
+          so sliding windows and anomaly detection would be reimplemented in
+          application code.
+        rep: -10
+      - id: opt-serverless-lake
+        label: "Point Synapse serverless SQL at the Parquet telemetry archive in the lake"
+        correct: false
+        explain: >
+          The data is already there and it costs nothing at rest, which is the
+          case for it. It is not interactive: each ad-hoc question scans a large
+          share of 4.7 TB with no hot cache and no index, so answers arrive in
+          minutes and are billed per terabyte scanned, a few dozen times a week
+          and rising. The lake is the durable archive; it is not the query
+          surface for a phone call.
+        rep: -6
+    next: END

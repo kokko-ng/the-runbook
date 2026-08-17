@@ -45,11 +45,11 @@ encounters:
         consequence: >
           Subscription four is created on a Friday and nobody assigns anything to it until March.
         explain: >
-            This works for two subscriptions and degrades from there: every new
-            subscription needs someone to remember, and assignments made
-            separately drift apart in parameters and exclusions until nobody can
-            say what is enforced where. Governance that depends on a person
-            remembering is governance you do not have.
+          This works for two subscriptions and degrades from there: every new
+          subscription needs someone to remember, and assignments made
+          separately drift apart in parameters and exclusions until nobody can
+          say what is enforced where. Governance that depends on a person
+          remembering is governance you do not have.
         rep: -8
       - id: opt-hierarchy
         label: "Create a top-level management group for Meridian with mg-prod and mg-nonprod beneath it, move both subscriptions in, and assign policy at the Meridian group"

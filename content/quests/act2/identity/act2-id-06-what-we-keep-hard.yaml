@@ -1,0 +1,266 @@
+schema_version: 1
+id: act2-id-06-what-we-keep-hard
+title: "What We Keep: Design Review"
+act: 2
+chapter: act2-identity
+domain: az305-d1
+order: 6
+role: associate-architect
+checkpoint: true
+bonus_variant_of: act2-id-06-what-we-keep
+summary: "One workspace, four audiences, and a two-minute detection target. The easy version of this design does not survive."
+entry: e1-workspace-rbac
+
+encounters:
+  - id: e1-workspace-rbac
+    type: design_decision
+    title: "One workspace, four audiences"
+    speaker: security
+    objectives: [AZ305-1.1]
+    scenario: |
+      Centralizing the workspace solved the query problem and created an access
+      problem, which Marcus raises before anyone else can.
+
+      "Everything is in one workspace now. The warehouse team wants their
+      application traces, which is reasonable. If I grant them the workspace,
+      they also get sign-in logs, audit logs, and Defender alerts, which is not."
+
+      There are four audiences and they want different slices. Delivery teams
+      want telemetry from their own resources and nothing else. The security
+      team needs every table. The NOC needs platform metrics and alerts across
+      the estate but no application payloads, because traces contain consignee
+      names. And the auditors get a read-only view of the security tables for
+      the quarter under review.
+
+      Desmond has the constraint that removes the easy answer. "Do not tell me
+      to split the workspace. We spent a quarter arguing our way to one, and the
+      commitment tier depends on the volume being in one place."
+
+      Marcus adds the last one. "The teams must not be able to widen their own
+      access. If the control is a query they agree not to run, it is not a
+      control."
+    prompt: "How do you design access to the central workspace?"
+    options:
+      - id: opt-resource-context
+        label: "Resource-context access so teams read only logs from resources they already have Azure permissions on, table-level roles for the security tables, and workspace-level read for the security team"
+        correct: true
+        explain: >
+          Resource-context access mode evaluates each query against the caller's
+          permissions on the originating resource, so a delivery team granted
+          Reader on its own resource group sees its own telemetry and nothing
+          else without a single workspace role assignment. That also satisfies
+          the last requirement, because widening the log view would require
+          widening Azure resource access, which the same governance already
+          controls. Table-level RBAC then carves the security tables out for the
+          security team and gives the auditors a read-only slice, all inside one
+          workspace and one commitment tier.
+        rep: 14
+      - id: opt-workspace-reader
+        label: "Grant every team Log Analytics Reader on the workspace and rely on saved queries and workbooks scoped to their own resources"
+        correct: false
+        consequence: >
+          A developer edits a workbook query out of curiosity and finds the
+          sign-in table. He mentions it in the standup, which is the good
+          version of this story.
+        explain: >
+          Log Analytics Reader at workspace scope grants read across every table
+          in the workspace; a scoped workbook is a convenience on top, not a
+          boundary. That fails Marcus's explicit requirement that the control
+          cannot be a query someone agrees not to run, and it exposes sign-in,
+          audit, and Defender data to every delivery team.
+        rep: -12
+      - id: opt-split-workspaces
+        label: "Split the security tables into a dedicated security workspace and leave application and platform telemetry in the central one"
+        correct: false
+        consequence: >
+          The commitment tier no longer fits either workspace's volume. The next
+          invoice is higher than the one that started this.
+        explain: >
+          It is a clean separation and it breaks the constraint that was stated:
+          Desmond ruled out splitting, and the commitment tier discount depends
+          on the ingestion volume sitting in one workspace. It also fragments the
+          correlation between a sign-in and the application activity that
+          followed it, which is the join Marcus most often needs during an
+          investigation.
+        rep: -8
+      - id: opt-custom-queries
+        label: "Keep workspace-level access for everyone and use a data collection rule transformation to strip consignee names from traces before ingestion"
+        correct: false
+        explain: >
+          Redacting personal data at ingestion is a good idea on its own merits
+          and it addresses one audience's concern about one field. It does
+          nothing about delivery teams reading sign-in logs, Defender alerts, or
+          each other's telemetry, so three of the four audiences are still
+          wrongly scoped. Data minimization and access control solve different
+          problems and this design has both.
+        rep: -8
+    next: e2-partner-feed
+
+  - id: e2-partner-feed
+    type: design_decision
+    title: "A feed for someone else's tenant"
+    speaker: security
+    objectives: [AZ305-1.2]
+    scenario: |
+      The security operations center's contract is being renegotiated and their
+      new parent company has a rule: they will not hold credentials for a
+      customer's Azure tenant.
+
+      What they need has not changed. A continuous stream of Entra sign-in logs,
+      Defender alerts, and firewall logs, arriving within a couple of minutes,
+      consumed by their Splunk platform which runs in their own Azure tenant.
+
+      What Meridian needs has hardened. Marcus wants the access revocable in one
+      operation, wants to know exactly which log categories left the tenant, and
+      does not want a standing identity for the provider inside Meridian's
+      directory. Evelyn has ruled out anything that duplicates the ingestion
+      cost a second time.
+
+      Desmond contributes the constraint that eliminates the obvious shortcut.
+      "There is a cap on how many diagnostic settings one resource can carry.
+      Five. We already use three on the firewall - workspace, event hub,
+      archive. Whatever you add has to fit in what is left, on every resource,
+      forever."
+    prompt: "How do you deliver the feed to the provider's tenant?"
+    options:
+      - id: opt-eventhub-sas
+        label: "Continue exporting the required categories to the existing Event Hub and give the provider a listen-only shared access policy on that specific hub, rotated on a schedule and revocable by deleting the policy"
+        correct: true
+        explain: >
+          The Event Hub is already a destination on those diagnostic settings, so
+          nothing new is added against the five-setting cap and nothing is
+          ingested twice. A shared access policy scoped to one hub with listen
+          rights only is the narrowest grant that works, it needs no identity in
+          Meridian's directory, and revocation is deleting the policy, which is
+          the single operation Marcus asked for. The hub the categories are
+          written to is itself the record of what leaves the tenant.
+        rep: 14
+        diagram_ops:
+          - {op: set_status, node: a2id-st-logarchive, status: healthy}
+      - id: opt-guest-workspace
+        label: "Invite the provider's analysts as guests in the Meridian tenant and grant them table-level read on the relevant workspace tables"
+        correct: false
+        consequence: >
+          The provider's compliance team refuses the invitations. Their rule was
+          the reason the contract changed.
+        explain: >
+          Guest access is a reasonable pattern for people who investigate
+          interactively, and it fails two stated requirements: it creates
+          standing identities for the provider inside Meridian's directory, which
+          their parent company forbids and Marcus does not want, and a query
+          surface is not the continuous near-real-time stream their detection
+          pipeline consumes.
+        rep: -10
+      - id: opt-second-diagnostic
+        label: "Add a fourth and fifth diagnostic setting on each resource writing directly to a storage account the provider reads with a shared access signature"
+        correct: false
+        consequence: >
+          The firewall accepts the fourth setting. The fifth is rejected, and the
+          Application Gateway is already at five.
+        explain: >
+          It consumes the remaining headroom on the per-resource diagnostic
+          setting cap that Desmond specifically flagged, leaving no room for
+          anything the estate needs later. Storage is also a batch destination
+          with append latency measured in minutes and no streaming semantics,
+          which misses the near-real-time requirement the provider's detections
+          depend on.
+        rep: -10
+      - id: opt-lighthouse
+        label: "Onboard the provider through Azure Lighthouse so they operate on Meridian's workspace from their own tenant with no guest accounts"
+        correct: false
+        explain: >
+          Lighthouse is the right answer to a genuinely similar question - a
+          managed service provider operating your resources from their tenant
+          with no guest identities - and it delegates access to Azure resources
+          rather than delivering a data stream. Their Splunk platform ingests
+          from an endpoint, not by holding an Azure role, so the streaming
+          requirement is unmet even though the identity requirement is elegantly
+          solved.
+        rep: -6
+    next: e3-detection-latency
+
+  - id: e3-detection-latency
+    type: design_decision
+    title: "Two minutes, measured"
+    speaker: noc
+    objectives: [AZ305-1.3]
+    scenario: |
+      The warehouse system now has an availability commitment written into the
+      Jakarta lane agreement, and it has a number attached.
+
+      A total outage of the picker login path must be detected and notified
+      within two minutes. Not diagnosed - detected and notified, because the
+      NOC's runbook takes another four and the contractual clock is ten.
+
+      The NOC shift lead has been reading Azure Monitor documentation and has
+      arrived somewhere uncomfortable.
+
+      "The alert we have is a log search rule. It runs every five minutes and it
+      queries data that took some minutes to reach the workspace. Even when it
+      works, we are outside the window before it fires."
+
+      The other requirements are unchanged. No new tooling budget. The signal
+      has to reflect what a picker experiences, not a server metric. And the
+      alert must distinguish a genuine outage from the warehouse floor's
+      wireless network dropping, because that has paged them twice and is
+      somebody else's problem.
+    prompt: "What do you change to meet the two-minute detection target?"
+    options:
+      - id: opt-availability-test
+        label: "A standard availability test against the login endpoint from several Azure regions, alerting when it fails from a majority of locations, backed by a metric alert on the Application Insights failed-request rate"
+        correct: true
+        explain: >
+          Availability tests run from Azure-hosted locations on a short interval
+          and raise alerts on a metric path rather than a log query path, which
+          is what removes both the query frequency and the ingestion delay from
+          the detection budget. Requiring failure from a majority of test
+          locations is what distinguishes a real outage from one site's wireless
+          network, since a warehouse floor problem does not affect probes running
+          in other regions. It also measures the user-facing endpoint rather than
+          a server metric, and it is inside the existing Application Insights
+          envelope.
+        rep: 14
+        diagram_ops:
+          - {op: set_status, node: a2id-monitor, status: healthy}
+      - id: opt-faster-log-alert
+        label: "Keep the log search alert but reduce its evaluation frequency to one minute and shorten the lookback window"
+        correct: false
+        consequence: >
+          The rule now runs every minute against data that is not there yet, and
+          starts producing gaps as well as delays.
+        explain: >
+          Evaluation frequency is only one of the two delays. A log search alert
+          also waits for the data to be collected, transmitted, and indexed
+          before a query can see it, and shortening the lookback window makes the
+          rule more likely to evaluate an interval whose records have not landed.
+          Metric-path alerting exists for detection targets measured in minutes;
+          log search alerting is for correlation and complex conditions.
+        rep: -8
+      - id: opt-heartbeat
+        label: "Alert on the absence of the heartbeat signal from the warehouse application's virtual machines, which arrives every minute"
+        correct: false
+        consequence: >
+          The application pool recycles into a crash loop. The machines are up,
+          the heartbeats keep arriving, and nobody is paged.
+        explain: >
+          Heartbeat absence detects a machine or agent failure and says nothing
+          about whether the login path works, which is the commitment being
+          measured. It is also a log-based signal with the same ingestion delay
+          as the current rule. Measuring the thing you promised, at the layer the
+          user experiences it, is the requirement.
+        rep: -10
+      - id: opt-synthetic-onprem
+        label: "Run a synthetic login script on a machine in the Kallang server room every thirty seconds and alert if it fails twice in a row"
+        correct: false
+        consequence: >
+          The Kallang uplink flaps during a maintenance window. The NOC is paged
+          for an outage that exists only from one building.
+        explain: >
+          A single vantage point cannot tell an application outage from a network
+          problem at the vantage point, which is precisely the false page the NOC
+          asked you to eliminate. It also adds a bespoke script on a server
+          somebody has to maintain, against the standing constraint about
+          anything the NOC has to support, when multi-region availability tests
+          provide the same probe with quorum built in.
+        rep: -8
+    next: END

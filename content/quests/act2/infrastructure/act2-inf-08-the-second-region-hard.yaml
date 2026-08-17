@@ -1,0 +1,227 @@
+schema_version: 1
+id: act2-inf-08-the-second-region-hard
+title: "The Second Region - Hard Questions"
+act: 2
+chapter: act2-infrastructure
+domain: az305-d4
+order: 8
+role: associate-architect
+bonus_variant_of: act2-inf-08-the-second-region
+checkpoint: true
+summary: "The routing design survives the board. The reviewer has three more questions."
+entry: e1-origin
+
+encounters:
+  - id: e1-origin
+    type: design_decision
+    title: "The origin nobody can reach"
+    speaker: security
+    objectives: [AZ305-4.21, AZ305-4.20]
+    scenario: |
+      Marcus reads the Front Door design and finds the hole in it.
+
+      "Front Door is at the edge. The origins are app services with public
+      hostnames. What stops somebody skipping the edge and hitting the origin
+      directly, with no WAF, no rate limit, and no logging?"
+
+      What has to be true:
+
+      - Origins must accept traffic only from Meridian's Front Door profile, not from any Front Door profile
+      - Origins must not be reachable from the public internet at all, if that is achievable
+      - The tracking portal, the partner gateway, and the WMS all sit behind the same profile
+      - Session affinity is not required; the workloads are stateless
+      - Health probes must still reach the origins
+      - No change to partner DNS; they resolve one hostname and always will
+
+      The reviewer, who has clearly seen this go wrong: "An IP allowlist of the
+      service tag is a popular answer. Say why it is not enough."
+    prompt: "How do you lock the origins to the edge?"
+    options:
+      - id: opt-private-link
+        label: "Private Link origins on Front Door Premium, with the origins' public network access disabled so they are reachable only through the approved private endpoint connection"
+        correct: true
+        explain: >
+          Private Link origins move the connection from the public network onto an
+          approved private endpoint, which is the only option here that satisfies
+          "not reachable from the public internet at all" rather than "filtered on
+          the public internet". Health probes traverse the same private path.
+          Nothing changes for partners, because they still resolve one Front Door
+          hostname.
+        rep: 12
+      - id: opt-service-tag
+        label: "Restrict origin access to the AzureFrontDoor.Backend service tag with an access restriction rule"
+        correct: false
+        consequence: >
+          A test account creates a Front Door profile of its own and reaches the
+          origin from it in under ten minutes.
+        explain: >
+          The service tag covers every Front Door profile in Azure, not just
+          yours, so it narrows the internet to a large shared set rather than to
+          Meridian. It is a necessary layer and an insufficient one: the documented
+          complement is validating the X-Azure-FDID header against your own
+          profile identifier. Even together, the origin remains on the public
+          network, which the requirement rules out.
+        rep: -8
+      - id: opt-waf-origin
+        label: "Put a WAF policy on the origins as well, so a direct hit is still inspected"
+        correct: false
+        explain: >
+          Defense in depth is sound reasoning applied to the wrong requirement.
+          Inspecting direct traffic does not stop it bypassing rate limits, edge
+          logging, and the routing rules, and it duplicates the WAF policy the
+          previous design deliberately kept in one place. The requirement is that
+          direct traffic be impossible, not that it be examined.
+        rep: -8
+      - id: opt-mtls
+        label: "Require client certificates on the origins and have Front Door present one"
+        correct: false
+        explain: >
+            Mutual TLS is strong authentication and it leaves the origin listening
+            on the public internet, so the endpoint is still discoverable,
+            scannable, and available to absorb a volumetric attack before the
+            handshake fails. It also adds certificate rotation on every origin.
+            Private Link removes the listener instead of defending it.
+        rep: -6
+    next: e2-dr
+
+  - id: e2-dr
+    type: design_decision
+    title: "What active-active actually means"
+    speaker: manager
+    objectives: [AZ305-4.21, AZ305-4.19]
+    scenario: |
+      The board asked for two regions. The reviewer asks what happens when one of
+      them goes away.
+
+      The estate as designed:
+
+      - Tracking portal and partner gateway: stateless, running in both regions behind Front Door
+      - WMS: active in Southeast Asia, warm standby in East Asia, SQL failover group with auto-failover
+      - Redis cache for tracking lookups: single instance in Southeast Asia
+      - App Configuration: single instance in Southeast Asia
+      - Stated RTO for tracking is 5 minutes; for WMS it is 15 minutes
+      - The failover group's automatic policy has a one-hour grace period before failing over
+      - East Asia is provisioned at 40 percent of Southeast Asia's capacity to save cost
+
+      "Draw me the Southeast Asia failure," the reviewer says, "and tell me which
+      of those lines is the one that hurts."
+    prompt: "What is the most important correction to the two-region design?"
+    options:
+      - id: opt-regional-deps
+        label: "Remove the single-region dependencies from the surviving path: geo-replicate the cache and App Configuration, and size East Asia so it can carry full load, before tuning any failover policy"
+        correct: true
+        explain: >
+          Active-active is only true if the surviving region can serve a request
+          without reaching into the failed one. As drawn, tracking in East Asia
+          calls a Redis instance and an App Configuration store that live in
+          Southeast Asia, so the region that survives fails anyway - and it fails
+          in a way health probes at the edge may not attribute correctly. Capacity
+          is the second half of the same point: a region at 40 percent that
+          receives 100 percent of traffic is a slower outage, not a survival.
+        rep: 12
+      - id: opt-grace-period
+        label: "Reduce the failover group's grace period to five minutes so the database fails over faster"
+        correct: false
+        consequence: >
+          A twelve-minute network event triggers an automatic geo-failover and the
+          unreplicated tail of transactions is gone.
+        explain: >
+            Grace period tuning is a real decision and it is the wrong first move.
+            A shorter grace period trades data loss risk against recovery time on
+            asynchronous replication, and it does nothing about the cache and
+            configuration dependencies that would leave the failed-over WMS unable
+            to serve anyway. Fix the dependency graph before tuning the timers on
+            it.
+        rep: -8
+      - id: opt-third-region
+        label: "Add a third region so a single regional failure still leaves two"
+        correct: false
+        explain: >
+          A third region multiplies the same single-region dependencies by three
+          and triples the cost of a problem that is architectural rather than
+          numerical. The design does not yet survive losing one region; adding a
+          region it also does not fully use is expansion in place of correction.
+        rep: -10
+      - id: opt-traffic-manager
+        label: "Add Traffic Manager above Front Door as a second layer of failover in case the edge itself is the problem"
+        correct: false
+        explain: >
+          Front Door is a global, anycast service with its own resilience, and
+          stacking a DNS-based router above it adds TTL-bound failover latency and
+          a second health model to reason about. It also addresses a failure the
+          scenario did not raise while leaving the one it did raise - regional
+          dependencies inside the surviving path - untouched.
+        rep: -8
+    next: e3-cost
+
+  - id: e3-cost
+    type: design_decision
+    title: "The line item at the bottom"
+    speaker: cfo
+    objectives: [AZ305-4.17, AZ305-4.19]
+    scenario: |
+      Evelyn has the first full-estate bill with both regions live and one line
+      she does not accept.
+
+      "Inter-region data transfer. Eighteen thousand dollars in a quarter. Tell
+      me what is crossing."
+
+      The breakdown, after an afternoon in Cost Analysis:
+
+      - 61 percent: East Asia application instances reading blobs from the Southeast Asia storage account
+      - 22 percent: East Asia instances reading the Southeast Asia Redis cache, now being corrected
+      - 11 percent: cross-region SQL failover group replication, which is required
+      - 6 percent: log ingestion into the Southeast Asia Log Analytics workspace
+      - The blobs are the manifest and photo archive: written once in either region, read from both
+      - Read volume is roughly 4 TB a month from East Asia, growing
+      - Consistency requirement on the archive: a photo must be readable within 15 minutes of upload
+    prompt: "What do you change to bring the transfer cost down?"
+    options:
+      - id: opt-grs-read
+        label: "Move the archive to a geo-replicated account with a read access secondary in East Asia and read locally there, keeping writes in the primary region"
+        correct: true
+        explain: >
+          The dominant cost is a read pattern that crosses regions on every
+          request, so the fix is to put a readable copy where the readers are.
+          Read-access geo-redundant storage gives East Asia a local secondary
+          endpoint for reads while writes stay in one primary, which preserves a
+          single source of truth. Replication lag is typically minutes, which fits
+          the stated 15-minute readability requirement - the requirement exists in
+          the scenario precisely so this can be checked rather than assumed.
+        rep: 12
+      - id: opt-cdn
+        label: "Put a CDN in front of the storage account so East Asia reads come from the edge"
+        correct: false
+        explain: >
+          Caching does reduce origin reads and it is a partial answer at best:
+          manifest photos are largely read once by one operator, so the cache hit
+          ratio on a long tail of unique objects is poor, and egress from the
+          origin to the edge is still billed. It also adds a caching layer to
+          content with an access-control requirement. Caching helps hot content;
+          this is a wide, cold read pattern.
+        rep: -6
+      - id: opt-second-account
+        label: "Create a second independent storage account in East Asia and have the application write to whichever region it is in"
+        correct: false
+        consequence: >
+          Two months later, a claim needs a photo and nobody can say which account
+          it is in.
+        explain: >
+          Two writable, unsynchronized accounts remove the transfer charge by
+          removing the single source of truth, which turns every read into a
+          lookup problem and every audit into a search. If both regions genuinely
+          must write locally, the answer is an account with multi-region write
+          semantics and a documented conflict model, not two independent
+          namespaces.
+        rep: -10
+      - id: opt-alert
+        label: "Leave the architecture alone and set a budget alert with a monthly cap on the transfer meter"
+        correct: false
+        explain: >
+          A budget alert reports the number Evelyn already has. Cost anomalies of
+          this shape are usually a design telling you something - here, that 4 TB
+          a month of reads is happening a region away from the data - and the
+          remedy is to move the data or the reader. Governance measures cost;
+          architecture determines it.
+        rep: -10
+    next: END

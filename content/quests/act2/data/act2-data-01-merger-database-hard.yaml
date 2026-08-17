@@ -1,0 +1,241 @@
+schema_version: 1
+id: act2-data-01-merger-database-hard
+title: "Two Companies, One Database (Design Review)"
+act: 2
+chapter: act2-data
+domain: az305-d2
+order: 1
+role: associate-architect
+checkpoint: true
+bonus_variant_of: act2-data-01-merger-database
+summary: "Desmond has read the relational design twice and found the three things it does not answer."
+entry: e1-filestream
+
+encounters:
+  - id: e1-filestream
+    type: design_decision
+    title: "The module nobody mentioned"
+    speaker: mentor
+    objectives: [AZ305-2.1]
+    scenario: |
+      Desmond has been reading the Sunda schema rather than the Sunda summary,
+      which is why he is the one who found this.
+
+      "Their archive module stores scanned customs declarations as FILESTREAM
+      data inside the database. Forty gigabytes of it. Managed Instance does
+      not support FILESTREAM or FileTable and never has."
+
+      What is on the table:
+
+      - The declarations are read a few dozen times a month, mostly by the
+        customs broker, and must be retained seven years.
+      - WMS-Pro v8 - the version the merged estate is going to anyway, because
+        the vendor supports nothing older past next year - replaced FILESTREAM
+        with a blob URL column. The migration utility ships with v8.
+      - Sunda is currently on 6.2. The upgrade path is 6.2 to 7 to 8.
+      - Everything else in the design still needs cross-database queries, SQL
+        Agent, and linked servers.
+      - Nobody is being hired to patch operating systems.
+    prompt: "How do you handle the FILESTREAM dependency?"
+    options:
+      - id: opt-mi-and-blob
+        label: "Stay on Managed Instance, sequence the v8 upgrade before cutover, and use the vendor's utility to move declarations to blob storage with URLs in the column"
+        correct: true
+        explain: >
+          The dependency is a version artifact, not a permanent requirement:
+          the target version already stores declarations the way you would
+          design them anyway, and the vendor ships the migration. Sequencing the
+          upgrade ahead of the cutover removes the only feature gap between
+          WMS-Pro and Managed Instance while keeping cross-database queries,
+          SQL Agent, and linked servers - and forty gigabytes of read-rarely
+          scans belong in object storage regardless.
+        rep: 14
+      - id: opt-vm-everything
+        label: "Move the whole estate to SQL Server on an Azure VM, since one unsupported feature decides the platform"
+        correct: false
+        consequence: >
+          Desmond accepts it without argument, which should worry you, and adds
+          a monthly patching window to the run book with his own name on it.
+        explain: >
+          One feature used by one deprecated module, holding forty gigabytes
+          read a few dozen times a month, now dictates that a two-person team
+          owns guest OS patching, clustering, and backup jobs forever. Let the
+          smallest, least valuable dependency choose your platform and you will
+          reliably choose the most operationally expensive one.
+        rep: -8
+      - id: opt-split
+        label: "Managed Instance for the transactional catalogs and a small SQL Server VM that keeps the archive module on FILESTREAM"
+        correct: false
+        consequence: >
+          Eighteen months later the VM is still there, still on 6.2, and it is
+          the only thing blocking the v8 upgrade for everyone.
+        explain: >
+          It looks like a pragmatic split and it permanently preserves the thing
+          you were trying to retire, along with a second platform, a second
+          backup regime, and a cross-instance dependency the vendor does not
+          test. Splitting to accommodate a dependency that the target version
+          removes trades a one-off sequencing task for indefinite operational
+          debt.
+        rep: -8
+      - id: opt-stay-onprem
+        label: "Leave the archive module running on the Jakarta server and reach it over a linked server from Managed Instance"
+        correct: false
+        explain: >
+          It keeps the comms room in Jakarta in the critical path for a
+          seven-year retention obligation, on hardware the acquisition
+          diligence flagged, reached over a link that does not exist yet - the
+          site-to-site connection is nine months out in procurement. It also
+          leaves the v8 upgrade blocked by the same module, just at a distance.
+        rep: -10
+    next: e2-nonprod-compute
+
+  - id: e2-nonprod-compute
+    type: design_decision
+    title: "Six databases nobody uses at night"
+    speaker: cfo
+    objectives: [AZ305-2.2]
+    scenario: |
+      Evelyn found the non-production line while looking for something else.
+
+      "Six developer databases. I am told they are small. I would like to know
+      why they cost what the production reporting replica costs."
+
+      The facts:
+
+      - The vendor's unit test harness runs against a single database, so the
+        six developer sandboxes are Azure SQL Database rather than instances.
+      - 32 GB each. Four developers across Manila and Bandung use them roughly
+        09:00 to 18:00 on weekdays.
+      - Measured utilization: idle about 70 percent of all hours, including
+        every night and weekend.
+      - Within the working window, load is spiky and unpredictable - a test run
+        can want four vCores for ninety seconds and then nothing for an hour.
+      - A resume delay of up to a minute on the first connection after idle is
+        acceptable. The developers were asked and did not care.
+      - No developer database carries production personal data.
+    prompt: "Which compute tier do you recommend for the six sandboxes?"
+    options:
+      - id: opt-serverless
+        label: "General Purpose serverless, autoscaling between 0.5 and 4 vCores, with auto-pause after one hour of inactivity"
+        correct: true
+        explain: >
+          Serverless bills compute per second of actual use and stops billing it
+          entirely while a database is paused, which is the shape of a workload
+          idle 70 percent of the time. The autoscale range absorbs a
+          ninety-second four-vCore test run without provisioning for it around
+          the clock, and the stated tolerance for a one-minute resume is exactly
+          the trade auto-pause asks you to make.
+        rep: 14
+      - id: opt-provisioned
+        label: "Provisioned General Purpose, 2 vCores each, sized to the average working-hours load"
+        correct: false
+        consequence: >
+          Evelyn asks what the databases were doing at 03:00 on Sunday. The
+          answer is nothing, at full rate.
+        explain: >
+          Provisioned compute bills continuously whether or not anyone connects,
+          so 70 percent of the spend buys idle time - and 2 vCores still throttles
+          the four-vCore test spikes the scenario describes. Provisioned is the
+          right choice for predictable, continuous load, which is precisely what
+          the measurements say this is not.
+        rep: -8
+      - id: opt-elastic-pool
+        label: "Put all six in a General Purpose elastic pool so they share compute"
+        correct: false
+        explain: >
+          Elastic pools are the right answer when many databases have staggered,
+          uncorrelated peaks and the pool stays usefully busy. These six peak at
+          the same time - four developers in one working window - and the pool
+          bills continuously, so nights and weekends cost full rate with nothing
+          connected. Pools smooth concurrency; they do not remove idle spend.
+        rep: -6
+      - id: opt-basic
+        label: "Basic tier databases, the cheapest option that will hold 32 GB"
+        correct: false
+        consequence: >
+          The first test run against a realistic data volume takes eleven
+          minutes and the harness times out.
+        explain: >
+          Basic tops out at 2 GB, so it does not hold 32 GB at all, and the DTU
+          tiers below Premium cannot supply a four-vCore burst under any
+          configuration. Choosing on price before checking the capability
+          envelope produces an option that is cheap because it does not do the
+          job.
+        rep: -10
+    next: e3-partitioning
+
+  - id: e3-partitioning
+    type: design_decision
+    title: "Four billion rows and a six-hour delete"
+    speaker: mentor
+    objectives: [AZ305-2.3]
+    scenario: |
+      Desmond brings the projection he built after the Sunda volumes landed.
+
+      "shipment_event. Two hundred million rows today, four billion at seven
+      years. Here is what already hurts."
+
+      - The monthly purge of events older than 24 months is a DELETE. It runs
+        six hours, generates 90 GB of log, and last month it filled the log
+        volume and rolled back.
+      - Index rebuilds on the table no longer fit the maintenance window, so
+        they have been skipped for two quarters and the plans show it.
+      - Every query that matters filters on event_utc, usually a range inside
+        one month. There is no query that reads across the whole table.
+      - The table lives on the same Business Critical instance as the scanner
+        write path and any maintenance operation competes with it.
+      - Growth is even. There is no hot tenant and no skewed key.
+    prompt: "How do you make the largest table sustainable?"
+    options:
+      - id: opt-partition
+        label: "Range-partition the table by month on event_utc, purge by switching out the oldest partition, and rebuild indexes one partition at a time"
+        correct: true
+        explain: >
+          Partition switching is a metadata operation: the 24-month-old
+          partition leaves the table in milliseconds with almost no log, which
+          replaces a six-hour DELETE and 90 GB of log with something that fits
+          any window. Partition-level index rebuilds bring maintenance back
+          inside the window by touching one month instead of four billion rows.
+          And because every query filters on event_utc, partition elimination
+          makes those reads cheaper as a side effect.
+        rep: 14
+      - id: opt-shard
+        label: "Shard shipment_event across four databases by originating region and query them with elastic queries"
+        correct: false
+        consequence: >
+          The first cross-region operations report takes nine minutes and
+          returns a number nobody can reconcile.
+        explain: >
+          Sharding buys horizontal scale for a workload constrained by
+          concurrency or by a single instance's ceiling, and neither is the
+          stated problem - the problem is maintenance and purge on one large
+          table. In exchange you get cross-shard queries, four backup regimes,
+          and a routing layer the vendor's application does not have. Do not
+          distribute data to solve a maintenance problem.
+        rep: -10
+      - id: opt-scaleup
+        label: "Scale the instance to 24 vCores so the purge and the rebuilds finish inside the window"
+        correct: false
+        consequence: >
+          The purge finishes in four hours instead of six. The log volume fills
+          at the same point.
+        explain: >
+          More compute does not reduce the amount of log a DELETE of hundreds of
+          millions of rows generates, which is the failure that actually
+          happened, and it does not shrink the rebuild - it just runs the same
+          work faster while contending with the scanner path on a bigger node.
+          Vertical scaling addresses throughput limits, not operations whose
+          cost is proportional to rows touched.
+        rep: -8
+      - id: opt-hyperscale
+        label: "Move the WMS database to Hyperscale so storage and log are handled by the service"
+        correct: false
+        explain: >
+          Hyperscale's log service and near-instant file snapshot backups would
+          genuinely soften some of this, and it is still the wrong move here:
+          it is a platform migration with a cutover, it drops you from Business
+          Critical's local SSD write path that the 5 ms scanner budget depends
+          on, and it does nothing about index rebuilds on a four-billion-row
+          table. Partitioning solves the stated problems without changing tier.
+        rep: -6
+    next: END

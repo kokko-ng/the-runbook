@@ -1,0 +1,473 @@
+schema_version: 1
+id: act1-cmp-09-go-live
+title: "Go Live"
+act: 1
+chapter: act1-compute
+domain: az104-d3
+order: 9
+role: senior-cloud-admin
+checkpoint: true
+summary: "A name, a certificate, a backup and a way to release without holding your breath. Then the first release."
+entry: e1-custom-domain
+
+encounters:
+  - id: e1-custom-domain
+    type: design_decision
+    title: "The name"
+    speaker: manager
+    objectives: [AZ104-3.21]
+    scenario: |
+      Marketing have printed the address on the side of forty trailers, so the
+      name is not negotiable: track.meridianlogistics.com.sg.
+
+      The zone meridianlogistics.com.sg is hosted at the registrar, not in Azure.
+      The apex record points at the corporate website, which is a different
+      company's content management system and must not move. You have access to
+      the registrar's control panel through the marketing manager, who is
+      available for about ten minutes at a time.
+
+      The app currently answers on app-track-sea.azurewebsites.net.
+    prompt: "How do you map the name to the app?"
+    options:
+      - id: opt-cname-asuid
+        label: "Add a CNAME for track pointing at app-track-sea.azurewebsites.net, plus a TXT record at asuid.track holding the app's custom domain verification id, then add the hostname in App Service"
+        correct: true
+        explain: >
+          A subdomain maps to an App Service with a CNAME, which follows the app
+          wherever the platform moves it. The TXT record at asuid.<subdomain>
+          carries the app's custom domain verification id and proves you control
+          the name - without it, anyone able to create a CNAME could claim a
+          hostname on someone else's app. Both records must exist before App
+          Service will accept the binding.
+        rep: 10
+      - id: opt-a-record
+        label: "Add an A record for track pointing at the app's inbound IP address, since A records resolve faster than a CNAME"
+        correct: false
+        consequence: >
+          It works for five months. Then a configuration change moves the app's
+          inbound address and forty trailers advertise a name that resolves to
+          nothing.
+        explain: >
+          An A record is supported and is how you map an apex domain, where CNAMEs
+          are not allowed. For a subdomain it takes on a maintenance burden for no
+          benefit: the inbound address of a multi-tenant app is stable but not
+          guaranteed, and it changes when the app is deleted and recreated or when
+          bindings change. The asuid TXT record is required for an A record too.
+        rep: -6
+      - id: opt-outbound-ip
+        label: "Point the record at one of the app's outbound IP addresses listed on the properties blade"
+        correct: false
+        consequence: >
+          The name resolves to an address that has never accepted an inbound
+          connection. The marketing manager is unavailable until Thursday.
+        explain: >
+          Inbound and outbound addresses are different things. Outbound addresses
+          are the source addresses the app's own calls appear to come from, are
+          shared across a plan, and answer nothing. The inbound address is the one
+          that serves requests, and it appears under the custom domain
+          configuration for exactly this reason.
+        rep: -8
+      - id: opt-azure-first
+        label: "Add the hostname in App Service first and let Azure create the DNS records, then confirm with the registrar afterward"
+        correct: false
+        explain: >
+          Azure can manage records for you only when it hosts the zone - an Azure
+          DNS zone, or an App Service domain purchased through the portal. This
+          zone lives at a registrar Azure has no access to, so the binding
+          validation fails until the records exist. The order is always DNS first,
+          binding second.
+        rep: -6
+    next: e2-certificate
+
+  - id: e2-certificate
+    type: design_decision
+    title: "The padlock"
+    speaker: security
+    objectives: [AZ104-3.20]
+    scenario: |
+      Marcus has two requirements and one piece of history.
+
+      The requirements: no browser warning on the tracking page, and no client
+      negotiating anything older than TLS 1.2 - a scanner vendor's middleware is
+      the only thing that ever asks, and it has a supported update.
+
+      The history: in 2024 the certificate on the customer portal expired on a
+      Sunday of a long weekend, because renewal was a calendar reminder owned by
+      somebody who had left. Marcus mentions this without visible emotion, which
+      is worse.
+
+      The name is a single subdomain. The network team has a wildcard PFX for
+      *.meridianlogistics.com.sg used on the on-premises load balancer.
+    prompt: "How do you configure the certificate and TLS?"
+    options:
+      - id: opt-managed-cert
+        label: "Create an App Service managed certificate for the hostname, bind it with SNI SSL, turn on HTTPS Only, and set the minimum TLS version to 1.2"
+        correct: true
+        explain: >
+          A managed certificate is issued and renewed by the platform at no cost
+          once the custom domain is validated, which removes the calendar reminder
+          that failed in 2024. SNI SSL is the normal binding type and consumes no
+          dedicated address. HTTPS Only redirects plain HTTP rather than serving
+          it, and the minimum TLS version is a per-app setting that refuses older
+          handshakes outright.
+        rep: 12
+      - id: opt-wildcard-ip-ssl
+        label: "Upload the network team's wildcard PFX and bind it with IP-based SSL, so the same certificate covers everything"
+        correct: false
+        consequence: >
+          The binding takes a dedicated inbound address, the DNS record has to
+          change, and the renewal in fourteen months belongs to nobody again.
+        explain: >
+          The wildcard would serve the name correctly. IP-based SSL, though, is for
+          clients too old to support SNI - it allocates a dedicated inbound
+          address and changes the address your DNS points at. And uploading a
+          certificate makes renewal a human responsibility again, which is the
+          specific failure Marcus described.
+        rep: -8
+      - id: opt-frontdoor-http
+        label: "Terminate TLS at a content delivery layer in front of the app and let it talk to App Service over plain HTTP"
+        correct: false
+        explain: >
+          Terminating at the edge is a real pattern and it does not remove the need
+          for a certificate on the origin. Leaving the app answering HTTP means
+          anyone who learns the azurewebsites.net hostname can bypass the edge
+          entirely and read traffic in clear text. There is no edge layer in this
+          design in any case.
+        rep: -10
+      - id: opt-tls10
+        label: "Use a managed certificate but leave the minimum TLS version at 1.0, so the scanner vendor's middleware keeps working until they ship an update"
+        correct: false
+        consequence: >
+          The next compliance scan reports the site as accepting deprecated
+          protocol versions, and the vendor update has been available since March.
+        explain: >
+          TLS 1.0 and 1.1 are deprecated and their presence weakens every
+          connection, not just the middleware's. The vendor has a supported update
+          available, which makes this a scheduling problem rather than a technical
+          constraint. Where a genuine legacy client exists, the answer is to give
+          it its own endpoint rather than lower the floor for the public site.
+        rep: -10
+    next: e3-backup
+
+  - id: e3-backup
+    type: design_decision
+    title: "What are we actually protecting"
+    speaker: manager
+    objectives: [AZ104-3.22]
+    scenario: |
+      Priya, with the go-live checklist and one item left unticked.
+
+      "Backup. I know the code comes out of the pipeline, so tell me what happens
+      if somebody deletes the wrong thing on a Friday. There is a small database
+      behind the site for saved tracking preferences and notification email
+      addresses - about forty thousand rows. It is not in the pipeline. It is not
+      anywhere."
+
+      The plan is Standard. There is a storage account in the same subscription
+      and region already used for deployment artifacts.
+    prompt: "How do you configure backup for the app?"
+    options:
+      - id: opt-scheduled-backup
+        label: "Configure a scheduled App Service backup to a container in that storage account, include the linked database, retain 30 days, and test a restore into a slot"
+        correct: true
+        explain: >
+          App Service backup captures the app's content and configuration together
+          with linked Azure SQL or MySQL databases, on a schedule, to a storage
+          account container in the same subscription. Standard and above support
+          it. The restore test matters as much as the backup: restoring into a
+          slot proves the backup is usable without touching the live site, which
+          is the only way to know before you need it.
+        rep: 10
+      - id: opt-pipeline-is-backup
+        label: "Treat the deployment pipeline as the backup, since any version of the site can be redeployed from source control in minutes"
+        correct: false
+        consequence: >
+          Friday's deletion takes the preferences with it. The pipeline
+          faithfully redeploys a site with no data in it.
+        explain: >
+          Source control protects the code and nothing else. It does not hold the
+          forty thousand rows, the app settings and connection strings configured
+          outside the repository, or anything uploaded at runtime. Priya's question
+          was specifically about the part the pipeline does not own.
+        rep: -10
+      - id: opt-recovery-vault
+        label: "Protect the app with a Recovery Services vault, so it is covered by the same backup policy as the virtual machines"
+        correct: false
+        explain: >
+          Recovery Services vaults protect virtual machines, file shares, SQL in
+          VMs and a few other workloads - App Service is not among them. App
+          Service backup is a feature of the app itself, configured on the app and
+          writing to a storage account you nominate. Consistency of tooling is a
+          reasonable instinct and this is not a place where it applies.
+        rep: -8
+      - id: opt-other-subscription
+        label: "Back up to a storage account in the security team's separate subscription, so an attacker with rights here cannot delete the backups"
+        correct: false
+        explain: >
+          The isolation instinct is sound and the mechanism does not support it:
+          App Service backup requires a storage account in the same subscription as
+          the app, and it cannot write to an account whose firewall blocks it.
+          Protect the backups with a lock, immutability or role separation on a
+          storage account it can actually reach.
+        rep: -6
+    next: e4-slots
+
+  - id: e4-slots
+    type: design_decision
+    title: "Releasing without holding your breath"
+    speaker: mentor
+    objectives: [AZ104-3.24]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: cmp-slot-staging
+          label: "app-track/staging (slot)"
+          kind: app-service
+          group: grp-corp
+          status: planned
+      - op: add_edge
+        edge:
+          id: cmp-e-app-slot
+          source: cmp-app-track
+          target: cmp-slot-staging
+          kind: dependency
+          status: planned
+    scenario: |
+      Ops release on Tuesday mornings. The current process is that somebody
+      deploys to production at 07:00 and everybody looks at the site for ten
+      minutes.
+
+      Desmond has opinions. "Deploying to a live site restarts it, and the first
+      requests after a restart hit a cold worker that has to compile and warm its
+      caches. That is why your 07:00 releases produce a spike of slow responses
+      that nobody has ever explained. And when it goes wrong your rollback is
+      another deployment, which is another restart."
+
+      The plan is Standard, which allows five slots.
+    prompt: "How should releases work?"
+    options:
+      - id: opt-slot-swap
+        label: "Create a staging slot on the same plan, deploy there, warm it with an applicationInitialization path, then swap - keeping the previous version in staging as the rollback"
+        correct: true
+        explain: >
+          A swap exchanges the routing between two slots rather than redeploying
+          anything, so production never restarts and the version that was live
+          lands in staging ready to be swapped straight back. The warm-up paths in
+          applicationInitialization are requested against the staging instances
+          before the swap completes, so the workers that go live are already warm.
+          Slots on the same plan use the plan's existing instances and cost nothing
+          extra.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: cmp-slot-staging, status: healthy}
+          - {op: set_edge_status, edge: cmp-e-app-slot, status: healthy}
+      - id: opt-deploy-prod
+        label: "Keep deploying to production but move the release to 05:00, when almost nobody is using the site"
+        correct: false
+        explain: >
+          It reduces the number of people who see the cold start and changes
+          nothing else. The restart still happens, the rollback is still a second
+          deployment under pressure, and the release now happens when the fewest
+          people are awake to notice that it went wrong.
+        rep: -8
+      - id: opt-second-app
+        label: "Create a second App Service on its own plan as the staging environment, and repoint DNS to it at release time"
+        correct: false
+        consequence: >
+          The first release goes out at 07:00 and customers are split across two
+          versions until 07:45 while DNS caches expire.
+        explain: >
+          It doubles the plan cost and replaces an instant, atomic swap with DNS
+          propagation, which you do not control and cannot roll back quickly.
+          Slots exist because this pattern was common and unsatisfactory: they give
+          you the separate environment without the second plan or the name change.
+        rep: -10
+      - id: opt-auto-swap-nowarm
+        label: "Create the slot and enable auto swap so a successful deployment goes live immediately with no manual step"
+        correct: false
+        explain: >
+          Auto swap is a legitimate feature for pipelines with strong automated
+          gates before deployment, and it removes the human check that a staging
+          slot exists to provide. Without warm-up configured it also swaps cold
+          instances into production, reproducing the original symptom. Start with a
+          manual swap and automate once the gates are trustworthy. Without warm-up
+          configured it also swaps cold instances into production, reproducing the
+          original symptom.
+        rep: -6
+    next: e5-swap-incident
+
+  - id: e5-swap-incident
+    type: troubleshoot
+    title: "P1: Tracking page shows test data"
+    speaker: noc
+    objectives: [AZ104-3.24]
+    ticket:
+      id: "MER-5140"
+      reporter: "NOC Manila"
+      priority: "P1"
+      opened: "09:06"
+      body: |
+        Customer service report consignees seeing shipment references that are not
+        theirs, with delivery dates in 2019. Started shortly after 09:00. Release
+        MER-5133 swapped to production at 09:02. Site is up and fast, it is just
+        showing the wrong shipments. Two customers have already called.
+    on_enter_diagram_ops:
+      - {op: set_status, node: cmp-app-track, status: broken}
+      - {op: set_status, node: cmp-slot-staging, status: warning}
+    scenario: |
+      The first slot swap went perfectly. The site did not restart, the swap took
+      nine seconds, and the release notes were closed at 09:03.
+
+      At 09:06 the tracking page is serving shipments from 2019 to real
+      consignees, some of whom now have somebody else's delivery address on their
+      screen. Marcus is going to want to know how many.
+
+      The staging slot has been pointed at the test database all through
+      integration testing, which is what the test database is for.
+    time_budget: 6
+    investigate:
+      - id: inv-noc
+        label: "Ask the NOC exactly what the customers see"
+        speaker: noc
+        reveals: >
+          "Valid page, valid layout, wrong contents. Reference numbers resolve to
+          shipments that were delivered years ago. It is not an error, it is a
+          different data set."
+      - id: inv-dev
+        label: "Ask the development team what the staging slot was configured with"
+        speaker: ticket
+        reveals: >
+          "Staging points at sql-wms-test. It has to - we run destructive tests
+          against it. Production points at sql-wms-prod. Both connection strings
+          are named WmsDb and they are set on their own slots, which we assumed
+          meant they stay there."
+      - id: inv-desmond
+        label: "Ask Desmond what a swap does to configuration"
+        speaker: mentor
+        reveals: >
+          "It moves it. Settings and connection strings travel with the content
+          unless you have told the platform that a particular one belongs to the
+          slot rather than to the release. There is a checkbox. It is the whole
+          reason slots are safe, and it defaults to off."
+      - id: inv-marcus
+        label: "Ask Marcus about the disclosure question"
+        speaker: security
+        reveals: >
+          "Consignees seeing other consignees' addresses is reportable if it
+          persists. Get it back first, then I want the exact window and the
+          request count. Do not spend twenty minutes counting before you fix it."
+    commands:
+      - id: cmd-conn-prod
+        label: "List connection strings on the production slot"
+        command: "az webapp config connection-string list -g rg-web-sea -n app-track --query \"[].{name:name,value:value,slotSetting:slotSetting}\" -o table"
+        output: |
+          Name    Value                                              SlotSetting
+          ------  -------------------------------------------------  -------------
+          WmsDb   Server=sql-wms-test.database.windows.net;...       False
+        time_cost: 1
+        note: "Production is holding the test connection string, and the slotSetting flag is False."
+      - id: cmd-conn-staging
+        label: "List connection strings on the staging slot"
+        command: "az webapp config connection-string list -g rg-web-sea -n app-track --slot staging --query \"[].{name:name,value:value,slotSetting:slotSetting}\" -o table"
+        output: |
+          Name    Value                                              SlotSetting
+          ------  -------------------------------------------------  -------------
+          WmsDb   Server=sql-wms-prod.database.windows.net;...       False
+        time_cost: 1
+        note: "The two values swapped places. Staging is now pointed at the production database, which is worse than it looks."
+      - id: cmd-appsettings
+        label: "Show which app settings are marked as slot settings"
+        command: "az webapp config appsettings list -g rg-web-sea -n app-track --query \"[].{name:name,slotSetting:slotSetting}\" -o table"
+        output: |
+          Name                              SlotSetting
+          --------------------------------  -------------
+          APPLICATIONINSIGHTS_CONNECTION_STRING  True
+          ENVIRONMENT_NAME                  False
+          FEATURE_PARTIAL_TRACKING          False
+        time_cost: 1
+        note: "One setting was marked correctly, which shows somebody knew the feature existed."
+      - id: cmd-activity
+        label: "Confirm the swap in the activity log"
+        command: "az monitor activity-log list -g rg-web-sea --offset 1h --query \"[?contains(operationName.value,'slotsswap')].{op:operationName.value,caller:caller,at:eventTimestamp}\" -o table"
+        output: |
+          Op                                          Caller                 At
+          ------------------------------------------  ---------------------  --------------------------
+          Microsoft.Web/sites/slotsswap/action        release-pipeline       2026-08-25T09:02:14.771Z
+        time_cost: 1
+      - id: cmd-health
+        label: "Check the app is otherwise healthy"
+        command: "az webapp show -g rg-web-sea -n app-track --query \"{state:state,https:httpsOnly,tls:siteConfig.minTlsVersion}\" -o json"
+        output: |
+          {
+            "state": "Running",
+            "httpsOnly": true,
+            "tls": "1.2"
+          }
+        time_cost: 1
+        note: "Running, healthy, correctly configured, and serving the wrong database. Nothing here is broken."
+      - id: cmd-db-firewall
+        label: "Check whether the test database is even reachable from production"
+        command: "az sql server firewall-rule list -g rg-data-sea -s sql-wms-test -o table"
+        output: |
+          Name                  StartIpAddress    EndIpAddress
+          --------------------  ----------------  ----------------
+          AllowAzureServices    0.0.0.0           0.0.0.0
+        time_cost: 2
+        note: "The allow-Azure-services rule lets any Azure resource connect, which is why nothing failed loudly."
+    fixes:
+      - id: fix-swap-back-sticky
+        label: "Swap back immediately to restore production, then mark WmsDb as a deployment slot setting on both slots and swap again"
+        correct: true
+        explain: >
+          The swap back is the fastest possible remediation - it is the same nine
+          second routing change - and it returns both slots to the configuration
+          they had at 09:01. Marking the connection string as a deployment slot
+          setting makes it stay with the slot instead of travelling with the
+          content, which is what the flag is for. Then the release can go live
+          again, correctly, with each environment on its own database.
+        rep: 15
+        diagram_ops:
+          - {op: set_status, node: cmp-app-track, status: healthy}
+          - {op: set_status, node: cmp-slot-staging, status: healthy}
+      - id: fix-edit-prod
+        label: "Edit the production connection string by hand to point at sql-wms-prod and restart the app"
+        correct: false
+        consequence: >
+          Production is correct in four minutes. Staging is still pointed at the
+          production database, and this afternoon's destructive test run finds it.
+        explain: >
+          It repairs one half of a swap and leaves the other half armed. The
+          staging slot now holds the production connection string, so the next test
+          cycle writes to live data, and the next swap moves the wrong value across
+          again because the flag is still unset. It is also slower than swapping
+          back.
+        rep: -12
+      - id: fix-delete-slot
+        label: "Swap back, then delete the staging slot and return to deploying straight to production"
+        correct: false
+        consequence: >
+          The next release restarts the site at 07:00 and there is no rollback but
+          a redeployment.
+        explain: >
+          The swap back is right and the conclusion is wrong. Slots worked exactly
+          as documented; a configuration flag was not set. Removing the mechanism
+          because of a mistake in configuring it gives up atomic releases,
+          instant rollback and warm-up, and the next bad release has no way home.
+        rep: -10
+      - id: fix-same-value
+        label: "Swap back, then set both slots to the production connection string so a swap can never change which database is used"
+        correct: false
+        consequence: >
+          Integration testing is now performed against live consignee data.
+          Marcus finds out in November.
+        explain: >
+          It makes swaps predictable by removing the separation the staging
+          environment exists to provide. Every destructive test, every migration
+          rehearsal and every half-finished feature would run against production
+          data. The deployment slot setting flag exists precisely so a value can
+          stay with its environment while the code moves between them.
+        rep: -12
+    rewards:
+      under_budget_bonus: 5
+      skill_points: 2
+    next: END

@@ -22,7 +22,7 @@ encounters:
           id: st-manifests
           label: "stmeridianarchive (scans, dashcam)"
           kind: storage-account
-          group: grp-onprem
+          group: grp-ops
           status: planned
     scenario: |
       The NAS goes off on the fifteenth of next month. Facilities have already
