@@ -45,6 +45,51 @@ def _word_count(text: str) -> int:
     return len(re.findall(r"\S+", text))
 
 
+# House style, enforced so it does not drift as content is added.
+#
+# en-US spelling matches the Azure documentation the game teaches from, which
+# matters when a player searches a term they read here. Em-dashes and emoji are
+# ruled out by the project's tone.
+EN_GB_SPELLINGS = re.compile(
+    r"\b("
+    r"behaviour|colour|centre|licence|defence|analyse[ds]?|"
+    r"organis(?:e|ed|es|ing|ation)|recognis(?:e|ed|es|ing)|realis(?:e|ed|es|ing)|"
+    r"prioritis(?:e|ed|es|ing)|optimis(?:e|ed|es|ing|ation)|minimis(?:e|ed|es|ing)|"
+    r"maximis(?:e|ed|es|ing)|summaris(?:e|ed|es|ing)|apologis(?:e|ed|es|ing)|"
+    r"utilis(?:e|ed|es|ing)|authoris(?:e|ed|es|ing)|customis(?:e|ed|es|ing)|"
+    r"standardis(?:e|ed|es|ing)|specialis(?:e|ed|es|ing)|"
+    r"labelled|labelling|modelled|modelling|travelled|travelling|"
+    r"cancelled|cancelling|signalled|totalled|fuelled|marvellous|"
+    r"whilst|amongst|labour|favour|neighbour|programme"
+    r")\b",
+    re.IGNORECASE,
+)
+
+EMOJI = re.compile(r"[\U0001F300-\U0001FAFF☀-➿]")
+
+
+def _check_house_style(item: LoadedFile) -> list[Problem]:
+    problems: list[Problem] = []
+    text = item.path.read_text(encoding="utf-8")
+
+    for line_no, line in enumerate(text.splitlines(), start=1):
+        if "—" in line:
+            problems.append(
+                Problem(item.path, "em-dash; use a hyphen or restructure", f"line {line_no}")
+            )
+        if EMOJI.search(line):
+            problems.append(Problem(item.path, "emoji are not used", f"line {line_no}"))
+        for match in EN_GB_SPELLINGS.finditer(line):
+            problems.append(
+                Problem(
+                    item.path,
+                    f"en-GB spelling {match.group(0)!r}; the game matches the Azure docs",
+                    f"line {line_no}",
+                )
+            )
+    return problems
+
+
 def _schema_registry(schema_dir: Path) -> Registry:
     """Registry so quest.schema.json can $ref diagram.schema.json by filename."""
     registry = Registry()
@@ -530,6 +575,7 @@ def validate(tree: ContentTree) -> list[Problem]:
             available[act] = (diagrams.nodes(act), diagrams.edges(act))
         nodes, edges = available[act]
         problems += _check_quest(item, objectives, nodes, edges, quest_ids)
+        problems += _check_house_style(item)
         for encounter in item.data["encounters"]:
             for _, op in _all_diagram_ops(encounter):
                 if op["op"] == "add_node":

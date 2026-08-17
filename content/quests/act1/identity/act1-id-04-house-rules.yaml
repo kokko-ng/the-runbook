@@ -235,7 +235,7 @@ encounters:
         label: "Assign an Append policy that adds costcenter with a default value of 'unassigned' when the tag is missing"
         correct: false
         consequence: >
-          Compliance reaches one hundred percent. Evelyn's report gains a large row labelled unassigned.
+          Compliance reaches one hundred percent. Evelyn's report gains a large row labeled unassigned.
         explain: >
           Append guarantees the tag exists but not that it means anything, so
           every deployment that would have failed now silently lands in one

@@ -115,7 +115,7 @@ encounters:
           label: "global peering"
           status: planned
     scenario: |
-      Desmond has drawn a box on the whiteboard, labelled it "somewhere else,"
+      Desmond has drawn a box on the whiteboard, labeled it "somewhere else,"
       and sat down.
 
       "You want a second region. Fine. Tell me which one, and tell me why, and do
@@ -252,7 +252,7 @@ encounters:
           consistent recovery points about every 5 minutes, comfortably inside a
           15-minute RPO, and the recovery plan brings the tier up in tens of
           minutes rather than hours. Because the target VMs are not running you
-          pay for replicated storage and the ASR licence per instance, not for
+          pay for replicated storage and the ASR license per instance, not for
           eight idle machines. That is the cheapest option that actually meets
           both numbers, which is the answer Evelyn is asking for.
         rep: 12
