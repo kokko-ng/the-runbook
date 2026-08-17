@@ -1,0 +1,416 @@
+schema_version: 1
+id: act2-id-04-the-erp-that-will-not-move
+title: "The ERP That Will Not Move"
+act: 2
+chapter: act2-identity
+domain: az305-d1
+order: 4
+role: associate-architect
+checkpoint: true
+summary: "Kerberos, a vendor who stopped answering the phone, and thirty guests who need a 2009 web application."
+entry: e1-publish-erp
+
+encounters:
+  - id: e1-publish-erp
+    type: design_decision
+    title: "Publishing the ERP"
+    speaker: mentor
+    objectives: [AZ305-1.7]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2id-appproxy
+          label: "Application Proxy connector (Kallang)"
+          kind: on-premises
+          group: grp-onprem2
+          status: planned
+    scenario: |
+      The ERP at Kallang is the reason Meridian still owns a server room. It
+      runs on Windows, it authenticates with Windows Integrated Authentication,
+      and the vendor's last release note is from 2019.
+
+      Desmond lays out the problem without much sympathy for it.
+
+      "Thirty Sunda dispatchers need the ERP web interface to raise freight
+      bookings. They are guests in our tenant. They have no account in the
+      Kallang forest and they never will, because the tenants merge before that
+      forest does."
+
+      The constraints have all been said out loud by someone with authority.
+      Marcus will not open an inbound port to Kallang. Priya will not fund a VPN
+      client rollout across a company Meridian does not own yet. The vendor
+      cannot modify the application to support anything modern, and there is no
+      support contract to ask them under. And Marcus wants ERP sign-ins to
+      appear in Entra sign-in logs and to be subject to the Conditional Access
+      policy you designed, like every other application.
+
+      "So it has to be pre-authenticated in the cloud," Desmond says, "and it
+      has to end up presenting a Kerberos ticket to a 2009 application that has
+      never heard of any of this."
+    prompt: "How do you publish the ERP to the Sunda guests?"
+    options:
+      - id: opt-app-proxy
+        label: "Microsoft Entra Application Proxy: a connector on the Kallang network, pre-authentication in Entra, and Kerberos constrained delegation from the connector to the ERP"
+        correct: true
+        explain: >
+          The connector makes only outbound connections to the Entra Application
+          Proxy service, so no inbound port is opened at Kallang. Entra
+          pre-authenticates the user, which puts the ERP in the sign-in logs and
+          under Conditional Access exactly like any other enterprise
+          application. Kerberos constrained delegation lets the connector obtain
+          a ticket on the user's behalf so the unmodified application sees the
+          Windows Integrated Authentication it expects. Guests reach it over the
+          internet with no VPN client and no account in the Kallang forest.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2id-appproxy, status: healthy}
+          - op: add_edge
+            edge:
+              id: a2id-e-entra-appproxy
+              source: entra-meridian
+              target: a2id-appproxy
+              kind: identity
+              label: "pre-authentication"
+              status: healthy
+          - op: add_edge
+            edge:
+              id: a2id-e-appproxy-erp
+              source: a2id-appproxy
+              target: erp-kallang
+              kind: dependency
+              label: "Kerberos delegation"
+              status: healthy
+      - id: opt-p2s-vpn
+        label: "Extend the existing site-to-site VPN and issue point-to-site VPN profiles to the thirty Sunda dispatchers"
+        correct: false
+        consequence: >
+          Priya reads the line item for thirty client deployments on machines
+          Meridian's service desk cannot touch and asks what the alternative was.
+        explain: >
+          It fails two stated constraints at once: a VPN client rollout is
+          exactly what Priya declined to fund, and it places external users from
+          a company Meridian has not finished acquiring onto the corporate
+          network rather than in front of a single published application. It also
+          leaves the ERP without pre-authentication, so nothing appears in Entra
+          sign-in logs and Conditional Access never evaluates.
+        rep: -10
+      - id: opt-entra-ds
+        label: "Deploy Microsoft Entra Domain Services and migrate the ERP onto the managed domain so guests can authenticate against it"
+        correct: false
+        consequence: >
+          The vendor's installer refuses the new domain. There is nobody to call.
+        explain: >
+          Entra Domain Services provides a managed domain synchronized from the
+          tenant, and it is a real answer for lift-and-shift workloads that need
+          Kerberos or LDAP. It does not help here on two counts: the ERP cannot
+          be modified or moved under the constraint stated, and guest accounts
+          are not synchronized into a managed domain with usable credentials, so
+          the Sunda dispatchers would still have nothing to authenticate with.
+        rep: -8
+      - id: opt-appgw
+        label: "Publish the ERP through Application Gateway with a public IP and the web application firewall enabled"
+        correct: false
+        consequence: >
+          Marcus finds the listener during his own review. The conversation is
+          brief.
+        explain: >
+          Application Gateway terminates and inspects traffic; it does not
+          pre-authenticate users against Entra, so the ERP would be reachable
+          from the internet and its own 2009 login page would be the only control
+          in the path. That fails the Conditional Access requirement outright and
+          means opening inbound reachability to Kallang, which Marcus refused.
+          A web application firewall in front of an unauthenticated legacy
+          application is a delay, not a boundary.
+        rep: -12
+    next: e2-jakarta-legacy
+
+  - id: e2-jakarta-legacy
+    type: design_decision
+    title: "The Jakarta server room closes in March"
+    speaker: manager
+    objectives: [AZ305-1.7]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2id-entra-ds
+          label: "Entra Domain Services (Indonesia)"
+          kind: entra-id
+          group: grp-landing
+          status: planned
+    scenario: |
+      Sunda's server room lease ends in March and the board will not renew it.
+      Two of the applications inside it will not survive the move as they are.
+
+      Priya has the list. "Their dispatch scheduler binds to LDAP to look up
+      users and groups. Their document store uses Windows authentication against
+      a file share. Both were written by a contractor in 2014. Sunda's IT lead
+      says the contractor's company no longer exists."
+
+      What has to be true after March is on one slide.
+
+      Both applications keep working, on virtual machines lifted into the
+      Indonesia landing zone. They cannot be rewritten inside the transition
+      window; there is no vendor and no source control. Meridian's platform team
+      will not take on managing domain controllers - Desmond has been explicit
+      that patching, backup, and forest recovery for a directory nobody owns is
+      not a service he is offering. And the Jakarta AD forest itself is retired
+      at the same time, because the hardware is what the lease covers.
+    prompt: "How do the two legacy applications authorize access after the move?"
+    options:
+      - id: opt-entra-ds
+        label: "Deploy Microsoft Entra Domain Services in the Indonesia landing zone and join the lifted virtual machines to the managed domain"
+        correct: true
+        explain: >
+          Entra Domain Services provides LDAP, Kerberos, NTLM, and domain join
+          against a domain Microsoft operates, synchronized one way from the
+          tenant. That is the precise fit: applications that need legacy protocols
+          keep working unmodified, and there are no domain controllers for
+          Desmond's team to patch, back up, or recover. The design note that
+          matters is that the managed domain needs the legacy credential hashes
+          synchronized, so users change their password once after enablement
+          before Kerberos and NTLM work for them.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2id-entra-ds, status: healthy}
+          - op: add_edge
+            edge:
+              id: a2id-e-entra-entrads
+              source: entra-meridian
+              target: a2id-entra-ds
+              kind: identity
+              label: "one-way sync"
+              status: healthy
+      - id: opt-iaas-dc
+        label: "Build two domain controllers as Azure virtual machines in the Indonesia landing zone and replicate the Jakarta forest into them before the lease ends"
+        correct: false
+        consequence: >
+          Six weeks after cutover, a domain controller runs out of disk during
+          patching. It is 02:00 in Manila and nobody on shift has ever seen a
+          directory service restore.
+        explain: >
+          It is a completely valid architecture and the industry has run it for
+          twenty years, which is why it is tempting. It fails the constraint that
+          the platform team will not manage domain controllers: two IaaS domain
+          controllers bring patching, backup with an authoritative restore
+          procedure, FSMO role placement, and a forest recovery runbook that
+          somebody has to rehearse. Managed domain services exist to remove
+          exactly that burden.
+        rep: -8
+      - id: opt-app-proxy-again
+        label: "Publish both applications through Entra Application Proxy, as you did for the ERP at Kallang"
+        correct: false
+        explain: >
+          Application Proxy publishes HTTP and HTTPS applications and handles
+          user-facing pre-authentication. The dispatch scheduler performs an LDAP
+          bind and the document store uses Windows authentication to a file
+          share; neither is a web request the proxy can carry. Reaching for the
+          previous answer is reasonable and the protocol on the wire decides it.
+        rep: -6
+      - id: opt-rewrite
+        label: "Rewrite both applications to use OpenID Connect and Microsoft Graph before the lease expires"
+        correct: false
+        consequence: >
+          The estimate comes back at nine months. The lease ends in four.
+        explain: >
+          Modernization is the correct long-term answer and it is not available
+          on this timeline: the scenario states there is no vendor, no source
+          control, and no window to rewrite inside the transition. A design that
+          requires a capability the organization does not have is a wish. Lift
+          them onto a managed domain now, and put the rewrite on the roadmap with
+          a date.
+        rep: -6
+    next: e3-managed-identity
+
+  - id: e3-managed-identity
+    type: design_decision
+    title: "No passwords in the pipeline"
+    speaker: mentor
+    objectives: [AZ305-1.6]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2id-umi-wms
+          label: "id-wms-shared (user-assigned identity)"
+          kind: user
+          group: grp-sea
+          status: planned
+    scenario: |
+      The warehouse management system reaches two things: the SQL database
+      behind it and the manifest archive storage account. Today it reaches both
+      with credentials in application settings, which Desmond found while
+      writing the Indonesia deployment.
+
+      "There is a SQL login with a password, and there is a storage account key.
+      Both were set in 2023. Both are in the deployment pipeline. I am not
+      copying them into a second region."
+
+      What the design has to satisfy is short and specific.
+
+      No credential in configuration, in the pipeline, or in a template
+      parameter. The same access must work for the App Service and for the
+      nightly reconciliation Function, which run as separate resources. And the
+      grants must survive a regional failover to Indonesia without anyone
+      re-issuing permissions during the incident, because the recovery runbook
+      already has enough steps in it.
+    prompt: "How should the warehouse system authorize to SQL and to storage?"
+    options:
+      - id: opt-user-assigned
+        label: "One user-assigned managed identity shared by the App Service and the Function, granted Storage Blob Data Reader on the archive and a contained database user in SQL"
+        correct: true
+        explain: >
+          A managed identity has no credential to place anywhere, which satisfies
+          the first requirement absolutely rather than by rotation. Choosing a
+          user-assigned identity is what satisfies the other two: its object id
+          is stable and independent of the resources that use it, so the App
+          Service and the Function share one set of grants, and the same identity
+          can be attached to the Indonesia resources ahead of a failover with the
+          role assignments and the contained database user already in place.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2id-umi-wms, status: healthy}
+          - op: add_edge
+            edge:
+              id: a2id-e-wms-umi
+              source: wms-sea
+              target: a2id-umi-wms
+              kind: identity
+              status: healthy
+          - op: add_edge
+            edge:
+              id: a2id-e-umi-sql
+              source: a2id-umi-wms
+              target: sql-wms
+              kind: identity
+              label: "contained user"
+              status: healthy
+          - op: add_edge
+            edge:
+              id: a2id-e-umi-archive
+              source: a2id-umi-wms
+              target: st-archive2
+              kind: identity
+              label: "Blob Data Reader"
+              status: healthy
+      - id: opt-system-assigned
+        label: "System-assigned managed identities on the App Service and on the Function, each granted the roles it needs"
+        correct: false
+        consequence: >
+          The Indonesia failover test fails at step nine. The standby App Service
+          has an identity, and it is not the one with the role assignments.
+        explain: >
+          System-assigned identities are the simpler default and they are tied to
+          the lifecycle of the resource: the identity is created with it,
+          destroyed with it, and a resource rebuilt in another region gets a new
+          object id. That fails the requirement that grants survive a failover
+          without re-issuing permissions, and it also doubles every role
+          assignment because the App Service and the Function are separate
+          principals.
+        rep: -8
+      - id: opt-sp-secret
+        label: "Register an application, grant its service principal the roles, and store the client secret in application settings with a two-year expiry"
+        correct: false
+        consequence: >
+          Two years later the secret expires on a public holiday. The
+          reconciliation job has been failing quietly for three days.
+        explain: >
+          A service principal with a client secret is a credential in
+          configuration, which is the exact thing the requirement forbids, and it
+          reintroduces an expiry date that has to be tracked by a human. A
+          managed identity is a service principal whose credential Azure manages
+          and rotates for you, so choosing the manual version keeps the
+          complexity and discards the benefit.
+        rep: -10
+      - id: opt-key-in-vault
+        label: "Move the storage account key and the SQL password into Key Vault and have the app read them at startup"
+        correct: false
+        explain: >
+          This is a genuine improvement over settings in the pipeline and it is
+          still a shared secret: a storage account key grants full data plane
+          access with no per-identity attribution, and anyone who can read the
+          vault secret holds it. The requirement was no credential rather than a
+          better-hidden one. Key Vault is the right home for secrets that must
+          exist; this pair does not have to exist at all.
+        rep: -6
+    next: e4-group-strategy
+
+  - id: e4-group-strategy
+    type: design_decision
+    title: "Which groups govern what"
+    speaker: mentor
+    objectives: [AZ305-1.6]
+    scenario: |
+      Group strategy comes up because two different things both want to be
+      groups and only one of them can be synchronized.
+
+      Desmond sets it out. "Department groups live in on-premises AD. The ERP
+      reads them, the file servers read them, and they stay authoritative until
+      2028 because that is when the ERP goes. Fine. I sync them and we use them
+      for Azure role assignments."
+
+      Then the second requirement. Marcus wants privileged Entra roles assigned
+      to groups rather than to people, so that Privileged Identity Management
+      governs one object per role and joiners and leavers are a membership
+      change.
+
+      "That is where I ran into a wall," Desmond says. "I made a synced group
+      called sg-global-admins, went to make it eligible for Global
+      Administrator, and the portal would not let me. I would like to know
+      whether that is a bug or whether I am about to design something that
+      cannot exist."
+
+      He is not wrong to ask. The estate has to end up with one coherent group
+      model that covers both workload access and privileged roles.
+    prompt: "What group strategy do you recommend?"
+    options:
+      - id: opt-hybrid-split
+        label: "Synchronized on-premises AD groups for Azure resource role assignments, and separate cloud-only role-assignable security groups for privileged Entra roles under Privileged Identity Management"
+        correct: true
+        explain: >
+          Not a bug. A group can only be used for Entra role assignment if it was
+          created with the role-assignable property set, and that property can
+          only be set at creation on a cloud-only assigned-membership security
+          group - synchronized groups and dynamic groups are both excluded,
+          because their membership is controlled somewhere Entra does not govern.
+          Splitting the model is therefore the design: department groups keep
+          flowing from AD for workload RBAC, while a small set of cloud-only
+          role-assignable groups carries the privileged roles.
+        rep: 12
+      - id: opt-all-synced
+        label: "Synchronize everything from on-premises AD, including the privileged role groups, so there is one source of truth for membership"
+        correct: false
+        consequence: >
+          The design review stops at the first privileged group. It cannot be
+          created the way the document says.
+        explain: >
+          One source of truth is a good instinct and it is not available for this
+          case: a synchronized group cannot be made role-assignable, so it can
+          never be assigned an Entra directory role. The reason is a security
+          one - if it could, anyone with write access to the on-premises AD group
+          would effectively control Global Administrator membership from a
+          system with a different trust boundary.
+        rep: -8
+      - id: opt-all-cloud
+        label: "Create every group in the cloud, stop synchronizing groups from on-premises AD, and let the on-premises applications use direct user permissions"
+        correct: false
+        consequence: >
+          The ERP's authorization tables are rebuilt by hand for eleven hundred
+          users. The project runs into the following quarter.
+        explain: >
+          It would produce a clean model and it breaks the stated constraint that
+          on-premises AD remains authoritative for department groups until 2028,
+          because the ERP and the file servers read those groups directly. Group
+          writeback is not the answer either at this scope. Design for the estate
+          you have until the dependency actually retires.
+        rep: -8
+      - id: opt-dynamic
+        label: "Use dynamic membership groups keyed on department and job title for everything, so membership is always derived and never manually maintained"
+        correct: false
+        explain: >
+          Dynamic groups are excellent for broad workload access where an
+          authoritative attribute exists, and they are disqualified for the
+          privileged half of this design: a role-assignable group must have
+          assigned membership, so dynamic groups cannot hold Entra directory
+          roles. Using a rule to decide who is a Global Administrator would also
+          make an attribute edit into a privilege escalation path.
+        rep: -6
+    next: END

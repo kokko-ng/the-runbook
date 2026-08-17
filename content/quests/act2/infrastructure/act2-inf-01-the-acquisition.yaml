@@ -1,0 +1,406 @@
+schema_version: 1
+id: act2-inf-01-the-acquisition
+title: "The Acquisition"
+act: 2
+chapter: act2-infrastructure
+domain: az305-d4
+order: 1
+role: associate-architect
+checkpoint: true
+summary: "Meridian bought a competitor with a data center in it. You have nine months and a framework."
+entry: e1-brief
+
+encounters:
+  - id: e1-brief
+    type: design_decision
+    title: "Nine months and a data center"
+    speaker: manager
+    objectives: [AZ305-4.12]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2inf-sunda-dc
+          label: "Sunda Freight DC (Jakarta)"
+          kind: on-premises
+          group: grp-onprem2
+          status: warning
+      - op: add_node
+        node:
+          id: a2inf-sunda-erp
+          label: "Sunda ERP (SAP ECC)"
+          kind: on-premises
+          group: grp-onprem2
+          status: warning
+      - op: add_node
+        node:
+          id: a2inf-sunda-files
+          label: "Jakarta file servers (48 TB)"
+          kind: on-premises
+          group: grp-onprem2
+          status: warning
+      - op: add_edge
+        edge: {id: a2inf-e-dc-erp, source: a2inf-sunda-dc, target: a2inf-sunda-erp, kind: dependency}
+      - op: add_edge
+        edge: {id: a2inf-e-dc-files, source: a2inf-sunda-dc, target: a2inf-sunda-files, kind: dependency}
+    scenario: |
+      Priya Raman books the small meeting room, which is how you know it is
+      serious. The big one has a window and no privacy.
+
+      "Meridian is buying Sunda Freight. Jakarta, two hundred staff, they run the
+      Java corridor better than we do. Board approved it on Friday. They also
+      approved your new title, so congratulations, you are an associate
+      architect, which means you now write things other people have to build."
+
+      She turns the laptop around. A photograph of a server room with a floor fan
+      pointed at a rack.
+
+      "That is their data center. The lease ends in nine months and the landlord
+      will not renew. Two hundred and fourteen servers, an SAP ECC install nobody
+      admits to owning, and forty-eight terabytes of scanned delivery notes.
+      Evelyn needs a run-rate number before she signs anything, and she will not
+      accept a range wider than fifteen percent."
+
+      Desmond, from the doorway: "And whatever you write, I build. So write it in
+      an order I can build in."
+    prompt: "How do you sequence the migration program?"
+    options:
+      - id: opt-lift-now
+        label: "Start replicating servers next week with Azure Site Recovery and assess the estate as it lands"
+        correct: false
+        consequence: >
+          Six weeks in, forty-one servers are running in a subscription with no
+          policy assignments and Evelyn still has no number.
+        explain: >
+          Moving before you have assessed fails two stated requirements at once:
+          Evelyn's run-rate estimate needs a rationalized inventory that does not
+          exist yet, and there is no landing zone for Sunda's workloads to land
+          in. The Cloud Adoption Framework puts Ready before Migrate for exactly
+          this reason - governance applied after the fact means re-doing the
+          migration, and you do not have nine months twice.
+        rep: -10
+      - id: opt-caf-sequence
+        label: "Strategy and Plan first, then Ready by extending the existing landing zone, then Migrate in waves, then Govern and Manage"
+        correct: true
+        explain: >
+          This is the Cloud Adoption Framework sequence and each phase produces
+          the input the next one needs. Strategy captures the motivation - a lease
+          that ends in nine months, which is a hard event-driven migration. Plan
+          turns discovery output into a rationalized digital estate and the
+          business case Evelyn asked for. Ready extends the landing zone so
+          workloads arrive already governed. Migrate runs in dependency-ordered
+          waves. Govern and Manage hand the result to NOC Manila with policy and
+          monitoring already in place.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-sub-sunda
+              label: "Sunda (landing zone)"
+              kind: subscription
+              group: grp-landing
+              status: planned
+          - op: add_edge
+            edge: {id: a2inf-e-workloads-sunda, source: mg-workloads, target: a2inf-sub-sunda, kind: dependency}
+      - id: opt-greenfield
+        label: "Build Sunda a separate tenant and management group hierarchy so the acquisition can run independently of Meridian"
+        correct: false
+        consequence: >
+          Marcus Lim asks who is going to run cross-tenant B2B for two hundred
+          staff. Nobody volunteers.
+        explain: >
+          A second tenant is the right call when the acquired company must stay
+          legally or operationally separate, and nothing in the brief says that -
+          Sunda is being absorbed. It fails the timeline requirement: you would be
+          building identity, connectivity, and policy from zero alongside the
+          migration, with the same team, inside nine months. CAF's guidance for
+          acquisitions is to extend the existing landing zone unless a hard
+          separation requirement forces otherwise.
+        rep: -8
+      - id: opt-external
+        label: "Commission a six-week external assessment and decide the approach when the report lands"
+        correct: false
+        explain: >
+          Assessment is necessary and is already part of Plan, but outsourcing the
+          decision consumes six of your thirty-six weeks and produces a document
+          rather than a landing zone. It also fails the cost requirement in the
+          most direct way possible: consultancy fees against a business case that
+          has not been written yet.
+        rep: -6
+    next: e2-assessment
+
+  - id: e2-assessment
+    type: design_decision
+    title: "What is actually in there"
+    speaker: mentor
+    objectives: [AZ305-4.13]
+    scenario: |
+      Sunda's documentation is a Visio file last saved in 2019 and a shared drive
+      called NEW_FINAL. Two of their three infrastructure staff took the
+      redundancy package.
+
+      Desmond has been on a call with the one who stayed.
+
+      "Two hundred and fourteen guests on VMware 6.7, plus forty physical boxes
+      doing print, backup, and something he called 'the label thing'. No CMDB. He
+      thinks about a third of the guests are idle but he cannot prove it."
+
+      He hands you the constraints, written on the back of the printout:
+
+      - Business case due to Evelyn in six weeks, sizing accurate to fifteen percent
+      - The ERP is under change freeze until the quarter closes - no agents, no reboots
+      - Application dependencies unknown; nobody knows what talks to the label thing
+      - Right-sizing matters: Evelyn is comparing against the Jakarta lease renewal
+
+      "So. How do we find out what we bought."
+    prompt: "How do you discover and assess the Jakarta estate?"
+    options:
+      - id: opt-appliance
+        label: "Deploy the Azure Migrate appliance for agentless VMware discovery, collect thirty days of performance data, and run agentless dependency analysis"
+        correct: true
+        explain: >
+          Agentless discovery reads inventory and performance counters through
+          vCenter, which respects the ERP change freeze because nothing is
+          installed on the guests. Thirty days of collected data lets Azure
+          Migrate size on observed CPU, memory, and disk throughput rather than
+          allocated capacity, which is where the idle third gets found and where
+          the fifteen percent accuracy comes from. Agentless dependency analysis
+          maps the connections that explain the label thing, and thirty days fits
+          inside the six-week deadline with room to write the case.
+        rep: 10
+        diagram_ops:
+          - {op: set_label, node: a2inf-sunda-dc, label: "Sunda Freight DC (Jakarta) - 214 VMs, 40 physical"}
+      - id: opt-asis
+        label: "Import the vCenter inventory and size every target VM to match its current allocated cores and memory"
+        correct: false
+        consequence: >
+          The first draft business case comes back forty-two percent above the
+          Jakarta lease. Evelyn forwards it to you with no message body.
+        explain: >
+          As-on-premises sizing carries a decade of over-provisioning straight
+          into your run rate, and the brief says a third of the estate may be
+          idle. It fails the right-sizing requirement outright. Performance-based
+          sizing exists precisely because the number that matters is what the
+          workload uses, not what somebody requested in 2016.
+        rep: -8
+      - id: opt-agents
+        label: "Install the dependency agent and Log Analytics agent on all 254 machines for full agent-based dependency mapping"
+        correct: false
+        consequence: >
+          The SAP basis contractor sees an agent install request against a frozen
+          system and escalates to Priya before lunch.
+        explain: >
+          Agent-based dependency analysis gives richer per-process detail, but it
+          requires installing software on every machine, which the ERP change
+          freeze explicitly forbids, and coordinating 254 installs with a
+          two-person team inside six weeks. Agentless analysis is the right
+          trade here: less detail, no footprint, no change board.
+        rep: -8
+      - id: opt-survey
+        label: "Send Sunda's remaining admin a spreadsheet template and build the assessment from his answers"
+        correct: false
+        explain: >
+          One person's recollection is not an inventory, and he has already said
+          he cannot prove which machines are idle. It fails the accuracy
+          requirement and the dependency requirement in the same stroke. Human
+          survey data is useful for capturing business context - who owns what,
+          what the compliance constraints are - not for sizing.
+        rep: -6
+    next: e3-disposition
+
+  - id: e3-disposition
+    type: design_decision
+    title: "Five Rs and a fax gateway"
+    speaker: mentor
+    objectives: [AZ305-4.13, AZ305-4.14]
+    scenario: |
+      The assessment lands. Thirty days of data, and the picture is clearer than
+      anyone expected.
+
+      | Workload | Servers | Finding |
+      |---|---|---|
+      | SAP ECC 6.0 ERP | 11 | Vendor supports Azure IaaS only. Certified VM sizes published. |
+      | Freight billing (SQL Server 2014) | 6 | 340 GB, no cross-database queries, no CLR, no SQL Agent jobs outside the instance |
+      | Customs document store | 4 | 48 TB SMB file shares, 92 percent untouched in 18 months |
+      | Idle or orphaned | 31 | Zero network traffic observed in 30 days |
+      | Fax-to-EDI gateway | 2 | Windows Server 2008 R2, vendor dissolved in 2021 |
+
+      Priya wants a disposition for each before the wave plan.
+
+      "Evelyn's rule is that anything we lift and shift, we have to justify. Her
+      words were 'I am not paying Azure prices for Jakarta habits'."
+    prompt: "What disposition do you recommend for each group?"
+    options:
+      - id: opt-all-rehost
+        label: "Rehost everything to IaaS for speed, then modernize after the lease ends"
+        correct: false
+        consequence: >
+          Thirty-one idle servers arrive in Azure and start billing. Nobody
+          revisits them, because nobody ever does.
+        explain: >
+          Rehost-everything hits the lease deadline and fails Evelyn's stated
+          rule. Migrating the 31 idle servers pays Azure prices for machines with
+          zero observed traffic, and lifting an unsupported 2008 R2 gateway
+          carries a dead vendor's software into your estate. The five Rs exist so
+          that speed is applied where it earns something, not uniformly.
+        rep: -10
+      - id: opt-mixed
+        label: "Rehost SAP to IaaS, replatform SQL Server to Azure SQL Managed Instance, move the documents to Azure Files and Blob, retire the 31 idle servers, replace the fax gateway with a supported service"
+        correct: true
+        explain: >
+          Each disposition follows from a finding rather than a preference. SAP is
+          rehosted because the vendor's support matrix only covers IaaS - a
+          support statement is a hard constraint, not a taste. Billing goes to
+          Managed Instance because the assessment found no cross-database queries,
+          CLR, or external agent jobs, which are the usual blockers. Documents are
+          unstructured data with a cold access pattern, so they belong in storage
+          tiers rather than on file servers. Retiring 31 idle servers is free
+          savings, and an unsupported gateway from a dissolved vendor must be
+          replaced rather than moved.
+        rep: 10
+      - id: opt-all-paas
+        label: "Refactor everything to PaaS so nothing arrives as a virtual machine"
+        correct: false
+        consequence: >
+          The SAP vendor's support desk confirms in writing that they will not
+          take a call about a containerized ECC install.
+        explain: >
+          PaaS-first is a reasonable default and a bad absolute. SAP ECC has a
+          published support matrix that covers Azure IaaS and nothing else, so
+          refactoring it forfeits vendor support - and it would not fit the
+          nine-month window regardless. Modernization is chosen per workload
+          against evidence, and the evidence here says one workload is
+          contractually pinned to VMs.
+        rep: -8
+      - id: opt-defer
+        label: "Rehost the ERP and billing now, and leave the 48 TB document store on-premises until a later project"
+        correct: false
+        explain: >
+          The document store cannot stay: the lease ends in nine months and the
+          servers holding it are in the building. Deferring a workload is a valid
+          disposition only when there is somewhere for it to be deferred to. The
+          data is also the easiest thing in the estate to move, because it has no
+          runtime dependencies - only volume.
+        rep: -6
+    next: e4-landing-zone
+
+  - id: e4-landing-zone
+    type: design_decision
+    title: "Where Sunda lands"
+    speaker: security
+    objectives: [AZ305-4.12]
+    scenario: |
+      Marcus Lim has read the disposition list and arrives with the part he cares
+      about.
+
+      "Sunda has never had a security baseline. Their domain admin count is
+      eleven. Whatever you build, the day their first workload boots in our
+      tenant it has to already be under our policy - I am not chasing exemptions
+      afterwards."
+
+      Meridian's hierarchy is already in place: a root management group with
+      Platform and Workloads beneath it, Production and Non-production
+      subscriptions under Workloads, and the policy set that Act one's governance
+      work assigned at the Workloads level - required tags, allowed regions,
+      no public IPs on VMs without an exception.
+
+      "One more thing," Marcus says. "Their finance systems are audited
+      separately for the first two years post-acquisition. Different auditor,
+      different evidence pack."
+    prompt: "Where do Sunda's workloads land in the hierarchy?"
+    options:
+      - id: opt-sub-under-workloads
+        label: "A dedicated Sunda subscription under the Workloads management group, inheriting the existing policy set, with a separate resource group boundary for the audited finance systems"
+        correct: true
+        explain: >
+          A subscription under Workloads inherits the whole assigned policy set
+          from day one, which is exactly Marcus's requirement - the first workload
+          to boot is already governed. A dedicated subscription rather than a
+          shared one gives the separate audit its own scope for role assignments,
+          cost reporting, and evidence, without inventing a parallel hierarchy.
+          Management groups are for policy differences; Sunda has none yet.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: a2inf-sub-sunda, status: healthy}
+      - id: opt-into-prod
+        label: "Put Sunda's workloads into the existing Production subscription so there is one place to look"
+        correct: false
+        consequence: >
+          The first audit request asks for a cost and access report scoped to
+          Sunda only. It takes two days and a tag query.
+        explain: >
+          Policy inheritance would be correct, but it fails the separate-audit
+          requirement. Subscriptions are the natural boundary for cost,
+          quota, and role assignment scope, and a two-year external audit needs a
+          boundary an auditor can be granted read access to without seeing all of
+          Meridian production.
+        rep: -6
+      - id: opt-new-mg
+        label: "Create a Sunda management group beside Workloads with its own policy assignments tuned to what Sunda's systems can tolerate"
+        correct: false
+        explain: >
+          This is how policy drift starts. A sibling management group means
+          Meridian's baseline stops applying, and the tuned exceptions written to
+          accommodate 2014-era systems outlive the systems. Where a specific
+          workload genuinely cannot meet a policy, the answer is a scoped,
+          expiring exemption on that resource - visible, reviewable, and not a
+          second baseline.
+        rep: -8
+      - id: opt-root
+        label: "Assign the policy set at the root management group instead, so anything created anywhere is covered"
+        correct: false
+        consequence: >
+          The next platform deployment fails the no-public-IP policy. The platform
+          is the thing that needs public IPs.
+        explain: >
+          Broadening the assignment scope sounds safer and breaks the platform.
+          Workload policies such as no-public-IP-on-VM are written for workload
+          landing zones; the Connectivity subscription exists to hold firewalls
+          and gateways that must have public addresses. CAF separates Platform
+          from Workloads management groups so each can carry the policy that fits
+          it.
+        rep: -8
+    next: e5-check
+
+  - id: e5-check
+    type: knowledge_check
+    title: "Desmond, in the lift"
+    speaker: mentor
+    objectives: [AZ305-4.12]
+    scenario: |
+      Desmond reads the plan on his phone all the way down from the fourth floor.
+
+      "It is fine. One thing bothers me and it is a words problem, so it will
+      come up in the review."
+    question: >
+      Priya's slide says the Sunda program "follows the Cloud Adoption Framework
+      for reliability, security, and cost optimization." Marcus wants to know
+      which framework actually covers those three. What do you tell them?
+    options:
+      - id: opt-caf-covers
+        label: "CAF covers them - reliability, security, and cost optimization are CAF's design pillars"
+        correct: false
+        explain: >
+          Those are the pillars of the Well-Architected Framework, not CAF. Using
+          the names interchangeably is common and it matters in a design review,
+          because the two frameworks answer different questions and produce
+          different artifacts.
+      - id: opt-waf-pillars
+        label: "Those are Well-Architected Framework pillars; CAF governs the journey - strategy, plan, ready, adopt, govern, manage - and WAF governs the design of each workload inside it"
+        correct: true
+        explain: >
+          CAF is the organizational lifecycle: how a company decides to adopt
+          cloud, builds a landing zone, migrates, and then operates. WAF is the
+          per-workload design standard, with pillars of reliability, security,
+          cost optimization, operational excellence, and performance efficiency.
+          The Sunda program is a CAF program containing workloads that each get a
+          WAF review. Both apply; they are not the same document.
+      - id: opt-same
+        label: "They are two names for the same guidance, so either label is fine on the slide"
+        correct: false
+        explain: >
+          They overlap in spirit and differ in scope and output. CAF produces a
+          migration plan, a landing zone, and a governance model. WAF produces a
+          workload design review with trade-offs against five pillars. A review
+          board asking "which pillar did you trade off" is asking a WAF question,
+          and answering with a CAF phase will not land.
+    next: END

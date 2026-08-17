@@ -1,0 +1,355 @@
+schema_version: 1
+id: act2-data-03-photos-and-footage
+title: "Proof of Delivery, Proof of Everything"
+act: 2
+chapter: act2-data
+domain: az305-d2
+order: 3
+role: associate-architect
+checkpoint: true
+summary: "Forty thousand photos a day and six terabytes of dashcam footage a month. Somebody has to say where it all lives and for how long."
+entry: e1-blobs
+
+encounters:
+  - id: e1-blobs
+    type: design_decision
+    title: "Where the photos go"
+    speaker: mentor
+    objectives: [AZ305-2.6]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2data-st-pod
+          label: "Proof-of-delivery store (undecided)"
+          kind: storage-account
+          group: grp-sea
+          status: planned
+    scenario: |
+      Desmond has the Sunda handover notes and a face like a man reading a
+      weather forecast.
+
+      "Their proof-of-delivery photos are on a file server in Jakarta. Fourteen
+      terabytes of it. The share is called `POD_FINAL_new2`."
+
+      Combined across both fleets, once the merged driver app ships:
+
+      - About 40,000 photos per day. Signature capture plus a shot of the
+        consignment at the door. Average 280 KB, so roughly 11 GB per day and
+        4 TB per year.
+      - 95 percent of all reads happen in the first 14 days, while a customer
+        can still dispute a delivery.
+      - Statutory retention for shipping documents is seven years.
+      - Drivers upload straight from the handset over mobile data. Routing 11 GB
+        a day through the WMS app tier is not acceptable to Desmond and he has
+        the egress figures to say so.
+      - Nothing mounts a share. No process needs a drive letter or a POSIX path.
+      - Each upload needs its own short-lived, scoped write credential. Handsets
+        are lost roughly monthly.
+    prompt: "Where do the proof-of-delivery images live?"
+    options:
+      - id: opt-blob
+        label: "Azure Blob storage, block blobs, with a user delegation SAS minted per upload"
+        correct: true
+        explain: >
+          Blob storage is the default answer for large volumes of write-once,
+          read-occasionally objects that nothing needs to mount, and it is the
+          only option here that offers access tiers for the seven-year tail. A
+          user delegation SAS is signed with Entra ID credentials rather than
+          the account key, so it can be scoped to one blob, expire in minutes,
+          and be revoked by revoking the delegation key - which is the control
+          you want when a handset goes missing.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: a2data-st-pod, status: healthy}
+          - {op: set_label, node: a2data-st-pod, label: "stpodmeridian (block blob)"}
+          - op: add_edge
+            edge:
+              id: a2data-e-wms-pod
+              source: wms-sea
+              target: a2data-st-pod
+              kind: dependency
+      - id: opt-files
+        label: "An Azure Files premium share, with the WMS app tier writing photos on the driver's behalf"
+        correct: false
+        consequence: >
+          Desmond re-sends the egress figures with one line highlighted twice.
+        explain: >
+          Azure Files exists for the workload that genuinely needs SMB or NFS,
+          and the scenario states nothing mounts a share. It also fails two
+          other requirements: every upload has to pass through the app tier
+          because a share has no per-object short-lived credential model, and
+          premium file shares are provisioned by size with no archive tier for
+          a seven-year tail.
+        rep: -8
+      - id: opt-varbinary
+        label: "A varbinary(max) column on the WMS database, keeping photos beside the consignment record"
+        correct: false
+        consequence: >
+          The Business Critical instance passes its storage ceiling in month
+          nine and every nightly backup now takes four hours.
+        explain: >
+          Referential tidiness at a spectacular price. Seven years is roughly
+          28 TB, which is past what the instance holds, and every byte is
+          carried by database compute, database storage rates, and every backup
+          you take. Store binaries in object storage and the identifier in the
+          row - the pattern exists precisely because databases are the most
+          expensive place to keep a JPEG.
+        rep: -10
+      - id: opt-netapp
+        label: "Azure NetApp Files, so the Jakarta share can be migrated across as-is"
+        correct: false
+        explain: >
+          It would make the lift painless, and that is the whole of its case.
+          NetApp Files is priced for low-latency NFS and SMB workloads such as
+          SAP or HPC scratch, has no archive tier, and again nothing here needs
+          a filesystem. Migrating a bad shape faithfully is still migrating a
+          bad shape.
+        rep: -6
+    next: e2-tiers
+
+  - id: e2-tiers
+    type: design_decision
+    title: "Seven years of cold storage"
+    speaker: cfo
+    objectives: [AZ305-2.7]
+    scenario: |
+      Evelyn wants the seven-year number before she approves the four-year
+      number.
+
+      "Twenty-eight terabytes at the end of it. I have been sent the price list
+      and I can see there are four tiers, so I assume there are four wrong
+      answers and one right one."
+
+      What the tiers do, and what the business needs:
+
+      - Hot: highest storage rate, lowest access rate. Cool: cheaper storage,
+        higher access, 30-day minimum retention. Cold: cheaper again, 90-day
+        minimum. Archive: cheapest by an order of magnitude, offline, and a blob
+        must be rehydrated before it can be read.
+      - Moving or deleting a blob before its tier's minimum retention charges
+        the remainder anyway.
+      - 95 percent of reads land in the first 14 days. Disputes have been raised
+        as late as day 26.
+      - After 30 days, reads are legal and audit requests only: a few dozen a
+        year, with a five working day response window.
+      - Deletion at seven years must happen without anyone remembering to do it.
+    prompt: "What lifecycle management policy do you recommend?"
+    options:
+      - id: opt-lifecycle
+        label: "Lifecycle rule: Hot on write, tier to Cool at day 30, tier to Archive at day 180, delete at day 2555"
+        correct: true
+        explain: >
+          It matches spend to the read curve without ever paying an early
+          deletion charge. Hot covers the dispute window including the day-26
+          outliers; Cool carries the tail-off; 150 days in Cool clears the
+          30-day minimum before Archive; and Archive holds the six and a half
+          years where reads are a few dozen a year, with rehydration in hours
+          against a five-day window. The delete action is part of the rule, so
+          retention expiry is a policy rather than a reminder.
+        rep: 12
+      - id: opt-all-hot
+        label: "Leave everything in Hot - storage is cheap and rehydration delays are a support problem"
+        correct: false
+        consequence: >
+          Evelyn arrives at your desk with the fourth quarterly increase
+          printed out. She does not sit down.
+        explain: >
+          Hot storage for 28 TB costs roughly ten times Archive for data that
+          serves a few dozen reads a year. Balancing features, performance, and
+          cost means paying for the performance that a stated requirement asks
+          for - and after day 30 no requirement here asks for millisecond reads.
+        rep: -8
+      - id: opt-fast-archive
+        label: "Hot for 7 days, then straight to Archive, since almost all reads are in the first week"
+        correct: false
+        consequence: >
+          The disputes desk starts opening tickets titled "photo not loading"
+          and the rehydration charges appear on the same invoice.
+        explain: >
+          It misreads the requirement. The scenario says 95 percent of reads
+          land in the first 14 days and disputes have arrived at day 26 - so a
+          day-7 archive puts real customer-facing reads behind a rehydration
+          that takes hours and bills per gigabyte retrieved. It also incurs
+          Archive's 180-day early deletion charge on anything removed sooner.
+        rep: -8
+      - id: opt-cool-forever
+        label: "Hot for 30 days, then Cool for the remaining seven years, avoiding rehydration entirely"
+        correct: false
+        explain: >
+          Defensible and expensive. It correctly protects the dispute window and
+          then declines to use the tier built for exactly this access pattern:
+          Cool for six and a half years costs several times Archive for data
+          read a few dozen times a year, and the five working day response
+          window means rehydration latency was never a real constraint.
+        rep: -5
+    next: e3-redundancy
+
+  - id: e3-redundancy
+    type: design_decision
+    title: "Where the second copy is allowed to be"
+    speaker: security
+    objectives: [AZ305-2.8]
+    scenario: |
+      Marcus Lim has the Sunda customer contracts, which he has clearly read all
+      of, in the way that only he does.
+
+      "Two things and they pull against each other, so I want the design in
+      writing rather than a conversation."
+
+      - A signature photo is personal data under PDPA and under the clause
+        Sunda's Indonesian shippers insisted on. That clause permits storage in
+        Singapore and Jakarta and names Hong Kong as excluded, because one of
+        their customers is a state-owned enterprise with its own list.
+      - The Azure region pair for Southeast Asia is East Asia, which is Hong
+        Kong. Geo-redundant options replicate there and the choice of pair is
+        not configurable.
+      - Loss of a single datacenter must not lose proof-of-delivery images.
+        Ops has quantified a lost photo as a lost dispute, at an average SGD
+        1,900 credit note.
+      - Region-level loss is covered elsewhere: continuity is a separate design
+        and Priya does not want it solved twice.
+    prompt: "Which redundancy option do you recommend for the proof-of-delivery account?"
+    options:
+      - id: opt-lrs
+        label: "Locally-redundant storage, the cheapest option that keeps everything inside Southeast Asia"
+        correct: false
+        consequence: >
+          Marcus asks what happens if the datacenter holding those three copies
+          is the one that floods. You do not have an answer.
+        explain: >
+          LRS keeps three synchronous copies, and it keeps all three inside one
+          datacenter. It satisfies the residency clause and fails the explicit
+          requirement that the loss of a single datacenter must not lose images.
+          LRS protects against drive and rack failure, not against losing a
+          facility.
+        rep: -8
+      - id: opt-zrs
+        label: "Zone-redundant storage, three copies across three availability zones in Southeast Asia"
+        correct: true
+        explain: >
+          ZRS writes synchronously to three availability zones, which are
+          physically separate datacenters inside the region, so the loss of one
+          facility costs nothing and the write is still acknowledged. Every copy
+          stays in Southeast Asia, so the contractual exclusion of Hong Kong
+          holds without needing an exception. It is the option that satisfies
+          both constraints rather than trading one away.
+        rep: 12
+        diagram_ops:
+          - {op: set_label, node: a2data-st-pod, label: "stpodmeridian (block blob, ZRS)"}
+      - id: opt-grs
+        label: "Geo-redundant storage, for sixteen nines of durability"
+        correct: false
+        consequence: >
+          Marcus forwards the contract clause to Priya with your design attached
+          and the sentence "please confirm this is not what we are doing."
+        explain: >
+          GRS is the most durable option on the list and it replicates
+          asynchronously to the paired region, which for Southeast Asia is East
+          Asia in Hong Kong. The pairing is fixed and not selectable, so this is
+          a direct breach of the residency clause. Durability nines do not
+          override a contractual restriction on where bytes may sit.
+        rep: -12
+      - id: opt-ragzrs
+        label: "Read-access geo-zone-redundant storage, combining zone protection with a readable second region"
+        correct: false
+        explain: >
+          It is the strongest option Azure sells and it is wrong for the same
+          reason as GRS, only more expensively: the geo half still replicates to
+          East Asia. The zone half is exactly right, which is why ZRS - the same
+          design with the prohibited half removed - is the answer.
+        rep: -10
+    next: e4-dashcam
+
+  - id: e4-dashcam
+    type: design_decision
+    title: "Footage that has to hold up in court"
+    speaker: security
+    objectives: [AZ305-2.6, AZ305-2.8]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2data-st-dashcam
+          label: "Dashcam footage store (undecided)"
+          kind: storage-account
+          group: grp-sea
+          status: planned
+    scenario: |
+      The dashcam rollout is the insurers' idea, and their lawyers have written
+      the requirements.
+
+      - 260 trucks. About 6 TB per month, uploaded overnight when vehicles
+        return to depot wireless.
+      - Routine footage is kept 30 days and then deleted. Nobody wants it and
+        storing it is pure cost.
+      - Footage covering an incident is retained seven years and must be
+        demonstrably unaltered. An adjuster's report that says "the operator
+        could have overwritten this" is worth nothing.
+      - It must not be possible to delete retained incident footage before its
+        term - including by whoever holds Owner on the subscription. Marcus was
+        explicit that this includes him.
+      - When a claim opens and the retention term is unknown, deletion must be
+        blocked immediately and released later.
+      - Within a year, analytics want to sample frames from incident footage
+        with Spark, reading by date and vehicle folder paths.
+    prompt: "How do you design the dashcam footage store?"
+    options:
+      - id: opt-immutable
+        label: "A dedicated ADLS Gen2 account: a routine container with a 30-day delete rule, and an incident container with a locked time-based retention policy plus legal hold"
+        correct: true
+        explain: >
+          A locked time-based retention policy is write-once-read-many enforced
+          by the storage service, so no role - Owner included - can delete or
+          overwrite a blob inside its term, which is what makes the footage
+          admissible rather than merely stored. Legal hold blocks deletion with
+          no fixed term and is released explicitly, covering the open claim
+          case. Splitting containers keeps the disposable 6 TB per month
+          disposable, and hierarchical namespace gives the analytics team real
+          directory semantics and atomic renames.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2data-st-dashcam, status: healthy}
+          - {op: set_label, node: a2data-st-dashcam, label: "stdashcam (ADLS Gen2, WORM incident container)"}
+          - op: add_edge
+            edge:
+              id: a2data-e-wms-dashcam
+              source: wms-sea
+              target: a2data-st-dashcam
+              kind: dependency
+      - id: opt-same-account
+        label: "Reuse the proof-of-delivery account with an `incidents/` prefix and a cleanup script for everything else"
+        correct: false
+        consequence: >
+          Six months in, a cleanup script bug deletes 400 GB under a mistyped
+          prefix. Two of those folders were open claims.
+        explain: >
+          A naming convention is not an access control and a script is not a
+          retention guarantee. This design satisfies the storage requirement and
+          none of the evidentiary ones: nothing prevents overwrite, nothing
+          prevents deletion by an administrator, and there is no mechanism to
+          block deletion the moment a claim opens.
+        rep: -10
+      - id: opt-account-immutable
+        label: "One account with an account-level seven-year immutability policy covering all footage"
+        correct: false
+        consequence: >
+          Evelyn's storage forecast for year three reads 430 TB and she asks
+          which regulator required it.
+        explain: >
+          It meets the evidentiary requirement by applying it to data that does
+          not need it. Six TB per month of routine footage becomes undeletable
+          for seven years - roughly 500 TB you are contractually unable to
+          remove. Immutability is applied at the scope that matches the
+          obligation, which here is the incident container, not the account.
+        rep: -8
+      - id: opt-softdelete
+        label: "Blob soft delete with a 365-day window, plus a CannotDelete resource lock on the account"
+        correct: false
+        explain: >
+          Both are useful and neither is immutability. Soft delete is an undo
+          for accidents: the blob can still be overwritten, and a data-plane
+          write replaces the current version. A resource lock guards the control
+          plane and can be removed by anyone who can remove locks. Neither
+          produces the tamper-evidence the insurers asked for, and neither
+          survives the person you are protecting against.
+        rep: -8
+    next: END

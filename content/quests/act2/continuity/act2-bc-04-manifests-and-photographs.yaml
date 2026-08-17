@@ -1,0 +1,374 @@
+schema_version: 1
+id: act2-bc-04-manifests-and-photographs
+title: "Manifests and Photographs"
+act: 2
+chapter: act2-continuity
+domain: az305-d3
+order: 4
+role: associate-architect
+checkpoint: true
+summary: "Forty terabytes of proof of delivery, a customs auditor, and an ops share nobody owns."
+entry: e1-blob-protection
+
+encounters:
+  - id: e1-blob-protection
+    type: design_decision
+    title: "The script that ran twice"
+    speaker: mentor
+    objectives: [AZ305-3.4]
+    scenario: |
+      The archive storage account holds 40 TB: scanned manifests, signed
+      delivery notes, and about nine million proof-of-delivery photographs taken
+      on driver handsets.
+
+      Desmond has an incident report from six weeks ago that never became a
+      ticket.
+
+      "A cleanup script meant to remove one depot's 2019 photos ran against the
+      wrong prefix. We got lucky - the operator noticed inside the hour and the
+      objects were still in the change feed, so we pieced it back together by
+      hand. It took two days. There is no control here. There is only luck."
+
+      The requirements finance and operations agreed:
+
+      | Requirement | Value |
+      | --- | --- |
+      | Recover a blob overwritten by mistake | any time within 30 days |
+      | Recover blobs deleted by a script | any time within 30 days |
+      | Recover a container deleted whole | any time within 30 days |
+      | Second full copy of 40 TB | not funded |
+    prompt: "What do you turn on for the archive account?"
+    options:
+      - id: opt-versioning-softdelete
+        label: "Blob versioning, blob soft delete at 30 days, and container soft delete at 30 days"
+        correct: true
+        explain: >
+          Three settings for three rows. Versioning keeps the prior state of a blob
+          automatically on every overwrite, so a bad write is a version away from
+          being undone. Blob soft delete retains deleted blobs and their versions
+          for the retention period. Container soft delete is a separate feature and
+          the only thing that brings back a container someone dropped - deleting a
+          container is not the same operation as deleting the blobs inside it. None
+          of them duplicates the 40 TB; you pay only for retained versions and
+          deleted data during the window.
+        rep: 12
+        diagram_ops:
+          - {op: set_label, node: st-archive2, label: "Manifest archive (versioning + soft delete 30d)"}
+      - id: opt-blob-softdelete-only
+        label: "Blob soft delete at 30 days, which already retains deleted blobs and the previous state of overwritten ones"
+        correct: false
+        consequence: >
+          A cleanup of an empty depot container three months later takes the
+          container and everything the retention window was holding for it.
+        explain: >
+          This is close, and it is the reason to read the third row carefully. Blob
+          soft delete does cover both delete and overwrite of individual blobs. It
+          does not cover the deletion of a container - that operation removes the
+          container and its contents together, and only container soft delete
+          brings it back. One setting short of the requirement.
+        rep: -5
+      - id: opt-lifecycle-archive
+        label: "A lifecycle management policy moving blobs to the archive access tier after 30 days, so old data is preserved cheaply"
+        correct: false
+        explain: >
+          Access tiers are a cost control, not a data protection control. Archive
+          tier makes storage cheaper and reads slower - rehydration takes hours -
+          and it does absolutely nothing to stop a script deleting the blobs. This
+          conflates two decisions that look similar on a storage design page and
+          answer entirely different requirements.
+        rep: -10
+      - id: opt-azcopy-second
+        label: "A nightly AzCopy job replicating the whole archive to a second storage account with 30-day retention"
+        correct: false
+        consequence: >
+          Evelyn's line: "Which of the two forty-terabyte accounts is the one we
+          are keeping."
+        explain: >
+          It fails the cost row directly - a second full copy of 40 TB plus the
+          transfer cost every night - and it does not even deliver the protection,
+          because a deletion made before the nightly run propagates to the copy on
+          the next one. It also gives a scheduled job standing write credentials
+          over the backup target, which is a new thing to compromise.
+        rep: -10
+    rewards:
+      skill_points: 1
+    next: e2-immutability
+
+  - id: e2-immutability
+    type: design_decision
+    title: "Non-erasable, non-rewritable"
+    speaker: security
+    objectives: [AZ305-3.4]
+    scenario: |
+      Marcus arrives with the customs compliance pack and the internal auditor's
+      follow-up, stapled together because they ask for the same thing.
+
+      "Signed manifests are evidence. If a shipment is disputed three years from
+      now, we have to produce the manifest and be able to show it has not been
+      touched since it was written. Storing it is not the same as being able to
+      prove it."
+
+      The requirements:
+
+      | Requirement | Value |
+      | --- | --- |
+      | Manifests non-erasable and non-rewritable | 5 years from creation |
+      | Applied automatically to new blobs | yes, no operator step |
+      | Reducible by an administrator | no |
+      | Freeze a subset indefinitely for a legal case, released later | yes |
+      | Acceptable as audit evidence | yes |
+
+      "The last row is not a technical requirement," Marcus says. "It is the one
+      that decides this."
+    prompt: "How do you make the manifest container immutable?"
+    options:
+      - id: opt-locked-timebased
+        label: "A locked time-based retention policy of 5 years on the manifest container, with legal hold tags applied to the subset under dispute"
+        correct: true
+        explain: >
+          A time-based retention policy at container scope applies to every blob
+          written into it, with the interval measured from each blob's creation, so
+          nothing depends on an operator remembering. Locking the policy makes it
+          irreversible - retention can be extended but never shortened or removed,
+          by anyone, which is what makes it WORM storage an auditor will accept.
+          Legal hold is the separate, tag-based control for the disputed subset: it
+          holds those blobs regardless of the retention interval until the tag is
+          cleared.
+        rep: 12
+        diagram_ops:
+          - {op: set_label, node: st-archive2, label: "Manifest archive (locked WORM, 5y)"}
+      - id: opt-unlocked-timebased
+        label: "A time-based retention policy of 5 years, left unlocked so retention can be adjusted if the statute changes"
+        correct: false
+        consequence: >
+          The auditor's finding survives another cycle, reworded slightly.
+        explain: >
+          An unlocked policy can be shortened or deleted by anyone with the right
+          role, so it fails the row about being reducible by an administrator and
+          therefore fails the audit-evidence row too. Unlocked mode exists for
+          testing the policy before you commit to it. If the statute changes, a
+          locked policy can still be extended - only shortening is prohibited,
+          which is the entire point.
+        rep: -10
+      - id: opt-legal-hold-only
+        label: "Apply a legal hold to the manifest container and leave it in place permanently"
+        correct: false
+        explain: >
+          Legal hold has no expiry, so every manifest ever written would be held
+          forever and could never be aged out or deleted, which quietly converts a
+          five-year obligation into an unbounded storage bill. It also has to be
+          cleared by hand, so the five-year interval per blob is not expressed
+          anywhere. Legal hold is the right tool for the disputed subset and the
+          wrong tool for the statutory baseline.
+        rep: -8
+      - id: opt-rbac-lock
+        label: "Remove delete permissions with RBAC and put a CannotDelete resource lock on the storage account"
+        correct: false
+        consequence: >
+          Marcus: "So the control is that we asked people not to."
+        explain: >
+          Both of these are management-plane controls. A resource lock stops the
+          storage account being deleted and does nothing about the blobs inside it,
+          and RBAC assignments can be changed by anyone with User Access
+          Administrator. Neither produces the immutability attestation the customs
+          pack asks for. WORM has to be enforced by the storage service on the data
+          plane, not by permissions that a privileged identity can rewrite.
+        rep: -10
+    next: e3-archive-redundancy
+
+  - id: e3-archive-redundancy
+    type: design_decision
+    title: "Reading photographs during an outage"
+    speaker: manager
+    objectives: [AZ305-3.7]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2bc-st-archive-dr
+          label: "Archive secondary (East Asia, proposed)"
+          kind: storage-account
+          status: planned
+      - op: add_edge
+        edge:
+          id: a2bc-e-archive-repl
+          source: st-archive2
+          target: a2bc-st-archive-dr
+          kind: replication
+          label: "geo-replication"
+          status: planned
+    scenario: |
+      Priya has been through the archive's tier assignment with the customer
+      service manager, and it came back with a wrinkle.
+
+      "Archive is tier three - RPO 24 hours, RTO 72 hours, because nobody is
+      loading photographs onto the warehouse floor. But customer service says
+      that when the WMS is down, calls go up, and every one of those calls ends
+      with somebody asking us to look at a delivery photo. They can wait three
+      days to write. They cannot wait three days to read."
+
+      The requirements:
+
+      | Requirement | Value |
+      | --- | --- |
+      | Survive loss of the Southeast Asia region | yes |
+      | Survive loss of one datacenter with no data loss | yes |
+      | Read access to the archive during a regional outage | within 15 minutes, without initiating a failover |
+      | Write availability during a regional outage | not required |
+      | Second writable region | not funded |
+    prompt: "Which redundancy option do you recommend for the archive account?"
+    options:
+      - id: opt-ragzrs
+        label: "Read-access geo-zone-redundant storage"
+        correct: true
+        explain: >
+          Geo-zone-redundant storage writes synchronously across three availability
+          zones in Southeast Asia, which covers the zero-data-loss datacenter row,
+          and replicates asynchronously to East Asia, which covers regional loss.
+          The read-access option is the row about the fifteen minutes: it exposes a
+          secondary endpoint that customer service can read from immediately,
+          without anyone declaring or initiating a failover. It adds no writable
+          second region, so the cost row holds.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2bc-st-archive-dr, status: healthy}
+          - {op: set_edge_status, edge: a2bc-e-archive-repl, status: healthy}
+          - {op: set_label, node: st-archive2, label: "Manifest archive (RA-GZRS)"}
+      - id: opt-gzrs
+        label: "Geo-zone-redundant storage without read access to the secondary"
+        correct: false
+        consequence: >
+          Customer service is told the photographs exist in Hong Kong and cannot be
+          opened. They ask what the difference is.
+        explain: >
+          The data is replicated and durable, which satisfies the first two rows,
+          and the secondary endpoint is simply not readable. Getting to it means a
+          customer-managed failover, which is an account-level operation measured
+          in hours and converts the account to locally redundant afterwards - far
+          past fifteen minutes and disruptive besides. Read access is the
+          difference between a copy that exists and a copy you can use.
+        rep: -8
+      - id: opt-lrs
+        label: "Locally redundant storage, because the archive is tier three and the objectives are the loosest in the estate"
+        correct: false
+        explain: >
+          Loose recovery objectives are not the same as no requirement. Locally
+          redundant storage keeps three copies inside one datacenter, so it fails
+          both the regional row and the datacenter row on the same page. Tier three
+          justifies a 72-hour restore, not the absence of a second copy.
+        rep: -12
+      - id: opt-object-replication
+        label: "Geo-zone-redundant storage plus object replication into a writable account in Japan East"
+        correct: false
+        explain: >
+          This buys a fourth and fifth copy of 40 TB and a writable region in a
+          country no requirement mentions, so it fails the funding row outright.
+          Object replication is a good tool when you need a writable copy near
+          another set of consumers or a different lifecycle policy; here the
+          requirement is read access during an outage, which read-access
+          geo-redundancy already provides for the price of the secondary reads.
+        rep: -8
+    next: e4-file-share
+
+  - id: e4-file-share
+    type: design_decision
+    title: "The share nobody owns"
+    speaker: mentor
+    objectives: [AZ305-3.4, AZ305-3.7]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2bc-files-ops
+          label: "Azure Files - ops share (proposed)"
+          kind: storage-account
+          group: grp-sea
+          status: planned
+      - op: add_node
+        node:
+          id: a2bc-bkv-files
+          label: "bv-meridian-files (proposed)"
+          kind: backup-vault
+          group: grp-platform
+          status: planned
+      - op: add_edge
+        edge:
+          id: a2bc-e-files-bkv
+          source: a2bc-files-ops
+          target: a2bc-bkv-files
+          kind: dependency
+          status: planned
+    scenario: |
+      Sunda Freight's file server came across with the acquisition and became an
+      Azure file share, because that was the fastest thing to do in the week
+      available. It is now 2 TB of customs paperwork, rate cards, and one
+      spreadsheet that four depots depend on.
+
+      Desmond is unsentimental about it.
+
+      "No owner, no backup, and the Jakarta office deletes something roughly once
+      a fortnight. Right now the answer is that it is gone."
+
+      The requirements:
+
+      | Requirement | Value |
+      | --- | --- |
+      | Restore a file deleted or overwritten | any point in the last 45 days |
+      | Who performs the restore | the service desk, without a change request |
+      | Survive loss of one datacenter in Southeast Asia | yes |
+      | Recovery time for total share loss | 4 hours |
+      | Third-party backup product | not approved |
+    prompt: "How do you protect the ops file share?"
+    options:
+      - id: opt-backup-files
+        label: "Zone-redundant Azure Files with Azure Backup for file shares, taking daily snapshots retained for 45 days"
+        correct: true
+        explain: >
+          Azure Backup protects file shares with scheduled share snapshots managed
+          by a vault, and restores can target a single file or the whole share,
+          which is what lets the service desk handle a fortnightly deletion without
+          a change request. Forty-five days of daily points sits well inside the
+          snapshot retention limits, and zone-redundant storage keeps the share
+          available through the loss of one datacenter. Nothing here is a
+          third-party product.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2bc-files-ops, status: healthy}
+          - {op: set_status, node: a2bc-bkv-files, status: healthy}
+          - {op: set_edge_status, edge: a2bc-e-files-bkv, status: healthy}
+          - {op: set_label, node: a2bc-files-ops, label: "Azure Files - ops share (ZRS)"}
+      - id: opt-file-sync
+        label: "Azure File Sync to a Windows Server at Kallang, using the server's local copy as the recovery source"
+        correct: false
+        consequence: >
+          Jakarta deletes a rate card at 09:10. Kallang deletes the same rate card
+          at 09:10 and change tracking records that it worked correctly.
+        explain: >
+          File Sync is a synchronization and cloud-tiering technology, not a backup
+          - it faithfully replicates deletions and overwrites to every endpoint,
+          usually within minutes. It is genuinely useful for putting a fast local
+          cache in front of a share, and it provides no recovery point at all, so
+          it fails the forty-five-day row completely.
+        rep: -10
+      - id: opt-grs-no-snapshots
+        label: "Move the share to a geo-redundant storage account so the data is replicated to East Asia"
+        correct: false
+        explain: >
+          Geo-redundancy answers a question nobody asked here - the requirement
+          table has a datacenter row and no regional row - and it does not provide a
+          single recovery point, so the fortnightly deletion is still unrecoverable.
+          Replication copies whatever happened, including the mistake. Zone
+          redundancy plus snapshots is both cheaper and the actual answer.
+        rep: -8
+      - id: opt-azcopy-blob
+        label: "A nightly AzCopy job writing the share into a blob container with a 45-day lifecycle rule"
+        correct: false
+        explain: >
+          Copying an SMB share into blob storage loses the NTFS permissions and
+          directory metadata, so a restore is a reconstruction rather than a
+          restore, and it can only be done by someone with access to the blob
+          container - failing the service-desk row. It also gives you one recovery
+          point a night from a job that has to be monitored, where the platform
+          feature does the same work with a retention policy and a vault.
+        rep: -8
+    rewards:
+      skill_points: 1
+    next: END

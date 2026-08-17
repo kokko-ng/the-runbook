@@ -113,16 +113,36 @@ async function nextQuest() {
             </section>
 
             <section v-else-if="game.questComplete" class="panel mt-2 p-4">
-              <p class="eyebrow mb-1">Job closed</p>
-              <p class="mb-3 font-serif text-[1.0625rem] leading-relaxed">
-                {{ current?.title }} is done. The estate is what you made it.
-              </p>
-              <div class="flex flex-wrap gap-2">
-                <button type="button" class="btn btn-primary" @click="nextQuest">
-                  Take the next job
-                </button>
-                <RouterLink to="/" class="btn btn-quiet">Back to the chapter list</RouterLink>
-              </div>
+              <template v-if="game.careerComplete">
+                <p class="eyebrow mb-1">Solutions architect</p>
+                <p class="mb-3 font-serif text-[1.0625rem] leading-relaxed">
+                  That is the last of it. The estate on the right is the one you designed, and
+                  the people who run it can explain why it is shaped the way it is, because you
+                  wrote that down. Desmond has stopped checking your work.
+                </p>
+                <p class="mb-3 text-[0.875rem] text-[var(--ink-muted)]">
+                  Every objective you cleared is lit in the skills drawer. If any are still dark,
+                  they are the ones worth revisiting before you sit the exam.
+                </p>
+                <div class="flex flex-wrap gap-2">
+                  <button type="button" class="btn btn-primary" @click="ui.toggleSkills()">
+                    Review the skill tree
+                  </button>
+                  <RouterLink to="/" class="btn btn-quiet">Back to the chapter list</RouterLink>
+                </div>
+              </template>
+              <template v-else>
+                <p class="eyebrow mb-1">Job closed</p>
+                <p class="mb-3 font-serif text-[1.0625rem] leading-relaxed">
+                  {{ current?.title }} is done. The estate is what you made it.
+                </p>
+                <div class="flex flex-wrap gap-2">
+                  <button type="button" class="btn btn-primary" @click="nextQuest">
+                    Take the next job
+                  </button>
+                  <RouterLink to="/" class="btn btn-quiet">Back to the chapter list</RouterLink>
+                </div>
+              </template>
             </section>
 
             <EncounterPanel v-else class="mt-2" />

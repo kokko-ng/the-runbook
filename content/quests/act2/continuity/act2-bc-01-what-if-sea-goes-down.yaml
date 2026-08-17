@@ -200,8 +200,8 @@ encounters:
       - op: add_node
         node:
           id: a2bc-wms-dr
-          label: "WMS (East Asia, proposed)"
-          kind: app-service
+          label: "WMS app tier (East Asia, proposed)"
+          kind: vm
           status: planned
       - op: add_edge
         edge:
@@ -218,8 +218,9 @@ encounters:
       am buying, because in my experience a standby environment is a thing we pay
       for every month and use once, at a drill, badly."
 
-      What is in scope: the WMS tier - eight VMs behind a load balancer, 3 TB of
-      attached data disks, and its Azure SQL database.
+      What is in scope: the WMS application tier, which the vendor ships as
+      virtual machines - eight of them behind a load balancer, 3 TB of attached
+      data disks - and its Azure SQL database.
 
       The requirements, agreed:
 
@@ -256,7 +257,7 @@ encounters:
           both numbers, which is the answer Evelyn is asking for.
         rep: 12
         diagram_ops:
-          - {op: set_label, node: a2bc-wms-dr, label: "WMS (East Asia, ASR warm standby)"}
+          - {op: set_label, node: a2bc-wms-dr, label: "WMS app tier (East Asia, ASR warm standby)"}
           - {op: set_status, node: a2bc-wms-dr, status: planned}
       - id: opt-backup-restore
         label: "Nightly Azure Backup to a geo-redundant vault, restored into East Asia by cross-region restore when a disaster is declared"

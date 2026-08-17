@@ -1,0 +1,347 @@
+schema_version: 1
+id: act1-id-04-house-rules
+title: "House Rules"
+act: 1
+chapter: act1-identity
+domain: az104-d1
+order: 4
+role: junior-cloud-admin
+checkpoint: true
+summary: "Nine resource groups, no naming convention, and a CFO who wants to know what Johor costs."
+entry: e1-resource-groups
+
+encounters:
+  - id: e1-resource-groups
+    type: design_decision
+    title: "Nine resource groups and a scavenger hunt"
+    speaker: manager
+    objectives: [AZ104-1.12]
+    scenario: |
+      Priya shares her screen with the subscription's resource group list open.
+
+      rg-hub-sea. rg-ops-sea. rg-temp-test. rg-wms-final. rg-wms-final-v2.
+      rg-desmond. rg-poc-johor-DELETE-ME. rg-migration. rg-new.
+
+      "Six months of nobody deciding anything. The Johor build lands in three
+      weeks and I would like it to land somewhere with a shape."
+
+      Two facts you confirm before answering. A resource group's location stores
+      only the group's own metadata, so resources inside it may sit in any
+      region. And resource groups do not nest - the scope hierarchy runs
+      management group, subscription, resource group, resource, with nothing in
+      between.
+
+      What a resource group actually is, operationally: the unit you delete, the
+      unit you assign roles at, and the unit you lock. Everything else about it
+      is naming.
+
+      "Give me a rule," Priya says. "One sentence that tells the next person
+      where to put a thing."
+    prompt: "What organizing principle do you propose for resource groups?"
+    options:
+      - id: opt-by-type
+        label: "One resource group per resource type - all VMs in rg-vms, all networking in rg-networks, all storage in rg-storage"
+        correct: false
+        consequence: >
+          Decommissioning the proof-of-concept becomes an afternoon of cross-referencing.
+        explain: >
+          Resource types do not share a lifecycle, so nothing you ever want to
+          do to a whole group lines up with this boundary. Deleting a retired
+          workload means picking its pieces out of four groups, and RBAC ends up
+          granted per technology rather than per team. Group by what you delete
+          together, not by what looks alike.
+        rep: -8
+      - id: opt-lifecycle
+        label: "One resource group per workload per environment, named for the workload, environment, and region"
+        correct: true
+        explain: >
+          The resource group is the delete boundary, the natural RBAC scope, and
+          the natural lock scope, so it should contain things that live and die
+          together. A group per workload per environment means retiring the
+          Johor pilot is one deletion, granting the WMS vendor access is one
+          assignment, and nobody has to ask where a new resource belongs. Encode
+          region in the name rather than relying on the group's own location,
+          which describes only where its metadata lives.
+        rep: 10
+        diagram_ops:
+          - {op: set_label, node: rg-ops, label: "rg-ops-sea (WMS production)"}
+      - id: opt-one-rg
+        label: "One resource group for the whole subscription - everything in one place is easier to find"
+        correct: false
+        explain: >
+          Findability is what tags and search are for. Collapsing to one group
+          means one delete boundary for the entire estate, one RBAC scope so
+          every grant is all-or-nothing, and a lock that either protects
+          everything or nothing. You would be discarding the only structural
+          control available between subscription and resource.
+        rep: -8
+      - id: opt-by-person
+        label: "One resource group per engineer who deploys, so ownership is never ambiguous"
+        correct: false
+        consequence: >
+          rg-desmond already exists. Nobody remembers what is in it.
+        explain: >
+          People change teams and leave; workloads outlive them. Naming the
+          boundary after a person guarantees orphans the moment someone moves,
+          and it fragments a single workload across as many groups as it had
+          contributors. Record ownership as a tag on resources that are grouped
+          by lifecycle.
+        rep: -10
+    next: e2-tags
+
+  - id: e2-tags
+    type: design_decision
+    title: "What does Johor cost"
+    speaker: cfo
+    objectives: [AZ104-1.11]
+    scenario: |
+      Evelyn asks the question she has been asking since February.
+
+      "What does Johor cost? Not the subscription. Johor."
+
+      The bill arrives as one number per subscription per month. Cost analysis
+      can group and filter by resource group, by resource type, by location, and
+      by tag. It cannot group by anything that is not one of those things.
+
+      Two behaviors matter here. Azure resources do not inherit their resource
+      group's tags automatically - a resource carries only the tags set on it,
+      and cost records reflect the resource's own tags. And while tag names are
+      case-insensitive, tag values are case-sensitive, so Prod and prod are two
+      different rows in a report.
+
+      Meridian's finance system already has cost center codes. Johor operations
+      is CC-4400. Kallang shared services is CC-4100.
+
+      "I do not want a project," Evelyn says. "I want a column."
+    prompt: "What tagging scheme do you propose?"
+    options:
+      - id: opt-rg-only
+        label: "Tag the resource groups with the cost center - resources inherit their group's tags"
+        correct: false
+        consequence: >
+          The tags look correct in the portal. The cost report shows every resource as untagged.
+        explain: >
+          Azure does not propagate resource group tags to resources. Tagging the
+          group is useful for organizing groups, but usage records carry the
+          resource's own tags, so cost analysis grouped by cost center returns
+          one large untagged bucket. Inheritance is achievable, but only by a
+          policy with the modify effect that writes the tag onto each resource.
+        rep: -8
+      - id: opt-small-set
+        label: "A small mandatory set - costcenter, environment, owner, workload - applied to resources, with values drawn from a fixed list"
+        correct: true
+        explain: >
+          Four keys is small enough that people actually apply them and broad
+          enough to answer the questions finance, security, and operations
+          keep asking. Applying them at resource level is what makes them show
+          up in cost records, and constraining values to a fixed list stops
+          prod, Prod, and production from splitting one workload across three
+          rows in Evelyn's report. Cost center maps to codes finance already
+          uses, so the column reconciles without translation.
+        rep: 10
+        diagram_ops:
+          - {op: set_label, node: rg-ops, label: "rg-ops-sea (costcenter CC-4400)"}
+      - id: opt-many-tags
+        label: "Fourteen tags covering everything finance, security, and operations might ever want to slice by"
+        correct: false
+        explain: >
+          The limit is fifty tags per resource, so fourteen is legal and still a
+          bad idea: the more keys you mandate, the more of them are filled in
+          with whatever makes the deployment succeed. A tag scheme is only worth
+          what its worst-maintained key is worth. Start with the keys somebody
+          has actually asked to report on and add more when a real question
+          needs one.
+        rep: -5
+      - id: opt-naming
+        label: "Encode cost center and environment in resource names instead - vm-wms-prod-cc4400-01"
+        correct: false
+        explain: >
+          Names are length-limited, constrained differently by every resource
+          provider, and effectively immutable once resources are referenced by
+          them. Cost analysis cannot group by a substring of a name, so Evelyn's
+          column still does not exist. Tags are mutable metadata designed for
+          exactly this; names are identifiers.
+        rep: -8
+    next: e3-policy
+
+  - id: e3-policy
+    type: design_decision
+    title: "Making the tag actually appear"
+    speaker: security
+    objectives: [AZ104-1.9]
+    scenario: |
+      Two weeks after the tagging standard is published, Marcus runs a count.
+      Thirty-one resources have been created since. Nine carry a costcenter tag.
+
+      "The standard is fine," he says. "The standard is on a wiki page. Wiki
+      pages are not a control."
+
+      Azure Policy evaluates resource creation and update requests at Azure
+      Resource Manager, which is the layer everything goes through - portal,
+      CLI, Bicep, Terraform, and the vendor's deployment pipeline alike.
+
+      The effects available to you include Audit, which records compliance and
+      allows the request; Deny, which rejects the request outright; Append and
+      Modify, which add or set properties on the way through; and Disabled.
+
+      There is a built-in policy definition, "Require a tag on resources", that
+      takes the tag name as a parameter.
+
+      Priya's position, delivered over Marcus's shoulder: "I do not want a
+      report about untagged resources. I want there to be no untagged
+      resources."
+    prompt: "How do you enforce the costcenter tag on new resources?"
+    options:
+      - id: opt-deny
+        label: "Assign 'Require a tag on resources' with the Deny effect at subscription scope, announced a week ahead with the pipelines updated first"
+        correct: true
+        explain: >
+          Deny is the only effect that produces the outcome Priya asked for: the
+          request fails at Resource Manager, so it fails identically whether it
+          came from the portal, the CLI, or the vendor's pipeline. Assigning at
+          subscription scope covers every resource group including ones created
+          later. The announcement and the pipeline work are part of the answer -
+          a Deny policy that lands without warning breaks deployments and gets
+          itself removed by lunchtime.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: id-policy-tags
+              label: "Require costcenter tag (Deny)"
+              kind: policy
+              group: grp-corp
+              status: healthy
+          - op: add_edge
+            edge:
+              id: id-e-sub-policytags
+              source: sub-prod
+              target: id-policy-tags
+              kind: dependency
+              label: "assigned"
+      - id: opt-audit
+        label: "Assign the same definition with the Audit effect, so nothing breaks and you get a compliance dashboard"
+        correct: false
+        consequence: >
+          The dashboard is very informative about the thirty-second untagged resource.
+        explain: >
+          Audit is the right first step when you do not yet know what a policy
+          will catch, and it is genuinely useful for measuring the existing
+          estate. It is not what was asked for: it records non-compliance and
+          allows the request, so the count of untagged resources keeps climbing.
+          Audit measures, Deny enforces.
+        rep: -6
+      - id: opt-append
+        label: "Assign an Append policy that adds costcenter with a default value of 'unassigned' when the tag is missing"
+        correct: false
+        consequence: >
+          Compliance reaches one hundred percent. Evelyn's report gains a large row labelled unassigned.
+        explain: >
+          Append guarantees the tag exists but not that it means anything, so
+          every deployment that would have failed now silently lands in one
+          fictional cost center. This is worse than an empty tag because the
+          report looks complete. Append and Modify are for values the platform
+          can determine correctly, such as inheriting a real code from the
+          resource group.
+        rep: -8
+      - id: opt-process
+        label: "Add a required costcenter field to the change request form and reject changes that leave it blank"
+        correct: false
+        explain: >
+          The form governs the people who fill in forms. Resource Manager
+          accepts requests from pipelines, scripts, the vendor's deployment
+          tooling, and anyone with a CLI session, none of which consult the
+          change request system. Enforcement belongs at the layer every request
+          passes through.
+        rep: -8
+    next: e4-remediation
+
+  - id: e4-remediation
+    type: design_decision
+    title: "The sixty that were already there"
+    speaker: mentor
+    objectives: [AZ104-1.9, AZ104-1.11]
+    scenario: |
+      The Deny policy goes live on Tuesday. On Wednesday the compliance view
+      reads: 60 non-compliant resources, 0 denied requests.
+
+      "Correct on both counts," Desmond says. "Nobody has tried to create
+      anything untagged since Tuesday, and everything that existed before
+      Tuesday is still sitting there untagged."
+
+      Deny evaluates create and update requests. It never touches a resource
+      that is not being written to, so pre-existing resources are only ever
+      marked non-compliant.
+
+      The sixty are spread across rg-hub-sea and rg-ops-sea, and both resource
+      groups now carry a correct costcenter tag of their own. There is a
+      built-in definition, "Inherit a tag from the resource group", with the
+      Modify effect.
+
+      A Modify or DeployIfNotExists assignment performs its changes using the
+      assignment's own managed identity, which needs a role assignment at the
+      scope before a remediation task can do anything.
+    prompt: "How do you bring the existing sixty into compliance?"
+    options:
+      - id: opt-remediate
+        label: "Assign 'Inherit a tag from the resource group' with Modify, give the assignment a managed identity granted Tag Contributor at the scope, then run a remediation task"
+        correct: true
+        explain: >
+          Modify is the effect that writes tags, and a remediation task is what
+          applies it to resources that already exist rather than only to new
+          writes. The managed identity is the part people forget: remediation
+          runs as the assignment's identity, not as whoever clicked the button,
+          so without a role it fails on every resource. Tag Contributor is the
+          narrow role for this - it can write tags and nothing else.
+        rep: 12
+        diagram_ops:
+          - op: add_node
+            node:
+              id: id-policy-inherit
+              label: "Inherit costcenter from RG (Modify)"
+              kind: policy
+              group: grp-corp
+              status: healthy
+          - op: add_edge
+            edge:
+              id: id-e-sub-policyinherit
+              source: sub-prod
+              target: id-policy-inherit
+              kind: dependency
+              label: "assigned"
+      - id: opt-reevaluate
+        label: "Trigger an on-demand evaluation scan so the Deny policy applies to the existing sixty"
+        correct: false
+        consequence: >
+          The scan completes in twenty minutes and reports the same sixty resources.
+        explain: >
+          An evaluation scan refreshes the compliance record; it does not
+          re-submit resources to Resource Manager. Deny only ever acts on a
+          request in flight, so no amount of scanning will make it change
+          something already deployed. Compliance state and enforcement are two
+          different things.
+        rep: -6
+      - id: opt-redeploy
+        label: "Delete and redeploy the sixty resources so they pass the Deny policy on the way in"
+        correct: false
+        consequence: >
+          The list includes vm-dc01.
+        explain: >
+          It would technically work and it would also take production down to
+          add metadata. The blast radius has to be proportionate to the problem,
+          and the problem here is a missing string on sixty resources. Modify
+          plus remediation achieves the same end state with no downtime.
+        rep: -15
+      - id: opt-no-identity
+        label: "Assign the Modify policy and run the remediation task under your own account, which is already Owner"
+        correct: false
+        consequence: >
+          The remediation task completes with sixty failures and a message about a missing identity.
+        explain: >
+          Your permissions authorize you to create the assignment; they are not
+          what executes it. Modify and DeployIfNotExists assignments act through
+          their own system-assigned or user-assigned managed identity, and an
+          assignment created without one has nothing to act as. The identity
+          also needs its role at the assignment scope, not just anywhere.
+        rep: -6
+    next: END

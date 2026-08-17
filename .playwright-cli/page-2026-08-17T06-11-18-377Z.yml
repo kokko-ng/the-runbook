@@ -1,0 +1,51 @@
+- generic [ref=f8e3]:
+  - banner [ref=f8e4]:
+    - generic [ref=f8e5]:
+      - generic [ref=f8e6]: The Runbook
+      - generic [ref=f8e7]:
+        - link "Sync across devices" [ref=f8e8] [cursor=pointer]:
+          - /url: /account
+        - button "Switch to light theme" [ref=f8e9]: Light
+  - main [ref=f8e10]:
+    - generic [ref=f8e11]:
+      - paragraph [ref=f8e12]: Meridian Logistics · Cloud operations
+      - heading "You are the new Azure admin at a freight company that cannot afford downtime." [level=1] [ref=f8e13]
+      - paragraph [ref=f8e14]: Tickets arrive. Peerings break at 09:12. The CFO asks what a gateway costs and the security officer asks why a domain controller has a public IP. Work the queue, survive the design reviews, and learn AZ-104 and AZ-305 the way you would actually meet them.
+      - generic [ref=f8e15]:
+        - button "Continue" [ref=f8e16]
+        - button "Start over" [ref=f8e17]
+      - paragraph [ref=f8e18]:
+        - text: Saved on this device, Aug 17, 2026.
+        - button "Delete it" [ref=f8e19]
+      - paragraph [ref=f8e20]: Free, no account needed. Every answer is a choice from a list, so there is nothing to type. Your progress saves in this browser.
+    - generic [ref=f8e21]:
+      - generic [ref=f8e22]:
+        - heading "The work" [level=2] [ref=f8e23]
+        - paragraph [ref=f8e24]: 6 jobs · 9 exam objectives
+      - list [ref=f8e25]:
+        - listitem [ref=f8e26]:
+          - generic [ref=f8e27]:
+            - heading "Configure and manage virtual networking" [level=3] [ref=f8e28]
+            - generic [ref=f8e29]: Act 1 · 0/6 jobs
+          - list [ref=f8e30]:
+            - listitem [ref=f8e31]:
+              - generic [ref=f8e33]: First Week, First Subnet — Meridian's warehouse app needs somewhere to live. Address space first, apologies later.
+            - listitem [ref=f8e34]:
+              - generic [ref=f8e36]: The Peering Problem — The spoke cannot reach the hub. Maintenance window says everything went fine.
+            - listitem [ref=f8e37]:
+              - generic [ref=f8e39]: Locked Out at 40 Degrees — Security tightened the rules on Friday. The scanners stopped on Monday.
+            - listitem [ref=f8e40]:
+              - generic [ref=f8e42]: It Resolves On My Machine — The storage endpoint resolves to a public address from inside the VNet. Nobody is happy about it.
+            - listitem [ref=f8e43]:
+              - generic [ref=f8e45]: The Route to Nowhere — Kallang finally gets its VPN. Then half the traffic stops coming back.
+            - listitem [ref=f8e46]:
+              - generic [ref=f8e48]: Peak Season — One front end held all year. Peak season starts in three weeks.
+          - button "Jump to this chapter" [ref=f8e49]
+  - contentinfo [ref=f8e50]:
+    - generic [ref=f8e51]:
+      - paragraph [ref=f8e52]: The Runbook is an independent study aid. It is not affiliated with, endorsed by, or sponsored by Microsoft. Azure, AZ-104, AZ-305, and Microsoft are trademarks of the Microsoft group of companies. Meridian Logistics and everyone who works there are fictional.
+      - navigation [ref=f8e53]:
+        - link "Privacy" [ref=f8e54] [cursor=pointer]:
+          - /url: /privacy
+        - link "Terms" [ref=f8e55] [cursor=pointer]:
+          - /url: /terms

@@ -1,0 +1,488 @@
+schema_version: 1
+id: act1-id-05-locks-and-lines
+title: "Locks and Lines"
+act: 1
+chapter: act1-identity
+domain: az104-d1
+order: 5
+role: cloud-admin
+checkpoint: true
+summary: "A second subscription is coming, and the last accidental deletion is still fresh."
+entry: e1-management-groups
+
+encounters:
+  - id: e1-management-groups
+    type: design_decision
+    title: "Two subscriptions, one rule set"
+    speaker: security
+    objectives: [AZ104-1.15]
+    scenario: |
+      Marcus opens with a question rather than a finding, which is unusual
+      enough that Desmond looks up.
+
+      "The WMS vendor wants somewhere to test against real integrations, so
+      finance has approved a second subscription. When it exists, does the
+      costcenter policy apply to it?"
+
+      It does not. Your policy assignment names the production subscription, and
+      a new subscription starts governed by nothing.
+
+      The scope hierarchy above a subscription is management groups. A
+      management group can contain subscriptions and other management groups, up
+      to six levels below the root, and policy and role assignments made on one
+      are inherited by everything beneath it. Every tenant has a root management
+      group that already contains all its subscriptions, but editing it requires
+      an administrator to explicitly elevate access, and it also contains any
+      subscription anyone in the tenant ever creates.
+
+      "Assume we end up with four or five subscriptions," Marcus says. "I want
+      the answer that still works then."
+    prompt: "How do you structure the scopes above the subscriptions?"
+    options:
+      - id: opt-per-sub
+        label: "Assign the policy separately to each subscription as it is created"
+        correct: false
+        consequence: >
+          Subscription four is created on a Friday and nobody assigns anything to it until March.
+        explain: >
+            This works for two subscriptions and degrades from there: every new
+            subscription needs someone to remember, and assignments made
+            separately drift apart in parameters and exclusions until nobody can
+            say what is enforced where. Governance that depends on a person
+            remembering is governance you do not have.
+        rep: -8
+      - id: opt-hierarchy
+        label: "Create a top-level management group for Meridian with mg-prod and mg-nonprod beneath it, move both subscriptions in, and assign policy at the Meridian group"
+        correct: true
+        explain: >
+          A single top-level group under the root gives you one place to assign
+          organization-wide policy and RBAC without elevating access to the root
+          group, and it leaves the root free for anything that must never be
+          governed the same way. Splitting prod from non-prod below it lets you
+          run Deny in production and Audit in the vendor's sandbox from the same
+          hierarchy. New subscriptions inherit the moment they are moved in.
+        rep: 12
+        diagram_ops:
+          - op: add_node
+            node:
+              id: id-mg-meridian
+              label: "mg-meridian (top level)"
+              kind: management-group
+              group: grp-corp
+              status: healthy
+          - op: add_node
+            node:
+              id: id-mg-prod
+              label: "mg-prod"
+              kind: management-group
+              group: grp-corp
+              status: healthy
+          - op: add_node
+            node:
+              id: id-mg-nonprod
+              label: "mg-nonprod"
+              kind: management-group
+              group: grp-corp
+              status: healthy
+          - op: add_edge
+            edge:
+              id: id-e-mgmeridian-mgprod
+              source: id-mg-meridian
+              target: id-mg-prod
+              kind: dependency
+          - op: add_edge
+            edge:
+              id: id-e-mgmeridian-mgnonprod
+              source: id-mg-meridian
+              target: id-mg-nonprod
+              kind: dependency
+          - op: add_edge
+            edge:
+              id: id-e-mgprod-sub
+              source: id-mg-prod
+              target: sub-prod
+              kind: dependency
+      - id: opt-root
+        label: "Assign the policy directly at the tenant root management group so it can never be escaped"
+        correct: false
+        explain: >
+          The root group does reach everything, which is the problem: it also
+          reaches subscriptions created by other parts of the business, vendor
+          managed subscriptions, and anything you later need to exempt. Changing
+          assignments there requires elevating access as Global Administrator
+          each time. Microsoft's own guidance is a single top-level group
+          beneath the root for exactly this reason.
+        rep: -6
+      - id: opt-nested-rg
+        label: "Skip management groups and nest resource groups under a parent resource group per environment"
+        correct: false
+        explain: >
+          Resource groups do not nest. The scope hierarchy is management group,
+          subscription, resource group, resource, and there is no construct
+          between subscription and tenant other than management groups. A
+          resource also belongs to exactly one resource group at a time.
+        rep: -8
+    next: e2-subscription
+
+  - id: e2-subscription
+    type: design_decision
+    title: "Where the new subscription comes from"
+    speaker: cfo
+    objectives: [AZ104-1.13]
+    scenario: |
+      Evelyn has approved the vendor test environment and would like it to
+      appear on the same invoice as everything else.
+
+      "Last year the marketing team put a website on somebody's credit card. I
+      found out in an expense claim eleven months later. That is not happening
+      again."
+
+      Meridian buys Azure through an enterprise agreement with a single billing
+      account. Subscriptions created under it roll up to one invoice, inherit
+      the enrollment's commercial terms, and can be moved between management
+      groups by anyone with write permission on both the subscription and the
+      target group.
+
+      A subscription is also the boundary for quotas and service limits - vCPU
+      counts, public IP allocations, and so on are counted per subscription per
+      region.
+
+      The vendor's engineers will need access, and their people change every
+      few months.
+    prompt: "How do you provision the vendor test environment?"
+    options:
+      - id: opt-ea-sub
+        label: "Create a new subscription under the enterprise agreement, move it into mg-nonprod, and assign Owner to a platform team group rather than to individuals"
+        correct: true
+        explain: >
+          Creating it under the existing billing account keeps it on one invoice
+          and under Meridian's commercial terms, and placing it in mg-nonprod
+          means it inherits governance from the moment it exists rather than
+          when someone remembers. Assigning Owner to a group rather than a
+          person survives the vendor's staff turnover - you change membership,
+          not assignments. A separate subscription also gives the test workload
+          its own quota pool so it cannot exhaust production's.
+        rep: 12
+        diagram_ops:
+          - op: add_node
+            node:
+              id: id-sub-vendor
+              label: "Meridian Vendor Test"
+              kind: subscription
+              group: grp-corp
+              status: healthy
+          - op: add_edge
+            edge:
+              id: id-e-mgnonprod-subvendor
+              source: id-mg-nonprod
+              target: id-sub-vendor
+              kind: dependency
+      - id: opt-credit-card
+        label: "Let the vendor create their own pay-as-you-go subscription and expense it to Meridian"
+        correct: false
+        consequence: >
+          Evelyn finds out in an expense claim. Again.
+        explain: >
+          A subscription created outside Meridian's billing account sits outside
+          the management group hierarchy, so no policy applies, no cost rolls
+          up, and nobody at Meridian can revoke access to it. It is also owned
+          by whoever created it, which means offboarding that person orphans the
+          environment.
+        rep: -15
+      - id: opt-rg-instead
+        label: "Add a resource group to the production subscription instead - it is cheaper than managing a second subscription"
+        correct: false
+        consequence: >
+          The vendor's load test exhausts the region's vCPU quota during the Johor pick wave.
+        explain: >
+          A resource group separates naming and RBAC but shares the
+          subscription's quotas, limits, and policy assignments, so a test
+          workload competes with production for the same vCPU allocation.
+          Subscriptions cost nothing to hold; the separation they provide is the
+          reason to use one.
+        rep: -10
+      - id: opt-new-tenant
+        label: "Create the subscription in a separate Microsoft Entra tenant so the vendor is fully isolated from Meridian's directory"
+        correct: false
+        explain: >
+          A second tenant means a second directory, a second set of identities,
+          and guest invitations for every Meridian engineer who needs to look at
+          the environment - and it puts the subscription outside your management
+          groups and outside your policy. Tenant separation is for legal or
+          regulatory boundaries, not for a test environment.
+        rep: -10
+    next: e3-locks
+
+  - id: e3-locks
+    type: design_decision
+    title: "The storage account that is not there any more"
+    speaker: manager
+    objectives: [AZ104-1.10]
+    scenario: |
+      Priya still refers to it as "the incident", four weeks on.
+
+      Someone cleaning up a proof of concept deleted a storage account that was
+      not part of the proof of concept. It held the scanner firmware images. The
+      Johor rollout lost two days.
+
+      "So we are putting something in front of deletion. Desmond says there is
+      a right way and three wrong ways."
+
+      Resource locks come in two levels. CanNotDelete allows every read and
+      write but blocks deletion. ReadOnly allows reads only, which blocks
+      creating, updating, tagging, and any operation implemented as a write -
+      including starting a virtual machine.
+
+      Locks are inherited by everything beneath the scope they are applied at,
+      and they apply to every principal, including Owners. Creating or removing
+      a lock requires Microsoft.Authorization/locks/*, which Owner and User
+      Access Administrator have and Contributor does not.
+    prompt: "How do you protect the production resources?"
+    options:
+      - id: opt-cannotdelete
+        label: "Apply a CanNotDelete lock at rg-hub-sea and rg-ops-sea, and let inheritance cover the resources inside them"
+        correct: true
+        explain: >
+          CanNotDelete stops the failure mode that actually happened while
+          leaving every routine operation - deployments, scaling, tagging,
+          starting and stopping machines - working normally. Applying it at the
+          resource group means resources added later are protected without
+          anyone remembering, and because Contributor cannot remove locks, the
+          people most likely to delete something by accident cannot quietly
+          clear the guard first.
+        rep: 12
+        diagram_ops:
+          - op: add_node
+            node:
+              id: id-lock-hub
+              label: "lock-rghub (CanNotDelete)"
+              kind: policy
+              group: grp-corp
+              status: healthy
+          - op: add_edge
+            edge:
+              id: id-e-lockhub-rghub
+              source: id-lock-hub
+              target: rg-hub
+              kind: dependency
+              label: "locked"
+      - id: opt-readonly
+        label: "Apply a ReadOnly lock at both resource groups - if nothing can be changed, nothing can be deleted"
+        correct: false
+        consequence: >
+          The next patch window fails, and so does the nightly scale-up.
+        explain: >
+          ReadOnly blocks far more than deletion: no deployments, no tagging, no
+          resizing, and starting a stopped VM is a write operation too. Every
+          routine change turns into a lock-removal ceremony, which trains the
+          team to remove locks casually - the opposite of what the lock is for.
+          Match the lock level to the risk you are actually mitigating.
+        rep: -10
+      - id: opt-rbac
+        label: "Remove Contributor from everyone and route all changes through the cloud team"
+        correct: false
+        explain: >
+          This makes deletion slower rather than harder, and it does not protect
+          against the case that occurred - the person cleaning up the proof of
+          concept was authorized. Owners can still delete anything. RBAC decides
+          who may act; a lock decides what may be done at all, which is why
+          locks apply even to Owner.
+        rep: -8
+      - id: opt-backup
+        label: "Rely on soft delete and backups instead, so anything deleted can be restored"
+        correct: false
+        consequence: >
+          The firmware images were in a storage account with soft delete turned off, which is how the two days were lost.
+        explain: >
+          Recovery and prevention answer different questions, and soft delete
+          coverage is uneven - it is per resource type, often off by default,
+          and time-limited. Backups are worth having regardless; they are not a
+          substitute for a control that stops the delete from being issued.
+        rep: -6
+    next: e4-locked-out
+
+  - id: e4-locked-out
+    type: troubleshoot
+    title: "P2: Nightly scale-up failed, cannot attach disk"
+    speaker: mentor
+    objectives: [AZ104-1.10, AZ104-1.8]
+    ticket:
+      id: "MER-4530"
+      reporter: "Desmond Toh"
+      priority: "P2"
+      opened: "08:05"
+      body: |
+        Automation that resizes vm-wms01 for the morning pick wave failed at
+        04:00 with a write error. WMS team also cannot attach the new data disk
+        that was scheduled for this morning. Both report the same message about
+        a locked scope. Nobody has changed RBAC. I have a design review at nine,
+        so this is yours.
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: id-lock-ops
+          label: "lock-rgops (ReadOnly)"
+          kind: policy
+          group: grp-ops
+          status: broken
+      - op: add_edge
+        edge:
+          id: id-e-lockops-rgops
+          source: id-lock-ops
+          target: rg-ops
+          kind: dependency
+          label: "locked"
+      - {op: set_status, node: rg-ops, status: warning}
+      - {op: set_status, node: vm-wms01, status: degraded}
+    scenario: |
+      The pick wave is running on a machine two sizes too small, which means the
+      scanners are slow rather than dead. Nobody has escalated yet. They will by
+      ten.
+
+      The error the automation logged names a scope and the word locked, which
+      narrows things considerably. What it does not tell you is which lock, at
+      which level, or who put it there.
+
+      Yesterday's change record is open on your second monitor: "apply delete
+      protection to production resource groups", closed successfully, no
+      exceptions noted.
+
+      Desmond is in his review. Priya has not noticed yet.
+    time_budget: 6
+    investigate:
+      - id: inv-error
+        label: "Read the full error text from the automation log"
+        speaker: ticket
+        reveals: >
+          "The scope '/subscriptions/8f2c1d34.../resourceGroups/rg-ops-sea'
+          cannot perform write operation because following scope(s) are locked:
+          '/subscriptions/8f2c1d34.../resourceGroups/rg-ops-sea'. Please remove
+          the lock and try again." The blocked operation is a write, not a
+          delete.
+      - id: inv-change
+        label: "Open change MER-4530 and read what was actually executed"
+        speaker: ticket
+        reveals: >
+          Two locks were created, one per production resource group, from the
+          portal rather than from a script. The change text says delete
+          protection. The change record does not record which lock level was
+          selected in the dialog.
+      - id: inv-wms
+        label: "Ask the WMS team what they were doing when it failed"
+        speaker: ticket
+        reveals: >
+          "Adding a 512 GB data disk for the Johor item master. It is a plain
+          attach. It failed instantly rather than timing out, and the message
+          mentioned a lock, so we assumed it was one of yours."
+      - id: inv-marcus
+        label: "Ask Marcus whether a policy assignment could be denying the write"
+        speaker: security
+        reveals: >
+          "Your costcenter Deny is the only assignment in scope and the disk
+          request carries the tag - I checked. A policy denial says
+          RequestDisallowedByPolicy and names the definition. That error does
+          not. Read the words."
+    commands:
+      - id: cmd-lock-ops
+        label: "List locks on rg-ops-sea"
+        command: "az lock list --resource-group rg-ops-sea -o table"
+        output: |
+          Level     Name         Notes                       ResourceGroup
+          --------  -----------  --------------------------  ---------------
+          ReadOnly  lock-rgops   delete protection MER-4530  rg-ops-sea
+        time_cost: 1
+        note: "The note says delete protection. The level says ReadOnly. Only one of those is enforced."
+      - id: cmd-lock-hub
+        label: "List locks on rg-hub-sea for comparison"
+        command: "az lock list --resource-group rg-hub-sea -o table"
+        output: |
+          Level          Name         Notes                       ResourceGroup
+          -------------  -----------  --------------------------  ---------------
+          CanNotDelete   lock-rghub   delete protection MER-4530  rg-hub-sea
+        time_cost: 1
+        note: "Same change, same intent, different level. The hub was done correctly."
+      - id: cmd-role
+        label: "Check what the automation's identity is granted on rg-ops-sea"
+        command: "az role assignment list --scope /subscriptions/8f2c1d34.../resourceGroups/rg-ops-sea --include-inherited -o table"
+        output: |
+          Principal              Role                          Scope
+          ---------------------  ----------------------------  ---------------------------------------------
+          grp-cloud-platform     Owner                         /subscriptions/8f2c1d34...
+          id-wms-automation      Virtual Machine Contributor   /subscriptions/8f2c1d34.../resourceGroups/rg-ops-sea
+          grp-noc-manila         Virtual Machine Contributor   /subscriptions/8f2c1d34.../resourceGroups/rg-ops-sea
+        time_cost: 2
+        note: "The automation holds the role it needs. RBAC is not refusing this."
+      - id: cmd-policy
+        label: "List policy assignments in scope for rg-ops-sea"
+        command: "az policy assignment list --scope /subscriptions/8f2c1d34.../resourceGroups/rg-ops-sea --disable-scope-strict-match -o table"
+        output: |
+          DisplayName                     EnforcementMode    Name                Scope
+          ------------------------------  -----------------  ------------------  -----------------------------
+          Require costcenter tag (Deny)   Default            require-costcenter  /subscriptions/8f2c1d34...
+          Inherit costcenter from RG      Default            inherit-costcenter  /subscriptions/8f2c1d34...
+        time_cost: 1
+        note: "Both tag policies. Neither denies a resize or a disk attach on a tagged request."
+      - id: cmd-vm-size
+        label: "Check the current size of vm-wms01"
+        command: "az vm show -g rg-ops-sea -n vm-wms01 --query \"hardwareProfile.vmSize\" -o tsv"
+        output: |
+          Standard_D2s_v5
+        time_cost: 1
+        note: "Still the overnight size. The 04:00 resize to D4s_v5 never applied."
+    fixes:
+      - id: fix-relevel
+        label: "Delete the ReadOnly lock on rg-ops-sea and create a CanNotDelete lock in its place"
+        correct: true
+        explain: >
+          The change asked for delete protection and the portal dialog got the
+          wrong level, which is why rg-hub-sea is fine and rg-ops-sea is frozen.
+          CanNotDelete blocks the deletion the incident was about while allowing
+          resizes, disk attaches, tagging, and deployments, so service returns
+          and the protection remains. Deleting and recreating is the correct
+          sequence because a lock's level cannot be changed in place.
+        rep: 12
+        diagram_ops:
+          - {op: set_label, node: id-lock-ops, label: "lock-rgops (CanNotDelete)"}
+          - {op: set_status, node: id-lock-ops, status: healthy}
+          - {op: set_status, node: rg-ops, status: healthy}
+          - {op: set_status, node: vm-wms01, status: healthy}
+      - id: fix-remove
+        label: "Delete the lock on rg-ops-sea and rely on the change process to prevent accidental deletions"
+        correct: false
+        consequence: >
+          The pick wave recovers. Priya asks what happened to the delete protection she signed off four weeks ago.
+        explain: >
+          This restores service by removing the control rather than correcting
+          it, and the control was a response to a real two-day outage. The
+          change process was already in place when the storage account was
+          deleted; that is precisely why a lock was added. Fix the level, not
+          the existence.
+        rep: -10
+      - id: fix-owner
+        label: "Grant the automation identity Owner on rg-ops-sea so it has enough privilege to write through the lock"
+        correct: false
+        consequence: >
+          The 04:00 job fails again the following morning, now running as Owner.
+        explain: >
+          Locks are evaluated independently of RBAC and apply to every
+          principal, Owner included - there is no permission level that writes
+          through a ReadOnly lock. The only thing this achieves is handing the
+          highest privilege in the resource group to an unattended process,
+          which Marcus will find within the week.
+        rep: -12
+      - id: fix-move-lock
+        label: "Move the lock from rg-ops-sea up to the subscription so it stops interfering with the warehouse resource group"
+        correct: false
+        consequence: >
+          Every write in the subscription now fails, including in the hub.
+        explain: >
+          Locks are inherited downward, so raising a ReadOnly lock to the
+          subscription applies it to rg-ops-sea and everything else as well.
+          This is the inheritance direction from role assignments, applied to a
+          control that behaves the same way - moving a restriction up a scope
+          widens it, it never narrows it.
+        rep: -15
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: END

@@ -1,0 +1,290 @@
+schema_version: 1
+id: act1-cmp-03-four-sites
+title: "Four Sites, One Template"
+act: 1
+chapter: act1-compute
+domain: az104-d3
+order: 3
+role: cloud-admin
+checkpoint: true
+summary: "Ops is opening cross-docks in Johor, Batam, Penang and Surabaya. They would like them to be identical, which nothing built by hand ever is."
+entry: e1-read-bicep
+
+encounters:
+  - id: e1-read-bicep
+    type: design_decision
+    title: "Desmond hands you a file"
+    speaker: mentor
+    objectives: [AZ104-3.1]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: cmp-rg-sites
+          label: "rg-johor-sea (cross-dock site)"
+          kind: resource-group
+          group: grp-ops
+          status: planned
+    scenario: |
+      Desmond drops a file called site.bicep into the review and waits.
+
+      param location string = resourceGroup().location
+      param siteCode string
+      param vmSize string = 'Standard_D4s_v5'
+      param addressOctet int
+
+      var vnetName = 'vnet-${siteCode}-sea'
+
+      resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
+        name: vnetName
+        location: location
+        properties: {
+          addressSpace: { addressPrefixes: ['10.${addressOctet}.0.0/16'] }
+          subnets: [
+            {
+              name: 'snet-app'
+              properties: { addressPrefix: '10.${addressOctet}.1.0/24' }
+            }
+          ]
+        }
+      }
+
+      output appSubnetId string = vnet.properties.subnets[0].id
+
+      "Priya wants to know what happens if we run this at the Johor resource
+      group. Tell her, in a sentence she can repeat in a meeting."
+    prompt: "What does this file produce?"
+    options:
+      - id: opt-correct-read
+        label: "A VNet named vnet-johor-sea in the resource group's own region; siteCode and addressOctet must be supplied because they have no defaults, and the VM size defaults to Standard_D4s_v5"
+        correct: true
+        explain: >
+          Reading a Bicep file starts with the parameters. A parameter with a
+          default is optional at deploy time; one without a default is mandatory
+          and the deployment is rejected before anything is created if it is
+          missing. The location default is the expression resourceGroup().location,
+          evaluated at deployment, so the region comes from the target resource
+          group rather than from the caller. String interpolation with ${} builds
+          the names from those parameters.
+        rep: 8
+        diagram_ops:
+          - {op: set_status, node: cmp-rg-sites, status: healthy}
+      - id: opt-location-fails
+        label: "It fails, because location is used but never passed in"
+        correct: false
+        explain: >
+          location does have a value: the default expression
+          resourceGroup().location. Bicep evaluates default expressions at
+          deployment time, so the parameter resolves without the caller supplying
+          anything. The parameters that would actually fail this deployment are
+          siteCode and addressOctet, which have no defaults at all.
+        rep: -6
+      - id: opt-cli-location
+        label: "It deploys wherever I point it with the --location flag on the deployment command"
+        correct: false
+        consequence: >
+          The command is rejected before it reaches Azure and the site build slips
+          a day while everyone reads the error.
+        explain: >
+          --location applies to deployments at subscription, management group and
+          tenant scope, where there is no resource group to hold the deployment
+          metadata. A resource group deployment takes its scope from -g, and
+          resources land in whatever region their own location property resolves
+          to - here, the resource group's region.
+        rep: -6
+      - id: opt-vmsize-fixed
+        label: "Every site gets a Standard_D4s_v5 VM, because vmSize is declared with a value and defaults in Bicep cannot be overridden"
+        correct: false
+        explain: >
+          A default is a fallback, not a constant. Any parameter can be overridden
+          at deploy time with --parameters, whether or not it has a default; if you
+          want a value fixed you declare it as a var instead, which cannot be
+          passed in. Worth noting the file shown declares no VM at all, so nothing
+          currently consumes vmSize.
+        rep: -8
+    next: e2-export
+
+  - id: e2-export
+    type: design_decision
+    title: "The environment nobody wrote down"
+    speaker: manager
+    objectives: [AZ104-3.5]
+    scenario: |
+      Priya has the same request from the other direction.
+
+      "The new sites can have your template. What about the two we already have.
+      Everything in rg-ops-sea was clicked into existence by somebody, mostly you,
+      and the only record is the change tickets. If we lose that resource group I
+      would like to know what was in it."
+
+      Nobody is going to spend three weeks writing Bicep for an environment that
+      already exists and already works.
+    prompt: "How do you get the existing environment into source control?"
+    options:
+      - id: opt-export-decompile
+        label: "Export the resource group's template with az group export, decompile it to Bicep with az bicep decompile, then clean up the result by hand before committing it"
+        correct: true
+        explain: >
+          Export produces an ARM template describing the current state of a
+          resource group, and the Bicep CLI decompiles that JSON into Bicep. Both
+          steps are best-effort starting points, not finished artifacts: exported
+          templates carry hard-coded names and resource ids, omit secrets, and
+          decompilation leaves generated parameter names and occasional warnings.
+          The value is that a day of tidying beats three weeks of archaeology.
+        rep: 8
+      - id: opt-export-deploy-direct
+        label: "Export the template and deploy it straight into the new site resource groups"
+        correct: false
+        consequence: >
+          The deployment fails on a globally unique name that is already taken,
+          and the resources that do land are all called something with sea in the
+          name.
+        explain: >
+          An export reflects one environment exactly, including its names, its
+          address space and its resource ids. Deploying it elsewhere unchanged
+          either collides on names that must be unique or produces a second site
+          that claims to be the first. Export gives you a description of what
+          exists; parameterizing it is the work that makes it reusable.
+        rep: -8
+      - id: opt-per-resource
+        label: "Open each resource's Export template blade in the portal and paste the JSON fragments together into one file"
+        correct: false
+        explain: >
+          The per-resource export exists and is useful for looking at a single
+          resource's shape, but stitching fragments by hand loses the dependency
+          ordering, duplicates parameters, and misses associations that live on
+          the other side of the relationship. Exporting the resource group asks
+          Azure to produce the consistent whole in one call.
+        rep: -5
+      - id: opt-rewrite
+        label: "Write the environment from scratch in Bicep, because Azure cannot export a resource group that was not created from a template"
+        correct: false
+        explain: >
+          Export does not require the resources to have been deployed from a
+          template - it reads current state, which is why it works on environments
+          built entirely by hand. What is true is that some resource types export
+          incompletely and the output warns you about them. Starting from an
+          imperfect export and fixing it is strictly less work than starting from
+          nothing.
+        rep: -6
+    next: e3-deploy
+
+  - id: e3-deploy
+    type: design_decision
+    title: "Johor, Thursday"
+    speaker: mentor
+    objectives: [AZ104-3.4]
+    scenario: |
+      The template is parameterized, reviewed and committed. Johor goes in on
+      Thursday.
+
+      One complication: rg-johor-sea is not empty. The site team created it last
+      month and put a storage account in it for the loading bay camera footage,
+      which is already recording and already being retained for insurance
+      purposes.
+
+      Desmond, from behind his monitor: "First deployment into a resource group
+      somebody else has been living in. Think about what you want to know before
+      you press the button, not after."
+    prompt: "How do you run the deployment?"
+    options:
+      - id: opt-whatif
+        label: "Run az deployment group what-if first, read the change list, then deploy with az deployment group create in the default Incremental mode"
+        correct: true
+        explain: >
+          What-if evaluates the template against the current state and prints the
+          resource-level difference: what is created, modified, deleted or left
+          alone, property by property. It is the only step that answers the
+          question you actually have, which is whether the camera storage account
+          is affected. Incremental mode then leaves resources that are not in the
+          template untouched.
+        rep: 10
+      - id: opt-validate-only
+        label: "Run az deployment group validate - if the template validates, the deployment is safe"
+        correct: false
+        consequence: >
+          Validation passes in four seconds and tells you nothing about the
+          storage account.
+        explain: >
+          Validate checks that the template and its parameters can be submitted:
+          syntax, resolved expressions, parameter types, some policy and quota
+          checks. It is a preflight on the template, not a preview of the outcome.
+          What-if is the command that reports the effect on existing resources.
+        rep: -6
+      - id: opt-complete
+        label: "Deploy with --mode Complete, so the site is guaranteed to match the template exactly"
+        correct: false
+        consequence: >
+          The deployment succeeds. So does the deletion of the camera storage
+          account, and the insurance footage with it.
+        explain: >
+          Complete mode deletes every resource in the target resource group that
+          the template does not describe. That is a legitimate and powerful
+          guarantee when the template is the sole owner of the resource group, and
+          it is a destructive accident anywhere else. The camera storage account
+          is not in your template.
+        rep: -15
+      - id: opt-cli-by-hand
+        label: "Skip the template for the first site and run the individual az network and az vm commands, so you can watch each resource appear"
+        correct: false
+        explain: >
+          It is comforting and it defeats the purpose. A template deployment is
+          idempotent, works out the dependency order itself, records what it did
+          as a deployment object you can list later, and can be re-run for the
+          next three sites. A sequence of commands typed once produces a site
+          nobody can reproduce, which is the problem this quest exists to solve.
+        rep: -8
+    next: e4-modes
+
+  - id: e4-modes
+    type: knowledge_check
+    title: "What incremental actually means"
+    speaker: mentor
+    objectives: [AZ104-3.4]
+    scenario: |
+      Johor comes up clean. Desmond signs the change and then, in the way he has,
+      does not leave.
+
+      "One question. People hear incremental and think it means additive. It does
+      not quite mean that."
+    question: >
+      You deploy a template in Incremental mode into a resource group. The group
+      also contains a storage account that the template does not mention. The
+      template does contain the site VNet, but its subnet definition omits the
+      NSG association that is currently set on the subnet. What happens to each?
+    options:
+      - id: opt-untouched-reset
+        label: "The storage account is left alone; the NSG association is removed, because the VNet is in the template and ARM applies the resource definition as written"
+        correct: true
+        explain: >
+          Incremental mode is about resources, not properties. A resource absent
+          from the template is not evaluated at all, so the storage account
+          survives. A resource present in the template is submitted in full, so
+          any property the template omits reverts to its default - here, no NSG on
+          the subnet. This is the single most common surprise in template
+          deployments, and what-if reports it before it happens.
+      - id: opt-both-untouched
+        label: "Both are left alone - incremental only ever adds and updates what it explicitly declares"
+        correct: false
+        explain: >
+          Half right. Resources outside the template are indeed untouched, but
+          within a declared resource the template is the complete statement of
+          that resource's properties. There is no merge with the existing
+          configuration, which is why a partially written resource block quietly
+          strips settings someone else configured in the portal.
+      - id: opt-both-removed
+        label: "Both are removed, because the template describes the desired state of the resource group"
+        correct: false
+        explain: >
+          That is a description of Complete mode, which does delete resources in
+          the resource group that the template does not declare. Incremental is
+          the default precisely so that a deployment cannot reach outside its own
+          declarations.
+      - id: opt-inverted
+        label: "The storage account is deleted; the NSG association is preserved, since ARM merges declared properties with the existing configuration"
+        correct: false
+        explain: >
+          This inverts both behaviors. Deleting undeclared resources is Complete
+          mode, and ARM does not merge property-level state - the submitted
+          resource definition replaces what is there. Both halves of the answer
+          describe systems other than Azure Resource Manager.
+    next: END

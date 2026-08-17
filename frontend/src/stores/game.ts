@@ -7,7 +7,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 
-import { loadQuest, manifest, nextQuest } from '@/content'
+import { loadQuest, manifest, nextQuestAnywhere } from '@/content'
 import { applyAction, createInitialState, remainingOptions } from '@/engine/engine'
 import { REP_BONUS_THRESHOLD } from '@/engine/constants'
 import type {
@@ -123,8 +123,7 @@ export const useGameStore = defineStore('game', () => {
     state.value = createInitialState(manifest)
     feed.value = []
     started.value = true
-    const first = manifest.chapters[0]
-    const target = first ? nextQuest(first.id, []) : undefined
+    const target = nextQuestAnywhere([])
     if (target) await startQuest(target.id)
   }
 
@@ -165,17 +164,22 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  /** Advance to the next quest in the chapter, or report the chapter is done. */
+  /**
+   * Advance to the next quest, rolling into the following chapter when the
+   * current one runs out. Returns false only when the whole game is finished.
+   */
   async function continueToNextQuest(): Promise<boolean> {
-    const current = quest.value
-    if (!current) return false
-
-    const target = nextQuest(current.chapter, state.value.completedQuestIds)
+    const target = nextQuestAnywhere(state.value.completedQuestIds)
     if (!target) return false
 
     await startQuest(target.id)
     return true
   }
+
+  /** True when every main-line quest in the game has been cleared. */
+  const careerComplete = computed(
+    () => nextQuestAnywhere(state.value.completedQuestIds) === undefined,
+  )
 
   /**
    * Autosave. Local storage is written synchronously and is the source of truth
@@ -241,6 +245,7 @@ export const useGameStore = defineStore('game', () => {
     canAdvance,
     isPip,
     questComplete,
+    careerComplete,
     dispatch,
     startQuest,
     newGame,
