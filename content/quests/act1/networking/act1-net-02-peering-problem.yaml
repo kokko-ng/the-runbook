@@ -26,6 +26,10 @@ encounters:
         web tier is up, database responds. Application log shows repeated
         "domain controller unreachable" on vm-wms01. Nothing changed on our side.
         Escalating to cloud team.
+    on_enter_diagram_ops:
+      - {op: set_edge_status, edge: peer-hub-warehouse, status: broken}
+      - {op: set_status, node: vm-wms01, status: broken}
+      - {op: set_status, node: vnet-warehouse, status: warning}
     scenario: |
       The NOC pings you at 09:12. Forty tablets on the warehouse floor are
       showing a login spinner and the shift supervisor has started counting

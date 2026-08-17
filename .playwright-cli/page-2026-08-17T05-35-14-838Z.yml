@@ -1,0 +1,129 @@
+- generic [ref=f1e3]:
+  - banner [ref=f1e4]:
+    - generic [ref=f1e5]:
+      - link "The Runbook First Week, First Subnet" [ref=f1e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f1e7]: The Runbook
+        - generic [ref=f1e8]: First Week, First Subnet
+      - generic [ref=f1e9]:
+        - img "Standing 40 of 100, Solid" [ref=f1e10]:
+          - generic [ref=f1e22]: "40"
+          - generic [ref=f1e23]: Solid
+        - button "Skills" [ref=f1e24]
+        - button "Switch to dark theme" [ref=f1e25]: Dark
+  - main [ref=f1e26]:
+    - generic [ref=f1e28]:
+      - generic [ref=f1e29]:
+        - generic [ref=f1e30]:
+          - paragraph [ref=f1e32]: You chose
+          - paragraph [ref=f1e33]: 10.101.0.0/16 - non-overlapping with on-premises and the hub, with room to subnet
+        - generic [ref=f1e36]:
+          - paragraph [ref=f1e37]: Why that works
+          - paragraph [ref=f1e38]: Non-overlapping with 10.10.0.0/16, 10.20.0.0/16, and the 10.100.0.0/16 hub, which keeps both peering and the planned VPN viable, and large enough to carve subnets for app, data, and management tiers without revisiting the address space. Private address space is free; running out of it is not.
+      - generic [ref=f1e39]:
+        - generic [ref=f1e90]:
+          - paragraph [ref=f1e91]: Carving subnets
+          - paragraph [ref=f1e92]: Desmond Toh · Senior cloud admin
+          - generic [ref=f1e93]:
+            - paragraph [ref=f1e94]: With the address space settled, Desmond wants the subnet layout before you touch the portal.
+            - paragraph [ref=f1e95]: "\"Warehouse app is three tiers. Web front end the pickers hit on tablets, an app tier, and a database. Security will want them separated - Marcus Lim will ask you about lateral movement in the review and he will not accept 'they're all in one subnet' as an answer.\""
+            - paragraph [ref=f1e96]: He writes 10.101.0.0/16 on the whiteboard.
+            - paragraph [ref=f1e97]: "\"One more thing. Eventually this VNet gets a gateway so the Kallang site can reach it. Plan for that now, because retrofitting it is a change request and a Saturday.\""
+        - paragraph [ref=f1e98]: How do you lay out the subnets?
+        - list [ref=f1e99]:
+          - listitem [ref=f1e100]:
+            - button "One subnet, 10.101.0.0/16, with NSG rules separating the tiers by IP" [ref=f1e101]
+          - listitem [ref=f1e102]:
+            - button "Three /24 subnets for web, app, and data, plus a GatewaySubnet of /27" [ref=f1e103]
+          - listitem [ref=f1e104]:
+            - button "Three /24 subnets for web, app, and data, and add a gateway subnet when the VPN project starts" [ref=f1e105]
+          - listitem [ref=f1e106]:
+            - button "Three /29 subnets, one per tier, to conserve address space for future spokes" [ref=f1e107]
+    - complementary [ref=f1e42]:
+      - generic [ref=f1e44]:
+        - generic [ref=f1e46]:
+          - paragraph [ref=f1e47]: Meridian estate
+          - paragraph [ref=f1e48]: 12 resources
+        - generic [ref=f1e52]:
+          - generic:
+            - img:
+              - img "Edge from sub-prod to rg-hub"
+            - img:
+              - img "Edge from sub-prod to rg-ops"
+            - img:
+              - img "Edge from rg-hub to vnet-hub"
+            - img:
+              - img "Edge from rg-ops to vnet-warehouse"
+            - img:
+              - img "Edge from vnet-hub to snet-shared"
+            - img:
+              - img "Edge from vnet-hub to snet-gateway"
+            - img:
+              - img "Edge from snet-shared to vm-dc01"
+            - img:
+              - img "Edge from vnet-warehouse to snet-app"
+            - img:
+              - img "Edge from snet-app to vm-wms01"
+            - img:
+              - img "Edge from nsg-app to snet-app":
+                - generic [ref=f1e53] [cursor=pointer]: associated
+            - generic:
+              - group:
+                - generic:
+                  - generic: SUB
+                  - generic "Meridian Production"
+              - group:
+                - generic:
+                  - generic: RG
+                  - generic "rg-hub-sea"
+              - group:
+                - generic:
+                  - generic: VN
+                  - generic "vnet-hub-sea"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "snet-shared-services"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "GatewaySubnet"
+              - group:
+                - generic:
+                  - generic: VM
+                  - generic "vm-dc01 (domain controller)"
+              - group:
+                - generic:
+                  - generic: RG
+                  - generic "rg-ops-sea"
+              - group:
+                - generic:
+                  - generic: VN
+                  - generic "vnet-warehouse-sea (10.101.0.0/16)"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "snet-wms-app"
+              - group:
+                - generic:
+                  - generic: VM
+                  - generic "vm-wms01 (warehouse mgmt)"
+              - group:
+                - generic:
+                  - generic: SEC
+                  - generic "nsg-wms-app"
+              - group:
+                - generic:
+                  - generic: DC
+                  - generic "Kallang data center"
+  - generic [ref=f1e82]:
+    - generic [ref=f1e83]: Perks
+    - button "Hint 0" [disabled] [ref=f1e84]:
+      - text: Hint
+      - generic [ref=f1e85]: "0"
+    - button "Overtime 0" [disabled] [ref=f1e86]:
+      - text: Overtime
+      - generic [ref=f1e87]: "0"
+    - button "Rep Shield 0" [disabled] [ref=f1e88]:
+      - text: Rep Shield
+      - generic [ref=f1e89]: "0"

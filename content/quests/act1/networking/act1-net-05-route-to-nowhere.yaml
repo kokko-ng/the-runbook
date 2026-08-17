@@ -113,6 +113,9 @@ encounters:
         hub responds to ping and LDAP. vm-wms01 in the warehouse spoke does not
         respond at all. Tunnel shows Connected. Warehouse-to-hub traffic inside
         Azure is fine. Requesting cloud team review before we sign off cutover.
+    on_enter_diagram_ops:
+      - {op: set_edge_status, edge: peer-hub-warehouse, status: warning}
+      - {op: set_status, node: vnet-warehouse, status: warning}
     scenario: |
       The tunnel came up on the first attempt, which Desmond called "suspicious."
 
@@ -235,6 +238,7 @@ encounters:
           - {op: set_edge_status, edge: peer-hub-warehouse, status: healthy}
           - {op: set_edge_status, edge: e-vgw-kallang, status: healthy}
           - {op: set_status, node: vgw-hub, status: healthy}
+          - {op: set_status, node: vnet-warehouse, status: healthy}
       - id: fix-udr-only
         label: "Add a user-defined route on snet-wms-app sending 10.10.0.0/16 to the gateway's private IP"
         correct: false

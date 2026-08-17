@@ -1,0 +1,394 @@
+/* Font faces are imported from main.ts so Vite fingerprints and emits the
+   woff2 files; a bare-specifier @import here leaves their URLs unresolved. */
+@import 'tailwindcss';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/*
+ * Three type registers, one per voice in the fiction:
+ *   grotesque - the system talking to the player (chrome, labels, choices)
+ *   serif     - the story talking (narrative prose, dialogue, tickets)
+ *   mono      - the machine talking (command output, logs, numbers)
+ *
+ * The palette comes from the logistics setting rather than Azure's own blue:
+ * galvanized steel, shipping-line navy, and high-visibility amber.
+ */
+@theme {
+  --font-sans: 'Archivo Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Source Serif 4', ui-serif, Georgia, serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', monospace;
+
+  --color-steel-50: #f4f6f8;
+  --color-steel-100: #e7ebef;
+  --color-steel-200: #ced6de;
+  --color-steel-300: #aab7c4;
+  --color-steel-400: #7d8d9d;
+  --color-steel-500: #5b6b7b;
+  --color-steel-600: #47555f;
+  --color-steel-700: #364149;
+  --color-steel-800: #232c34;
+  --color-steel-900: #161d23;
+  --color-steel-950: #0d1216;
+
+  --color-navy-600: #24405c;
+  --color-navy-700: #1b2f45;
+  --color-navy-800: #142433;
+
+  /* High-visibility amber is both the interactive colour and the warning
+     status, because in this world they mean the same thing: look here. */
+  --color-hivis-200: #fbe7b8;
+  --color-hivis-300: #f7cf7a;
+  --color-hivis-400: #eeb63c;
+  --color-hivis-500: #e0a11c;
+  --color-hivis-600: #b87d0e;
+  --color-hivis-700: #8d5e0a;
+
+  --color-healthy: #3f8f6f;
+  --color-healthy-soft: #dcece5;
+  --color-broken: #bd4a3d;
+  --color-broken-soft: #f6dedb;
+  --color-degraded: #6c6a8f;
+
+  --radius-card: 3px;
+}
+
+/* ------------------------------------------------------------------ theme */
+
+:root {
+  --surface: var(--color-steel-50);
+  --surface-raised: #ffffff;
+  --surface-sunken: var(--color-steel-100);
+  --ink: var(--color-steel-900);
+  --ink-muted: var(--color-steel-500);
+  --ink-faint: var(--color-steel-400);
+  --rule: var(--color-steel-200);
+  --rule-strong: var(--color-steel-300);
+  --accent: var(--color-hivis-600);
+  --accent-ink: var(--color-steel-950);
+  --terminal-bg: var(--color-steel-900);
+  --terminal-ink: var(--color-steel-100);
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --surface: var(--color-steel-950);
+  --surface-raised: var(--color-steel-900);
+  --surface-sunken: #090d10;
+  --ink: var(--color-steel-100);
+  --ink-muted: var(--color-steel-400);
+  --ink-faint: var(--color-steel-500);
+  --rule: var(--color-steel-800);
+  --rule-strong: var(--color-steel-700);
+  --accent: var(--color-hivis-400);
+  --accent-ink: var(--color-steel-950);
+  --terminal-bg: #070b0e;
+  --terminal-ink: var(--color-steel-200);
+  color-scheme: dark;
+}
+
+/* ------------------------------------------------------------------- base */
+
+@layer base {
+  html {
+    /* Fluid scale: comfortable at 320px, never oversized on a wide monitor. */
+    font-size: clamp(15px, 0.92rem + 0.25vw, 17px);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    /* No element may push the page sideways, down to 320px. */
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    letter-spacing: -0.011em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: var(--color-hivis-300);
+    color: var(--color-steel-950);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ------------------------------------------------------------ components */
+
+@layer components {
+  /* Small uppercase label: dock signage, ticket fields, section eyebrows. */
+  .eyebrow {
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+  }
+
+  /* Narrative prose. The story is the only thing set in serif. */
+  .prose-beat {
+    font-family: var(--font-serif);
+    font-size: 1.0625rem;
+    line-height: 1.62;
+    color: var(--ink);
+  }
+
+  .prose-beat p + p {
+    margin-top: 0.85em;
+  }
+
+  /*
+   * The feed rail: a continuous vertical rule with a marker per entry whose
+   * shape says what kind of entry it is. Skimming the gutter tells you the
+   * shape of the incident before you read a word.
+   */
+  .rail {
+    position: relative;
+    padding-left: 1.75rem;
+  }
+
+  .rail::before {
+    content: '';
+    position: absolute;
+    left: 0.4375rem;
+    top: 0.5rem;
+    bottom: 0;
+    width: 1px;
+    background: var(--rule);
+  }
+
+  .rail:last-child::before {
+    bottom: auto;
+    height: calc(100% - 0.5rem);
+  }
+
+  .rail-mark {
+    position: absolute;
+    left: 0;
+    top: 0.4375rem;
+    width: 0.9375rem;
+    height: 0.9375rem;
+    display: grid;
+    place-items: center;
+    background: var(--surface);
+  }
+
+  .rail-mark::after {
+    content: '';
+    display: block;
+  }
+
+  /* Someone spoke. */
+  .rail-mark--voice::after {
+    width: 7px;
+    height: 7px;
+    border: 1.5px solid var(--rule-strong);
+    border-radius: 50%;
+  }
+
+  /* A ticket or change record arrived. */
+  .rail-mark--record::after {
+    width: 8px;
+    height: 9px;
+    border: 1.5px solid var(--ink-muted);
+  }
+
+  /* A command was run. */
+  .rail-mark--machine::after {
+    width: 9px;
+    height: 2px;
+    background: var(--ink-muted);
+    box-shadow: 0 4px 0 var(--ink-muted);
+  }
+
+  /* A decision was made and it was right. */
+  .rail-mark--right::after {
+    width: 9px;
+    height: 9px;
+    background: var(--color-healthy);
+    clip-path: polygon(0 52%, 38% 100%, 100% 8%, 100% 30%, 38% 100%, 0 72%);
+  }
+
+  /* A decision was made and it was wrong. */
+  .rail-mark--wrong::after {
+    width: 9px;
+    height: 9px;
+    background: var(--color-broken);
+    clip-path: polygon(
+      14% 0,
+      50% 36%,
+      86% 0,
+      100% 14%,
+      64% 50%,
+      100% 86%,
+      86% 100%,
+      50% 64%,
+      14% 100%,
+      0 86%,
+      36% 50%,
+      0 14%
+    );
+  }
+
+  /* The system itself moved: phase change, quest boundary, checkpoint. */
+  .rail-mark--system::after {
+    width: 9px;
+    height: 1.5px;
+    background: var(--accent);
+  }
+
+  /* Terminal output. Scrolls inside itself so the page never scrolls sideways. */
+  .terminal {
+    background: var(--terminal-bg);
+    color: var(--terminal-ink);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    border-radius: var(--radius-card);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .terminal pre {
+    margin: 0;
+    padding: 0.75rem 0.875rem;
+    white-space: pre;
+    min-width: max-content;
+  }
+
+  /* Choice buttons: full-width tap targets, minimum 44px on touch. */
+  .choice {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    text-align: left;
+    background: var(--surface-raised);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--rule-strong);
+    border-radius: var(--radius-card);
+    padding: 0.75rem 0.875rem;
+    color: var(--ink);
+    font-size: 0.9375rem;
+    line-height: 1.45;
+    transition:
+      border-color 140ms ease,
+      background-color 140ms ease,
+      transform 140ms ease;
+  }
+
+  .choice:hover:not(:disabled) {
+    border-left-color: var(--accent);
+    background: var(--surface-raised);
+  }
+
+  .choice:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .choice:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  /* An option the player has ruled out stays visible but struck through -
+     seeing what you eliminated is part of the teaching. */
+  .choice--eliminated {
+    opacity: 0.4;
+    text-decoration: line-through;
+    text-decoration-color: var(--ink-faint);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-height: 44px;
+    padding: 0 1rem;
+    border-radius: var(--radius-card);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: 1px solid transparent;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-hivis-500);
+  }
+
+  .btn-quiet {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--rule-strong);
+  }
+
+  .btn-quiet:hover:not(:disabled) {
+    border-color: var(--accent);
+  }
+
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .panel {
+    background: var(--surface-raised);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius-card);
+  }
+
+  /* Numbers read as instrument readings, not prose. */
+  .readout {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'zero' 1;
+  }
+}
+
+/* ---------------------------------------------------------------- motion */
+
+@keyframes entry-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.entry-in {
+  animation: entry-in 220ms ease-out both;
+}
