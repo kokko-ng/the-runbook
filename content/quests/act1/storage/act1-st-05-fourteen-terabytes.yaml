@@ -1,0 +1,297 @@
+schema_version: 1
+id: act1-st-05-fourteen-terabytes
+title: "Fourteen Terabytes of Dashcam"
+act: 1
+chapter: act1-storage
+domain: az104-d2
+order: 5
+role: cloud-admin
+checkpoint: true
+summary: "The Kallang NAS is decommissioned in six weeks. Everything on it has to be somewhere else by then."
+entry: e1-move-it
+
+encounters:
+  - id: e1-move-it
+    type: design_decision
+    title: "Six weeks and a NAS"
+    speaker: manager
+    objectives: [AZ104-2.10]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: st-manifests
+          label: "stmeridianarchive (scans, dashcam)"
+          kind: storage-account
+          group: grp-onprem
+          status: planned
+    scenario: |
+      The NAS goes off on the fifteenth of next month. Facilities have already
+      booked the electrician, which at Meridian is the most binding form of
+      commitment there is.
+
+      On it: 11 TB of dashcam footage from the tractor units, 2.6 TB of scanned
+      manifests and customs paperwork going back nine years, and 400 GB of
+      material Desmond describes as "someone's problem, not ours."
+
+      The Kallang site has a 500 Mbps internet link. During the day the WMS
+      replication and sixty people's video calls use most of it. Between 20:00
+      and 06:00 it is almost entirely idle, and the network team will let you
+      have it if you leave headroom.
+
+      "Six weeks," Priya says. "Ten hours a night. I need the paperwork intact,
+      because that is the part customs cares about, and I need to be able to tell
+      you where we are on any given morning."
+    prompt: "How do you move 14 TB from Kallang into Azure?"
+    options:
+      - id: opt-azcopy
+        label: "Run AzCopy on the Kallang file server against a container SAS, in nightly windows, one source folder at a time"
+        correct: true
+        explain: >
+          AzCopy is the command-line tool built for bulk transfer into Azure
+          Storage: it parallelizes uploads, writes a job log and plan file, and
+          can be resumed after an interrupted window with azcopy jobs resume. At
+          500 Mbps with headroom left for other traffic, 14 TB fits inside six
+          weeks of ten-hour nights with room to spare, and the per-job summary
+          gives Priya her morning number.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: st-manifests, status: healthy}
+          - op: add_edge
+            edge:
+              id: st-e-kallang-manifests
+              source: dc-kallang
+              target: st-manifests
+              kind: traffic
+              label: "AzCopy migration"
+      - id: opt-storage-explorer
+        label: "Have the service desk drag the folders into Azure Storage Explorer over a few afternoons"
+        correct: false
+        consequence: >
+          The transfer stops each time the workstation locks, and after nine days
+          nobody can say which folders are complete.
+        explain: >
+          Storage Explorer is a graphical client for browsing, spot uploads, and
+          inspecting properties, and it uses AzCopy underneath for transfers - but
+          it ties a multi-week job to an interactive session with no scheduling
+          and no resumable job record you can query. Use the GUI to look at
+          storage; use the CLI to move terabytes of it.
+        rep: -10
+      - id: opt-stage-vm
+        label: "Copy the data to a large managed disk on an Azure VM first, then move it into blob storage from there"
+        correct: false
+        explain: >
+          Every byte crosses the link once and is then written and read a second
+          time, so this adds cost and elapsed time without improving reliability -
+          the wire is the constraint, not the destination. Staging on a VM makes
+          sense when the source needs transformation or the protocols do not
+          match, and neither is true here.
+        rep: -8
+      - id: opt-data-box
+        label: "Order an Azure Data Box, load it at Kallang, and ship it to the region"
+        correct: false
+        explain: >
+          Data Box is the right answer when the arithmetic says so: it wins where
+          bandwidth is scarce or the transfer would take longer than shipping. Do
+          the sum here and it does not. 14 TB at 500 Mbps is roughly 62 hours at
+          line rate, comfortably inside six weeks of night windows, while a Data
+          Box round trip is around ten business days plus the customs paperwork
+          for a device that leaves the building.
+        rep: -5
+    next: e2-azcopy-mechanics
+
+  - id: e2-azcopy-mechanics
+    type: design_decision
+    title: "Night three"
+    speaker: mentor
+    objectives: [AZ104-2.10]
+    scenario: |
+      Night one moves 1.9 TB. Night two moves 1.7 TB. Night three moves 1.9 TB,
+      and on the morning of day four the container holds 1.9 TB.
+
+      Desmond looks at the command in your scheduled task for about four
+      seconds.
+
+      "You are running copy with overwrite set to true against the same source
+      folder every night. It is doing exactly what you told it. It starts at the
+      beginning, uploads everything it finds, gets ten hours in, and gets killed.
+      You will finish this migration in never."
+
+      There is a second complaint from the network team: on night two, throughput
+      pinned the link at 480 Mbps and the on-call engineer in Manila lost a call
+      twice.
+    prompt: "What do you change about the transfer?"
+    options:
+      - id: opt-sync-cap
+        label: "Switch to azcopy sync with --recursive, and cap the transfer with --cap-mbps 300"
+        correct: true
+        explain: >
+          azcopy sync compares source and destination and transfers only what is
+          missing or newer, so each night resumes where the last one stopped and
+          the final pass over a completed folder is nearly free. The cap keeps the
+          job inside the headroom the network team agreed to, which is what makes
+          the window renewable rather than a favor you spend once.
+        rep: 10
+      - id: opt-overwrite-false
+        label: "Keep azcopy copy but set --overwrite=false so existing blobs are skipped"
+        correct: false
+        explain: >
+          This does avoid re-uploading what is already there, and it is a real
+          improvement - but it skips purely on existence, so a scan that was
+          re-exported at the source after being copied is silently never updated.
+          For a migration that has to be provably complete and current, sync is
+          the command that compares rather than assumes.
+        rep: -5
+      - id: opt-parallel
+        label: "Launch eight AzCopy processes in parallel, one per top-level folder, to use the window better"
+        correct: false
+        consequence: >
+          The link saturates, the WMS replication falls behind, and the network
+          team withdraws the night window.
+        explain: >
+          AzCopy is already concurrent internally and tunes itself to the
+          machine, so running eight copies mostly makes them compete for the same
+          link and CPU while multiplying the retry noise. It also removes the one
+          thing the network team asked for, which was headroom. Concurrency is
+          tuned with AZCOPY_CONCURRENCY_VALUE, not with more processes.
+        rep: -10
+      - id: opt-mount-drive
+        label: "Mount the container as a drive letter with a third-party tool and use robocopy, which the team already knows"
+        correct: false
+        explain: >
+          Blob storage is not a file system, and tools that present it as one
+          translate every file operation into REST calls with their own semantics
+          for partial writes and retries - which is where a nine-year customs
+          archive is exactly the wrong place to find out how good that translation
+          is. AzCopy speaks the storage API directly and reports what it did.
+        rep: -8
+    next: e3-lifecycle
+
+  - id: e3-lifecycle
+    type: design_decision
+    title: "Evelyn reads the first full month"
+    speaker: cfo
+    objectives: [AZ104-2.16, AZ104-2.13]
+    scenario: |
+      The migration finishes eleven days early. Evelyn's first full month of
+      billing for stmeridianarchive arrives and she prints it, which is never a
+      good sign.
+
+      "Fourteen terabytes at the hot rate. I want to understand why we are paying
+      the read-it-constantly price for footage nobody has watched since 2023."
+
+      The facts. Dashcam clips matter when there is an incident, and an incident
+      is investigated within about thirty days. The insurer requires clips to be
+      retained for two years, after which they should be gone, because keeping
+      them is a liability of its own. Scanned manifests and customs paperwork are
+      pulled a handful of times a year and must be kept for seven. The two live
+      in separate containers, dashcam and manifests.
+
+      "I do not want a person doing this every month," Evelyn adds. "People
+      forget. I have a spreadsheet about how much people forget."
+    prompt: "How do you get the storage bill down?"
+    options:
+      - id: opt-lifecycle-policy
+        label: "Write a lifecycle management policy with two rules, filtered by container prefix: dashcam to cool at 30 days, archive at 90, delete at 730; manifests to cool at 30, archive at 180, delete at 2555"
+        correct: true
+        explain: >
+          Lifecycle management is the built-in engine for exactly this: rules
+          filtered by blob type and prefix, with tier and delete actions keyed off
+          daysAfterModificationGreaterThan. It runs once a day with no compute to
+          own, and it encodes the retention rules where an auditor can read them.
+          Expect the first run to take up to 24 hours to appear, and up to 48 for
+          the tier changes to complete.
+        rep: 12
+      - id: opt-function
+        label: "Write a Function App that runs monthly, enumerates the blobs, and sets each one's tier by age"
+        correct: false
+        consequence: >
+          The function times out on the dashcam container in its third month and
+          nobody notices until the next invoice.
+        explain: >
+          This rebuilds lifecycle management badly: you own the compute, the
+          pagination, the retries, and the list transaction charges for
+          enumerating millions of blobs every month. Lifecycle rules do the same
+          work as a platform feature with no code and no schedule to maintain.
+          Reach for custom compute when the policy engine genuinely cannot express
+          the rule.
+        rep: -10
+      - id: opt-account-tier
+        label: "Set the storage account's default access tier to Archive so everything inherits the cheapest rate"
+        correct: false
+        explain: >
+          The account default access tier can be set to hot, cool, or cold, not
+          archive - archive is a blob-level tier only, and it is offline. Even if
+          it were possible, applying it to everything would put this month's
+          dashcam footage out of reach of the very incident investigations it
+          exists for. Tiering has to follow the age of each object.
+        rep: -10
+      - id: opt-blanket-archive
+        label: "One lifecycle rule over the whole account: archive everything after 30 days, and keep it all, since storage is cheap once archived"
+        correct: false
+        consequence: >
+          An incident investigation in week three hits a clip that was archived
+          on day 31 and waits nine hours for it.
+        explain: >
+          Two problems. Incidents are investigated for about thirty days, so a
+          30-day archive rule guarantees rehydration waits on live cases, and
+          archive carries a 180-day early deletion charge if the blob moves or is
+          removed sooner. Keeping everything forever also breaks the insurer's
+          two-year limit, which is a retention obligation and not a saving.
+        rep: -8
+    next: e4-rehydrate
+
+  - id: e4-rehydrate
+    type: knowledge_check
+    title: "The clip from fourteen months ago"
+    speaker: ticket
+    objectives: [AZ104-2.13]
+    scenario: |
+      The insurer's loss adjuster needs one dashcam clip from January of last
+      year for a hearing on Thursday. It is 240 MB, it is in the dashcam
+      container, and the lifecycle policy moved it to archive thirteen months
+      ago.
+
+      Legal would like it today.
+    question: "What is the correct way to get the clip?"
+    options:
+      - id: opt-rehydrate-high
+        label: "Set the blob's tier to hot with rehydrate priority High, or copy it to a new blob in an online tier with the same priority"
+        correct: true
+        explain: >
+          An archived blob is offline and must be rehydrated before it can be
+          read. Changing its tier to hot or cool with priority High typically
+          completes in under an hour for objects below 10 GB, against up to 15
+          hours at standard priority. Copying to a new blob in an online tier is
+          the variant to use when the original must stay in archive, since the
+          source is left untouched.
+        rep: 8
+      - id: opt-download
+        label: "Download it directly with AzCopy and let the service rehydrate it transparently"
+        correct: false
+        explain: >
+          There is no transparent read from archive. A read or copy request
+          against an archived blob fails with BlobArchived, and only the blob
+          properties and metadata are available. The tier change is a separate,
+          explicit operation that must complete first.
+        rep: -8
+      - id: opt-lifecycle-back
+        label: "Add a lifecycle rule that moves blobs matching the clip's prefix back to hot"
+        correct: false
+        consequence: >
+          The rule is accepted and does nothing. Thursday arrives.
+        explain: >
+          Lifecycle management can move blobs down through the tiers and delete
+          them, but it cannot rehydrate from archive - tierToHot actions do not
+          apply to archived blobs. Policies are also evaluated once a day, which
+          is the wrong instrument for a single urgent object regardless.
+        rep: -8
+      - id: opt-default-tier
+        label: "Change the account's default access tier to hot, which brings archived blobs online with it"
+        correct: false
+        explain: >
+          The account default applies only to blobs that have no explicit tier
+          set. This clip was tiered explicitly by the lifecycle policy, so it
+          keeps its own tier and stays archived, while every other untiered blob
+          in the account quietly gets more expensive.
+        rep: -6
+    next: END

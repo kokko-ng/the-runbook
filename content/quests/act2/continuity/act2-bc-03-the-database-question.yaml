@@ -1,0 +1,343 @@
+schema_version: 1
+id: act2-bc-03-the-database-question
+title: "The Database Question"
+act: 2
+chapter: act2-continuity
+domain: az305-d3
+order: 3
+role: associate-architect
+checkpoint: true
+summary: "Retention, a dropped table, and the difference between a replica and a backup."
+entry: e1-retention
+
+encounters:
+  - id: e1-retention
+    type: design_decision
+    title: "Seven years of month-ends"
+    speaker: manager
+    objectives: [AZ305-3.3]
+    scenario: |
+      sql-wms-sea is the Azure SQL database behind the warehouse system: every
+      scan, every pick, every proof of delivery reference. It is on the default
+      backup settings, which nobody has looked at since it was created.
+
+      Priya has the retention schedule from legal and the ops team's own request,
+      combined onto one page.
+
+      | Requirement | Value | Asked by |
+      | --- | --- | --- |
+      | Restore to any point in time in the last 30 days | any second | Operations |
+      | Month-end copy retained | 7 years | Legal |
+      | Cost | must not add a second copy of the database | Finance |
+
+      "Operations want thirty days because that is how long it takes a customer
+      to dispute a delivery," she says. "Legal want seven years because that is
+      the statute. Nobody wants to pay for a bespoke thing."
+    prompt: "How do you configure backup retention for sql-wms-sea?"
+    options:
+      - id: opt-pitr-ltr
+        label: "Set point-in-time restore retention to 30 days and add a long-term retention policy keeping the monthly backup for 7 years"
+        correct: true
+        explain: >
+          These are two different features and the requirement needs both. Point-
+          in-time restore uses the full, differential, and transaction log backups
+          the service already takes, and its retention is configurable up to 35
+          days - thirty covers the dispute window at a granularity of seconds.
+          Long-term retention then copies the weekly, monthly, or yearly full
+          backup into separate storage for up to ten years, so a monthly policy at
+          seven years satisfies legal without provisioning anything.
+        rep: 12
+        diagram_ops:
+          - {op: set_label, node: sql-wms, label: "sql-wms-sea (PITR 30d, LTR 7y)"}
+      - id: opt-pitr-max
+        label: "Raise point-in-time restore retention to its maximum of 35 days and rely on that alone"
+        correct: false
+        consequence: >
+          Legal ask which month-end in 2021 that setting covers. It covers none of
+          them.
+        explain: >
+          Thirty-five days is the ceiling for point-in-time restore, so it can
+          never reach a seven-year statutory requirement no matter how it is
+          configured. It satisfies the operations row and silently fails the legal
+          row. Long-term retention exists precisely because the two requirements
+          have different mechanisms and different storage.
+        rep: -8
+      - id: opt-bacpac
+        label: "Export a BACPAC to the archive storage account every night and keep the exports for seven years"
+        correct: false
+        explain: >
+          A BACPAC export runs as a normal workload against the database, consuming
+          the compute the warehouse floor is using, and it is not transactionally
+          consistent unless you export from a copy or snapshot first. It also gives
+          you one recovery point per night rather than any point in the last thirty
+          days, so it fails the operations row while doing more work than the
+          built-in long-term retention policy that already exists.
+        rep: -10
+      - id: opt-ltr-only
+        label: "Skip point-in-time retention changes and configure long-term retention with weekly backups kept for seven years"
+        correct: false
+        explain: >
+          Long-term retention restores to the exact backup point it kept, not to an
+          arbitrary second, so weekly points cannot answer a dispute about what the
+          database held on a Tuesday afternoon. It also keeps 364 weekly copies in
+          long-term storage where twelve monthly copies a year would satisfy the
+          statute, so it misses one requirement and overspends on the other.
+        rep: -8
+    rewards:
+      skill_points: 1
+    next: e2-dropped-table
+
+  - id: e2-dropped-table
+    type: design_decision
+    title: "A very quiet fifteen minutes"
+    speaker: noc
+    objectives: [AZ305-3.3]
+    scenario: |
+      NOC Manila calls at 15:05. A release script written for the staging
+      database ran against production.
+
+      "DROP TABLE dbo.DeliveryException. Timestamp 14:20:41. We caught it when the
+      exceptions dashboard went blank."
+
+      Desmond is already at your desk with the facts.
+
+      - The table held about 200,000 rows. Nothing else was touched.
+      - Since 14:20 the floor has kept working. Roughly 45 minutes of picks,
+        scans, and new orders have been written to other tables.
+      - Operations will accept the exception data being restored within 2 hours.
+      - Operations will not accept losing anything written after 14:20.
+      - Point-in-time restore retention is 30 days. There is an auto-failover
+        group secondary in East Asia.
+
+      "Before you say failover group," Desmond says, "think about what a
+      transactionally consistent replica does with a DROP TABLE."
+    prompt: "How do you recover the exception data?"
+    options:
+      - id: opt-pitr-side
+        label: "Point-in-time restore to 14:20:00 as a new database, then copy the table's rows back into production"
+        correct: true
+        explain: >
+          Point-in-time restore always creates a new database, which is the
+          property you want here: the production database keeps taking traffic
+          while you recover the one object you lost. Restoring to just before the
+          drop and copying 200,000 rows across satisfies the two-hour window and
+          loses none of the forty-five minutes of subsequent work. Recovering a
+          single object out of a side-restore is the standard pattern for logical
+          corruption.
+        rep: 12
+      - id: opt-pitr-swap
+        label: "Point-in-time restore to 14:20:00, then rename the restored database over production and repoint the application"
+        correct: false
+        consequence: >
+          The dashboard comes back. So does every picker who scanned between 14:20
+          and 15:20, asking where their work went.
+        explain: >
+          The restore mechanism is right and the scope is wrong. Swapping the whole
+          database back to 14:20 discards forty-five minutes of picks and orders
+          written to untouched tables, which is the one thing operations said they
+          would not accept. Match the blast radius of the recovery to the blast
+          radius of the damage.
+        rep: -10
+      - id: opt-geo-restore
+        label: "Geo-restore from the geo-redundant backup copy in East Asia"
+        correct: false
+        explain: >
+          Geo-restore recovers from the most recent geo-replicated backup, which
+          can be up to an hour behind, and it cannot target an arbitrary second.
+          You would get an unpredictable point somewhere around the drop and a
+          slower restore. Geo-restore is the mechanism for losing the region, not
+          for losing a table inside a healthy one.
+        rep: -8
+      - id: opt-failover
+        label: "Fail the auto-failover group over to the East Asia secondary, which still has the table"
+        correct: false
+        consequence: >
+          The failover completes in under a minute. The exception table is just as
+          absent in Hong Kong.
+        explain: >
+          This is the replica-is-not-a-backup trap. Geo-replication ships committed
+          transactions, and DROP TABLE is a committed transaction - it reached the
+          secondary within seconds of 14:20:41. Replication protects against
+          infrastructure loss; only backups protect against something the
+          application or a human did on purpose. Failing over also moves the
+          write workload to another region for no benefit.
+        rep: -12
+    next: e3-in-region-ha
+
+  - id: e3-in-region-ha
+    type: design_decision
+    title: "One datacenter, three copies, same building"
+    speaker: mentor
+    objectives: [AZ305-3.6]
+    scenario: |
+      Desmond has the availability requirement, which arrived separately from the
+      disaster recovery one and contradicts nobody, for once.
+
+      "Losing the region is your four-hour problem. Losing one datacenter inside
+      Singapore is a different problem and it happens more often. The board's risk
+      register has a line for it."
+
+      The requirements for sql-wms-sea:
+
+      | Requirement | Value |
+      | --- | --- |
+      | Survive loss of one datacenter within Southeast Asia | yes |
+      | Recovery time for that event | under 60 seconds, automatic |
+      | Application changes permitted | none |
+      | Reporting workload | ops want a readable secondary for the shift reports |
+      | Data loss for that event | zero |
+
+      "Zero data loss inside the region," Desmond says. "That word means
+      synchronous, and synchronous inside one region is cheap. Do not go
+      confusing it with the cross-region conversation."
+    prompt: "Which service tier and configuration do you recommend?"
+    options:
+      - id: opt-bc-zr
+        label: "Business Critical, deployed as zone redundant"
+        correct: true
+        explain: >
+          Business Critical runs an Always On availability group of four replicas
+          with local SSD storage, and the zone-redundant configuration places
+          those replicas in different availability zones, so the loss of one
+          datacenter leaves a synchronous copy intact with zero data loss and
+          automatic failover in seconds. It also includes one readable secondary
+          at no additional cost, which is the reporting row answered without
+          another database.
+        rep: 12
+        diagram_ops:
+          - {op: set_label, node: sql-wms, label: "sql-wms-sea (Business Critical, zone redundant)"}
+      - id: opt-bc-local
+        label: "Business Critical in its default configuration, relying on the four replicas it already runs"
+        correct: false
+        consequence: >
+          Marcus reads the design and asks which building the four replicas are
+          in. It is one building.
+        explain: >
+          This is the subtle one. Business Critical always runs multiple replicas,
+          but without the zone-redundant configuration they sit within a single
+          datacenter, so a datacenter-level failure takes all of them. Zone
+          redundancy is a separate setting, and it is the setting this requirement
+          is actually about.
+        rep: -10
+      - id: opt-gp-zr
+        label: "General Purpose, deployed as zone redundant, to keep the cost down"
+        correct: false
+        explain: >
+          General Purpose zone redundancy is real and it does survive the loss of a
+          zone, so this is the closest wrong answer. It fails on the reporting row -
+          General Purpose has no readable secondary - and its failover means
+          re-attaching remote storage to a new compute node, which is measured in
+          tens of seconds and can exceed the sixty-second requirement under load.
+          If ops dropped the reporting replica, this would be the cheaper right
+          answer.
+        rep: -5
+      - id: opt-failover-group
+        label: "Leave the tier alone and use the East Asia auto-failover group to cover datacenter failures too"
+        correct: false
+        explain: >
+          Cross-region failover for a single-datacenter fault answers the
+          requirement by leaving the country. The documented recovery time for an
+          auto-failover group is around an hour rather than sixty seconds, its
+          replication is asynchronous so data loss is not zero, and afterwards the
+          warehouse floor talks to a database in another region across 30 ms of
+          latency. Use zones for datacenter failures and the region pair for
+          regional ones.
+        rep: -8
+    rewards:
+      skill_points: 1
+    next: e4-cross-region
+
+  - id: e4-cross-region
+    type: design_decision
+    title: "One action at three in the morning"
+    speaker: noc
+    objectives: [AZ305-3.6, AZ305-3.1]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2bc-sql-dr
+          label: "sql-wms-eastasia (proposed)"
+          kind: sql-database
+          status: planned
+      - op: add_edge
+        edge:
+          id: a2bc-e-sql-repl
+          source: sql-wms
+          target: a2bc-sql-dr
+          kind: replication
+          label: "geo-replication"
+          status: planned
+    scenario: |
+      The NOC Manila shift lead joins the design call, which is unusual, because
+      Priya asked her to.
+
+      "I want to say one thing about your document. At three in the morning I have
+      two people and a runbook. If the runbook says edit a connection string and
+      restart eight web instances, we will get it wrong. Somebody always gets it
+      wrong."
+
+      The requirements for the database half of the WMS failover:
+
+      | Requirement | Value |
+      | --- | --- |
+      | Data loss on regional failover | 5 seconds or less |
+      | Database available in East Asia | within 1 hour |
+      | Application connection string | must not change at failover |
+      | Operator actions to trigger failover | one |
+      | Who decides to fail over | Meridian, not the platform |
+
+      "That last row is Priya's," the shift lead says. "She does not want an
+      automatic failover firing because a network blip made Singapore look dead."
+    prompt: "How do you design the cross-region database recovery?"
+    options:
+      - id: opt-afg
+        label: "An auto-failover group to East Asia with the failover policy set to customer managed, and the application using the read-write listener endpoint"
+        correct: true
+        explain: >
+          The failover group's read-write listener is a stable DNS name that always
+          points at the current primary, so the connection string never changes -
+          that is the row the NOC cares about. The group replicates asynchronously
+          with a recovery point objective of about five seconds and a documented
+          recovery time of around one hour, matching the first two rows. Setting
+          the policy to customer managed means Meridian triggers the failover
+          deliberately, in one action, rather than the platform deciding.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2bc-sql-dr, status: healthy}
+          - {op: set_edge_status, edge: a2bc-e-sql-repl, status: healthy}
+          - {op: set_label, node: a2bc-sql-dr, label: "sql-wms-eastasia (failover group secondary)"}
+      - id: opt-geo-replication
+        label: "Active geo-replication to a readable secondary in East Asia, with the runbook repointing the application at the secondary server name"
+        correct: false
+        consequence: >
+          The NOC shift lead writes "connection string" on her pad and underlines
+          it.
+        explain: >
+          Active geo-replication gives you the same five-second replication and the
+          same readable secondary, so the data rows pass. It has no listener
+          endpoint, which means the application must be repointed at a different
+          server name during the failover - exactly the manual step the NOC said
+          they would get wrong, and it fails the connection-string row. Failover
+          groups are geo-replication plus the endpoint and the group semantics.
+        rep: -8
+      - id: opt-geo-restore-dr
+        label: "Rely on geo-restore from the geo-redundant backups when a disaster is declared"
+        correct: false
+        explain: >
+          Geo-restore is included at no extra cost, which is its entire appeal, and
+          it fails both timing rows: the geo-replicated backup can be up to an hour
+          behind, against a five-second requirement, and restoring a multi-terabyte
+          database is not a one-hour operation. It is the right answer for a
+          tier-three database, not for the warehouse floor.
+        rep: -10
+      - id: opt-zone-only
+        label: "Rely on the zone-redundant Business Critical configuration already in place, since it survives a datacenter failure"
+        correct: false
+        explain: >
+          Zone redundancy answers the in-region availability requirement you
+          already settled and does nothing for regional loss - all zones are in
+          Southeast Asia. This is the reverse of the earlier mistake and just as
+          common: the two requirements need two mechanisms, and having one is not
+          evidence of the other.
+        rep: -10
+    next: END

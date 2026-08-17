@@ -1,0 +1,345 @@
+schema_version: 1
+id: act2-data-05-laptop-under-the-desk
+title: "The Laptop Under The Desk"
+act: 2
+chapter: act2-data
+domain: az305-d2
+order: 5
+role: associate-architect
+checkpoint: true
+summary: "Sunda's nightly feed into Meridian runs on a laptop in a Jakarta office. Design what replaces it before someone unplugs it."
+entry: e1-platform
+
+encounters:
+  - id: e1-platform
+    type: design_decision
+    title: "What replaces the laptop"
+    speaker: manager
+    objectives: [AZ305-2.9]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2data-sunda-jkt
+          label: "Sunda WMS (Jakarta comms room)"
+          kind: on-premises
+          group: grp-onprem2
+          status: warning
+      - op: add_node
+        node:
+          id: a2data-adf
+          label: "Integration platform (undecided)"
+          kind: app-service
+          group: grp-sea
+          status: planned
+    scenario: |
+      Priya has a photograph on her phone. It is a laptop on a shelf under a
+      desk in the Jakarta office, lid closed, with a sticky note on it reading
+      JANGAN MATIKAN - do not switch off.
+
+      "That is the integration. Every night at 23:00 it pulls fourteen tables
+      out of Sunda's SQL Server and pushes them into our WMS. The analyst who
+      wrote it left in March. Nobody has the source except what is on that
+      disk."
+
+      What you know about the workload:
+
+      - 2.4 GB per night across fourteen tables. The largest, shipment_event,
+        holds 40 million rows.
+      - The load window is eight hours. The current run takes five hours twenty
+        and grows each month.
+      - The auditor wants a run history, per-step outcomes, and evidence of
+        retries. "The analyst checked it" was a finding last year.
+      - Failures must alert NOC Manila, who will be operating this.
+      - The team is T-SQL and PowerShell. No Spark, no Scala, and nobody is
+        being hired.
+      - It must deploy from the existing Bicep pipeline like everything else.
+      - Evelyn's ceiling for the integration line is SGD 600 per month.
+    prompt: "What do you recommend as the integration platform?"
+    options:
+      - id: opt-adf
+        label: "Azure Data Factory, with the copy and transform steps expressed as pipeline activities"
+        correct: true
+        explain: >
+          Data Factory is the managed orchestration surface for exactly this
+          shape of work: scheduled batch movement between a private source and a
+          cloud target. Retry policy, per-activity run history, and alerting are
+          service features rather than code someone has to write and maintain,
+          which is what the audit finding was actually about. It is authored
+          declaratively, deploys from Bicep, and at 2.4 GB a night the copy
+          charges sit well inside SGD 600.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: a2data-adf, status: healthy}
+          - {op: set_label, node: a2data-adf, label: "adf-meridian (Data Factory)"}
+          - op: add_edge
+            edge:
+              id: a2data-e-adf-sqlmi
+              source: a2data-adf
+              target: a2data-sqlmi
+              kind: dependency
+              label: "nightly load"
+      - id: opt-databricks
+        label: "Azure Databricks, with notebooks doing the extract and load on a job cluster"
+        correct: false
+        consequence: >
+          Desmond asks who is going to debug a Spark stage trace at two in the
+          morning. Nobody volunteers.
+        explain: >
+          Databricks is the right tool when the transformation genuinely needs
+          distributed compute or the team already lives in Spark. Neither is
+          true here: 2.4 GB fits in memory on a laptop, which is the entire
+          problem you are solving, and the scenario states there is no Spark
+          skill and no hiring. Choosing a platform your operators cannot debug
+          moves the single point of failure from a laptop to a person.
+        rep: -8
+      - id: opt-function
+        label: "An Azure Function on a timer trigger, running the same Python the laptop runs"
+        correct: false
+        consequence: >
+          The first run against shipment_event hits the execution timeout, and
+          the audit finding about bespoke unreviewed code survives the migration
+          intact.
+        explain: >
+          It relocates the script without changing anything the auditor
+          objected to: retries, step-level history, and alerting all remain
+          things somebody has to write. Consumption plan executions are also
+          bounded by a timeout that a multi-hour load will exceed. Moving
+          bespoke code to a different compute host is a hosting decision, not an
+          integration design.
+        rep: -8
+      - id: opt-logicapps
+        label: "Logic Apps Standard with the SQL connector and an on-premises data gateway"
+        correct: false
+        explain: >
+          Logic Apps is genuinely good at connector-driven workflow - approvals,
+          events, a few hundred records - and bills by action. Moving 40 million
+          rows through a workflow engine means either a very long loop or a very
+          large bill, and neither fits an eight-hour window that is already
+          two-thirds consumed. Use workflow engines for orchestration of events,
+          and a data movement service for bulk data.
+        rep: -6
+    next: e2-connectivity
+
+  - id: e2-connectivity
+    type: design_decision
+    title: "Getting into the comms room"
+    speaker: mentor
+    objectives: [AZ305-2.9]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2data-shir
+          label: "Integration runtime (undecided)"
+          kind: vm
+          group: grp-onprem2
+          status: planned
+    scenario: |
+      Desmond has been on a call with Sunda's outsourced network provider and
+      is in the mood that follows.
+
+      "The Jakarta SQL Server is behind their firewall. Their firewall is
+      managed by an ISP under a contract we inherited. Every inbound rule is a
+      change request and the last one took six weeks."
+
+      The constraints, from him and from Marcus:
+
+      - No inbound connections from the internet to the Jakarta comms room.
+        Marcus will not sign anything that creates one.
+      - ExpressRoute or a site-to-site VPN to Jakarta is in procurement and is
+        at least nine months away. The feed cannot wait for it.
+      - Outbound HTTPS on 443 from the comms room is already permitted and does
+        not need a change request.
+      - Data in transit must be encrypted end to end.
+      - The SQL credential must not appear in any pipeline definition or
+        parameter file that lands in the repository.
+    prompt: "How does the integration platform reach the Jakarta source?"
+    options:
+      - id: opt-shir
+        label: "A self-hosted integration runtime on a Windows server in the Jakarta comms room, with the SQL credential in Key Vault and referenced by the linked service"
+        correct: true
+        explain: >
+          A self-hosted integration runtime runs inside the private network and
+          dials out to the service over HTTPS on 443, so the copy works with the
+          outbound path that already exists and creates no inbound rule for
+          Marcus to refuse or the ISP to bill for. It is also the compute doing
+          the copy, so the data path stays local until it leaves encrypted. The
+          linked service resolves the credential from Key Vault at runtime, so
+          the repository holds a reference rather than a secret.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2data-shir, status: healthy}
+          - {op: set_label, node: a2data-shir, label: "Self-hosted IR (Jakarta)"}
+          - op: add_edge
+            edge:
+              id: a2data-e-adf-shir
+              source: a2data-adf
+              target: a2data-shir
+              kind: dependency
+              label: "outbound 443"
+          - op: add_edge
+            edge:
+              id: a2data-e-shir-sunda
+              source: a2data-shir
+              target: a2data-sunda-jkt
+              kind: dependency
+      - id: opt-publicip
+        label: "Publish the Jakarta SQL Server on a public IP and allowlist the Azure integration runtime IP ranges on the ISP firewall"
+        correct: false
+        consequence: >
+          Marcus reads "public IP" and "SQL Server" in the same sentence and
+          declines before he reaches the end of it.
+        explain: >
+          It creates the inbound path the scenario explicitly forbids, and
+          allowlisting service IP ranges is a weak control - those ranges are
+          large, change on a published schedule, and every rule change is a
+          six-week ISP request. Exposing a database engine to the internet to
+          avoid installing a piece of software is the wrong side of that trade.
+        rep: -12
+      - id: opt-waitvpn
+        label: "Wait for the site-to-site VPN, keep the laptop running until then, and use the Azure integration runtime afterwards"
+        correct: false
+        consequence: >
+          In month four the Jakarta office moves floors and the laptop is packed
+          into a box labelled MISC.
+        explain: >
+          It is the only option that leaves the stated problem in place for nine
+          months, which is the requirement it fails. A self-hosted runtime is
+          also not wasted work when the VPN lands: you can retire it then, or
+          keep it, and either way the pipeline definition does not change.
+        rep: -8
+      - id: opt-managedvnet
+        label: "Use the Azure integration runtime with a managed virtual network and a managed private endpoint to the Jakarta server"
+        correct: false
+        explain: >
+          Managed private endpoints reach Azure platform services and Private
+          Link services. There is no private endpoint to be created for a
+          physical SQL Server in someone else's comms room - private
+          connectivity to on-premises still requires ExpressRoute or a VPN,
+          which the scenario rules out for nine months. The managed virtual
+          network solves outbound isolation within Azure, not reachability
+          outside it.
+        rep: -8
+    next: e3-incremental
+
+  - id: e3-incremental
+    type: design_decision
+    title: "Eight hours, and shrinking"
+    speaker: mentor
+    objectives: [AZ305-2.9, AZ305-2.7]
+    scenario: |
+      The window is the part Desmond actually cares about.
+
+      "Five hours twenty today. Add Sunda's volume growth and it is past eight
+      inside a year, and eight is when the wave planning starts. Then it is my
+      pager."
+
+      What the source looks like:
+
+      - shipment_event: 40 million rows, append-only, roughly 180,000 new rows a
+        night. It has a modified_utc column maintained by the application.
+      - customer and tariff: small, updated in place, and rows are deleted when
+        an account closes or a rate is withdrawn.
+      - The other eleven tables are reference data, a few thousand rows each,
+        and reloading them entirely takes under a minute.
+      - The source is SQL Server 2016 Standard. Change tracking is available on
+        every edition; the DBA at Sunda will enable it on named tables but not
+        estate-wide.
+      - Nothing in this feed is needed intraday. Nightly is the requirement,
+        not a limitation anyone wants relaxed.
+    prompt: "What load pattern do you recommend?"
+    options:
+      - id: opt-hybrid
+        label: "Watermark on modified_utc for shipment_event, change tracking on customer and tariff, full reload for the eleven reference tables"
+        correct: true
+        explain: >
+          It matches the mechanism to each table's behavior. A high-water mark
+          moves 180,000 rows instead of 40 million, which is where the five
+          hours goes. Change tracking is the only one of the three that reports
+          deletes, which is why the two mutable dimensions need it and the
+          append-only fact does not. And full reload is correct for tables where
+          the read costs less than the bookkeeping - simplicity is a legitimate
+          choice when it is cheap.
+        rep: 12
+      - id: opt-fullload
+        label: "Keep the full truncate-and-reload for all fourteen tables; the platform is faster than the laptop was"
+        correct: false
+        consequence: >
+          The first Data Factory run is quicker. The tenth is not, and the
+          twentieth overruns into wave planning.
+        explain: >
+          Better hardware buys you months against a growth curve, not a design.
+          The scenario states the window is already two-thirds consumed and
+          growing, so reloading 40 million rows nightly fails the stated
+          constraint on a known timeline. It is also the most expensive shape:
+          you pay to move the same 40 million rows every night to learn about
+          180,000 of them.
+        rep: -8
+      - id: opt-watermark-all
+        label: "A modified_utc watermark on all fourteen tables, for one consistent pattern everywhere"
+        correct: false
+        consequence: >
+          Six months later, closed customer accounts are still receiving rate
+          cards, and one of them is a competitor.
+        explain: >
+          Consistency is appealing and this one is silently wrong for customer
+          and tariff. A timestamp watermark can only see rows that still exist -
+          a deleted row has no modified_utc to detect, so deletions never
+          propagate and the target drifts from the source forever. Deletes are
+          the requirement that decides between a watermark and change tracking.
+        rep: -10
+      - id: opt-cdc-stream
+        label: "Enable change data capture on all fourteen tables and stream changes through Event Hubs into the WMS continuously"
+        correct: false
+        explain: >
+          It would work and it answers a question nobody asked: the scenario
+          says nightly is the requirement and nobody wants it relaxed. In
+          exchange you add a streaming platform to operate, put capture overhead
+          on a source database another company runs, and ask a Standard-edition
+          server and its DBA for estate-wide capture they have declined. Latency
+          you do not need is bought with complexity you keep.
+        rep: -6
+    next: e4-check
+
+  - id: e4-check
+    type: knowledge_check
+    title: "Desmond finds the single point of failure"
+    speaker: mentor
+    objectives: [AZ305-2.9]
+    scenario: |
+      Desmond reads the design twice, which is unusual, then puts a finger on
+      one box in the diagram.
+
+      "This is one Windows server in a comms room in another country. Jakarta
+      IT patch on the third Tuesday and they reboot when they feel like it."
+    question: >
+      The self-hosted integration runtime node reboots midway through the
+      nightly copy. What happens, and what do you change in the design?
+    options:
+      - id: opt-fallback
+        label: "Data Factory falls back to the Azure integration runtime and completes the copy over the internet"
+        correct: false
+        explain: >
+          There is no fallback. A linked service is bound to one integration
+          runtime, and the Azure integration runtime has no route into a private
+          Jakarta network anyway. Runtime selection is a design decision, not
+          something the service re-makes at failure time.
+      - id: opt-second-node
+        label: "The activity fails; register a second node against the same self-hosted integration runtime so it runs highly available and shares copy concurrency"
+        correct: true
+        explain: >
+          A self-hosted integration runtime is a logical resource that can have
+          up to four registered nodes. With two or more, the loss of a node
+          moves work to the survivors instead of failing the run, and the extra
+          node also raises concurrent copy capacity, which shortens the window.
+          One node is a single point of failure you inherited from the laptop,
+          just in a rack.
+      - id: opt-retry
+        label: "The copy activity's retry policy reissues the request, which the service routes to the Azure integration runtime after three failures"
+        correct: false
+        explain: >
+          Retry policy reissues the activity against the same integration
+          runtime. If the only node is still rebooting, every retry fails the
+          same way, and the run ends having consumed the window rather than the
+          data. Retries handle transient faults; they do not create capacity
+          that is not registered.
+    next: END

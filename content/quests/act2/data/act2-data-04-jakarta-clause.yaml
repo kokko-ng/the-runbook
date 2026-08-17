@@ -1,0 +1,323 @@
+schema_version: 1
+id: act2-data-04-jakarta-clause
+title: "The Jakarta Clause"
+act: 2
+chapter: act2-data
+domain: az305-d2
+order: 4
+role: associate-architect
+checkpoint: true
+summary: "Backups, retention, and one contract clause that decides where Meridian's second copy is allowed to exist."
+entry: e1-retention
+
+encounters:
+  - id: e1-retention
+    type: design_decision
+    title: "How far back you can go"
+    speaker: mentor
+    objectives: [AZ305-2.8]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2data-ltr
+          label: "Long-term retention (undecided)"
+          kind: backup-vault
+          group: grp-sea
+          status: planned
+    scenario: |
+      Desmond has found something in the Sunda incident log and is enjoying it
+      more than he should.
+
+      "Two years ago their WMS vendor shipped a patch that quietly wrote wrong
+      cost centers onto consignments. Nobody noticed for nine days. They
+      restored, discovered their backups only went back seven, and spent a
+      fortnight fixing rows by hand."
+
+      Priya adds the other half from the audit pack.
+
+      - The external auditor requires the financial year-end state of the
+        warehouse database to be retrievable for seven years. Once a year,
+        retrievable, on request.
+      - The restore must be something Meridian can run without opening a vendor
+        ticket.
+      - Point-in-time restore on Managed Instance defaults to seven days and is
+        configurable up to 35.
+      - Long-term retention copies are billed at backup storage rates. A weekly
+        policy held for seven years is 364 stored copies of a 640 GB database.
+      - Evelyn has approved backup spend "within reason", which from Evelyn
+        means she will count the copies.
+    prompt: "What backup retention policy do you recommend?"
+    options:
+      - id: opt-pitr35-ltr-yearly
+        label: "Point-in-time restore window of 35 days, plus long-term retention of one yearly backup kept for seven years"
+        correct: true
+        explain: >
+          The 35-day window covers the failure mode that actually bit Sunda -
+          silent corruption found on day nine - with a wide margin, and
+          point-in-time restore is self-service. The yearly long-term retention
+          copy matches the auditor's requirement exactly: one state, once a
+          year, retrievable for seven years. Seven copies instead of 364, which
+          is the difference between a defensible line item and one Evelyn reads
+          aloud.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2data-ltr, status: healthy}
+          - {op: set_label, node: a2data-ltr, label: "LTR: PITR 35d + yearly x7"}
+          - op: add_edge
+            edge:
+              id: a2data-e-sqlmi-ltr
+              source: a2data-sqlmi
+              target: a2data-ltr
+              kind: replication
+              label: "backups"
+      - id: opt-weekly-ltr
+        label: "Default seven-day point-in-time window, plus weekly long-term retention backups kept for seven years"
+        correct: false
+        consequence: >
+          Evelyn counts the copies. Then she counts them again out loud, in the
+          review, slowly.
+        explain: >
+          It fails at both ends. Seven days is the exact window that failed
+          Sunda when corruption surfaced on day nine, and no long-term copy
+          helps because weekly granularity cannot reconstruct an arbitrary
+          moment. It then stores 364 full copies to satisfy a requirement that
+          asked for one state per year.
+        rep: -8
+      - id: opt-pitr-only
+        label: "Point-in-time restore window of 35 days and nothing else, since 35 days covers every realistic recovery"
+        correct: false
+        consequence: >
+          The auditor asks for the 2027 year-end position in 2031 and there is
+          nothing to give her.
+        explain: >
+          It covers operational recovery well and ignores the stated compliance
+          requirement. Point-in-time restore is bounded at 35 days by the
+          service; a seven-year obligation can only be met by long-term
+          retention, which stores backups separately from the PITR chain. Two
+          different requirements, two different mechanisms.
+        rep: -8
+      - id: opt-copyonly
+        label: "A SQL Agent job taking COPY_ONLY native backups to a blob container every night, retained seven years"
+        correct: false
+        explain: >
+          Managed Instance can write native COPY_ONLY backups to a URL, so this
+          runs - and it replaces a service guarantee with a job you now own.
+          A failed night is silent, the container needs its own retention and
+          immutability design, and a seven-year-old native backup must be
+          restorable onto whatever engine version exists in 2033. Built-in
+          long-term retention carries all of that for you.
+        rep: -6
+    next: e2-redundancy
+
+  - id: e2-redundancy
+    type: design_decision
+    title: "The clause, again"
+    speaker: security
+    objectives: [AZ305-2.8]
+    scenario: |
+      Marcus brings the same contract clause he brought to the photo design,
+      with a new sticky note on it.
+
+      "Backups are copies. The clause says copies of Indonesian consignee data
+      may sit in Singapore or Jakarta and names Hong Kong as excluded. Nobody
+      wrote 'except backups' anywhere in it."
+
+      The relevant facts:
+
+      - Backup storage redundancy for a Managed Instance is chosen per instance:
+        locally-redundant, zone-redundant, geo-redundant, or geo-zone-redundant.
+      - The default is geo-redundant, and geo-redundant backups replicate to
+        the paired region. For Southeast Asia the pair is East Asia, in Hong
+        Kong. The pairing is fixed.
+      - Geo-restore - recreating the database in another region from backup - is
+        available only when backup storage redundancy is geo-redundant or
+        geo-zone-redundant.
+      - The instance must survive the loss of one datacenter without data loss.
+      - Priya has confirmed cross-region recovery for this workload is a
+        separate continuity design and is not to be solved here.
+    prompt: "Which backup storage redundancy do you recommend for sqlmi-meridian-sea?"
+    options:
+      - id: opt-geo
+        label: "Geo-redundant, the default, because losing recoverability is a bigger risk than a contract clause"
+        correct: false
+        consequence: >
+          Marcus does not argue. He books thirty minutes with Priya and the
+          general counsel and puts your name in the invite.
+        explain: >
+          Geo-redundant backup storage copies every backup to East Asia, which
+          the contract names as excluded - a breach that exists from the moment
+          the instance is created, whether or not anyone ever restores. A
+          compliance constraint is a hard requirement in a design, not a risk to
+          be traded against convenience.
+        rep: -12
+      - id: opt-zone
+        label: "Zone-redundant, keeping every backup copy inside Southeast Asia across three availability zones"
+        correct: true
+        explain: >
+          Zone-redundant backup storage keeps three copies in three physically
+          separate datacenters inside the region, which satisfies the
+          single-datacenter loss requirement without a byte leaving Southeast
+          Asia. The trade it makes is explicit and worth writing down: geo-restore
+          is unavailable, so cross-region recovery has to come from the
+          continuity design rather than from backup.
+        rep: 12
+        diagram_ops:
+          - {op: set_label, node: a2data-ltr, label: "LTR: PITR 35d + yearly x7 (ZRS backup storage)"}
+      - id: opt-local
+        label: "Locally-redundant, the cheapest option and unarguably inside Singapore"
+        correct: false
+        explain: >
+          It clears the residency constraint and fails the availability one:
+          locally-redundant backup storage holds all three copies in a single
+          datacenter, so losing that facility loses the backups along with it.
+          The scenario states the instance must survive the loss of one
+          datacenter without data loss, and backups are part of the instance.
+        rep: -8
+      - id: opt-gzrs
+        label: "Geo-zone-redundant, so backups survive both a datacenter loss and a region loss"
+        correct: false
+        explain: >
+          The zone half is correct and the geo half breaches the same clause as
+          plain geo-redundant, because the secondary is still East Asia. It also
+          solves the cross-region problem Priya explicitly moved out of scope,
+          at a higher rate, in the one way the contract forbids.
+        rep: -10
+    next: e3-nonprod
+
+  - id: e3-nonprod
+    type: design_decision
+    title: "What the developers get"
+    speaker: security
+    objectives: [AZ305-2.4]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2data-sqlmi-dev
+          label: "Non-production WMS copy (undecided)"
+          kind: sql-database
+          group: grp-landing
+          status: planned
+    scenario: |
+      The WMS vendor's integration developers need a realistic database to
+      build the merged release against, and they work from Manila and Bandung.
+
+      Marcus states the boundary before you propose anything.
+
+      - PDPA obliges Meridian to limit personal data to the purposes it was
+        collected for. Building a release is not one of them.
+      - The developers need realistic volumes and realistic distributions.
+        A thousand synthetic rows will not surface the wave-planning bugs.
+      - Consignee identity columns are protected with Always Encrypted; the
+        column master keys stay in kv-meridian-data and developers do not get
+        access to that vault.
+      - Names, addresses, and phone numbers are in ordinary columns and are
+        just as much personal data.
+      - The non-production subscription is governed less tightly than
+        production and Marcus is not planning to change that.
+    prompt: "How do you supply the non-production copy?"
+    options:
+      - id: opt-mask-pipeline
+        label: "Restore a copy inside the production boundary, run a scripted transformation that replaces personal columns with realistic surrogates, then export that database to non-production"
+        correct: true
+        explain: >
+          The personal data never crosses the boundary: the restore, the
+          classification-driven transformation, and the export all happen where
+          production controls apply, and only the transformed database moves.
+          Surrogates preserve row counts, cardinality, and distributions, so the
+          wave-planning bugs still reproduce. It is the only option here where
+          a weaker non-production subscription is not also a weaker control over
+          personal data.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2data-sqlmi-dev, status: healthy}
+          - {op: set_label, node: a2data-sqlmi-dev, label: "Non-production WMS (surrogate data)"}
+          - op: add_edge
+            edge:
+              id: a2data-e-sqlmi-dev
+              source: a2data-sqlmi
+              target: a2data-sqlmi-dev
+              kind: dependency
+              label: "masked refresh"
+      - id: opt-copy-rbac
+        label: "Copy the production database into the non-production subscription and control access with role assignments"
+        correct: false
+        consequence: >
+          A contractor's laptop in Bandung ends up with a bacpac of it. The
+          notification obligation is Marcus's problem and the meeting is yours.
+        explain: >
+          It moves live personal data into an environment the scenario says is
+          governed less tightly, which fails the purpose-limitation requirement
+          the moment the copy exists - role assignments control who reads it,
+          not whether it should be there. The identity columns would also be
+          unreadable ciphertext without vault access, so the copy is both
+          non-compliant and less useful than it looks.
+        rep: -12
+      - id: opt-ddm-nonprod
+        label: "Copy production to non-production and apply Dynamic Data Masking to the personal columns there"
+        correct: false
+        explain: >
+          The plaintext is already in non-production the instant the copy lands;
+          masking only changes what a query returns. Anyone who can be granted
+          UNMASK, or who restores the copy elsewhere, has the real data.
+          Masking presentation in an environment that should never have held the
+          data is treating the symptom.
+        rep: -10
+      - id: opt-readonly-prod
+        label: "Skip the copy and give the developers read-only access to the production read scale-out replica"
+        correct: false
+        consequence: >
+          Someone runs an unbounded join against the replica during a berthing
+          window while investigating a bug.
+        explain: >
+          It avoids making a copy by giving external developers a live view of
+          production personal data, which is a larger version of the same
+          failure. It also puts unreviewed ad-hoc queries onto the replica the
+          shipment-tracking API depends on, undoing the read isolation that
+          replica exists to provide.
+        rep: -10
+    next: e4-check
+
+  - id: e4-check
+    type: knowledge_check
+    title: "Marcus checks the trade you made"
+    speaker: security
+    objectives: [AZ305-2.8]
+    scenario: |
+      Marcus signs the residency section, then stops with the pen still on the
+      page.
+
+      "You wrote that zone-redundant backup storage costs us something. I want
+      to be able to say what, in one sentence, when the board asks."
+    question: >
+      With zone-redundant backup storage and a Business Critical Managed
+      Instance, what is the recovery position if the entire Southeast Asia
+      region becomes unavailable?
+    options:
+      - id: opt-auto-failover
+        label: "The instance fails over automatically to the paired region, because Business Critical maintains replicas across regions"
+        correct: false
+        explain: >
+          Business Critical's replicas are within one region - that is what
+          delivers its intra-region SLA and its readable secondary. Cross-region
+          protection comes from a separate construct such as a failover group or
+          active geo-replication, and it is never implied by a service tier.
+      - id: opt-no-cross-region
+        label: "There is no cross-region recovery from backup by design; the data is recoverable when the region returns, and region-level protection must come from the continuity design"
+        correct: true
+        explain: >
+          Geo-restore is the only backup-based cross-region recovery for Azure
+          SQL, and it requires geo-redundant or geo-zone-redundant backup
+          storage, which the residency clause rules out. That is a real,
+          accepted gap, and the value of stating it plainly is that the
+          continuity design has to close it deliberately rather than everyone
+          assuming backups already did.
+      - id: opt-geo-restore
+        label: "Geo-restore rebuilds the instance in East Asia within roughly twelve hours, as it does for any Azure SQL database"
+        correct: false
+        explain: >
+          Geo-restore is not a universal capability - it reads the geo-replicated
+          copy of the backups, which only exists when backup storage redundancy
+          is geo-redundant or geo-zone-redundant. Choosing zone-redundant
+          removes geo-restore from the menu entirely, which is exactly the trade
+          the residency clause forced.
+    next: END

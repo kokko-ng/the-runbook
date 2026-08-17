@@ -1,0 +1,417 @@
+schema_version: 1
+id: act1-mon-05-day-before-the-audit
+title: "The Day Before the Audit"
+act: 1
+chapter: act1-monitoring
+domain: az104-d5
+order: 5
+role: senior-cloud-admin
+checkpoint: true
+summary: "A decommissioning script matches the wrong tag. The auditors arrive at nine."
+entry: e1-vault
+
+encounters:
+  - id: e1-vault
+    type: design_decision
+    title: "Where the backups live"
+    speaker: security
+    objectives: [AZ104-5.7]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: mon-rsv
+          label: "rsv-meridian-sea"
+          kind: recovery-vault
+          group: grp-corp
+          status: planned
+    scenario: |
+      Marcus has the ISO evidence list open and one line unticked.
+
+      "Backup of production systems. We take snapshots when someone remembers,
+      into whichever resource group they were standing in. I need something I can
+      point an auditor at."
+
+      The workloads are Azure VMs in Southeast Asia - vm-wms01, vm-dc01, and the
+      six machines behind them. Evelyn has already said the word redundancy in a
+      tone that suggests she has read what it costs.
+
+      Marcus adds the requirement that actually constrains the design. "If we
+      lose the region, I need to be able to get the data back from somewhere
+      else. Not next quarter. That week."
+    prompt: "How do you set the vault up?"
+    options:
+      - id: opt-rsv-grs
+        label: "Create a Recovery Services vault in Southeast Asia, set storage replication to geo-redundant and enable cross-region restore before protecting anything"
+        correct: true
+        explain: >
+          A Recovery Services vault protecting Azure VMs must sit in the same
+          region as those VMs, so the region is not a choice. What is a choice is
+          the vault's storage replication, and it can only be changed while no
+          backup item has ever been registered - geo-redundant storage plus
+          cross-region restore is what lets you recover in the paired region when
+          Southeast Asia is gone. Get both settings right on day one, because
+          day two is too late.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: mon-rsv, status: healthy}
+          - op: add_edge
+            edge:
+              id: mon-e-rsv-wms01
+              source: mon-rsv
+              target: vm-wms01
+              kind: dependency
+              label: "protected"
+      - id: opt-rsv-remote
+        label: "Create the vault in East Asia so the backups are already out of region, and protect the Southeast Asia VMs from there"
+        correct: false
+        consequence: >
+          The VM does not appear in the list of protectable items. You spend
+          forty minutes convinced it is a permissions problem.
+        explain: >
+          The instinct is sound and the mechanism is wrong: Azure Backup requires
+          the vault to be in the same region as the VMs it protects, so a
+          cross-region vault simply cannot enroll them. Out-of-region durability
+          comes from the vault's replication setting, not from placing the vault
+          somewhere else.
+        rep: -10
+      - id: opt-lrs
+        label: "Create the vault in Southeast Asia with locally redundant storage, since it is materially cheaper and the data is already replicated three times"
+        correct: false
+        explain: >
+          Locally redundant storage is a legitimate choice for a development
+          vault and it is the cheapest option, but three copies inside one region
+          are three copies you lose together when that region is unavailable.
+          Marcus's stated requirement is recovery when the region is gone, which
+          is the one failure locally redundant storage does not survive.
+        rep: -8
+      - id: opt-script-snapshots
+        label: "Keep it simple with a scheduled runbook that snapshots the managed disks nightly and copies them to a storage account"
+        correct: false
+        consequence: >
+          Six months later the runbook's service principal secret expires. The
+          snapshots stop. Nothing reports it.
+        explain: >
+          Disk snapshots are a real primitive, but rolling your own backup means
+          owning retention, consistency, cataloguing, restore tooling, alerting
+          and evidence for the auditor - all of which the vault provides. It also
+          gives an attacker or an accident a single set of writable blobs, with
+          none of the vault's soft delete or immutability.
+        rep: -10
+    next: e2-policy
+
+  - id: e2-policy
+    type: design_decision
+    title: "Retention, negotiated"
+    speaker: cfo
+    objectives: [AZ104-5.9]
+    scenario: |
+      Evelyn and Marcus arrive at your desk from opposite directions, which is
+      how policy usually gets written here.
+
+      Marcus needs a restore point from any of the last thirty days, a point from
+      the end of each of the last twelve months, and seven years of year-end
+      copies for the finance systems. That is the audit requirement and it is not
+      negotiable.
+
+      Evelyn's position is that she has read the storage line on the estimate.
+      "Whatever you keep, I want to know why each tier exists. If the answer to
+      all seven years is daily copies, we are not doing that."
+
+      The workloads are managed-disk VMs, and Ops has asked whether backups can
+      run more than once a day for the warehouse system during peak.
+    prompt: "What backup policy do you configure?"
+    options:
+      - id: opt-tiered
+        label: "One policy with thirty daily points, twelve monthly points taken from the last successful backup of each month, and seven yearly points"
+        correct: true
+        explain: >
+          A backup policy is a schedule plus a retention range per tier, and the
+          tiers are what make long retention affordable: the daily tier covers
+          operational recovery for a month, monthly points serve the audit's
+          twelve-month view, and yearly points satisfy the seven-year
+          requirement at a fraction of the storage of keeping daily copies that
+          long. Each tier has a stated reason, which is what Evelyn asked for.
+        rep: 12
+      - id: opt-daily-only
+        label: "Daily backups retained for seven days, and restore anything older from the monthly disk snapshots"
+        correct: false
+        consequence: >
+          The auditor asks to see a restore point from March. There is not one.
+        explain: >
+          Seven days covers the most common recovery case and fails every
+          compliance one, and the fallback named here is the ad hoc snapshot
+          practice the vault was introduced to replace. Retention is driven by
+          the obligations on the data, not by the recovery scenario that happens
+          most often.
+        rep: -12
+      - id: opt-daily-seven-years
+        label: "Daily backups retained for seven years, so any point in time is always available"
+        correct: false
+        consequence: >
+          Evelyn returns with the recalculated estimate and a very short
+          question.
+        explain: >
+          It meets every requirement and costs roughly two thousand five hundred
+          recovery points per VM instead of about fifty, in vault storage that is
+          billed by consumption. Nobody has ever needed a specific Tuesday from
+          four years ago; the tiered pattern exists precisely because the value
+          of granularity decays and the cost of it does not.
+        rep: -10
+      - id: opt-standard-hourly
+        label: "A standard policy taking backups every four hours, so peak season is covered as well"
+        correct: false
+        explain: >
+          A standard policy supports one scheduled backup per day - multiple
+          backups per day for Azure VMs require an enhanced policy, which brings
+          hourly scheduling on managed disks. The requirement is real and the
+          policy type named cannot express it, so the schedule would silently
+          come out as daily.
+        rep: -8
+    next: e3-deleted-vm
+
+  - id: e3-deleted-vm
+    type: troubleshoot
+    title: "P1: vm-wms01 does not exist"
+    speaker: noc
+    objectives: [AZ104-5.10]
+    ticket:
+      id: "MER-5488"
+      reporter: "NOC Manila"
+      priority: "P1"
+      opened: "04:02"
+      body: |
+        vm-wms01 has gone. Not stopped - gone. The resource returns not found and
+        every picking tablet is showing a connection error. Nothing was scheduled
+        for tonight in rg-ops-sea. Audit walkthrough is at 09:00. Waking the
+        senior on call.
+    on_enter_diagram_ops:
+      - {op: set_status, node: vm-wms01, status: broken}
+      - {op: set_status, node: snet-app, status: warning}
+      - {op: set_edge_status, edge: mon-e-rsv-wms01, status: broken}
+    scenario: |
+      Your phone goes at four minutes past four. It is Ravi, and he leads with
+      the word gone, which is a word you have never wanted at the start of a
+      sentence.
+
+      vm-wms01 is not stopped, not deallocated, not in a failed state. The
+      resource does not exist. Its NIC does not exist. The subnet is still there
+      and empty.
+
+      The auditors arrive at nine, and one of the things they were going to be
+      shown is the warehouse management system.
+
+      Desmond joins the bridge from home, sounding entirely awake. "Before you
+      touch anything: find out what deleted it, and find out whether last night's
+      backup completed. Those two answers decide whether this is a two-hour
+      morning or a very different one."
+    time_budget: 7
+    investigate:
+      - id: inv-ravi
+        label: "Ask Ravi what the tablets and the app tier are seeing"
+        speaker: noc
+        reveals: >
+          "Connection refused, nothing else. The database is untouched and
+          responding - it is on a different machine. Whatever happened took the
+          one VM and its NIC and nothing around it."
+      - id: inv-desmond
+        label: "Ask Desmond what happens to a backup when the source VM is deleted"
+        speaker: mentor
+        reveals: >
+          "The protected item stays in the vault and the recovery points stay
+          with it. Protection stops, because there is nothing left to back up,
+          but the points are yours until retention expires. That is the entire
+          reason we did this three weeks ago."
+      - id: inv-change
+        label: "Look for a decommissioning job in the automation account"
+        speaker: ticket
+        reveals: >
+          Runbook rb-decom-stale-vms ran at 03:41. It selects VMs with the tag
+          lifecycle equal to retire. vm-wms01 was tagged lifecycle retire in
+          March when the hardware refresh was planned and the tag was never
+          removed after the plan was cancelled.
+      - id: inv-marcus
+        label: "Ask Marcus what the auditors will need to see at nine"
+        speaker: security
+        reveals: >
+          "The system running, and evidence that the backup and restore process
+          works. If you restore it from the vault in front of them, that is a
+          better walkthrough than the one I had planned."
+    commands:
+      - id: cmd-vm-show
+        label: "Confirm the VM is genuinely gone"
+        command: "az vm show -g rg-ops-sea -n vm-wms01 -o table"
+        output: |
+          (ResourceNotFound) The Resource 'Microsoft.Compute/virtualMachines/vm-wms01'
+          under resource group 'rg-ops-sea' was not found.
+        time_cost: 1
+      - id: cmd-activity
+        label: "Search the activity log for the delete operation"
+        command: "az monitor activity-log list -g rg-ops-sea --offset 6h --query \"[?operationName.value=='Microsoft.Compute/virtualMachines/delete'].{who:caller, when:eventTimestamp, status:status.value}\" -o table"
+        output: |
+          Who                                   When                  Status
+          ------------------------------------  --------------------  ---------
+          sp-automation-decom@meridianlog.com   2026-09-08T03:41:22Z  Succeeded
+        time_cost: 1
+        note: "Deleted by the decommissioning service principal at 03:41. Not a platform failure."
+      - id: cmd-backup-item
+        label: "Show the backup item for vm-wms01 in the vault"
+        command: "az backup item list --vault-name rsv-meridian-sea -g rg-hub-sea --backup-management-type AzureIaasVM -o table"
+        output: |
+          Name       ProtectionState     LastBackupStatus    LastBackupTime
+          ---------  ------------------  ------------------  --------------------
+          vm-wms01   ProtectionStopped   Completed           2026-09-07T21:04:11Z
+          vm-dc01    Protected           Completed           2026-09-07T21:11:47Z
+        time_cost: 1
+        note: "Protection stopped when the source disappeared, and the recovery points are retained."
+      - id: cmd-recovery-points
+        label: "List the recovery points available for vm-wms01"
+        command: "az backup recoverypoint list --vault-name rsv-meridian-sea -g rg-hub-sea -c vm-wms01 -i vm-wms01 --query '[].{name:name, time:properties.recoveryPointTime, type:properties.recoveryPointType}' -o table"
+        output: |
+          Name              Time                  Type
+          ----------------  --------------------  ---------------
+          312884991044      2026-09-07T21:04:11Z  AppConsistent
+          312884918233      2026-09-06T21:03:58Z  AppConsistent
+          312884847101      2026-09-05T21:04:26Z  AppConsistent
+        time_cost: 1
+        note: "Last night's point is app consistent and seven hours old."
+      - id: cmd-jobs
+        label: "Check recent backup jobs in the vault"
+        command: "az backup job list --vault-name rsv-meridian-sea -g rg-hub-sea --query '[0:3].{item:properties.entityFriendlyName, op:properties.operation, status:properties.status}' -o table"
+        output: |
+          Item       Op       Status
+          ---------  -------  ----------
+          vm-wms01   Backup   Completed
+          vm-dc01    Backup   Completed
+          vm-wms01   Backup   Completed
+        time_cost: 1
+      - id: cmd-snapshot-search
+        label: "Look for any orphaned disk or snapshot left behind by the delete"
+        command: "az snapshot list -g rg-ops-sea -o table; az disk list -g rg-ops-sea --query \"[?diskState=='Unattached']\" -o table"
+        output: |
+          (empty)
+          (empty)
+        time_cost: 2
+        note: "The delete took the disks with it. The vault is the only copy."
+    fixes:
+      - id: fix-restore-vm
+        label: "Restore from the 21:04 recovery point, using restore-disks into a staging resource group and then building the VM back into snet-wms-app"
+        correct: true
+        explain: >
+          The recovery points survived the source VM, which is the point of a
+          vault: they are stored in the vault, not alongside the resource.
+          Restoring the disks and attaching them to a new VM in the original
+          subnet gives you the machine as it was at 21:04, seven hours of
+          transactions short, which the WMS reconciles from the database. Doing
+          it in front of the auditors also produces the evidence Marcus needed
+          for the line he could not tick.
+        rep: 15
+        diagram_ops:
+          - {op: set_status, node: vm-wms01, status: healthy}
+          - {op: set_status, node: snet-app, status: healthy}
+          - {op: set_edge_status, edge: mon-e-rsv-wms01, status: healthy}
+      - id: fix-undelete
+        label: "Recover the deleted resource from the subscription's deleted resources, the way soft delete works elsewhere"
+        correct: false
+        consequence: >
+          You lose twenty-five minutes looking for a blade that does not exist.
+        explain: >
+          Soft delete is a per-service feature - key vaults have it, storage
+          blobs have it, and Recovery Services vaults have it for backup items -
+          but there is no subscription-wide undelete for a virtual machine.
+          Deleting a VM and its disks is final at the resource layer, which is
+          precisely why the recovery point matters.
+        rep: -8
+      - id: fix-redeploy
+        label: "Redeploy vm-wms01 from the infrastructure template and have the app team reinstall the warehouse system"
+        correct: false
+        consequence: >
+          The machine is up by eleven with an empty application directory and no
+          local configuration. The audit walkthrough is rescheduled.
+        explain: >
+          A template rebuilds the shape of the machine and none of its state -
+          the installed application, its configuration, and anything written to
+          disk since deployment are all absent. It is also slower than a disk
+          restore and depends on people who are not awake yet.
+        rep: -12
+      - id: fix-file-recovery
+        label: "Mount the recovery point with the item-level file recovery script and copy the application files onto a freshly built VM"
+        correct: false
+        explain: >
+          File recovery is a genuine Azure Backup capability and the right choice
+          when someone deletes a folder from a running server. Here the entire
+          machine is gone, so recovering files means rebuilding the operating
+          system, roles and configuration by hand and then copying data into it -
+          more steps, more ways to be wrong, and slower than restoring the disks
+          you already have.
+        rep: -8
+    rewards:
+      under_budget_bonus: 5
+      skill_points: 2
+    next: e4-restore-drill
+
+  - id: e4-restore-drill
+    type: design_decision
+    title: "Proving it before you need it"
+    speaker: mentor
+    objectives: [AZ104-5.10]
+    scenario: |
+      The VM is back at 07:20. The auditors watch the last twenty minutes of it
+      and Marcus ticks his line.
+
+      Desmond stays on the call after everyone else has dropped.
+
+      "You got lucky twice. The backup happened to be working, and the restore
+      happened to work first time. We have eight protected machines and we have
+      restored exactly one of them, once, by accident."
+
+      He is not being rhetorical. Priya has asked what to promise the business
+      about recovery, and the honest current answer is that backup jobs report
+      success and nobody has ever tested what that success is worth.
+    prompt: "What do you commit to?"
+    options:
+      - id: opt-drill
+        label: "A quarterly restore drill: restore one protected machine to an isolated resource group, verify the application starts, record the elapsed time, then delete it"
+        correct: true
+        explain: >
+          A completed backup job proves the data was read, not that it can be
+          turned back into a working system - the only test of a restore is a
+          restore. Doing it into an isolated resource group makes the drill safe
+          to run against production data, and recording elapsed time converts a
+          vague promise into a recovery time you can actually quote to Priya.
+        rep: 12
+      - id: opt-job-reports
+        label: "Report the backup job success rate monthly, and treat a hundred percent as evidence that recovery works"
+        correct: false
+        consequence: >
+          The report reads a hundred percent every month until the quarter
+          somebody needs a restore from a policy that was silently protecting the
+          wrong disk.
+        explain: >
+          Job success measures one half of the round trip. Backups that complete
+          can still restore into an unbootable machine, a missing data disk, or
+          an application that needs configuration nobody captured - and none of
+          those show up in a job status. Measure the outcome you actually care
+          about.
+        rep: -8
+      - id: opt-restore-prod
+        label: "Test by restoring over the live machine during the next maintenance window, so the test is fully realistic"
+        correct: false
+        consequence: >
+          The first drill replaces a healthy production VM with a
+          fourteen-hour-old copy, on purpose, in front of the warehouse.
+        explain: >
+          Realism is not worth risking the system you are protecting. Restoring
+          to an alternate location exercises everything that matters - the
+          recovery point, the disks, the boot, the application - without any
+          chance of the drill itself becoming the incident.
+        rep: -12
+      - id: opt-more-frequent
+        label: "Increase backup frequency to hourly, so that whatever the restore costs, less data is ever at risk"
+        correct: false
+        explain: >
+          Frequency reduces the recovery point objective and does nothing for the
+          recovery time objective or for the question being asked, which is
+          whether a restore works at all. Twenty-four hourly points that cannot
+          be restored are worth less than one daily point that can.
+        rep: -6
+    next: END

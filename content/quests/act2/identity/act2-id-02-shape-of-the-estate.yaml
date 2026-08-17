@@ -1,0 +1,412 @@
+schema_version: 1
+id: act2-id-02-shape-of-the-estate
+title: "The Shape of the Estate"
+act: 2
+chapter: act2-identity
+domain: az305-d1
+order: 2
+role: associate-architect
+checkpoint: true
+summary: "Auditors read hierarchies. Draw one they can follow, before Sunda's six subscriptions arrive."
+entry: e1-mg-hierarchy
+
+encounters:
+  - id: e1-mg-hierarchy
+    type: design_decision
+    title: "A hierarchy someone else can read"
+    speaker: manager
+    objectives: [AZ305-1.9]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2id-mg-transition
+          label: "Transition (acquired estate)"
+          kind: management-group
+          group: grp-landing
+          status: planned
+      - op: add_node
+        node:
+          id: a2id-mg-sandbox
+          label: "Sandbox"
+          kind: management-group
+          group: grp-landing
+          status: planned
+      - op: add_node
+        node:
+          id: a2id-sub-sunda
+          label: "Sunda inherited subscriptions"
+          kind: subscription
+          group: grp-landing
+          status: warning
+      - op: add_node
+        node:
+          id: a2id-sub-prod-idn
+          label: "Production (Indonesia)"
+          kind: subscription
+          group: grp-landing
+          status: planned
+    scenario: |
+      Priya has brought the board pack, which is worse than it sounds.
+
+      "Chen and Partners are auditing the acquisition. They want to see, on one
+      page, that production is governed differently from everything else, and
+      that every subscription Meridian owns sits under that governance. Not a
+      sample. Every one."
+
+      The estate has changed shape underneath you. Meridian runs four
+      subscriptions today. The board funded a second region, so Indonesia
+      Central gets a production landing zone. Sunda arrives with six
+      subscriptions that were created by whoever needed one, hold a mixture of
+      production and experiments, and would fail every control Marcus cares
+      about if you applied them tomorrow.
+
+      "Two things I will hold you to," Priya says. "Anything we set has to apply
+      to subscriptions that do not exist yet, because there will be more. And
+      the Sunda estate cannot be blocked while it is being cleaned up - Jakarta
+      still has to ship freight in the meantime."
+
+      Desmond adds one line from the corner. "And do not make me move a
+      subscription between groups twice. Moves are cheap. Explaining a move to
+      an auditor is not."
+    prompt: "What management group structure do you recommend?"
+    options:
+      - id: opt-caf-hierarchy
+        label: "A root Meridian group with Platform, Landing zones, Sandbox, and Decommissioned beneath it, plus a Transition group holding Sunda's six subscriptions under audit-only policy until remediated"
+        correct: true
+        explain: >
+          The hierarchy is organized by the thing that actually differs between
+          subscriptions, which is the set of controls they must obey, not the
+          business unit or the country. Platform holds connectivity, identity,
+          and management; Landing zones holds workload subscriptions where
+          production and non-production carry different policy; Sandbox has
+          looser rules and no connectivity; Decommissioned holds subscriptions
+          on the way out. Policy assigned at the root reaches subscriptions
+          created next year, because inheritance is downward and automatic. The
+          Transition group is the honest answer to Sunda: same visibility to the
+          auditors, audit-only effects while the estate is cleaned up, and a
+          single move at the end.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: a2id-mg-transition, status: healthy}
+          - {op: set_status, node: a2id-mg-sandbox, status: healthy}
+          - {op: set_status, node: a2id-sub-prod-idn, status: healthy}
+          - op: add_edge
+            edge:
+              id: a2id-e-root-transition
+              source: mg-meridian
+              target: a2id-mg-transition
+              kind: dependency
+          - op: add_edge
+            edge:
+              id: a2id-e-transition-sunda
+              source: a2id-mg-transition
+              target: a2id-sub-sunda
+              kind: dependency
+          - op: add_edge
+            edge:
+              id: a2id-e-workloads-sandbox
+              source: mg-workloads
+              target: a2id-mg-sandbox
+              kind: dependency
+          - op: add_edge
+            edge:
+              id: a2id-e-workloads-prodidn
+              source: mg-workloads
+              target: a2id-sub-prod-idn
+              kind: dependency
+      - id: opt-by-geography
+        label: "Management groups by country: Singapore, Indonesia, and Philippines, each holding that country's subscriptions"
+        correct: false
+        consequence: >
+          Six months later the same eleven policies exist in three places and two
+          of them have drifted.
+        explain: >
+          Geography feels natural because the org chart is geographic, but
+          controls do not vary by country here - they vary by whether a workload
+          is production. Splitting by country forces you to duplicate every
+          initiative per branch and keeps them in sync by hand. Data residency,
+          which is the real geographic concern, is expressed by an allowed
+          locations policy applied once at the root, not by the shape of the
+          tree.
+        rep: -8
+      - id: opt-flat
+        label: "Skip management groups and assign the policy set directly to each of the eleven subscriptions"
+        correct: false
+        consequence: >
+          The twelfth subscription is created in November. Nobody assigns
+          anything to it, and the auditors find it before Marcus does.
+        explain: >
+          It produces the same effective policy today and fails the requirement
+          that governance apply to subscriptions that do not exist yet. Every new
+          subscription becomes a manual assignment step that will eventually be
+          missed, and the auditors asked for coverage of every subscription
+          rather than the ones somebody remembered. Inheritance is the control;
+          repetition is not.
+        rep: -10
+      - id: opt-by-department
+        label: "A management group per business unit - Warehousing, Freight, Corporate - mirroring the org chart the board already understands"
+        correct: false
+        consequence: >
+          The freight and warehousing teams merge in Q4. Twenty-two subscriptions
+          need to move, and each move is a change record.
+        explain: >
+          Mirroring the org chart makes the diagram legible on day one and
+          obsolete on the day of the next reorganization, which is exactly what
+          Desmond asked you to avoid. Business unit is a cost and reporting
+          concern and belongs in tags and billing sections, where it can change
+          without restructuring the estate. Management groups should track the
+          control boundary, which changes far more slowly.
+        rep: -8
+    next: e2-subscription-strategy
+
+  - id: e2-subscription-strategy
+    type: design_decision
+    title: "Who is allowed to create a subscription"
+    speaker: cfo
+    objectives: [AZ305-1.9]
+    scenario: |
+      Evelyn Koh does not ask about line items any more. She asks about run
+      rate, and she has found something she does not like.
+
+      "There are three subscriptions on last month's invoice that nobody in your
+      team recognizes. One of them belongs to a Sunda developer who created it
+      on a corporate card in March. I want to know how that is possible and I
+      want it to stop being possible."
+
+      It is possible because anyone with the right role on the billing account
+      can create a subscription, and a subscription created that way lands
+      outside your hierarchy by default, where no policy reaches it.
+
+      She has requirements of her own, and they are not only defensive.
+
+      Cost has to be attributable by business unit and by environment, on one
+      invoice, because the board wants one invoice. Sunda's development team
+      genuinely needs somewhere to experiment before the platform team can offer
+      them anything better. And the four applications moving into Indonesia
+      Central must not share a blast radius with Singapore production.
+
+      "I am not trying to slow anyone down," Evelyn says. "I am trying to be
+      able to answer a question in a board meeting without three days of
+      warning."
+    prompt: "What subscription strategy do you recommend?"
+    options:
+      - id: opt-controlled-vending
+        label: "Subscriptions as the blast radius and scale boundary - separate production and non-production per landing zone plus platform subscriptions - with creation rights held by a small group, a default management group set, and business unit reported through tags and invoice sections"
+        correct: true
+        explain: >
+          The subscription is the unit that carries its own policy assignment,
+          its own service quotas, and its own RBAC boundary, so splitting
+          production from non-production per landing zone gives Indonesia its
+          separation from Singapore production. Restricting who holds the
+          subscription creation role on the billing account closes the corporate
+          card route, and setting a default management group means any
+          subscription that is created still lands under governance rather than
+          outside it. Cost attribution rides on tags and invoice sections, which
+          keeps one invoice and still answers Evelyn's question.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: a2id-sub-sunda, status: warning}
+      - id: opt-per-app
+        label: "One subscription per application, sixty in total, so every workload gets a clean boundary and unambiguous cost"
+        correct: false
+        consequence: >
+          Desmond calculates the number of policy assignments, role assignments,
+          and network peerings implied and asks whether you are feeling well.
+        explain: >
+          Per-application subscriptions do give perfect cost attribution and a
+          tight blast radius, and at hyperscale some organizations do it. At
+          Meridian's size it multiplies every platform operation by sixty -
+          peering, private DNS links, diagnostic settings, role assignments -
+          for a cost breakdown that tags already provide. Boundaries should be
+          drawn where isolation is required, and sixty applications do not have
+          sixty isolation requirements.
+        rep: -6
+      - id: opt-one-subscription
+        label: "Consolidate everything into a single subscription and use resource groups to separate environments and regions"
+        correct: false
+        consequence: >
+          A quota increase requested for the Indonesia migration is applied to
+          the same subscription serving Singapore production. The change window
+          becomes a company-wide one.
+        explain: >
+          Resource groups are a management and lifecycle boundary, not a control
+          or quota boundary: service limits, policy exemptions, and many
+          subscription-level settings apply to everything inside. That directly
+          fails the requirement that Indonesia production not share a blast
+          radius with Singapore production, and it collapses the production and
+          non-production distinction the auditors specifically asked to see.
+        rep: -10
+      - id: opt-self-service
+        label: "Let each team create their own subscriptions under the billing account and reconcile them into the hierarchy during the monthly review"
+        correct: false
+        consequence: >
+          Two subscriptions created in the first week of the month spend three
+          weeks outside policy. One of them holds manifest data.
+        explain: >
+          Reconciling after the fact means every new subscription spends its
+          most vulnerable period - initial build - with no policy, no diagnostic
+          settings, and no allowed-locations control. It is the behavior Evelyn
+          asked you to make impossible, restated as a process. Even with a
+          default management group set, unrestricted creation removes any
+          approval point for cost, naming, and ownership.
+        rep: -10
+    next: e3-tagging
+
+  - id: e3-tagging
+    type: design_decision
+    title: "Four tags, enforced"
+    speaker: cfo
+    objectives: [AZ305-1.9, AZ305-1.10]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2id-policy-tags
+          label: "Tag governance initiative"
+          kind: policy
+          group: grp-platform
+          status: planned
+    scenario: |
+      The tagging conversation happens because two people need different things
+      from the same field.
+
+      Evelyn needs monthly cost split by business unit and by environment, and
+      she needs to find resources nobody owns. Last quarter's cleanup found
+      eleven thousand dollars a month of orphaned disks and public IP addresses
+      that had outlived their virtual machines, and the only reason anyone found
+      them was that Desmond went looking.
+
+      Marcus needs something narrower and non-negotiable. Anything holding
+      personal data under PDPA has to be identifiable at the resource level, not
+      the resource group level, because a storage account and a database in the
+      same group can carry very different obligations.
+
+      Desmond supplies the constraint that decides the design.
+
+      "Tags do not inherit. If you put a cost center on a resource group,
+      the virtual machines inside it do not get one. Cost analysis groups by the
+      tag on the resource. Half the estate is untagged today and no amount of
+      documentation has changed that in two years."
+    prompt: "What tagging strategy do you recommend?"
+    options:
+      - id: opt-minimal-enforced
+        label: "Four mandatory tags - cost-center, environment, owner, data-classification - enforced at the root management group with deny on create, an inherit-from-resource-group modify policy, and remediation tasks for existing resources"
+        correct: true
+        explain: >
+          A small mandatory set is the only kind that survives contact with
+          delivery teams, and every tag on the list answers a stated
+          requirement: cost-center and environment for Evelyn's split, owner for
+          the orphan hunt, data-classification for Marcus. Enforcement is the
+          part that matters. Deny stops new untagged resources, the modify
+          effect with an inherited tag closes Desmond's point that tags do not
+          flow downward, and a remediation task fixes the existing estate rather
+          than documenting it.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: a2id-policy-tags, status: healthy}
+          - op: add_edge
+            edge:
+              id: a2id-e-root-tags
+              source: mg-meridian
+              target: a2id-policy-tags
+              kind: dependency
+      - id: opt-big-taxonomy
+        label: "An eighteen-tag taxonomy covering cost, ownership, criticality, compliance, lifecycle, and support, published as a standard"
+        correct: false
+        consequence: >
+          Six months on, four tags are populated reliably, seven are populated
+          inconsistently, and seven have never been used.
+        explain: >
+          Breadth is not the problem tagging has; adherence is. Eighteen tags
+          published as a standard with no enforcement mechanism reproduces
+          exactly the situation Desmond described, where documentation has not
+          moved the needle in two years. Optional tags decay into unreliable
+          tags, and an unreliable tag is worse than a missing one because
+          reports quietly under-count.
+        rep: -6
+      - id: opt-naming
+        label: "Encode business unit, environment, and classification in the resource group naming convention instead, which cannot be left blank"
+        correct: false
+        consequence: >
+          Marcus asks which storage accounts in rg-sg-prod-wms hold personal
+          data. The name says all of them, which is not true.
+        explain: >
+          A name cannot be left blank, which is its one advantage, and it cannot
+          be corrected either without recreating the resource. Cost analysis and
+          policy both evaluate tags, not name fragments, so Evelyn's split would
+          need parsing. It also fails Marcus's requirement outright: he asked for
+          classification at the resource level, and a resource group name applies
+          one answer to everything inside it.
+        rep: -8
+      - id: opt-audit-only
+        label: "Audit-only tag policies with a monthly report emailed to resource owners asking them to fill in the gaps"
+        correct: false
+        consequence: >
+          The first report lists nine hundred resources. The second lists nine
+          hundred and forty.
+        explain: >
+          Auditing is the right effect for controls you cannot break people over,
+          but tagging at creation costs a delivery team one line of template. An
+          audit-only policy leaves the untagged resource in place and moves the
+          work to whoever reads the report, which is how the estate arrived at
+          half untagged. Deny at creation plus remediation for history closes the
+          gap; a report describes it.
+        rep: -6
+    next: e4-inheritance-check
+
+  - id: e4-inheritance-check
+    type: knowledge_check
+    title: "Desmond checks the move"
+    speaker: mentor
+    objectives: [AZ305-1.9]
+    scenario: |
+      The structure is signed off. Desmond is holding the change record for the
+      first subscription move and has not submitted it yet.
+
+      "One question, because the answer decides whether I do this on a Tuesday
+      afternoon or at midnight on a Saturday with the Jakarta team on a call."
+
+      A deny policy assigned at the Landing zones management group blocks
+      storage accounts with public blob access. Sunda's first remediated
+      subscription has twelve storage accounts with public blob access still
+      enabled, and it is about to move out of Transition and into Landing zones.
+    question: >
+      When the subscription moves under Landing zones, what happens to the
+      twelve existing storage accounts with public blob access enabled?
+    options:
+      - id: opt-deleted
+        label: "They are blocked immediately - public blob access is disabled on all twelve as the assignment takes effect"
+        correct: false
+        explain: >
+          Policy does not reach into existing resources to change them unless the
+          effect is specifically modify or deployIfNotExists and a remediation
+          task is run. Deny evaluates requests, not resources at rest, so nothing
+          about the twelve accounts changes on the move.
+      - id: opt-noncompliant
+        label: "They keep working and are reported as non-compliant - deny only evaluates create and update requests"
+        correct: true
+        explain: >
+          Deny is evaluated by Azure Resource Manager when a create or update
+          request arrives, so it cannot retroactively alter resources that
+          already exist. The twelve accounts continue to serve traffic and appear
+          as non-compliant in the policy compliance state, which is the signal
+          for remediation. The sharp edge comes later: the next legitimate update
+          to one of those accounts will be denied unless the setting is fixed
+          first, so the move is safe on a Tuesday but the remediation is not
+          optional.
+      - id: opt-nothing
+        label: "Nothing happens at all - policy assigned at a management group only applies to subscriptions that were under it when the assignment was created"
+        correct: false
+        explain: >
+          Assignments apply to the current membership of the scope, evaluated
+          continuously. Moving a subscription under a management group brings it
+          into every assignment at that scope and above, which is precisely why
+          the Transition group exists in the first place.
+      - id: opt-blocked-move
+        label: "The move itself is rejected, because the subscription contains resources that violate an inherited deny policy"
+        correct: false
+        explain: >
+          Subscription moves are not evaluated against the destination's policy
+          set; if they were, remediating an acquired estate would be impossible
+          to sequence. The move succeeds and the non-compliance becomes visible,
+          which is the outcome you want from a governance point of view.
+    next: END

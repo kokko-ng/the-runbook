@@ -1,0 +1,340 @@
+schema_version: 1
+id: act1-st-06-the-container-that-was-there
+title: "The Container That Was There This Morning"
+act: 1
+chapter: act1-storage
+domain: az104-d2
+order: 6
+role: cloud-admin
+checkpoint: true
+summary: "Nine years of customs paperwork stops answering at 10:31. The NAS it came from was decommissioned on the fifteenth."
+entry: e1-deleted-container
+
+encounters:
+  - id: e1-deleted-container
+    type: troubleshoot
+    title: "P1: Customs archive returning 404"
+    speaker: ticket
+    objectives: [AZ104-2.14, AZ104-2.12]
+    ticket:
+      id: "MER-4881"
+      reporter: "Customs compliance team"
+      priority: "P1"
+      opened: "10:38"
+      body: |
+        Every link into the scanned manifest archive is returning "The specified
+        container does not exist." Started somewhere before 10:35. We have an
+        inspection response due to Singapore Customs at 17:00 today and the
+        documents they asked for are in there. Nine years of it.
+    on_enter_diagram_ops:
+      - {op: set_status, node: st-manifests, status: broken}
+    scenario: |
+      Priya arrives at your desk before you have finished reading the ticket,
+      which means she read it first.
+
+      "Tell me the NAS is still in the rack."
+
+      The NAS was collected on the fifteenth. There is a photograph of the empty
+      rack in the Facilities channel, captioned "all done."
+
+      A contractor has been tidying up the migration's leftovers this week under
+      change MER-4870, working from a list of temporary containers to remove. He
+      is contactable, apologetic, and not currently helpful.
+
+      Desmond puts his coat on the back of his chair, which means he is staying.
+      "Before you panic, go and find out what the account was configured to do
+      when something gets deleted. That decision was made weeks ago. Today you
+      only get to find out what it was."
+    time_budget: 7
+    investigate:
+      - id: inv-contractor
+        label: "Ask the contractor exactly what he ran"
+        speaker: ticket
+        reveals: >
+          His script removed four containers from a list. Three were the
+          temporary staging containers from the migration. The fourth was
+          manifests, which was on the list because the migration plan called the
+          staging container manifests-staging and somebody trimmed the suffix
+          when tidying the spreadsheet.
+      - id: inv-customs
+        label: "Ask the compliance team what they actually need by 17:00"
+        speaker: ticket
+        reveals: >
+          Eleven specific declarations from 2023 and 2024, by reference number.
+          They can work from any copy that is provably the original scan. They
+          cannot work from a summary.
+      - id: inv-desmond
+        label: "Ask Desmond what protection you configured on this account"
+        speaker: mentor
+        reveals: >
+          "You turned container soft delete on when you built it, because I made
+          you. I do not remember whether you did the blob-level one, and today
+          that distinction is going to matter. Go and read the service
+          properties rather than guessing."
+      - id: inv-priya
+        label: "Ask Priya to hold off on telling Customs"
+        speaker: manager
+        reveals: >
+          "I will give you forty minutes before I make that call, because if I
+          make it I have to make it in writing. Use them on the account, not on
+          the contractor."
+    commands:
+      - id: cmd-list-containers
+        label: "List the containers on the account"
+        command: "az storage container list --account-name stmeridianarchive --auth-mode login -o table"
+        output: |
+          Name        Lease Status    Last Modified
+          ----------  --------------  -------------------------
+          dashcam     unlocked        2027-04-21T02:14:11+00:00
+        time_cost: 1
+        note: "manifests is not there. dashcam survived."
+      - id: cmd-list-deleted
+        label: "List containers including soft-deleted ones"
+        command: "az storage container list --account-name stmeridianarchive --include-deleted --auth-mode login --query \"[?deleted].{name:name,deleted:deleted,version:version,remaining:properties.remainingRetentionDays}\" -o table"
+        output: |
+          Name                 Deleted    Version                          Remaining
+          -------------------  ---------  -------------------------------  -----------
+          manifests            True       01D9A4C6F2E1B8A0                 6
+          manifests-staging    True       01D9A4C6F1C33D40                 6
+        time_cost: 1
+        note: "Soft-deleted, with a version id and six days left on the clock."
+      - id: cmd-service-props
+        label: "Show the blob service data protection settings"
+        command: "az storage account blob-service-properties show -n stmeridianarchive -g rg-ops-sea --query '{containerSoftDelete:containerDeleteRetentionPolicy,blobSoftDelete:deleteRetentionPolicy,versioning:isVersioningEnabled}' -o json"
+        output: |
+          {
+            "blobSoftDelete": {
+              "days": null,
+              "enabled": false
+            },
+            "containerSoftDelete": {
+              "days": 7,
+              "enabled": true
+            },
+            "versioning": false
+          }
+        time_cost: 1
+        note: "Container soft delete on at 7 days. Blob soft delete and versioning both off."
+      - id: cmd-activity
+        label: "Find the delete operation in the activity log"
+        command: "az monitor activity-log list -g rg-ops-sea --offset 2h --query \"[?contains(operationName.value,'blobServices/containers/delete')].{time:eventTimestamp,caller:caller,status:status.value}\" -o table"
+        output: |
+          Time                       Caller                              Status
+          -------------------------  ----------------------------------  ----------
+          2027-04-21T10:31:04Z       contractor.wj@meridianlogistics.com Succeeded
+          2027-04-21T10:31:06Z       contractor.wj@meridianlogistics.com Succeeded
+        time_cost: 1
+      - id: cmd-blob-list
+        label: "Try to list the blobs that were in the container"
+        command: "az storage blob list -c manifests --account-name stmeridianarchive --auth-mode login --include d -o table"
+        output: |
+          ContainerNotFound: The specified container does not exist.
+          RequestId: 0f4c9e12-401e-0043-2a7b-9c1f43000000
+        time_cost: 1
+        note: "There is no container to enumerate blobs inside, deleted or otherwise."
+      - id: cmd-replication
+        label: "Check the account's redundancy in case a secondary copy survives"
+        command: "az storage account show -n stmeridianarchive -g rg-ops-sea --query '{sku:sku.name,status:statusOfPrimary}' -o json"
+        output: |
+          {
+            "sku": "Standard_ZRS",
+            "status": "available"
+          }
+        time_cost: 2
+        note: "Three zonal copies of the same delete operation."
+    fixes:
+      - id: fix-restore-container
+        label: "Restore the container from its soft-deleted version with az storage container restore, using the version id"
+        correct: true
+        explain: >
+          Container soft delete retains a deleted container and everything that
+          was in it for the retention period, and restoring it brings the blobs
+          back with their names, tiers, and metadata intact. It has to be
+          restored under a name that is currently free, which is why the first
+          instinct - recreate the container so the links work - is the one that
+          would have closed this door. Blob soft delete and versioning are the
+          next change you raise, because neither was on.
+        rep: 14
+        diagram_ops:
+          - {op: set_status, node: st-manifests, status: healthy}
+      - id: fix-undelete-blobs
+        label: "Recreate the manifests container and undelete the blobs into it individually"
+        correct: false
+        consequence: >
+          Recreating the name makes the soft-deleted container unrestorable, and
+          blob soft delete was never enabled, so there is nothing to undelete.
+        explain: >
+          Two independent failures. Blobs removed as part of a container deletion
+          are not individually recoverable - they go with the container, and the
+          service properties confirm blob soft delete was off in any case.
+          Creating a container with the same name also blocks the restore of the
+          soft-deleted one. This turns a recoverable morning into a permanent
+          loss.
+        rep: -20
+      - id: fix-support-case
+        label: "Open a Microsoft support case to recover the container from the zone-redundant copies"
+        correct: false
+        consequence: >
+          The case is answered in ninety minutes advising you to use container
+          soft delete, which by then has five days left on it.
+        explain: >
+          Redundancy protects against hardware and facility failure, not against
+          an authorized delete: ZRS replicated the deletion to all three zones
+          within milliseconds because it was a valid request. Support cannot
+          recover deleted data. Recovery from deletion comes from soft delete,
+          versioning, and backup, which are separate features for exactly this
+          reason.
+        rep: -12
+      - id: fix-recopy-nas
+        label: "Re-run the AzCopy migration from the Kallang NAS to rebuild the container"
+        correct: false
+        consequence: >
+          Facilities confirm the NAS left the building on the fifteenth and the
+          drives were shredded by the disposal vendor on the seventeenth.
+        explain: >
+          The source is gone, which was foreseeable the moment the decommission
+          date was set - a migration is complete when the destination is
+          protected, not when the copy finishes. Even with the NAS present, a
+          full re-copy of 2.6 TB would not have met a 17:00 deadline, while the
+          restore takes seconds.
+        rep: -10
+    rewards:
+      under_budget_bonus: 5
+      skill_points: 1
+    next: e2-data-protection
+
+  - id: e2-data-protection
+    type: design_decision
+    title: "The change you raise the same afternoon"
+    speaker: mentor
+    objectives: [AZ104-2.14, AZ104-2.17]
+    scenario: |
+      The container comes back at 11:04. Compliance sends their eleven
+      declarations at 11:20 and Priya makes no phone call at all, which she
+      describes as the best possible outcome of a Tuesday.
+
+      Desmond has already opened a change record and put your name on it.
+
+      "Today worked because one setting was on. Write down the ones that were
+      not, and what each of them would have covered. I want the difference
+      between them in the change, not a list of switches, because in six months
+      somebody will ask why we are paying for all three."
+
+      The account holds scanned manifests and customs paperwork under a seven
+      year retention. Documents are occasionally re-scanned and re-uploaded under
+      the same blob name when a page is illegible.
+    prompt: "What do you put in the change?"
+    options:
+      - id: opt-all-three
+        label: "Container soft delete at 30 days, blob soft delete at 14 days, and blob versioning, with a note on what each one covers"
+        correct: true
+        explain: >
+          The three cover different failures. Container soft delete recovers a
+          deleted container and its contents. Blob soft delete recovers an
+          individual deleted blob, and also retains a soft-deleted snapshot when a
+          blob is overwritten. Versioning keeps an immutable prior version on
+          every overwrite, retrievable by version id, which is what a re-scanned
+          page needs. Together they cover delete at two levels and overwrite; no
+          one of them covers all three.
+        rep: 12
+      - id: opt-versioning-only
+        label: "Blob versioning only - a version of everything, forever, is a superset of the other two"
+        correct: false
+        explain: >
+          Versioning protects the contents of a container, not the container. Had
+          versioning been the only setting this morning, the container delete
+          would still have taken the versions with it. It also captures nothing
+          for shares or queues and grows without a lifecycle rule to bound it.
+        rep: -8
+      - id: opt-soft-delete-only
+        label: "Blob and container soft delete only - versioning duplicates what soft delete already keeps"
+        correct: false
+        explain: >
+          Blob soft delete does retain overwritten data as a soft-deleted
+          snapshot, so the overlap is real, but only for the retention window and
+          without a stable version id to cite. For records held under a seven-year
+          retention where a re-scan replaces the original, versioning is the
+          feature that gives you an addressable prior version rather than a
+          fourteen-day grace period.
+        rep: -6
+      - id: opt-pitr
+        label: "Point-in-time restore with a 35-day window, which rolls the whole account back past any mistake"
+        correct: false
+        explain: >
+          Point-in-time restore is a real capability and it is built on the
+          others: it requires versioning and change feed, and it restores block
+          blobs within containers rather than recovering a deleted container.
+          Adopting it instead of container soft delete would have left this
+          morning unrecoverable, and change feed is a cost you take on
+          deliberately.
+        rep: -8
+    next: e3-version-cost
+
+  - id: e3-version-cost
+    type: design_decision
+    title: "Evelyn finds the versions"
+    speaker: cfo
+    objectives: [AZ104-2.17, AZ104-2.16]
+    scenario: |
+      Three months later, Evelyn arrives with a printout and a highlighter that
+      has seen use.
+
+      "Blob storage on the archive account is up thirty-eight percent and the
+      data has not grown. I have been told this is called versioning. I have also
+      been told it is a safety feature, which is what people say when they want me
+      to stop asking."
+
+      The pattern is clear enough once you look. Quality control re-scans about
+      four percent of pages, and a few of the customs bundles get re-uploaded
+      several times as corrections come in. Every one of those overwrites leaves
+      a previous version behind, at the same hot tier as the current blob, for
+      the whole seven years.
+
+      Nobody has ever needed a version older than a few months. The current blob
+      is the record of truth; the versions are insurance for the week somebody
+      overwrites the wrong file.
+    prompt: "What do you do about the cost of versioning?"
+    options:
+      - id: opt-version-lifecycle
+        label: "Keep versioning and add lifecycle rules that act on previous versions: cool at 30 days after creation, delete at 365"
+        correct: true
+        explain: >
+          Lifecycle management can target previous versions separately from the
+          current blob, keyed on daysAfterCreationGreaterThan, so the safety net
+          stays and stops being a permanent one. Old versions move to a cheaper
+          tier and then age out entirely, while the current blob keeps its own
+          seven-year retention rule. This is the standard companion to enabling
+          versioning, and skipping it is why the bill moved.
+        rep: 12
+      - id: opt-disable-versioning
+        label: "Turn versioning off, since blob soft delete already retains overwritten data for 14 days"
+        correct: false
+        consequence: >
+          Two weeks later a bulk re-scan overwrites 900 correct documents with
+          blank pages, and the discovery happens on day nineteen.
+        explain: >
+          It removes the cost and the protection with it, and it silently deletes
+          nothing you already have - existing versions stay and keep being billed
+          until something removes them. The problem was never that versions exist;
+          it was that nothing ever aged them out.
+        rep: -10
+      - id: opt-manual-cleanup
+        label: "Run a quarterly script that lists versions and deletes any older than a year"
+        correct: false
+        explain: >
+          It reaches the same end state by hand, with list transaction charges
+          across millions of blobs, a script to maintain, and a quarter of drift
+          each time somebody forgets. Lifecycle management expresses the same rule
+          declaratively and runs daily, which is both cheaper and auditable.
+        rep: -8
+      - id: opt-cold-everything
+        label: "Move every previous version straight to archive on creation, since versions are almost never read"
+        correct: false
+        explain: >
+          Archive has a 180-day early deletion charge, so a version deleted at 90
+          days by any later rule is billed as if it stayed 180. Versions created
+          and superseded quickly are exactly the objects that lose money in
+          archive. Cool for the first stretch and then delete is the cheaper
+          shape for short-lived objects.
+        rep: -6
+    next: END

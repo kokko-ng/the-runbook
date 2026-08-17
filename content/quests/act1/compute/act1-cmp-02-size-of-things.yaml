@@ -1,0 +1,324 @@
+schema_version: 1
+id: act1-cmp-02-size-of-things
+title: "The Size of Things"
+act: 1
+chapter: act1-compute
+domain: az104-d3
+order: 2
+role: cloud-admin
+checkpoint: true
+summary: "Evelyn has read the invoice line by line. The warehouse app server is the biggest number on it."
+entry: e1-rightsize
+
+encounters:
+  - id: e1-rightsize
+    type: design_decision
+    title: "Nine percent"
+    speaker: cfo
+    objectives: [AZ104-3.9]
+    scenario: |
+      Evelyn Koh forwards the monthly invoice with one row highlighted and no
+      accompanying text, which is her house style.
+
+      vm-wms01 is a Standard_D16s_v5: sixteen vCPUs and 64 GB of memory. Thirty
+      days of metrics say the processor averages nine percent and has never been
+      above twenty-two. Memory tells a different story - the working set sits at
+      seventy-eight percent of the 64 GB and does not fall much overnight, because
+      the application caches the entire product catalog and holds it.
+
+      "I am not asking you to break the warehouse," she writes, when you ask.
+      "I am asking why we are buying sixteen processors to run nine percent of
+      them."
+    prompt: "What size do you propose for vm-wms01?"
+    options:
+      - id: opt-e8s
+        label: "Standard_E8s_v5 - eight vCPUs, 64 GB of memory"
+        correct: true
+        explain: >
+          Right-sizing means matching the resource that is actually constrained.
+          Memory is the constraint here at roughly 50 GB in use, so the memory
+          stays at 64 GB while the processor count halves. The E-series is the
+          memory-optimized family, giving 8 GB per vCPU instead of the D-series 4
+          GB, which is precisely the shape this workload has. The s suffix keeps
+          premium storage support for the existing disks.
+        rep: 10
+      - id: opt-d4s
+        label: "Standard_D4s_v5 - four vCPUs, 16 GB of memory, since the processor is barely used"
+        correct: false
+        consequence: >
+          The catalog cache cannot load. The application starts, swaps, and the
+          pickers report that scanning has gone treacle-slow.
+        explain: >
+          It reads only the processor metric. The working set is around 50 GB, so
+          16 GB of memory is not a tighter fit, it is a smaller box than the data.
+          Right-sizing has to satisfy every dimension: the correct size is the
+          smallest one that clears the highest constraint, and here that
+          constraint is memory.
+        rep: -12
+      - id: opt-b8ms
+        label: "Standard_B8ms - burstable, eight vCPUs, 32 GB of memory, priced for a machine that idles"
+        correct: false
+        explain: >
+          Burstable sizes bank credits while below a baseline and spend them above
+          it, which suits workloads that are genuinely idle most of the day. A
+          warehouse application serving scanners across a full shift runs out of
+          credits and is then throttled to its baseline, at the worst possible
+          moment. The 32 GB of memory is also below the working set.
+        rep: -10
+      - id: opt-reserve
+        label: "Leave the size alone and buy a three-year reserved instance for the D16s_v5, which cuts the bill immediately"
+        correct: false
+        consequence: >
+          The saving is real and the reservation is now attached to a size you
+          will want to change in six weeks.
+        explain: >
+          Reservations are a discount on committed capacity, not a fix for the
+          wrong shape of machine. Committing three years to an oversized size
+          locks in the waste and makes the eventual correction an exchange
+          exercise. The order is always right-size first, then reserve the size
+          you have settled on.
+        rep: -8
+    next: e2-resize-incident
+
+  - id: e2-resize-incident
+    type: troubleshoot
+    title: "P3: Resize failed in the maintenance window"
+    speaker: noc
+    objectives: [AZ104-3.9]
+    ticket:
+      id: "MER-4851"
+      reporter: "NOC Manila"
+      priority: "P3"
+      opened: "01:12"
+      body: |
+        Change MER-4840, resize vm-wms01 from Standard_D16s_v5 to
+        Standard_E8s_v5. Ran the command at 01:08, it failed. VM is still up and
+        serving on the old size. Window closes 03:00. Did not retry, escalating
+        per the change instructions.
+    on_enter_diagram_ops:
+      - {op: set_status, node: vm-wms01, status: warning}
+    scenario: |
+      The window is open until 03:00 and the NOC has stopped, correctly, rather
+      than trying the same command a second time and hoping.
+
+      The failure text they pasted in is short:
+
+      Code: OperationNotAllowed. Message: The VM size 'Standard_E8s_v5' is not
+      available in the current hardware cluster hosting 'vm-wms01'.
+
+      Desmond is asleep. The change record says the resize was approved on the
+      understanding that it is a reboot, nothing more, and Priya has told the
+      warehouse to expect four minutes of downtime somewhere before three.
+    time_budget: 6
+    investigate:
+      - id: inv-noc
+        label: "Ask the NOC exactly what they ran"
+        speaker: noc
+        reveals: >
+          "az vm resize -g rg-ops-sea -n vm-wms01 --size Standard_E8s_v5, straight
+          out of the change record. The VM was running at the time - the record
+          did not say to stop it, so we did not."
+      - id: inv-change
+        label: "Read the change record for MER-4840"
+        speaker: ticket
+        reveals: >
+          The record was written from a lab test where the same resize succeeded
+          first time. The lab VM had been deallocated overnight to save money,
+          which nobody thought worth writing down.
+      - id: inv-desmond
+        label: "Message Desmond and hope he is a light sleeper"
+        speaker: mentor
+        reveals: >
+          Two minutes later: "Read the error again. It says cluster, not quota and
+          not region. A running VM lives on a specific set of hosts. Ask yourself
+          what has to happen before it can live on a different one." Then: "Do not
+          wake me twice."
+      - id: inv-evelyn
+        label: "Check whether the E-series was ever approved for this subscription"
+        speaker: cfo
+        reveals: >
+          Evelyn's approval covers "any size at or below the current monthly cost
+          of the machine it replaces." The E8s_v5 is comfortably under. No
+          purchasing obstacle.
+    commands:
+      - id: cmd-resize-options
+        label: "List the sizes vm-wms01 can be resized to right now"
+        command: "az vm list-vm-resize-options -g rg-ops-sea -n vm-wms01 --query \"[].name\" -o tsv | sort | head"
+        output: |
+          Standard_D2s_v5
+          Standard_D4s_v5
+          Standard_D8s_v5
+          Standard_D16s_v5
+          Standard_D32s_v5
+          Standard_D48s_v5
+        time_cost: 1
+        note: "Only the family already on the host. This list is what the current cluster can offer, not what the region can."
+      - id: cmd-list-skus
+        label: "Check whether Standard_E8s_v5 is offered in the region"
+        command: "az vm list-skus -l southeastasia --size Standard_E8s_v5 --query \"[].{Name:name,Zones:locationInfo[0].zones,Restrictions:restrictions}\" -o json"
+        output: |
+          [
+            {
+              "Name": "Standard_E8s_v5",
+              "Zones": ["1", "2", "3"],
+              "Restrictions": []
+            }
+          ]
+        time_cost: 1
+        note: "Offered in the region, in every zone, with no subscription restriction."
+      - id: cmd-usage
+        label: "Check compute quota for the E-series family"
+        command: "az vm list-usage -l southeastasia --query \"[?contains(localName,'ESv5')]\" -o table"
+        output: |
+          CurrentValue    Limit    LocalName
+          --------------  -------  ---------------------------------
+          0               100      Standard ESv5 Family vCPUs
+          72              200      Total Regional vCPUs
+        time_cost: 1
+        note: "Nothing near a limit. Quota is not the constraint."
+      - id: cmd-instance-view
+        label: "Check the power state of vm-wms01"
+        command: "az vm get-instance-view -g rg-ops-sea -n vm-wms01 --query \"instanceView.statuses[].displayStatus\" -o tsv"
+        output: |
+          Provisioning succeeded
+          VM running
+        time_cost: 1
+        note: "Running, and therefore allocated to a specific host in a specific cluster."
+      - id: cmd-disks
+        label: "Check the disks attached to vm-wms01"
+        command: "az vm show -g rg-ops-sea -n vm-wms01 --query \"storageProfile.{os:osDisk.managedDisk.storageAccountType,data:dataDisks[].{lun:lun,sku:managedDisk.storageAccountType,gb:diskSizeGb}}\" -o json"
+        output: |
+          {
+            "os": "Premium_LRS",
+            "data": [
+              { "lun": 0, "sku": "Premium_LRS", "gb": 512 }
+            ]
+          }
+        time_cost: 1
+        note: "Premium disks, supported by both the current and the target size. Not the blocker."
+      - id: cmd-avset
+        label: "Check whether vm-wms01 is in an availability set"
+        command: "az vm show -g rg-ops-sea -n vm-wms01 --query \"{avset:availabilitySet.id, zones:zones}\" -o json"
+        output: |
+          {
+            "avset": null,
+            "zones": null
+          }
+        time_cost: 2
+        note: "Standalone. Nothing pinning it to a set's allocation, which would have made this harder."
+    fixes:
+      - id: fix-deallocate-resize
+        label: "Deallocate vm-wms01, resize it to Standard_E8s_v5, then start it"
+        correct: true
+        explain: >
+          A running VM can only be resized to a size its current hardware cluster
+          offers, which is why the resize options list is shorter than the region's
+          catalog. Deallocating releases the machine from that cluster; the next
+          start allocates it to a cluster that offers the target size. The region
+          has capacity, quota is clear, and the change was already approved as a
+          reboot, so the extra step costs a few minutes inside the window.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: vm-wms01, status: healthy}
+      - id: fix-d8s
+        label: "Resize to Standard_D8s_v5 instead, since it is in the list and needs no downtime beyond the reboot"
+        correct: false
+        consequence: >
+          The change closes as successful. Two days later the application starts
+          paging and the pickers notice before the monitoring does.
+        explain: >
+          It resizes without complaint because the size is on the current cluster,
+          but the D8s_v5 has 32 GB of memory against a working set near 50 GB. The
+          whole point of the change was the memory-to-processor ratio; taking the
+          convenient size gives up the reason for doing it at all.
+        rep: -10
+      - id: fix-quota
+        label: "Raise a quota increase request for the ESv5 family and retry once it is approved"
+        correct: false
+        consequence: >
+          Support closes the request the next morning noting the existing limit is
+          untouched. The window has long since closed.
+        explain: >
+          The usage output shows zero of one hundred ESv5 vCPUs consumed and the
+          SKU list shows no subscription restriction, so there is nothing to
+          raise. A quota problem reports an operation exceeding a limit; this
+          error names the hardware cluster, which is an allocation concern and is
+          resolved by deallocating.
+        rep: -8
+      - id: fix-rebuild
+        label: "Build a new E8s_v5 VM and attach the existing disks to it, then delete the old one"
+        correct: false
+        consequence: >
+          Two hours later there is a new machine with a new NIC, a new private IP
+          and a firewall rule set that no longer matches it.
+        explain: >
+          It would work, and it is what you do when a resize genuinely is not
+          possible - crossing a generation that does not support the existing
+          disks, for instance. Here it trades a three-command operation for a
+          rebuild that discards the NIC, the private IP, the extensions and the
+          machine's identity, all inside a window sized for a reboot.
+        rep: -6
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: e3-disk-growth
+
+  - id: e3-disk-growth
+    type: design_decision
+    title: "Ninety-two percent"
+    speaker: mentor
+    objectives: [AZ104-3.10]
+    scenario: |
+      The resize lands at 02:31. At 02:40 Desmond, who is apparently awake after
+      all, sends one line.
+
+      "While you are in there. The data disk is a 512 GB Premium P20 at
+      ninety-two percent, and the application's own alert has been firing at
+      Manila every night for a fortnight because they tuned the threshold up
+      instead of telling anyone. It needs room and it needs more IOPS - the
+      nightly reindex saturates the disk's limit for about forty minutes."
+    prompt: "What do you do with the data disk?"
+    options:
+      - id: opt-expand
+        label: "Expand the managed disk to 1 TiB, moving it to the P30 tier, then extend the file system inside the guest"
+        correct: true
+        explain: >
+          On Premium SSD the performance tier follows the provisioned size, so
+          growing from P20 to P30 raises the capacity and the IOPS and throughput
+          ceilings in one operation. Azure changes only the disk; the guest still
+          has to extend the partition and file system before the space is usable.
+          Note the direction: a managed disk can grow but can never be shrunk.
+        rep: 8
+      - id: opt-stripe
+        label: "Attach a second 512 GB Premium disk and stripe the two together in the guest"
+        correct: false
+        explain: >
+          Striping is the right answer when a workload needs more IOPS than any
+          single disk can provide, because the limits are per disk. Here one P30
+          clears both requirements, and a striped volume adds a guest storage
+          layer that every future resize, snapshot and restore has to account for.
+          Reach for it when you have run out of disk, not before.
+        rep: -5
+      - id: opt-shrink-later
+        label: "Archive last year's data first, shrink the disk to 256 GB, and grow it again only if it fills"
+        correct: false
+        consequence: >
+          The archive job runs. The shrink command is rejected and the disk is
+          still ninety-two percent full, now with a smaller data set inside it.
+        explain: >
+          Managed disks cannot be shrunk. Reducing the provisioned size means
+          creating a smaller disk and copying the data across, with the downtime
+          that implies. Archiving is worth doing on its own merits, but it does
+          not address the IOPS ceiling that saturates every night.
+        rep: -8
+      - id: opt-ultra-convert
+        label: "Convert the existing disk to an Ultra Disk so capacity and IOPS can be tuned independently"
+        correct: false
+        explain: >
+          You can change a managed disk between Standard HDD, Standard SSD and
+          Premium SSD in place with a SKU update. Ultra Disk is not part of that
+          set: it requires a new disk created from a snapshot, a VM with the ultra
+          capability enabled, and matching zone placement. For a disk that needs
+          headroom and one more performance tier, that is a great deal of ceremony.
+        rep: -6
+    next: END

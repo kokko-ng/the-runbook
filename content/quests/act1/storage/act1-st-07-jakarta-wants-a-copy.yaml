@@ -1,0 +1,313 @@
+schema_version: 1
+id: act1-st-07-jakarta-wants-a-copy
+title: "Jakarta Wants a Copy"
+act: 1
+chapter: act1-storage
+domain: az104-d2
+order: 7
+role: cloud-admin
+checkpoint: true
+summary: "A second office, a second regulator, and a very specific argument about what a second copy is for."
+entry: e1-second-copy
+
+encounters:
+  - id: e1-second-copy
+    type: design_decision
+    title: "The branch that opened in March"
+    speaker: manager
+    objectives: [AZ104-2.8, AZ104-2.7]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: st-pod-jkt
+          label: "stmeridianpodjkt (Jakarta replica)"
+          kind: storage-account
+          group: grp-ops
+          status: planned
+    scenario: |
+      Meridian opened a Jakarta office in March. It has eleven people, a customs
+      broker on retainer, and a complaint.
+
+      "Their claims clerks open delivery photos all day and they say it is slow,"
+      Priya says. "And the broker's regulator wants the evidence for Indonesian
+      shipments held on infrastructure in Indonesia. That part is not
+      negotiable, and it is not my area, and it is now your problem."
+
+      The details. Jakarta only ever looks at the pod container, only at the last
+      ninety days, and only reads - all writes still come from the handhelds into
+      Singapore. Azure has a region in Indonesia. The Singapore account is
+      Standard_ZRS and holds seven years of photos.
+
+      Desmond, who has heard this shape of request before: "Careful with the
+      word copy. A resilience copy and a locality copy are different products,
+      and people ask for one while describing the other."
+    prompt: "How do you get a readable copy of the delivery photos into Indonesia?"
+    options:
+      - id: opt-object-replication
+        label: "Create a destination account in the Indonesia region and configure object replication from the pod container, filtered to the prefixes Jakarta reads"
+        correct: true
+        explain: >
+          Object replication asynchronously copies block blobs from a source
+          container to a destination container in an account you choose, which
+          means you pick the region, the redundancy, and the filter. Rules can be
+          scoped by prefix, so only the shipments Jakarta cares about cross, and
+          the destination is a normal readable account rather than a failover
+          artifact. It is the feature built for read locality and data residency.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: st-pod-jkt, status: healthy}
+          - op: add_edge
+            edge:
+              id: st-e-replication-jkt
+              source: st-pod-archive
+              target: st-pod-jkt
+              kind: replication
+              label: "object replication"
+      - id: opt-ragrs
+        label: "Convert the Singapore account to read-access geo-redundant storage and point Jakarta at the secondary endpoint"
+        correct: false
+        consequence: >
+          The broker's regulator asks which country the secondary is in, and the
+          answer is Hong Kong.
+        explain: >
+          Geo-redundancy replicates to the region's assigned pair, which you do
+          not choose - for Southeast Asia that is East Asia, not Indonesia, so the
+          residency requirement fails outright. The secondary is also read-only
+          and lags by an unpredictable interval with no SLA on the last sync
+          time. It is a resilience feature being used as a content distribution
+          one.
+        rep: -12
+      - id: opt-nightly-copy
+        label: "Run a nightly AzCopy sync of the last ninety days into a Jakarta account"
+        correct: false
+        explain: >
+          It reaches the right end state with a job you own: a 24-hour worst-case
+          lag on evidence the clerks need the same day, a schedule to monitor, a
+          credential to rotate, and a full prefix comparison every night. Object
+          replication does the same copy as a platform feature, continuously, with
+          a replication status you can query per blob.
+        rep: -8
+      - id: opt-sas-to-jakarta
+        label: "Issue the Jakarta office a SAS against the Singapore container so they read the originals directly"
+        correct: false
+        explain: >
+          This is what they do today, and it addresses neither complaint: the
+          latency is the distance, and the regulator's requirement is about where
+          the data sits, not who can read it. Access control was never the
+          constraint in this request.
+        rep: -10
+    next: e2-replication-prereqs
+
+  - id: e2-replication-prereqs
+    type: design_decision
+    title: "Why the policy will not save"
+    speaker: mentor
+    objectives: [AZ104-2.8]
+    scenario: |
+      You create the destination account, create a pod container in it, open the
+      object replication blade, define the rule, and the save fails.
+
+      Desmond reads the error over your shoulder without sympathy. "Object
+      replication has prerequisites and the portal tells you about them one at a
+      time, which is its way of building character."
+
+      What you know: the source account is Standard_ZRS, general-purpose v2, with
+      blob versioning enabled since the container incident in April. The
+      destination is a freshly created general-purpose v2 account with nothing
+      turned on. Neither has change feed.
+
+      There is a second question waiting behind the first. Jakarta needs the last
+      ninety days, and the container holds four years. A new replication rule has
+      to be told what to do about the blobs that are already there.
+    prompt: "What do you configure before the rule will work?"
+    options:
+      - id: opt-prereqs
+        label: "Enable blob versioning on the destination as well as the source, turn on change feed on the source, then create the rule with a copy scope that includes existing blobs from a chosen date"
+        correct: true
+        explain: >
+          Object replication requires blob versioning on both accounts and change
+          feed on the source, because the change feed is how the service knows
+          what to replicate and versions are how it keeps the copy consistent. The
+          rule's copy scope then decides history: only new objects from now on,
+          everything in the container, or everything modified since a date you
+          pick - which is how you get ninety days rather than four years.
+        rep: 12
+      - id: opt-soft-delete
+        label: "Enable blob soft delete on both accounts, since replication needs a recovery point to copy from"
+        correct: false
+        explain: >
+          Soft delete is worth having and is not a prerequisite for object
+          replication - the service tracks what to copy through the change feed,
+          not through soft-deleted state. Enabling the wrong data protection
+          feature leaves the same error on the screen and adds retention cost that
+          answers a different problem.
+        rep: -8
+      - id: opt-same-region
+        label: "Put the destination container in the same account as the source, since replication is a container-level feature"
+        correct: false
+        explain: >
+          Object replication does support a source and destination in the same
+          account, so this saves the rule - and destroys the requirement. The
+          entire point was a copy held in Indonesia, and two containers in one
+          Singapore account are one region, one failure domain, and one
+          jurisdiction.
+        rep: -12
+      - id: opt-sync-expectation
+        label: "Enable versioning on both and set the rule to synchronous replication so Jakarta never reads a stale photo"
+        correct: false
+        explain: >
+          The first half is right and the second does not exist. Object
+          replication is asynchronous with no SLA on how long a blob takes to
+          appear, so the design has to tolerate a lag - typically minutes. If a
+          workload genuinely cannot, the answer is to read the source, not to
+          look for a synchronous mode.
+        rep: -6
+    next: e3-source-redundancy
+
+  - id: e3-source-redundancy
+    type: design_decision
+    title: "What the risk register actually asked"
+    speaker: cfo
+    objectives: [AZ104-2.7]
+    scenario: |
+      Replication runs. Jakarta stops complaining, which Priya treats as a
+      formal thank-you.
+
+      Then the group risk register comes round, and Evelyn has the entry in front
+      of her.
+
+      "It says here we now hold delivery evidence in two countries. I said that in
+      the board pack. Is it true."
+
+      It is partly true. The Jakarta replica holds ninety days of one container.
+      The seven-year archive - the part customs disputes actually reach into -
+      exists only in Singapore, as three zonal copies of one account in one
+      region.
+
+      "So if Singapore goes," Evelyn says, "we keep three months of photographs
+      and lose the six years that matter. I would like the sentence in the board
+      pack to be true. I would also like to know what it costs before you do
+      anything about it."
+    prompt: "What do you change on the Singapore account?"
+    options:
+      - id: opt-gzrs
+        label: "Convert the account from Standard_ZRS to Standard_GZRS with a customer-initiated conversion"
+        correct: true
+        explain: >
+          GZRS keeps the three synchronous zonal copies in Southeast Asia and adds
+          asynchronous replication of the whole account to the paired region, so
+          the seven-year archive survives the loss of the region as well as the
+          loss of a zone. ZRS to GZRS is a supported customer-initiated
+          conversion with no downtime and no data movement you manage, and it
+          leaves the Jakarta replication rule untouched.
+        rep: 12
+      - id: opt-more-replication
+        label: "Add more object replication rules covering the whole seven-year archive into the Jakarta account"
+        correct: false
+        consequence: >
+          The Indonesian broker's regulator now holds four years of Singaporean
+          and Malaysian delivery evidence it never asked for.
+        explain: >
+          Object replication is not a disaster recovery mechanism: there is no
+          failover, no endpoint that redirects, and archived blobs are not
+          replicated at all, so the older material simply would not copy. It would
+          also push data into a jurisdiction chosen for one country's residency
+          rule, which is a compliance problem rather than a resilience answer.
+        rep: -10
+      - id: opt-grs
+        label: "Convert to Standard_GRS, which is the cheaper of the two geo options"
+        correct: false
+        explain: >
+          GRS keeps its in-region copies as three local copies in one data
+          center, so adopting it from ZRS trades away the zone redundancy Marcus
+          asked for two quarters ago in exchange for the geo copy. GZRS is the
+          option that holds both, and moving from ZRS to GRS is not a supported
+          conversion path in any case.
+        rep: -10
+      - id: opt-ragzrs
+        label: "Convert to Standard_RAGZRS so the claims desk can read the secondary during an incident"
+        correct: false
+        explain: >
+          Read access to the secondary is a real capability at a real premium,
+          and it only pays when an application is written to detect a primary
+          failure and switch to the secondary endpoint read-only. Nothing at
+          Meridian does that today, and Jakarta already covers the recent photos.
+          Buy read access when something is built to use it.
+        rep: -6
+    next: e4-region-incident
+
+  - id: e4-region-incident
+    type: design_decision
+    title: "11:20, Southeast Asia"
+    speaker: manager
+    objectives: [AZ104-2.7]
+    on_enter_diagram_ops:
+      - {op: set_status, node: st-pod-archive, status: degraded}
+    scenario: |
+      Azure posts a service issue at 11:20: storage availability degraded across
+      multiple zones in Southeast Asia, cause under investigation, next update in
+      sixty minutes. Meridian's photo archive is returning 503 on most requests.
+
+      The claims desk cannot open anything. The handhelds are queueing uploads
+      locally, which they are designed to do for up to twelve hours.
+
+      Priya has been in a call with the COO and arrives with a suggestion she has
+      clearly been given rather than formed. "We have geo-redundancy now. Can we
+      not just fail over to the other region."
+
+      You check the account. Last sync time is 11:04, sixteen minutes before the
+      incident began.
+    prompt: "What do you do?"
+    options:
+      - id: opt-wait
+        label: "Do not fail over yet: serve Jakarta's replica to the claims desk for recent photos, let the handhelds queue, and hold the failover decision until the outage is understood"
+        correct: true
+        explain: >
+          Customer-initiated failover is not a switch you flip and unflip. It
+          promotes the secondary and discards anything written after the last sync
+          time - sixteen minutes of photos here - and the account comes back as
+          locally redundant in the new primary until you convert it again, at full
+          replication cost and time. With the handhelds queueing and Jakarta
+          serving recent reads, the cheap option is patience while Microsoft's
+          next update lands.
+        rep: 14
+        diagram_ops:
+          - {op: set_status, node: st-pod-archive, status: healthy}
+      - id: opt-failover-now
+        label: "Initiate account failover immediately so the claims desk is working again within the hour"
+        correct: false
+        consequence: >
+          The region recovers at 13:05. The sixteen minutes of photos written
+          before the incident are gone, and the account spends the next two days
+          as LRS while it converts back.
+        explain: >
+          Failover trades unreplicated data for availability, and that trade is
+          only worth making when the primary is not coming back. It is also not
+          symmetric: after failover the account is LRS in the new primary and has
+          to be reconfigured for geo-redundancy, which takes a full replication
+          pass. Read the last sync time and the incident's expected duration
+          before spending data.
+        rep: -12
+      - id: opt-secondary-read
+        label: "Point the claims system at the secondary endpoint so it reads from the paired region until Singapore is back"
+        correct: false
+        explain: >
+          The account is GZRS, not RA-GZRS, so there is no readable secondary
+          endpoint to point at - the geo copy exists for failover only.
+          Read-access is the separate, dearer tier that makes the secondary
+          reachable, and it was declined deliberately last quarter.
+        rep: -8
+      - id: opt-azcopy-out
+        label: "Start an AzCopy job pulling everything out of the account into the Jakarta replica while it is still partially responding"
+        correct: false
+        consequence: >
+          The job hammers a degraded endpoint with retries and finishes nothing
+          before the region recovers.
+        explain: >
+          Bulk-copying seven years of photos out of a service that is already
+          returning 503 adds load to the thing that is struggling and cannot
+          complete inside the incident window. Emergency data movement is a
+          recovery step for data you are about to lose, not a substitute for
+          reading the status update.
+        rep: -10
+    next: END

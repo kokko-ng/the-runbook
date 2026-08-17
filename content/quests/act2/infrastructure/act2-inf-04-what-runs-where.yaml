@@ -1,0 +1,334 @@
+schema_version: 1
+id: act2-inf-04-what-runs-where
+title: "What Runs Where"
+act: 2
+chapter: act2-infrastructure
+domain: az305-d4
+order: 4
+role: associate-architect
+checkpoint: true
+summary: "An ERP that must be a virtual machine, and a shipping service that must not be."
+entry: e1-requirements
+
+encounters:
+  - id: e1-requirements
+    type: design_decision
+    title: "Reading the requirements before the brochure"
+    speaker: manager
+    objectives: [AZ305-4.1]
+    scenario: |
+      Four workloads arrive with the acquisition and Priya wants a compute
+      recommendation for each before the architecture review.
+
+      | Workload | Shape | Hard requirement |
+      |---|---|---|
+      | SAP ECC | 11 servers, steady load, licensed per core | Vendor-certified VM sizes only |
+      | Shipment events service | Stateless HTTP, 40x traffic swing between night and peak | Scale to zero is worth money |
+      | Driver mobile API | 14 small services, one team, deploys 30 times a week | Team has never run Kubernetes |
+      | Customs OCR | Runs 4 hours nightly, embarrassingly parallel, restartable | Under 900 SGD a month |
+
+      "Desmond's complaint," Priya says, "is that architects pick a platform and
+      then look for a workload to justify it. So tell me what the requirements
+      make you pick, in that order."
+    prompt: "Which requirement do you treat as the first filter for each workload?"
+    options:
+      - id: opt-constraints-first
+        label: "Start from the non-negotiable constraints - licensing, vendor support, team capability, cost ceiling - then choose the least operationally expensive platform that satisfies them"
+        correct: true
+        explain: >
+          Compute selection is a filter, not a preference. Vendor certification
+          and per-core licensing eliminate whole platforms before performance is
+          discussed. Team capability is a real constraint: fourteen services and
+          one team that has never run Kubernetes is a statement about who gets
+          paged, not about container technology. Once the hard filters have been
+          applied, picking the option with the least operational surface is what
+          keeps the estate supportable by NOC Manila.
+        rep: 10
+      - id: opt-cost-first
+        label: "Rank the four workloads by monthly cost and put each on the cheapest platform that can technically run it"
+        correct: false
+        consequence: >
+          The cheapest platform that can technically run SAP is not one the vendor
+          will support. The saving lasts until the first sev-1.
+        explain: >
+          Cost is one constraint among several and it is not the first filter,
+          because a platform that violates a support matrix or that nobody on the
+          team can operate has a cost that does not appear on the invoice.
+          Optimize cost inside the set of options that satisfy the hard
+          constraints, not across all of them.
+        rep: -8
+      - id: opt-modernize
+        label: "Containerize all four workloads on a shared AKS cluster so there is a single platform to operate"
+        correct: false
+        consequence: >
+          The mobile team's first cluster upgrade lands on a Thursday. Desmond
+          takes the call.
+        explain: >
+          A single platform is a real operational benefit and it is being applied
+          before the filters. SAP's certification covers VMs, so it cannot go on
+          the cluster; the mobile team has never run Kubernetes, which the
+          scenario states outright; and a four-hour nightly parallel job on a
+          shared cluster either sits idle or fights the daytime workloads for
+          nodes. Standardization is a goal you pursue among the candidates the
+          requirements leave.
+        rep: -10
+      - id: opt-lift-all
+        label: "Run everything on virtual machines so the operating model matches what the team already knows"
+        correct: false
+        explain: >
+          Familiarity is a legitimate input and it does not survive contact with
+          the stated numbers. A stateless service with a forty-fold traffic swing
+          on VMs pays for peak capacity all night, and a nightly four-hour job on
+          always-on VMs blows the 900 SGD ceiling. The team-capability constraint
+          applies to the mobile team and Kubernetes; it does not make VMs correct
+          for workloads whose economics argue against them.
+        rep: -8
+    next: e2-vm
+
+  - id: e2-vm
+    type: design_decision
+    title: "Eleven certified machines"
+    speaker: mentor
+    objectives: [AZ305-4.2]
+    scenario: |
+      SAP is going on virtual machines. Desmond wants the specification, not the
+      principle.
+
+      What the contractor and Evelyn have between them established:
+
+      - SAP HANA database tier needs 512 GB memory; certified for M-series
+      - SAP is licensed per core, and the database tier needs the memory rather than the cores
+      - Application tier: six machines, 8 vCPU each, steady all day, running for years
+      - Application-to-database latency budget is tight; the contractor wants them close
+      - Availability target agreed with the board: 99.99 percent for the ERP
+      - Southeast Asia has availability zones
+
+      "The last consultant put the database on a general purpose size with a
+      hundred and twenty-eight gig and said we could scale up later," Desmond
+      says. "Scaling up is a reboot. Say the size once, correctly."
+    prompt: "What virtual machine design do you recommend for SAP?"
+    options:
+      - id: opt-constrained-zones
+        label: "M-series for the database with constrained core vCPUs, D-series for the application tier, spread across availability zones with a proximity placement group per zone, and three-year reserved instances"
+        correct: true
+        explain: >
+          Constrained core sizing is the specific answer to per-core licensing: it
+          keeps the memory and I/O of the large M-series size while billing and
+          licensing fewer active cores. Availability zones are what a four-nines
+          VM target needs, since a single-zone availability set only covers rack
+          and update-domain failures. Proximity placement groups keep the
+          application and database tiers physically close for the latency budget,
+          and they are per-zone because a PPG cannot span zones. Reserved
+          instances fit a workload the scenario says runs for years.
+        rep: 10
+        diagram_ops:
+          - {op: set_label, node: a2inf-vm-sap, label: "SAP ECC - M-series DB + 6x D-series app, zonal"}
+          - {op: set_status, node: a2inf-vm-sap, status: healthy}
+      - id: opt-avset
+        label: "M-series for the database and D-series for the application tier, all in one availability set for simplicity"
+        correct: false
+        consequence: >
+          The board's four-nines number is quoted in the acquisition announcement
+          before anyone checks the SLA it maps to.
+        explain: >
+            An availability set protects against rack-level and host-update
+            failures within a single datacenter, and the availability SLA it
+            carries is below the 99.99 percent the board agreed. Zones are the
+            control that spans datacenters within the region. The size choices are
+            right; the availability construct does not meet the stated target.
+        rep: -8
+      - id: opt-full-cores
+        label: "M-series at full vCPU count for headroom, since the memory size dictates the SKU anyway"
+        correct: false
+        consequence: >
+          The SAP license true-up counts every core the machine reports. Evelyn
+          finds it in the second month.
+        explain: >
+          The reasoning about memory dictating the SKU is exactly right, which is
+          why constrained core sizing exists: it lets you buy the memory without
+          buying the licensable cores. Taking the full core count on a per-core
+          licensed product pays a software bill for compute the workload was never
+          going to use.
+        rep: -8
+      - id: opt-spot
+        label: "Use Spot virtual machines for the six application servers to cut the run rate, since the tier is stateless"
+        correct: false
+        consequence: >
+          Azure evicts two application servers during Jakarta's month-end close.
+        explain: >
+          Spot capacity can be reclaimed with thirty seconds notice and carries no
+          availability SLA, which is incompatible with a 99.99 percent target for
+          a workload the business runs on all day. Statelessness makes eviction
+          survivable, not free. Spot belongs on interruptible batch - which is
+          coming, on a different workload.
+        rep: -10
+    next: e3-container
+
+  - id: e3-container
+    type: design_decision
+    title: "Fourteen services and one team"
+    speaker: mentor
+    objectives: [AZ305-4.3]
+    scenario: |
+      The driver mobile API is fourteen small HTTP and gRPC services written by a
+      team of five in Jakarta who currently deploy by copying files onto a
+      Windows server.
+
+      The requirements, agreed with their lead:
+
+      - Containers are settled; the services already build to images
+      - Thirty deployments a week, and they want blue-green with traffic splitting
+      - Nobody on the team has operated Kubernetes, and headcount is not increasing
+      - Peak concurrency around 300 requests per second, near zero from 22:00 to 05:00
+      - Must reach the Managed Instance over a private endpoint, so VNet integration is required
+      - No requirement for service mesh, custom schedulers, GPU, or Windows containers
+
+      Desmond, flatly: "If you give them a cluster, the cluster becomes mine."
+    prompt: "What container platform do you recommend for the mobile API?"
+    options:
+      - id: opt-aca
+        label: "Azure Container Apps on a workload profile environment, with VNet integration, revision-based traffic splitting, and scale to zero overnight"
+        correct: true
+        explain: >
+          Container Apps covers every stated requirement without exposing a
+          control plane: revisions give blue-green with weighted traffic splitting
+          natively, KEDA-based scaling handles the 300 requests per second peak and
+          scales to zero in the overnight window, and a workload profile
+          environment injected into a VNet reaches the private endpoint. The
+          decisive requirement is the team - fourteen services and no Kubernetes
+          experience means the platform must not require node pool, upgrade, and
+          scheduler operations.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-aca-driver
+              label: "ca-driver-api (14 services)"
+              kind: container-app
+              group: grp-sea
+              status: healthy
+          - op: add_edge
+            edge: {id: a2inf-e-sunda-aca, source: a2inf-sub-sunda, target: a2inf-aca-driver, kind: dependency}
+      - id: opt-aks
+        label: "An AKS cluster with a system and a user node pool, and Ingress with a canary annotation for blue-green"
+        correct: false
+        consequence: >
+          Six weeks later the Jakarta team asks Desmond what a PodDisruptionBudget
+          is, during an upgrade.
+        explain: >
+          AKS would meet the technical requirements and fails the stated team
+          capability constraint, which is the one the scenario puts in bold. AKS
+          earns its operational cost when you need what only Kubernetes gives -
+          custom schedulers, mesh, operators, GPU scheduling, portability of
+          manifests - and the scenario explicitly rules all of those out. Choose
+          the platform whose operating burden matches the team that will carry it.
+        rep: -8
+      - id: opt-aci
+        label: "Azure Container Instances, one container group per service, restarted by a scheduled job"
+        correct: false
+        explain: >
+          Container Instances is a good fit for short-lived, isolated, single-shot
+          workloads and it has no built-in autoscaling, no ingress with traffic
+          splitting, and no revision model. Meeting the 300 requests per second
+          peak and thirty blue-green deployments a week would mean writing the
+          orchestration yourself, which is more operational surface than the
+          platform you were trying to avoid.
+        rep: -8
+      - id: opt-appservice
+        label: "Azure App Service on a Premium v3 plan, one web app per service in a shared plan"
+        correct: false
+        consequence: >
+          Fourteen apps on one plan, and the noisiest service decides everyone's
+          CPU.
+        explain: >
+          App Service runs containers well and supports VNet integration and
+          deployment slots, so it is a near miss rather than a wrong answer. It
+          loses on the overnight economics - a Premium v3 plan bills for its
+          instances whether or not any app is serving - and on slot-based
+          swapping being coarser than weighted revision traffic across fourteen
+          independently deployed services.
+        rep: -5
+    next: e4-nodepools
+
+  - id: e4-nodepools
+    type: design_decision
+    title: "The one cluster you do keep"
+    speaker: mentor
+    objectives: [AZ305-4.1, AZ305-4.3]
+    scenario: |
+      One workload does need Kubernetes. The customs OCR pipeline that came with
+      Sunda is a vendor product shipped as Helm charts, with a GPU inference step
+      and a custom scheduler extension the vendor will not remove.
+
+      Constraints:
+
+      - Vendor supports only Kubernetes 1.29 or later, deployed by their Helm chart
+      - GPU nodes needed for inference, four hours nightly, idle the rest of the day
+      - System components must not share nodes with the vendor workload; the vendor's operator has crashed nodes before
+      - Meridian's platform team runs one cluster and does not want a second
+      - Compliance: the OCR pods handle customs documents and must not egress to the internet
+
+      Desmond has accepted the cluster. He wants the node pool design so he never
+      has to think about it again.
+    prompt: "How do you design the AKS cluster?"
+    options:
+      - id: opt-pools
+        label: "A system node pool tainted for system workloads only, a user node pool for the vendor services, and a GPU user node pool with the cluster autoscaler scaling it from zero, all on a private cluster with egress through the hub firewall"
+        correct: true
+        explain: >
+          Separating system and user node pools is the documented AKS pattern and
+          it is exactly the stated requirement that the vendor's operator must not
+          share nodes with cluster components. A GPU pool that autoscales from zero
+          matches a workload running four hours a night, so the expensive nodes
+          exist only while inference runs. A private cluster with UDR egress
+          through the hub firewall keeps customs documents off the internet and
+          reuses the inspected egress path already built.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-aks-ocr
+              label: "aks-ocr-sea (system + user + GPU pools)"
+              kind: aks
+              group: grp-sea
+              status: healthy
+          - op: add_edge
+            edge: {id: a2inf-e-sunda-aks, source: a2inf-sub-sunda, target: a2inf-aks-ocr, kind: dependency}
+          - op: add_edge
+            edge: {id: a2inf-e-aks-fw, source: a2inf-aks-ocr, target: a2inf-fw-hub, kind: traffic, label: "UDR egress"}
+      - id: opt-single-pool
+        label: "One large node pool with GPU-enabled nodes, using resource requests and limits to keep the workloads apart"
+        correct: false
+        consequence: >
+          The vendor operator wedges a node at 02:00. CoreDNS was on it.
+        explain: >
+          Requests and limits schedule CPU and memory; they do not isolate a
+          workload that destabilizes the node itself, which the scenario says this
+          vendor's operator has done. It also means paying for GPU-enabled nodes
+          twenty-four hours a day for four hours of inference. Node pools are the
+          isolation and cost boundary in AKS.
+        rep: -10
+      - id: opt-two-clusters
+        label: "Two clusters, one for the vendor product and one for everything else, so the blast radius is a whole cluster"
+        correct: false
+        explain: >
+          Cluster-per-workload is a legitimate isolation model and it fails the
+          stated constraint that the platform team runs one cluster. It doubles
+          control plane, upgrade, and identity configuration for an isolation
+          requirement that node pools and taints already satisfy. Reach for a
+          second cluster when the boundary needed is regulatory or a different
+          Kubernetes version, not when a taint would do.
+        rep: -6
+      - id: opt-gpu-always
+        label: "Keep the GPU node pool at a fixed minimum of two nodes so the nightly run never waits for capacity"
+        correct: false
+        consequence: >
+          Evelyn asks what the two idle GPU machines did between 04:00 and midnight.
+        explain: >
+          Warm capacity removes node provisioning time from the nightly run, which
+          is a real benefit for a job that has a deadline - and this one has four
+          hours of a night with no stated start-time pressure. Paying for GPU
+          nodes for twenty hours to save a few minutes of scale-up is the wrong
+          side of the trade unless a requirement names the latency.
+        rep: -5
+    next: END

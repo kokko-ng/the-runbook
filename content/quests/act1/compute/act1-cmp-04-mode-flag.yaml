@@ -1,0 +1,335 @@
+schema_version: 1
+id: act1-cmp-04-mode-flag
+title: "The Mode Flag"
+act: 1
+chapter: act1-compute
+domain: az104-d3
+order: 4
+role: cloud-admin
+checkpoint: true
+summary: "One word in a pipeline definition. Nine characters. It deletes a firewall at two in the morning."
+entry: e1-arm-parameter
+
+encounters:
+  - id: e1-arm-parameter
+    type: design_decision
+    title: "Four sites, four sizes"
+    speaker: manager
+    objectives: [AZ104-3.2]
+    scenario: |
+      The export from last week came back as ARM JSON, and the site template is
+      now a mix: new work in Bicep, the exported warehouse template still in JSON
+      because nobody has had a day to convert it.
+
+      Priya has a new requirement. "Johor and Batam are small cross-docks. Penang
+      and Surabaya handle three times the volume. Same design, different machine.
+      I do not want four templates."
+
+      The relevant fragment of the ARM template reads:
+
+      "hardwareProfile": { "vmSize": "Standard_D4s_v5" }
+    prompt: "How do you change the ARM template so the size can differ per site?"
+    options:
+      - id: opt-parameter
+        label: "Add a vmSize parameter with a defaultValue and allowedValues, and reference it as \"[parameters('vmSize')]\" in hardwareProfile"
+        correct: true
+        explain: >
+          Parameters are the supported way to vary a template per deployment: the
+          value is supplied at deploy time, usually from a parameter file checked
+          in alongside each site. allowedValues constrains the input to sizes you
+          have actually tested, so a typo fails validation instead of provisioning
+          something strange, and defaultValue means the small sites need no
+          parameter file entry at all.
+        rep: 8
+      - id: opt-variable
+        label: "Add \"vmSize\": \"Standard_D4s_v5\" to the variables section and reference \"[variables('vmSize')]\""
+        correct: false
+        explain: >
+          Variables are evaluated inside the template and cannot be supplied from
+          outside it, so every site would still get the same size. Variables are
+          for values you compute once and reuse - a naming convention built from
+          other parameters, for instance. The test is simple: if a caller needs to
+          change it, it is a parameter.
+        rep: -8
+      - id: opt-four-copies
+        label: "Keep two copies of the template, one with the small size and one with the large, so each is simple to read"
+        correct: false
+        consequence: >
+          Six weeks later the two files differ in eleven places and nobody can say
+          which differences were deliberate.
+        explain: >
+          Copies drift. Every future change now has to be made twice and reviewed
+          twice, and the divergence is invisible until an incident exposes it.
+          Parameterizing the one thing that varies keeps a single reviewed
+          definition of what a site is.
+        rep: -10
+      - id: opt-tag-lookup
+        label: "Read the size from a resource group tag with \"[resourceGroup().tags['vmSize']]\" so the site's own metadata drives it"
+        correct: false
+        explain: >
+          It is valid template syntax and it does resolve, which is what makes it
+          tempting. It also makes the deployed infrastructure depend on a mutable
+          tag that anyone with Contributor can edit without review, and the
+          deployment fails outright if the tag is missing on a new resource group.
+          Configuration that governs what gets built belongs in the parameter file,
+          under the same review as the template.
+        rep: -6
+    next: e2-complete-incident
+
+  - id: e2-complete-incident
+    type: troubleshoot
+    title: "P1: The warehouse subnet has no NSG"
+    speaker: security
+    objectives: [AZ104-3.4, AZ104-3.2]
+    ticket:
+      id: "MER-4903"
+      reporter: "Marcus Lim, security"
+      priority: "P1"
+      opened: "07:55"
+      body: |
+        Overnight compliance scan flags snet-wms-app as having no network
+        security group associated. It had one yesterday. I can see the rules in
+        last month's evidence pack and I cannot see the resource. Nobody raised a
+        change with me. I want to know what happened before I have to tell anyone
+        else that it happened.
+    on_enter_diagram_ops:
+      - {op: set_status, node: nsg-app, status: broken}
+      - {op: set_status, node: snet-app, status: warning}
+    scenario: |
+      Marcus is at your desk before eight, which he does not usually do, holding a
+      printout of the scan.
+
+      The warehouse app subnet is currently filtered by nothing. Any resource in
+      the peered network can reach the application tier on any port, and has been
+      able to since some time overnight. The application itself is up and the
+      pickers have noticed nothing, which is the part Marcus finds least
+      reassuring.
+
+      Nobody raised a change. The overnight window did run - the site pipeline
+      deployed the warehouse template as part of the standardization work you
+      started last week.
+    time_budget: 7
+    investigate:
+      - id: inv-marcus
+        label: "Ask Marcus what the scan compares against"
+        speaker: security
+        reveals: >
+          "A baseline exported in June. nsg-wms-app, six rules, associated to
+          snet-wms-app. I have the rule set. What I do not have is any record of
+          somebody deleting it, and deletions are the one thing I always get an
+          alert for."
+      - id: inv-pipeline
+        label: "Look at what the site pipeline ran overnight"
+        speaker: ticket
+        reveals: >
+          A job named warehouse-standardize ran at 02:14. Its step is a single
+          az deployment group create against rg-ops-sea using warehouse.json, the
+          template exported from the existing environment. The step passes
+          --mode Complete, added by whoever wrote it "so the environment always
+          matches the file."
+      - id: inv-template
+        label: "Read warehouse.json and list what it declares"
+        speaker: self
+        reveals: >
+          The template declares the VNet, the subnet, the VM, its NIC and its
+          disks. It declares no network security group. The export that produced
+          it was taken before the NSG work, and nobody diffed it afterward.
+      - id: inv-desmond
+        label: "Ask Desmond what Complete mode does that Incremental does not"
+        speaker: mentor
+        reveals: >
+          "It deletes anything in the resource group the template does not
+          mention. That is not a bug, it is the entire feature. It is safe when
+          the template owns the whole resource group and it is a loaded weapon
+          anywhere else. Go and look at the deployment's mode, then look at what
+          it deleted."
+    commands:
+      - id: cmd-deployment-list
+        label: "List recent deployments on rg-ops-sea"
+        command: "az deployment group list -g rg-ops-sea --query \"[].{name:name,state:properties.provisioningState,mode:properties.mode,at:properties.timestamp}\" -o table"
+        output: |
+          Name                    State      Mode      At
+          ----------------------  ---------  --------  --------------------------
+          warehouse-standardize   Succeeded  Complete  2026-08-17T02:14:38.117Z
+          site-johor              Succeeded  Incremental  2026-08-14T09:02:11.664Z
+        time_cost: 1
+        note: "Succeeded, which is the point. Complete mode did exactly what it was asked to do."
+      - id: cmd-deployment-ops
+        label: "List the operations inside that deployment"
+        command: "az deployment operation group list -g rg-ops-sea -n warehouse-standardize --query \"[].{res:properties.targetResource.resourceType,op:properties.provisioningOperation,status:properties.provisioningState}\" -o table"
+        output: |
+          Res                                     Op      Status
+          --------------------------------------  ------  ---------
+          Microsoft.Network/virtualNetworks       Create  Succeeded
+          Microsoft.Network/networkInterfaces     Create  Succeeded
+          Microsoft.Compute/virtualMachines       Create  Succeeded
+          Microsoft.Network/networkSecurityGroups  Delete  Succeeded
+        time_cost: 2
+        note: "The delete is a deployment operation, not a user action. That is why Marcus never got an alert he recognized."
+      - id: cmd-nsg-list
+        label: "List network security groups in rg-ops-sea"
+        command: "az network nsg list -g rg-ops-sea -o table"
+        output: |
+          (empty)
+        time_cost: 1
+      - id: cmd-subnet
+        label: "Check the subnet's NSG association"
+        command: "az network vnet subnet show -g rg-ops-sea --vnet-name vnet-warehouse-sea -n snet-wms-app --query \"{nsg:networkSecurityGroup, prefix:addressPrefix}\" -o json"
+        output: |
+          {
+            "nsg": null,
+            "prefix": "10.101.1.0/24"
+          }
+        time_cost: 1
+        note: "No NSG on the subnet, so the default platform rules are all that remain."
+      - id: cmd-activity
+        label: "Query the activity log for delete operations overnight"
+        command: "az monitor activity-log list -g rg-ops-sea --offset 8h --query \"[?contains(operationName.value,'delete')].{op:operationName.value,caller:caller,status:status.value,at:eventTimestamp}\" -o table"
+        output: |
+          Op                                                        Caller                            Status     At
+          --------------------------------------------------------  --------------------------------  ---------  --------------------------
+          Microsoft.Network/networkSecurityGroups/delete             sp-meridian-deploy                Succeeded  2026-08-17T02:14:51.902Z
+        time_cost: 2
+        note: "The deployment service principal, not a person. Consistent with the deployment operation list."
+      - id: cmd-whatif
+        label: "Run what-if with the same template and mode against the resource group"
+        command: "az deployment group what-if -g rg-ops-sea --template-file warehouse.json --mode Complete --parameters @warehouse.parameters.json"
+        output: |
+          Resource and property changes are indicated with these symbols:
+            - Delete
+            = Nochange
+
+          The deployment will update the following scope:
+
+          Scope: /subscriptions/8f3d.../resourceGroups/rg-ops-sea
+            = Microsoft.Network/virtualNetworks/vnet-warehouse-sea
+            = Microsoft.Compute/virtualMachines/vm-wms01
+
+          Resource changes: 2 no change.
+        time_cost: 2
+        note: "Nothing left to delete - the NSG is already gone. Run this before a Complete deployment, not after."
+    fixes:
+      - id: fix-add-nsg-incremental
+        label: "Recreate nsg-wms-app with its six rules from the baseline, re-associate it to the subnet, add it to warehouse.json, and change the pipeline step to Incremental"
+        correct: true
+        explain: >
+          Two halves, both required. Restoring the NSG and its association closes
+          the exposure now. Adding it to the template and dropping back to
+          Incremental stops the next run doing it again - because in Complete mode
+          any resource missing from the template is a resource marked for
+          deletion, and an exported template is only as complete as the day it was
+          exported. Incremental is the default for exactly this reason.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: nsg-app, status: healthy}
+          - {op: set_status, node: snet-app, status: healthy}
+      - id: fix-rerun-complete
+        label: "Re-run the deployment so the environment is put back the way the template describes it"
+        correct: false
+        consequence: >
+          The what-if output is already on your screen: two resources, no change.
+          The subnet is still unfiltered.
+        explain: >
+          A deployment can only create what the template declares, and this
+          template has never declared a network security group. Re-running it
+          restores nothing and burns the remaining window. When a Complete
+          deployment has deleted something, the recovery is to put the resource
+          back and then fix the template that failed to describe it.
+        rep: -10
+      - id: fix-lock
+        label: "Put a CanNotDelete lock on the resource group so the pipeline cannot do this again"
+        correct: false
+        consequence: >
+          The lock goes on. The subnet is still open, and tomorrow night the
+          deployment fails instead of succeeding, which is an improvement nobody
+          asked for at this moment.
+        explain: >
+          A lock is a genuinely good control here - a CanNotDelete lock on the NSG
+          would have turned this silent deletion into a failed deployment, which is
+          the outcome you want. What it does not do is restore a resource that has
+          already gone. Prevention and remediation are different tasks and the
+          open subnet is the one with a clock on it.
+        rep: -6
+      - id: fix-permissive-nsg
+        label: "Create a replacement NSG in the portal with a single allow-any inbound rule so something is associated immediately, and reconstruct the rules later"
+        correct: false
+        consequence: >
+          Marcus watches you create it. The compliance scan now reports an NSG
+          present and permissive, which is worse evidence than none.
+        explain: >
+          Associating an NSG that permits everything restores the shape of the
+          control and none of its effect, while making the gap harder to see in
+          any report. The baseline with all six rules is on Marcus's desk, so the
+          correct rules are available right now, and rebuilding from the template
+          is the same amount of typing.
+        rep: -12
+    rewards:
+      under_budget_bonus: 5
+      skill_points: 1
+    next: e3-bicep-loop
+
+  - id: e3-bicep-loop
+    type: design_decision
+    title: "One file, four sites"
+    speaker: mentor
+    objectives: [AZ104-3.3]
+    scenario: |
+      Postmortem closed. Desmond stays behind afterward with the Bicep file open.
+
+      "Now do the other half. Four sites, each in its own resource group, same
+      shape, different site code, different address octet, two of them on the
+      bigger machine. Right now you have one file that builds one site and a human
+      who runs it four times, and the human is the part that goes wrong at two in
+      the morning."
+
+      site.bicep already takes siteCode, addressOctet and vmSize as parameters and
+      deploys cleanly at resource group scope.
+    prompt: "How do you modify the Bicep so one deployment builds all four sites?"
+    options:
+      - id: opt-module-loop
+        label: "Add a sites array parameter, turn site.bicep into a module, and invoke it in a loop - module site 'site.bicep' = [for s in sites: ...] - with scope: resourceGroup(s.rg), deployed at subscription scope"
+        correct: true
+        explain: >
+          A module is a Bicep file consumed by another Bicep file, and a module
+          loop instantiates it once per element of an array. Because each module
+          instance can set its own scope, one subscription-scope deployment can
+          target four different resource groups. The definition of a site stays in
+          one reviewed file and the sites array becomes the list of facts that
+          differ. A subscription-scope deployment needs a location for its own
+          metadata, so it runs as az deployment sub create --location southeastasia.
+        rep: 12
+      - id: opt-copy-files
+        label: "Keep site.bicep as it is and add four small wrapper files, one per site, each with its parameter values baked in"
+        correct: false
+        explain: >
+          It is better than four copies of the whole template, because the shared
+          logic stays in one place - this is very nearly the module pattern with
+          the loop removed. What you lose is the single deployment: adding a fifth
+          site means a new file and a new pipeline step, and there is no one place
+          that lists which sites exist. The array is that list.
+        rep: -5
+      - id: opt-resource-loops
+        label: "Put a for loop on each individual resource inside site.bicep, so the VNet, subnet and VM each iterate over the sites array"
+        correct: false
+        consequence: >
+          Everything lands in one resource group with names that collide on the
+          second iteration.
+        explain: >
+          Resource-level loops are the right tool when you need several of one
+          resource in one scope - eight identical NICs, say. They cannot change
+          the target resource group, because scope is a property of a module or a
+          deployment, not of a resource. You also end up repeating the same loop
+          expression on every resource and hoping the indexes stay aligned.
+        rep: -8
+      - id: opt-conditions
+        label: "Add if (siteCode == 'penang') style conditions inside site.bicep for the properties that differ between sites"
+        correct: false
+        explain: >
+          Conditions in Bicep are for deploying a resource or not - a bastion host
+          in production but not in test, for example. Using them to encode
+          per-site values buries the data inside the logic, so every new site is a
+          code change and a review, and the file grows a branch for every fact
+          that turns out to vary. Data belongs in parameters; conditions decide
+          whether a resource exists.
+        rep: -8
+    next: END

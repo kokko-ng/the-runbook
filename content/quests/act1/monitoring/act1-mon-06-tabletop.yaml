@@ -1,0 +1,426 @@
+schema_version: 1
+id: act1-mon-06-tabletop
+title: "The Tabletop"
+act: 1
+chapter: act1-monitoring
+domain: az104-d5
+order: 6
+role: senior-cloud-admin
+checkpoint: true
+summary: "Marcus runs a ransomware exercise. It stops being an exercise about forty minutes in."
+entry: e1-immutable
+
+encounters:
+  - id: e1-immutable
+    type: design_decision
+    title: "Assume they have your credentials"
+    speaker: security
+    objectives: [AZ104-5.7]
+    scenario: |
+      Marcus has booked the room for three hours and brought printed scenario
+      cards, which nobody expected and everybody respects.
+
+      "Card one. An attacker has been in the estate for eleven days. They have
+      the credentials of a global administrator. It is a Friday evening. Their
+      first move is not to encrypt anything - it is to make sure you cannot
+      recover. Walk me through what they do to rsv-meridian-sea."
+
+      Desmond answers before you do. "Stop protection with delete data on every
+      item, then delete the vault. Two minutes."
+
+      Marcus nods and turns the card over. "Right. Now tell me what stops them,
+      given that revoking their access is not on the table, because in this
+      scenario we do not know they are there."
+    prompt: "What do you configure on the vault?"
+    options:
+      - id: opt-immutable-mua
+        label: "Leave soft delete enabled, make the vault immutable and lock the setting, and require multi-user authorization through a Resource Guard held in a separate subscription"
+        correct: true
+        explain: >
+          These three answer three different attacks. Soft delete keeps deleted
+          backup data recoverable for a retention window rather than destroying
+          it immediately. Immutability, once locked, prevents anyone including an
+          owner from shortening retention or deleting recovery points before they
+          expire. Multi-user authorization puts critical vault operations behind
+          approval from a principal in a scope the compromised admin does not
+          control, which is the part that survives stolen credentials.
+        rep: 14
+      - id: opt-copy-storage
+        label: "Copy the recovery points to a storage account nightly so there is a second copy outside the vault"
+        correct: false
+        consequence: >
+          Marcus asks who has write access to the storage account. The answer is
+          the same global administrator.
+        explain: >
+          A second copy in the same blast radius is not a second copy. The
+          attacker in this scenario holds credentials that reach the storage
+          account as easily as the vault, and the copy process itself needs
+          standing write access to the target. Protection comes from controls the
+          compromised identity cannot override, not from duplication within its
+          reach.
+        rep: -10
+      - id: opt-grs
+        label: "Rely on the vault being geo-redundant, which already keeps a copy in the paired region"
+        correct: false
+        explain: >
+          Geo-redundant storage protects against the region failing, not against
+          a person deleting things. A stop-protection-with-delete-data operation
+          removes the backup data in both regions, because the secondary is a
+          replica of the primary rather than an independent copy. Redundancy and
+          immutability defend against different adversaries.
+        rep: -10
+      - id: opt-rbac
+        label: "Restrict the Backup Contributor role on the vault to two named engineers and review it quarterly"
+        correct: false
+        explain: >
+          Least privilege is right and it is not sufficient here, because the
+          scenario card explicitly hands the attacker a global administrator - an
+          identity that can grant itself any role it lacks. Role assignments
+          constrain honest mistakes and lateral movement; they do not constrain
+          someone who already holds the authority to change them.
+        rep: -8
+    next: e2-backup-vault
+
+  - id: e2-backup-vault
+    type: design_decision
+    title: "The things that are not VMs"
+    speaker: manager
+    objectives: [AZ104-5.8]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: mon-bvault
+          label: "bvault-meridian-sea"
+          kind: backup-vault
+          group: grp-ops
+          status: planned
+    scenario: |
+      Card three lands on the table and it is the one that stops the room.
+
+      "You have restored the VMs. The proof-of-delivery scans are in a blob
+      container in stinvoicesprod. The consignment database is Azure Database for
+      PostgreSQL flexible server. Two of the reporting machines keep their working
+      set on managed disks that are attached at boot and detached afterwards.
+      Which of those is in a vault?"
+
+      Nobody says anything for a moment, because the answer is none of them. The
+      Recovery Services vault protects the virtual machines and the SMB file
+      share, and it was built for exactly that.
+
+      Priya, quietly. "So what protects the rest of it."
+    prompt: "What do you propose for the blobs, the disks and the database?"
+    options:
+      - id: opt-backup-vault
+        label: "Create an Azure Backup vault and configure backup for the blob container, the managed disks and the PostgreSQL flexible server, keeping the VMs and the file share in the Recovery Services vault"
+        correct: true
+        explain: >
+          Azure Backup has two vault types and they cover different workloads. A
+          Recovery Services vault handles Azure VMs, Azure Files and the older
+          agent-based estate. A Backup vault handles the newer datasources -
+          Azure Blobs, managed disks, Azure Database for PostgreSQL and its
+          flexible server, and Kubernetes - each with its own backup policy. The
+          two coexist, and knowing which datasource belongs in which is the whole
+          decision.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: mon-bvault, status: healthy}
+          - op: add_edge
+            edge:
+              id: mon-e-bvault-stg
+              source: mon-bvault
+              target: mon-stg-invoices
+              kind: dependency
+              label: "blob backup"
+      - id: opt-add-to-rsv
+        label: "Add all three to the existing Recovery Services vault, since it already has immutability and multi-user authorization configured"
+        correct: false
+        consequence: >
+          The blob container and the PostgreSQL server do not appear as
+          protectable datasources. You conclude a preview flag is missing and
+          open a support case.
+        explain: >
+          The vault's protections are worth having, but they cannot be applied to
+          workloads the vault does not support - blobs, managed disks and
+          PostgreSQL are Backup vault datasources. Backup vaults have their own
+          soft delete and immutability settings, so the answer is to configure
+          them there rather than to force the workload into the wrong vault.
+        rep: -8
+      - id: opt-object-replication
+        label: "Use object replication to copy the blob container to a second storage account, and set the disks to a snapshot schedule"
+        correct: false
+        explain: >
+          Object replication is asynchronous copying, not backup: a deletion or
+          an encryption of the source propagates to the destination, which is the
+          exact scenario on the card. Backup differs from replication by keeping
+          point-in-time versions that the source cannot reach back and change.
+        rep: -10
+      - id: opt-lifecycle
+        label: "Apply a lifecycle management policy that moves blobs to the archive tier after thirty days, so old scans are preserved cheaply"
+        correct: false
+        explain: >
+          Lifecycle management controls the access tier of blobs to manage cost.
+          It has no versioning, no point-in-time recovery, and no protection
+          against overwrite or delete - an archived blob that gets deleted is
+          just as gone, only slower to have retrieved. Tiering is a cost control
+          that is often mistaken for a durability one.
+        rep: -10
+    next: e3-backup-reports
+
+  - id: e3-backup-reports
+    type: design_decision
+    title: "How would we know"
+    speaker: security
+    objectives: [AZ104-5.13]
+    scenario: |
+      Card five is one sentence, and Marcus reads it out twice.
+
+      "A backup has been failing for a fortnight. How would you know."
+
+      The honest answer takes a while to arrive. Somebody would have to open the
+      vault's Backup Jobs blade and look. The vault has no diagnostic settings on
+      it, so nothing about jobs, policies or protected instances reaches
+      law-meridian, and no alert rule anywhere refers to backup at all.
+
+      Priya wants a monthly compliance number for the board - how many protected
+      instances, how much vault storage, how many jobs failed. Marcus wants to be
+      told the same day, not the same month, when a job fails.
+    prompt: "What do you configure?"
+    options:
+      - id: opt-diag-reports
+        label: "Add a diagnostic setting on both vaults sending the Azure Backup reporting categories to law-meridian, use the Backup Reports workbook for the monthly number, and enable built-in backup alerts routed to the on-call action group"
+        correct: true
+        explain: >
+          Backup reporting is built on the vault's diagnostic settings: the job,
+          policy, protected instance and storage categories land in Log Analytics
+          and the Backup Reports workbook renders them, which gives Priya the
+          monthly view without anyone assembling it. The alerting is a separate
+          control - built-in Azure Backup alerts fire on job failure and need a
+          notification rule pointing at an action group to reach a human. The
+          report answers how many; the alert answers today.
+        rep: 12
+        diagram_ops:
+          - op: add_edge
+            edge:
+              id: mon-e-rsv-law
+              source: mon-rsv
+              target: mon-law
+              kind: dependency
+              label: "backup diagnostics"
+      - id: opt-blade-check
+        label: "Add the vault's Backup Jobs blade to the NOC's morning checklist, so a human confirms the overnight run every day"
+        correct: false
+        consequence: >
+          It is checked reliably for nine days. Then a public holiday, then a
+          shift handover, then nobody remembers whose task it was.
+        explain: >
+          Human checklists degrade, and this one puts a person on the path of a
+          signal the platform can raise on its own. It also cannot produce the
+          monthly aggregate Priya asked for without someone transcribing numbers.
+          Reserve human review for judgment, not for noticing that a job failed.
+        rep: -8
+      - id: opt-export-powerbi
+        label: "Export vault data to a storage account and build a Power BI report over it for the monthly board number"
+        correct: false
+        explain: >
+          It would eventually produce a report, at the cost of building and
+          owning a pipeline that duplicates the Backup Reports workbook Azure
+          already ships. It also solves only the monthly half of the requirement
+          and leaves same-day failure notification unaddressed.
+        rep: -6
+      - id: opt-metric-alert-storage
+        label: "Create a metric alert on vault storage consumption, since a failing backup means storage stops growing"
+        correct: false
+        consequence: >
+          The alert stays quiet through a fortnight of failures, because the
+          other seven machines kept backing up and the total kept rising.
+        explain: >
+          This infers a failure from a side effect, and the inference breaks as
+          soon as more than one item shares the vault. Alert on the event you
+          care about - a failed job - rather than on a downstream measurement
+          that correlates with it under assumptions that will not hold.
+        rep: -10
+    next: e4-silent-failure
+
+  - id: e4-silent-failure
+    type: troubleshoot
+    title: "P2: Nineteen days of failed backups"
+    speaker: security
+    objectives: [AZ104-5.13, AZ104-5.10]
+    ticket:
+      id: "MER-5602"
+      reporter: "Marcus Lim (during tabletop exercise)"
+      priority: "P2"
+      opened: "15:20"
+      body: |
+        Opened the Backup Jobs blade to demonstrate card five and found the
+        answer on the screen. vm-wms01 has failed every scheduled backup since
+        the 20th of last month. Nineteen consecutive failures. Every other
+        protected item in the vault is completing normally. The exercise is
+        suspended; treating this as real.
+    on_enter_diagram_ops:
+      - {op: set_status, node: mon-rsv, status: warning}
+      - {op: set_status, node: vm-wms01, status: warning}
+      - {op: set_edge_status, edge: mon-e-rsv-wms01, status: broken}
+    scenario: |
+      Marcus was going to make a point about hypotheticals. Instead the Backup
+      Jobs blade opens on a column of red.
+
+      Nineteen consecutive failures on vm-wms01, starting on the twentieth. The
+      last good recovery point is from the night before that, which means the
+      machine you restored three weeks ago has been unprotected almost since the
+      day it came back.
+
+      Everything else in the vault is green. The policy is the same one. The
+      vault is the same vault.
+
+      Desmond, in the doorway, arms folded. "Same policy, same vault, one item
+      failing. Whatever it is, it lives on that machine. And read the error
+      before you form an opinion about it."
+    time_budget: 6
+    investigate:
+      - id: inv-marcus
+        label: "Ask Marcus what changed around the twentieth"
+        speaker: security
+        reveals: >
+          "Hardening baseline went out that week. It disables a list of services
+          that were flagged as unnecessary on the March review. I can send you
+          the list, and I would rather you read it than that I guess from
+          memory."
+      - id: inv-desmond
+        label: "Ask Desmond how Azure Backup actually takes a VM backup"
+        speaker: mentor
+        reveals: >
+          "The platform tells the VM agent to quiesce and snapshot through the
+          backup extension inside the guest. No agent, no application-consistent
+          snapshot, and the job fails rather than quietly giving you a worse
+          one. The vault is not the place to look."
+      - id: inv-ravi
+        label: "Ask Manila whether anything about vm-wms01 has looked odd"
+        speaker: noc
+        reveals: >
+          "It has been fine. Serving pickers all day, patched on schedule,
+          heartbeat is unbroken. Nothing in our queue about it since the night it
+          was restored."
+      - id: inv-priya
+        label: "Ask Priya what the exposure is if this is not fixed today"
+        speaker: manager
+        reveals: >
+          "Nineteen days without a recovery point on the system the warehouse
+          runs on. If we lose it tonight we restore to the eighteenth and hand
+          the floor three weeks of reconciliation. Fix it today, then tell me why
+          nobody knew."
+    commands:
+      - id: cmd-failed-jobs
+        label: "List failed backup jobs in the vault"
+        command: "az backup job list --vault-name rsv-meridian-sea -g rg-hub-sea --status Failed --query '[0:3].{item:properties.entityFriendlyName, op:properties.operation, err:properties.errorDetails[0].errorString}' -o table"
+        output: |
+          Item       Op       Err
+          ---------  -------  ----------------------------------------------------------
+          vm-wms01   Backup   UserErrorGuestAgentStatusUnavailable - the Azure VM agent
+                              is unable to communicate with the Azure Backup service
+          vm-wms01   Backup   UserErrorGuestAgentStatusUnavailable
+          vm-wms01   Backup   UserErrorGuestAgentStatusUnavailable
+        time_cost: 1
+        note: "The error names the component: the guest agent, not the vault and not the policy."
+      - id: cmd-jobs-kql
+        label: "Chart job outcomes per item from the workspace"
+        command: "az monitor log-analytics query -w law-meridian --analytics-query 'AddonAzureBackupJobs | where TimeGenerated > ago(30d) | summarize Jobs = count() by BackupItemUniqueId, JobStatus' -o table"
+        output: |
+          BackupItemUniqueId    JobStatus     Jobs
+          --------------------  ------------  ------
+          vm-wms01              Failed        19
+          vm-wms01              Completed     11
+          vm-dc01               Completed     30
+        time_cost: 2
+        note: "Eleven successes then nineteen failures, cleanly split at the twentieth."
+      - id: cmd-agent-status
+        label: "Check the VM agent status on vm-wms01"
+        command: "az vm get-instance-view -g rg-ops-sea -n vm-wms01 --query 'instanceView.vmAgent.{version:vmAgentVersion, status:statuses[0].displayStatus}' -o json"
+        output: |
+          {
+            "version": "2.7.41491.1117",
+            "status": "Not Ready"
+          }
+        time_cost: 1
+        note: "The agent is installed and not running. That matches the job error exactly."
+      - id: cmd-service
+        label: "Inspect the guest agent service inside the VM"
+        command: "az vm run-command invoke -g rg-ops-sea -n vm-wms01 --command-id RunPowerShellScript --scripts 'Get-Service WindowsAzureGuestAgent | Select-Object Name,Status,StartType'"
+        output: |
+          Name                     Status   StartType
+          WindowsAzureGuestAgent   Stopped  Disabled
+        time_cost: 2
+        note: "Stopped and set to disabled. Something turned it off deliberately."
+      - id: cmd-policy
+        label: "Show the backup policy applied to the item"
+        command: "az backup policy show --vault-name rsv-meridian-sea -g rg-hub-sea -n pol-meridian-tiered --query '{schedule:properties.schedulePolicy.scheduleRunTimes, daily:properties.retentionPolicy.dailySchedule.retentionDuration}' -o json"
+        output: |
+          {
+            "schedule": ["2026-09-01T21:00:00Z"],
+            "daily": { "count": 30, "durationType": "Days" }
+          }
+        time_cost: 1
+        note: "Unchanged, and vm-dc01 backs up successfully under the same policy."
+      - id: cmd-alerts
+        label: "List alert rules that reference the vault"
+        command: "az monitor metrics alert list -g rg-hub-sea --query \"[?contains(scopes[0], 'vaults')].name\" -o table"
+        output: |
+          (empty)
+        time_cost: 1
+        note: "Nothing is watching this vault. Nineteen failures and no rule to notice them."
+    fixes:
+      - id: fix-agent-and-alert
+        label: "Re-enable and start the WindowsAzureGuestAgent service, exclude it from the hardening baseline, trigger an on-demand backup, and turn on backup job failure alerts to the on-call action group"
+        correct: true
+        explain: >
+          Azure Backup for a VM runs through the guest agent and its backup
+          extension, so a disabled agent fails every job with
+          UserErrorGuestAgentStatusUnavailable no matter how healthy the vault
+          is - the hardening baseline swept up a service the platform depends on.
+          Restarting it and running an on-demand backup closes the exposure
+          today. The alert is not optional garnish: the reason this ran for
+          nineteen days is that nothing was configured to say so.
+        rep: 15
+        diagram_ops:
+          - {op: set_status, node: mon-rsv, status: healthy}
+          - {op: set_status, node: vm-wms01, status: healthy}
+          - {op: set_edge_status, edge: mon-e-rsv-wms01, status: healthy}
+      - id: fix-reprotect
+        label: "Stop protection with retain data, delete the backup item, and re-enable protection to get a clean registration"
+        correct: false
+        consequence: >
+          The re-registered item fails its first backup with the same error, and
+          the job history that proved when this started is now harder to read.
+        explain: >
+          Re-registering is a reasonable move against a corrupted protected item,
+          and this item is not corrupted - the error is raised by the guest, and
+          nothing about deleting and recreating the vault-side object starts a
+          stopped service inside the VM. Read the error before choosing the
+          remedy.
+        rep: -10
+      - id: fix-workbook-checklist
+        label: "Add the Backup Reports workbook to the NOC's morning routine so failures are spotted within a day"
+        correct: false
+        explain: >
+          It improves detection for next time and does nothing about the nineteen
+          days of missing recovery points sitting in front of you. It is also the
+          weaker half of what you configured earlier: the workbook refreshes on a
+          daily cadence and depends on a human opening it, where an alert on job
+          failure does not.
+        rep: -8
+      - id: fix-extend-retention
+        label: "Extend the policy's daily retention so the last good recovery point from the eighteenth does not expire while this is investigated"
+        correct: false
+        consequence: >
+          The old point is preserved. It is still nineteen days old, and tonight's
+          backup fails again.
+        explain: >
+          Preserving the last good point is a sensible instinct during a genuine
+          investigation, and here it substitutes for the fix. Retention governs
+          how long points are kept; it has no effect on whether new ones are
+          being created, which is the actual failure.
+        rep: -6
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 2
+    next: END

@@ -1,0 +1,376 @@
+schema_version: 1
+id: act2-inf-03-the-jakarta-uplink
+title: "The Jakarta Uplink"
+act: 2
+chapter: act2-infrastructure
+domain: az305-d4
+order: 3
+role: associate-architect
+checkpoint: true
+summary: "Two hundred staff, one circuit, and an egress bill nobody forecast."
+entry: e1-connectivity
+
+encounters:
+  - id: e1-connectivity
+    type: design_decision
+    title: "Getting Jakarta onto the network"
+    speaker: mentor
+    objectives: [AZ305-4.18]
+    scenario: |
+      The Jakarta office survives the data center. Two hundred staff stay in the
+      building; only the servers leave.
+
+      Desmond has the requirements from the wave plan taped to his monitor:
+
+      - 2.1 TB SAP database replicating continuously for six weeks before cutover
+      - After cutover, 200 staff using SAP GUI and the WMS all day from Jakarta
+      - SAP GUI is latency-sensitive; the SAP contractor's number is 100 ms round trip or users complain
+      - Sustained replication throughput needed: 400 Mbps, peaking higher at month end
+      - Must not traverse the public internet - Marcus's condition, in writing
+      - Meridian already runs a hub VNet in Southeast Asia with a VPN gateway to Kallang
+      - Evelyn approved circuit spend; she did not approve a second hub
+
+      "Kallang has a site-to-site VPN and it is fine for what it does," Desmond
+      says. "Do not just do the same thing again because it is the thing we have."
+    prompt: "How do you connect Jakarta to Azure?"
+    options:
+      - id: opt-er
+        label: "An ExpressRoute circuit from Jakarta to the Southeast Asia peering location, with an ExpressRoute gateway in the existing hub VNet and private peering"
+        correct: true
+        explain: >
+          ExpressRoute is the answer when the requirements name sustained
+          throughput, predictable latency, and no public internet in the same
+          breath. Private peering keeps SAP replication and daily GUI traffic off
+          the internet entirely, which is Marcus's written condition, and a
+          dedicated circuit gives the 400 Mbps sustained rate with a latency
+          profile a VPN over consumer transit cannot promise. The gateway goes in
+          the existing hub, so Jakarta reaches Meridian's shared services through
+          connectivity that already exists.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-ergw
+              label: "ExpressRoute gateway (hub)"
+              kind: vpn-gateway
+              group: grp-sea
+              status: healthy
+          - op: add_edge
+            edge: {id: a2inf-e-hub-ergw, source: vnet-hub-sea2, target: a2inf-ergw, kind: dependency}
+          - op: add_edge
+            edge: {id: a2inf-e-jakarta-hub, source: a2inf-sunda-dc, target: a2inf-ergw, kind: expressroute, label: "1 Gbps private peering"}
+      - id: opt-vpn
+        label: "A site-to-site VPN from Jakarta to the existing hub gateway, matching what Kallang already uses"
+        correct: false
+        consequence: >
+          Replication runs at 180 Mbps on a good afternoon. The six-week seeding
+          window becomes fourteen.
+        explain: >
+          Consistency is a real argument and it loses to two stated numbers. A
+          VPN gateway's throughput is capped by SKU and shared across tunnels, and
+          the underlying path is the public internet, so the 400 Mbps sustained
+          requirement and the 100 ms latency target are both at the mercy of
+          transit conditions between Jakarta and Singapore. It also fails Marcus's
+          no-public-internet condition, encryption notwithstanding.
+        rep: -8
+      - id: opt-vwan
+        label: "Deploy Azure Virtual WAN with a new secured hub, and attach both Jakarta and Kallang to it"
+        correct: false
+        consequence: >
+          Evelyn asks what a virtual hub costs per hour, then asks why there are
+          now two hubs.
+        explain: >
+          Virtual WAN is a strong answer for many branches, transitive
+          any-to-any routing, and managed scale - Meridian has two sites and an
+          existing hub that already works. The scenario states Evelyn funded a
+          circuit and not a second hub, so this fails the cost constraint, and it
+          adds a migration of existing connectivity to a program that already has
+          a lease deadline.
+        rep: -6
+      - id: opt-internet
+        label: "Publish SAP and the WMS through a public endpoint with Entra ID authentication, so Jakarta needs no private connectivity at all"
+        correct: false
+        consequence: >
+          Marcus forwards his written condition back to you with the relevant
+          sentence highlighted.
+        explain: >
+          Strong authentication does not satisfy a requirement that says traffic
+          must not traverse the public internet, and it does nothing for the 2.1
+          TB replication stream, which is not a user session. Identity controls
+          who connects; the network requirement here is about the path the bytes
+          take and the throughput they get.
+        rep: -12
+    next: e2-egress
+
+  - id: e2-egress
+    type: design_decision
+    title: "The bill nobody forecast"
+    speaker: cfo
+    objectives: [AZ305-4.17]
+    scenario: |
+      Evelyn Koh sends one line at 07:40.
+
+      "What is 'Bandwidth - Inter-Region and Internet Egress, 41,200 GB'."
+
+      It is the Sunda landing zone. Every VM in it currently reaches the internet
+      through Azure's default outbound access - Windows Update, the SAP vendor's
+      license service, an antivirus definition feed, and a backup agent that was
+      never repointed and is still uploading to a third-party cloud in Frankfurt.
+
+      Marcus has been waiting for this conversation.
+
+      "Default outbound gives every one of those machines its own implicit public
+      address. I cannot allowlist what I cannot predict, our partners want a fixed
+      source IP for the EDI feed, and Microsoft is retiring default outbound
+      access for new deployments anyway."
+
+      Requirements, agreed in the room:
+
+      - Deterministic, fixed source addresses for outbound traffic
+      - Egress must be inspectable and restrictable by destination FQDN
+      - Roughly 300 VMs across Sunda and Production, bursty at patch time
+      - No public IP on individual workload VMs
+    prompt: "How do you design outbound internet connectivity for the landing zones?"
+    options:
+      - id: opt-firewall
+        label: "Route all spoke egress through Azure Firewall in the hub with a public IP prefix, using application rules for FQDN filtering and forced tunneling via user-defined routes"
+        correct: true
+        explain: >
+          One inspected egress point satisfies every stated requirement at once: a
+          public IP prefix gives the partners a fixed, contiguous source range to
+          allowlist, application rules filter by FQDN so the Frankfurt backup
+          endpoint can simply be denied, and UDRs on the spoke subnets mean no
+          workload VM needs a public IP. It also produces the log Marcus needs to
+          answer "what went out" when someone eventually asks.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-internet
+              label: "Internet"
+              kind: internet
+              status: healthy
+          - op: add_node
+            node:
+              id: a2inf-fw-hub
+              label: "azfw-hub-sea (Premium)"
+              kind: firewall
+              group: grp-sea
+              status: healthy
+          - op: add_edge
+            edge: {id: a2inf-e-hub-fw, source: vnet-hub-sea2, target: a2inf-fw-hub, kind: dependency}
+          - op: add_edge
+            edge: {id: a2inf-e-fw-internet, source: a2inf-fw-hub, target: a2inf-internet, kind: traffic, label: "inspected egress"}
+      - id: opt-natgw
+        label: "Attach a NAT gateway to each workload subnet for predictable outbound addresses"
+        correct: false
+        consequence: >
+          The source addresses are now stable. The backup agent keeps uploading to
+          Frankfurt, at the same rate, from a known IP.
+        explain: >
+          NAT gateway solves the fixed-source-address and SNAT-exhaustion half of
+          the problem elegantly and cheaply, and it does no filtering at all. The
+          requirement explicitly asks for egress that is inspectable and
+          restrictable by destination FQDN, which NAT gateway cannot express. It
+          is the right building block when the only requirement is deterministic,
+          scalable outbound.
+        rep: -6
+      - id: opt-public-ips
+        label: "Give each VM its own static public IP so every source address is documented"
+        correct: false
+        consequence: >
+          Marcus counts three hundred new internet-facing attack surfaces and
+          stops counting.
+        explain: >
+          It produces predictable addresses by producing three hundred of them,
+          each an inbound-capable public endpoint, which breaks the stated
+          no-public-IP-on-workload-VM requirement and the policy assigned to the
+          Workloads management group. Documentation is not the goal; a small,
+          controlled, inspected egress footprint is.
+        rep: -12
+      - id: opt-nothing
+        label: "Leave default outbound access in place and put a budget alert on the egress meter"
+        correct: false
+        explain: >
+          An alert tells you the bill arrived, which you already knew. Default
+          outbound access gives no fixed source address for the EDI partners, no
+          filtering, and is being retired for new deployments, so this is a design
+          with an expiry date attached. Cost visibility is not a substitute for a
+          connectivity design.
+        rep: -10
+    next: e3-security
+
+  - id: e3-security
+    type: design_decision
+    title: "Marcus reads the diagram"
+    speaker: security
+    objectives: [AZ305-4.20]
+    scenario: |
+      With egress fixed, Marcus turns to the rest of the picture.
+
+      "Sunda's servers have never been segmented. Their VMware estate is one flat
+      VLAN and their ERP database accepts connections from anything in the
+      building. When it lands in our tenant I want that habit to not come with
+      it."
+
+      What he wants, in his order:
+
+      - The SAP database tier reachable only from the SAP application tier
+      - The Managed Instance and the document storage account not reachable from the internet at all
+      - Spoke-to-spoke traffic between Sunda and Production inspected, not implicitly trusted
+      - Rules that survive someone building a new VM in the subnet next Tuesday
+      - No new appliance licenses; Evelyn has been clear
+
+      "And I want to be able to say, in one sentence, why a machine in Sunda
+      cannot reach the WMS database. Right now the sentence is 'because nobody
+      has tried'."
+    prompt: "What network security design do you recommend?"
+    options:
+      - id: opt-layered
+        label: "Subnet-scoped NSGs with application security groups for the tiers, private endpoints for the Managed Instance and storage account with public network access disabled, and UDRs forcing spoke-to-spoke traffic through the hub firewall"
+        correct: true
+        explain: >
+          Each control answers one of the stated requirements. Subnet-scoped NSGs
+          apply to machines built after the rule is written, and application
+          security groups let the tier relationship be expressed by membership
+          rather than by IP address. Private endpoints with public network access
+          disabled remove the PaaS services from the internet entirely rather than
+          firewalling them on it. UDRs pointing spoke-to-spoke traffic at the hub
+          firewall replace implicit peering trust with inspection, using the
+          firewall you already deployed and no new licenses.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-pe-sunda
+              label: "Private endpoints (MI, storage)"
+              kind: private-endpoint
+              group: grp-sea
+              status: healthy
+          - op: add_edge
+            edge: {id: a2inf-e-pe-sqlmi, source: a2inf-pe-sunda, target: a2inf-sqlmi-sunda, kind: private-link}
+          - op: add_edge
+            edge: {id: a2inf-e-pe-st, source: a2inf-pe-sunda, target: a2inf-st-sunda, kind: private-link}
+      - id: opt-nic-nsg
+        label: "NSGs applied per network interface, written against each server's IP address, generated from the migration inventory"
+        correct: false
+        consequence: >
+          Desmond builds a replacement app server in November. It gets no rules
+          and nobody notices for three weeks.
+        explain: >
+          Per-NIC rules keyed to addresses fail the stated requirement that the
+          design survive a new VM built next Tuesday: the new machine has no rule
+          and the old rule outlives the machine it described. Subnet association
+          plus application security groups expresses the same intent as membership,
+          which is what makes it durable.
+        rep: -8
+      - id: opt-firewall-only
+        label: "Send everything through the hub firewall and rely on its rules alone, since NSGs would duplicate the policy"
+        correct: false
+        consequence: >
+          A compromised SAP app server talks straight to the database on the same
+          subnet. The firewall never sees the packet.
+        explain: >
+          Traffic between machines in the same subnet never leaves it, so the hub
+          firewall has no visibility of exactly the lateral movement Marcus asked
+          about. Perimeter and segmentation are different layers doing different
+          jobs: the firewall controls what crosses boundaries, NSGs control what
+          happens inside them.
+        rep: -10
+      - id: opt-service-endpoints
+        label: "Use service endpoints on the workload subnets to reach the Managed Instance and storage privately"
+        correct: false
+        explain: >
+          Service endpoints keep the traffic on the Microsoft backbone and let the
+          service restrict access to named subnets, but the resource keeps its
+          public endpoint and public DNS name - it is filtered, not removed from
+          the internet. The requirement says not reachable from the internet at
+          all, which is a private endpoint with public network access disabled.
+        rep: -6
+    next: e4-portal
+
+  - id: e4-portal
+    type: design_decision
+    title: "The tracking portal, from outside"
+    speaker: security
+    objectives: [AZ305-4.17, AZ305-4.20]
+    scenario: |
+      Sunda's public shipment tracking portal comes with the acquisition. It is a
+      web front end that customers hit with a consignment number, and it is
+      currently a Windows server with a public IP and an unpatched reverse proxy.
+
+      What it has to become:
+
+      - Public by design; anonymous customers, no authentication
+      - Peaks at 9,000 requests per minute when a port closes for weather
+      - Two documented SQL injection attempts in the last quarter's logs
+      - Must survive volumetric attack; Jakarta's competitors are not gracious losers
+      - Single region for now, Southeast Asia; a second region is next quarter's problem
+      - Backend will run in the Sunda landing zone with no public IP of its own
+
+      Marcus: "Public is fine. Public and unexamined is not."
+    prompt: "How do you design inbound connectivity for the tracking portal?"
+    options:
+      - id: opt-agw-waf
+        label: "Azure Application Gateway with the WAF v2 SKU in the hub, terminating TLS and forwarding to the backend over private IPs, with a DDoS Network Protection plan on the public IP"
+        correct: true
+        explain: >
+          A regional Layer 7 entry point matches a single-region requirement:
+          Application Gateway terminates TLS, the WAF managed rule set addresses
+          the injection attempts already in the logs, and the backend pool is
+          reached by private IP so the workload keeps no public address of its
+          own. DDoS Network Protection on the public IP covers the volumetric case
+          with mitigation tuned to the endpoint rather than the platform-wide
+          defaults.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-agw-tracking
+              label: "agw-tracking (WAF v2)"
+              kind: app-gateway
+              group: grp-sea
+              status: healthy
+          - op: add_edge
+            edge: {id: a2inf-e-internet-agw, source: a2inf-internet, target: a2inf-agw-tracking, kind: traffic}
+          - op: add_edge
+            edge: {id: a2inf-e-agw-sunda, source: a2inf-agw-tracking, target: a2inf-sub-sunda, kind: traffic}
+      - id: opt-lb
+        label: "A public standard load balancer in front of the portal VMs, with NSGs restricting inbound to ports 80 and 443"
+        correct: false
+        consequence: >
+          The next injection attempt is a well-formed HTTPS request on port 443.
+          It passes every rule.
+        explain: >
+          A Layer 4 load balancer distributes connections and cannot read the
+          request, so it has nothing to say about SQL injection in a query string -
+          the stated attack the design has to address. Port-level NSGs are the
+          same limitation restated. Layer 7 inspection is the requirement here,
+          not connection distribution.
+        rep: -10
+      - id: opt-fw-dnat
+        label: "Publish the portal through the hub Azure Firewall with a DNAT rule and the Premium IDPS ruleset"
+        correct: false
+        explain: >
+          Firewall Premium's IDPS does inspect traffic and this is not a bad
+          answer, which is what makes it worth naming. It is the weaker fit for an
+          anonymous public web application: Application Gateway's WAF carries the
+          OWASP managed rule sets, offloads TLS, and does the health probing and
+          Layer 7 routing a web front end needs. Use the firewall for egress and
+          non-HTTP publishing; use a WAF for a website.
+        rep: -5
+      - id: opt-frontdoor
+        label: "Put Azure Front Door in front of it now, so the second region next quarter needs no rework"
+        correct: false
+        consequence: >
+          Priya asks what the global tier buys today. The honest answer is
+          "nothing yet".
+        explain: >
+          Front Door is the right answer once there are two regions, and this
+          quest states there is one. Building the global tier a quarter early adds
+          a global service, its own WAF policy, and origin configuration to a
+          program that has a lease deadline. Note the shape of the trap: the
+          option is correct in the wrong quarter, which is how premature
+          architecture usually presents.
+        rep: -5
+    next: END

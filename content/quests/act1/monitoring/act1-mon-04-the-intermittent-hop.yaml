@@ -1,0 +1,414 @@
+schema_version: 1
+id: act1-mon-04-the-intermittent-hop
+title: "The Intermittent Hop"
+act: 1
+chapter: act1-monitoring
+domain: az104-d5
+order: 4
+role: senior-cloud-admin
+checkpoint: true
+summary: "The warehouse app hiccups a few times an hour. Every test anyone runs passes."
+entry: e1-connection-monitor
+
+encounters:
+  - id: e1-connection-monitor
+    type: design_decision
+    title: "It works when I test it"
+    speaker: manager
+    objectives: [AZ104-5.6]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: mon-cm
+          label: "Connection Monitor - warehouse to hub"
+          kind: monitor
+          group: grp-ops
+          status: planned
+    scenario: |
+      Priya has three weeks of complaints and no evidence.
+
+      "The pickers say the app pauses. Five seconds, maybe six, a few times an
+      hour, then it carries on. Ops runs a test, the test passes, the ticket gets
+      closed, and next week it comes back."
+
+      You have been running the same test yourself. Every time you check
+      connectivity from vm-wms01 to vm-dc01 it returns reachable, because you
+      check when someone complains, which is after the pause has ended.
+
+      Desmond is unusually invested in this one. "Point-in-time tools answer
+      point-in-time questions. Nobody in this building can answer what
+      percentage of the time the path works, and until somebody can, this ticket
+      will keep coming back with a different reporter on it."
+    prompt: "How do you get evidence?"
+    options:
+      - id: opt-connection-monitor
+        label: "Configure Connection Monitor in Network Watcher with a test group from vm-wms01 to vm-dc01 on the ports the app uses, writing results to law-meridian"
+        correct: true
+        explain: >
+          Connection Monitor runs continuously rather than on demand: it probes
+          the configured source and destination endpoints on a schedule, records
+          reachability, round-trip time and the per-hop path, and writes to a Log
+          Analytics workspace so the results are queryable and alertable.
+          Intermittent faults are a statistics problem, and only a standing test
+          produces the statistics.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: mon-cm, status: healthy}
+          - op: add_edge
+            edge:
+              id: mon-e-cm-path
+              source: vm-wms01
+              target: vm-dc01
+              kind: traffic
+              label: "connection monitor test"
+          - op: add_edge
+            edge:
+              id: mon-e-cm-law
+              source: mon-cm
+              target: mon-law
+              kind: dependency
+              label: "test results"
+      - id: opt-repeat-test
+        label: "Run az network watcher test-connectivity from a scheduled task every fifteen minutes and log the output to a file"
+        correct: false
+        consequence: >
+          Four days of files. Two failures captured, both at times nobody
+          complained.
+        explain: >
+          Connection troubleshoot is the right tool for a fault you can reproduce
+          now, and wrapping it in a scheduler is a reasonable instinct - but a
+          fifteen-minute cadence samples a fault that lasts five seconds, the
+          output is not queryable, and there is nothing to alert on. You are
+          hand-building a worse Connection Monitor.
+        rep: -8
+      - id: opt-flow-logs
+        label: "Turn on NSG flow logs for nsg-wms-app and have Manila review them each morning"
+        correct: false
+        explain: >
+          Flow logs record what traffic was allowed or denied, which is valuable
+          once you suspect a rule - but they are a record of the traffic that
+          happened, not a measurement of whether the path works, and they carry
+          no latency or per-hop information. They also require a human to notice
+          a pattern in a very large file.
+        rep: -6
+      - id: opt-ping
+        label: "Ask the warehouse supervisor to run a continuous ping from a tablet and screenshot it when the app pauses"
+        correct: false
+        explain: >
+          The tablet is not the failing endpoint, ICMP is not the protocol the
+          app uses and is frequently filtered independently of it, and the
+          evidence arrives as an image with no timestamp you can correlate
+          against anything. Measure the path the application actually takes,
+          from the endpoint that actually takes it.
+        rep: -10
+    next: e2-ldap-deny
+
+  - id: e2-ldap-deny
+    type: troubleshoot
+    title: "P2: Six percent of checks fail on one port"
+    speaker: noc
+    objectives: [AZ104-5.6]
+    ticket:
+      id: "MER-5301"
+      reporter: "NOC Manila"
+      priority: "P2"
+      opened: "08:05"
+      body: |
+        Connection Monitor has been running four days. Test group wms-to-dc has
+        two checks: TCP 389 and TCP 636 against 10.100.1.10. The 636 check is
+        clean. The 389 check fails on every single probe, and has since the test
+        was created. Pickers still report intermittent pauses. Escalating - we
+        cannot tell whether these two facts are the same fact.
+    on_enter_diagram_ops:
+      - {op: set_status, node: nsg-app, status: broken}
+      - {op: set_status, node: vm-wms01, status: warning}
+      - {op: set_edge_status, edge: mon-e-cm-path, status: degraded}
+    scenario: |
+      Four days of data and the first surprise is that nothing is intermittent.
+
+      The check on TCP 389 has never once succeeded. The check on TCP 636 has
+      never once failed. Both target the same domain controller from the same
+      source. The application, meanwhile, authenticates successfully every time -
+      it just sometimes takes six seconds to do it.
+
+      Desmond looks at the two lines on the chart for a while.
+
+      "An application that always works but sometimes takes six seconds is an
+      application that is failing over to something. Find out what it tries
+      first, find out why that fails, and stop assuming the pauses and the failed
+      checks are two different problems."
+    time_budget: 6
+    investigate:
+      - id: inv-app-team
+        label: "Ask the application team how the app connects to the directory"
+        speaker: ticket
+        reveals: >
+          "It tries plain LDAP on 389 first because that is the historic default
+          in the config, then falls back to LDAPS on 636 when the first attempt
+          times out. The socket timeout is five seconds. It has always been
+          configured that way."
+      - id: inv-marcus
+        label: "Ask Marcus whether security changed anything on the warehouse subnet"
+        speaker: security
+        reveals: >
+          "Yes, and I will own it. We are removing unencrypted LDAP across the
+          estate - the audit finding from March. I had a deny rule written for
+          traffic leaving to external directories. Whether the scope came out the
+          way I intended is a fair question."
+      - id: inv-desmond
+        label: "Ask Desmond which Network Watcher tool names a blocking rule"
+        speaker: mentor
+        reveals: >
+          "Effective security rules will list you every rule on the NIC and let
+          you work it out yourself. IP flow verify takes a five-tuple, evaluates
+          it the way the platform does, and tells you allowed or denied and the
+          name of the rule that decided. Use the one that answers the question."
+      - id: inv-ravi
+        label: "Ask Manila whether the pause frequency matches anything"
+        speaker: noc
+        reveals: >
+          "Pauses cluster at shift change and after tea breaks - whenever a batch
+          of tablets re-authenticates at once. Sessions last about an hour, so a
+          picker only feels it when their session is renewed."
+    commands:
+      - id: cmd-cm-results
+        label: "Query Connection Monitor results by destination port"
+        command: "az monitor log-analytics query -w law-meridian --analytics-query 'NWConnectionMonitorTestResult | where TimeGenerated > ago(4d) | summarize Checks = count(), Failed = countif(TestResult == \"Fail\") by DestinationPort, DestinationIP' -o table"
+        output: |
+          DestinationPort    DestinationIP    Checks    Failed
+          -----------------  ---------------  --------  --------
+          389                10.100.1.10      11520     11520
+          636                10.100.1.10      11520     0
+        time_cost: 1
+        note: "Not intermittent at all. One port is completely blocked, the other is completely fine."
+      - id: cmd-path-result
+        label: "Query the per-hop path result for the failing check"
+        command: "az monitor log-analytics query -w law-meridian --analytics-query 'NWConnectionMonitorPathResult | where DestinationPort == 389 | where TimeGenerated > ago(1d) | project TimeGenerated, PathTestResult, HopAddresses, IssueType | take 3' -o table"
+        output: |
+          TimeGenerated         PathTestResult    HopAddresses    IssueType
+          --------------------  ----------------  --------------  -----------------
+          2026-09-01T07:55:12Z  Fail              10.101.1.10     NetworkSecurityRule
+          2026-09-01T07:56:12Z  Fail              10.101.1.10     NetworkSecurityRule
+          2026-09-01T07:57:12Z  Fail              10.101.1.10     NetworkSecurityRule
+        time_cost: 2
+        note: "The failure is at the source NIC and Connection Monitor has already classified it as a security rule."
+      - id: cmd-ip-flow
+        label: "Run IP flow verify for the failing five-tuple"
+        command: "az network watcher test-ip-flow -g rg-ops-sea --vm vm-wms01 --nic nic-wms01 --direction Outbound --protocol TCP --local 10.101.1.10:61204 --remote 10.100.1.10:389 -o table"
+        output: |
+          Access    RuleName
+          --------  ----------------------
+          Deny      deny-legacy-ldap-out
+        time_cost: 1
+        note: "Denied, and the platform names the rule that did it."
+      - id: cmd-nsg-rules
+        label: "List the rules on nsg-wms-app"
+        command: "az network nsg rule list -g rg-ops-sea --nsg-name nsg-wms-app --query '[].{name:name, pri:priority, dir:direction, access:access, dst:destinationAddressPrefix, port:destinationPortRange}' -o table"
+        output: |
+          Name                    Pri    Dir        Access    Dst              Port
+          ----------------------  -----  ---------  --------  ---------------  ------
+          allow-web-in            100    Inbound    Allow     *                443
+          deny-legacy-ldap-out    200    Outbound   Deny      *                389
+          allow-dc-out            300    Outbound   Allow     10.100.1.0/24    *
+        time_cost: 1
+        note: "The deny is at priority 200 with a destination of any, so it wins over the allow at 300."
+      - id: cmd-next-hop
+        label: "Check the next hop from vm-wms01 to the domain controller"
+        command: "az network watcher show-next-hop -g rg-ops-sea --vm vm-wms01 --source-ip 10.101.1.10 --dest-ip 10.100.1.10 -o table"
+        output: |
+          NextHopType     NextHopIpAddress    RouteTableId
+          --------------  ------------------  --------------
+          VnetPeering     10.100.1.10         System Route
+        time_cost: 1
+        note: "Routing is intact. This is not a path problem."
+      - id: cmd-dc-listening
+        label: "Confirm the domain controller is still listening on 389"
+        command: "az vm run-command invoke -g rg-hub-sea -n vm-dc01 --command-id RunPowerShellScript --scripts 'Get-NetTCPConnection -LocalPort 389 -State Listen | Select-Object -First 1 LocalAddress,LocalPort,State'"
+        output: |
+          LocalAddress  LocalPort  State
+          10.100.1.10         389  Listen
+        time_cost: 2
+        note: "The service is up. Nothing is wrong at the destination."
+    fixes:
+      - id: fix-scope-rule
+        label: "Rescope deny-legacy-ldap-out so it denies 389 only to destinations outside the hub, leaving internal LDAP to the domain controller allowed"
+        correct: true
+        explain: >
+          NSG rules are evaluated by priority and the first match wins, so a deny
+          at 200 with a destination of any beats the allow at 300 for the hub
+          subnet - the rule was written for external directories and its
+          destination prefix never narrowed it to them. Correcting the
+          destination restores the app's first-choice connection, which removes
+          the five-second timeout the pickers were feeling. Note the diagnosis
+          order that got here: Connection Monitor found the pattern, IP flow
+          verify named the rule.
+        rep: 14
+        diagram_ops:
+          - {op: set_status, node: nsg-app, status: healthy}
+          - {op: set_status, node: vm-wms01, status: healthy}
+          - {op: set_edge_status, edge: mon-e-cm-path, status: healthy}
+      - id: fix-app-config
+        label: "Reconfigure the application to use LDAPS on 636 only, so it never attempts the blocked port"
+        correct: false
+        consequence: >
+          The application change goes through change control and ships in three
+          weeks. The mis-scoped deny rule is still there, waiting for the next
+          service that needs the hub.
+        explain: >
+          It is where the estate should end up, and it is not the fix for this
+          incident. The rule denies 389 to every destination rather than to the
+          external directories it was written for, so leaving it in place means
+          the next workload hits the same wall. Fix the misconfiguration first;
+          schedule the application hardening as its own change.
+        rep: -6
+      - id: fix-delete-deny
+        label: "Delete deny-legacy-ldap-out entirely, since it is breaking production"
+        correct: false
+        consequence: >
+          Marcus's audit finding reopens. The March remediation is now
+          undocumented and undone.
+        explain: >
+          Removing a control because it was scoped badly throws away the intent
+          along with the error - unencrypted LDAP to external directories is
+          genuinely what the audit asked to be blocked. The rule needs a correct
+          destination prefix, not deletion, and the difference matters when
+          someone asks in November why the finding is open again.
+        rep: -10
+      - id: fix-raise-priority
+        label: "Move allow-dc-out to priority 100 so it is evaluated before the deny"
+        correct: false
+        explain: >
+          This does restore the traffic, and it is the fix that ages worst.
+          Priority 100 is already taken by allow-web-in, and reordering rules to
+          defeat a deny leaves a rule in the set that says one thing and does
+          another - the next person to read the NSG sees a deny on 389 and
+          believes it. Encode the intent in the rule's scope, not in the ordering
+          around it.
+        rep: -8
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: e3-tool-choice
+
+  - id: e3-tool-choice
+    type: knowledge_check
+    title: "The right instrument"
+    speaker: mentor
+    objectives: [AZ104-5.6]
+    scenario: |
+      Desmond has taken to quizzing you between meetings, which is his version of
+      a compliment.
+
+      "New one. A developer says a VM cannot reach a database endpoint. She wants
+      a yes or no on whether an NSG rule is stopping a specific packet, and if it
+      is, the name of the rule that did it. She needs the answer now, from the
+      portal, without deploying anything or waiting for data to accumulate."
+    question: "Which Network Watcher feature answers that?"
+    options:
+      - id: opt-ip-flow
+        label: "IP flow verify"
+        correct: true
+        explain: >
+          IP flow verify takes a five-tuple - direction, protocol, local address
+          and port, remote address and port - evaluates it against the effective
+          NSG rules exactly as the platform would, and returns Allow or Deny plus
+          the name of the deciding rule. It is instant, it needs no agent, and
+          naming the rule is the part the other tools do not do.
+        rep: 8
+      - id: opt-effective-rules
+        label: "Effective security rules on the NIC"
+        correct: false
+        explain: >
+          This is the closest wrong answer. It shows every rule applied to the
+          NIC from all NSGs, which is genuinely useful - but it hands you the
+          rule set and leaves the priority evaluation to you. For a specific
+          packet, that is manual work you can get wrong; IP flow verify does the
+          evaluation for you.
+        rep: -4
+      - id: opt-next-hop
+        label: "Next hop"
+        correct: false
+        explain: >
+          Next hop answers a routing question - where will traffic to this
+          destination be sent, and by which route table. It is the right tool
+          when traffic is disappearing rather than being refused, but it does not
+          consult NSGs at all, so it cannot tell you whether a rule is blocking
+          anything.
+        rep: -6
+      - id: opt-connection-monitor
+        label: "Connection Monitor"
+        correct: false
+        explain: >
+          Connection Monitor measures whether a path works over time and can
+          classify a failure as a security rule issue, which is how the LDAP
+          problem surfaced - but it requires setup, an agent on the source, and
+          time to gather results, and it does not name the rule. Wrong instrument
+          for a question that needs an answer in the next minute.
+        rep: -5
+    next: e4-network-insights
+
+  - id: e4-network-insights
+    type: design_decision
+    title: "A standing view"
+    speaker: manager
+    objectives: [AZ104-5.5]
+    scenario: |
+      Priya closes the ticket and immediately opens the follow-up conversation.
+
+      "Four days of Connection Monitor found something three weeks of tickets did
+      not. Fine. Now I have the network team asking for the same thing across
+      everything - the gateway, the peerings, the load balancers, the NSGs - and
+      I would like to not spend a month building it."
+
+      What she wants is specific: a topology she can look at, the health and
+      metrics of each network resource next to it, and the connection monitor
+      results in the same place, without an engineer curating a dashboard.
+
+      Desmond's constraint from six weeks ago has not changed, and he restates it
+      anyway. "Nothing hand-built that has to be edited when we add a resource."
+    prompt: "What do you give her?"
+    options:
+      - id: opt-network-insights
+        label: "Azure Monitor Network Insights, which discovers the network resources in the subscription and presents topology, health and metrics with connectivity results built in"
+        correct: true
+        explain: >
+          Network Insights is the curated Azure Monitor experience for
+          networking: it enumerates the network resources in scope on its own,
+          renders the topology, surfaces each resource's platform metrics and
+          health, and folds Connection Monitor results into the same view. Being
+          scope-driven rather than resource-list-driven is what makes it survive
+          the estate changing, which was the stated requirement.
+        rep: 10
+      - id: opt-workbook
+        label: "Author a workbook that lists every network resource with its key metrics and pin it to a dashboard"
+        correct: false
+        explain: >
+          Workbooks are the correct answer when you need a view Azure does not
+          ship, and this one it does. A hand-authored workbook has to be extended
+          each time a resource appears, which is the maintenance objection
+          Desmond has now raised twice, and it will not draw the topology.
+        rep: -6
+      - id: opt-more-cm
+        label: "Create Connection Monitor test groups between every pair of subnets so the coverage is complete"
+        correct: false
+        consequence: >
+          Sixty test groups later, the results table is larger than the flow logs
+          and nobody can say which failures matter.
+        explain: >
+          Connection Monitor is for paths that carry a real dependency and a real
+          expectation - a full mesh generates enormous volume, most of it about
+          paths nothing uses, and buries the handful of tests that mean
+          something. Instrument the dependencies you would be paged about, not
+          the cartesian product.
+        rep: -8
+      - id: opt-service-health
+        label: "Point the network team at Azure Service Health, which reports on the platform's own network"
+        correct: false
+        explain: >
+          Service Health tells you when Microsoft has a problem in a region or
+          with a service, and every team should subscribe to it - but it says
+          nothing about your peerings, your NSGs, or a rule someone wrote last
+          Tuesday. Platform health and resource health answer different
+          questions, and most incidents are the second kind.
+        rep: -6
+    next: END

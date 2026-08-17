@@ -1,0 +1,305 @@
+schema_version: 1
+id: act1-id-06-evelyns-spreadsheet
+title: "Evelyn's Spreadsheet"
+act: 1
+chapter: act1-identity
+domain: az104-d1
+order: 6
+role: cloud-admin
+checkpoint: true
+summary: "The bill has doubled in two months and the CFO has questions in a specific order."
+entry: e1-budget
+
+encounters:
+  - id: e1-budget
+    type: design_decision
+    title: "Three thousand one hundred to seven thousand nine hundred"
+    speaker: cfo
+    objectives: [AZ104-1.14]
+    scenario: |
+      Evelyn has the spreadsheet open on the meeting room screen, which is new
+      and not encouraging.
+
+      "February, three thousand one hundred Singapore dollars. April, seven
+      thousand nine hundred. I understand Johor is a project. What I do not
+      understand is why I found out in April."
+
+      She is right that nobody told her. There is no budget configured on the
+      subscription, no cost alert, and no scheduled export. The first signal
+      anyone gets is the invoice.
+
+      Two things are true about Azure budgets. They notify - they do not stop
+      spend, and nothing about a budget prevents a resource from being created.
+      And actual-cost alerts and forecasted-cost alerts are separate conditions:
+      an actual alert fires on spend already incurred, a forecasted alert fires
+      when the projection for the period crosses your threshold.
+
+      Meridian buys through an enterprise agreement, so the subscription
+      spending cap - which only exists on credit-based offers such as free
+      trials - is not available.
+
+      "I want to know in the first week of the month," Evelyn says, "not the
+      first week of the next one."
+    prompt: "How do you give Evelyn early warning?"
+    options:
+      - id: opt-budget-alerts
+        label: "Create a budget on the subscription with actual-cost alerts at 80 and 100 percent and a forecasted alert at 110 percent, notifying an action group with Evelyn and Priya"
+        correct: true
+        explain: >
+          The forecasted condition is what delivers the first-week signal: it
+          projects the period's total from spend so far, so a bad trend raises a
+          hand long before the actual threshold is crossed. Pairing it with
+          actual thresholds means you also hear about the month that spends
+          everything on day twenty-nine. Routing through an action group rather
+          than a list of addresses means the recipients change without editing
+          the budget.
+        rep: 12
+        diagram_ops:
+          - op: add_node
+            node:
+              id: id-budget-prod
+              label: "Budget - Meridian Production (SGD 8,000/mo)"
+              kind: monitor
+              group: grp-corp
+              status: healthy
+          - op: add_edge
+            edge:
+              id: id-e-sub-budget
+              source: sub-prod
+              target: id-budget-prod
+              kind: dependency
+              label: "scoped to"
+      - id: opt-hard-stop
+        label: "Set a budget that automatically stops resources when spend reaches one hundred percent"
+        correct: false
+        consequence: >
+          The warehouse system stops during the Johor ramp on the twenty-third of the month.
+        explain: >
+          Budgets alert; they do not enforce. You can wire a budget alert to an
+          action group that triggers automation, but that automation is yours to
+          write and it does exactly what you tell it - which on a production
+          subscription means shutting down the workload the business runs on. A
+          cost control that causes an outage is a more expensive problem than
+          the overspend.
+        rep: -12
+      - id: opt-manual
+        label: "Review Cost Analysis every Monday morning and email Evelyn a summary"
+        correct: false
+        explain: >
+          Better than nothing and worse than a budget: it depends on someone
+          remembering during a ramp, it has up to a week of detection latency,
+          and it stops the first time you are on leave. Automate the detection
+          and spend the human attention on deciding what to do about it.
+        rep: -6
+      - id: opt-cap
+        label: "Turn on the subscription spending cap so Azure stops billing once the limit is reached"
+        correct: false
+        explain: >
+          The spending cap only exists on credit-based offers such as free
+          trials and some dev/test subscriptions, and Meridian buys through an
+          enterprise agreement, so the setting is not there to turn on. Even
+          where it exists it works by deprovisioning services at the limit,
+          which is not a behavior you want in production.
+        rep: -8
+    next: e2-attribution
+
+  - id: e2-attribution
+    type: design_decision
+    title: "The Johor number"
+    speaker: cfo
+    objectives: [AZ104-1.14, AZ104-1.11]
+    scenario: |
+      With the budget in place Evelyn returns to the question she started with.
+
+      "Now split it. How much of the increase is Johor?"
+
+      Cost Analysis can group by tag, and the costcenter tag has been enforced
+      since Tuesday of last week. The remediation task backfilled the existing
+      sixty resources the same day. Before that date, no resource carried a
+      costcenter tag at all.
+
+      Tags are applied to cost records at the time usage is metered. Setting a
+      tag today does not re-tag last month's usage - historical records keep
+      whatever tags the resource had when the usage occurred.
+
+      What does exist for the earlier period: the resource group split, which
+      has cleanly separated hub from warehouse operations since the beginning,
+      and the resource-level detail underneath it.
+
+      "I am presenting this to the board in nine days," Evelyn says.
+    prompt: "How do you produce the split?"
+    options:
+      - id: opt-mixed
+        label: "Group by the costcenter tag from the date it went live, use the resource group split for the earlier months, and label the join date in the report"
+        correct: true
+        explain: >
+          Resource groups have carried the same separation since the beginning,
+          so they are a valid attribution key for the period before the tag
+          existed, and the tag is the better key going forward. Stating where
+          the methodology changes is what makes the number defensible in front
+          of a board - a report that quietly switches basis mid-series is the
+          one that falls apart under a question.
+        rep: 12
+      - id: opt-backdate
+        label: "Apply the tags with a retroactive effective date so the earlier months report correctly"
+        correct: false
+        consequence: >
+          The February figures come back identical, and you have spent two days of the nine.
+        explain: >
+          There is no retroactive tagging. Tags are stamped onto usage records
+          as the usage is metered, so applying a tag today changes today's
+          records onward and nothing before it. This is the most common
+          misconception about tag-based chargeback and the reason to introduce
+          tags before you need the report.
+        rep: -8
+      - id: opt-headcount
+        label: "Allocate the total across sites by headcount, which is the ratio finance already uses for facilities"
+        correct: false
+        consequence: >
+          The board asks which resources make up the Johor figure, and there is no answer.
+        explain: >
+          An allocation model produces a number that looks measured and is not,
+          and Evelyn will treat it as measured because it came from you. Where
+          real attribution data exists for part of the period, use it and say so
+          rather than replacing measurement with an assumption.
+        rep: -10
+      - id: opt-resplit
+        label: "Create one subscription per site and redeploy the workloads so future billing separates itself"
+        correct: false
+        explain: >
+          Subscription-per-site is a defensible target state and a wildly
+          disproportionate answer to a reporting question with a nine-day
+          deadline. Tags exist so that attribution does not require moving
+          production. If hard cost separation is genuinely wanted, propose it as
+          its own piece of work with its own timeline.
+        rep: -8
+    next: e3-advisor
+
+  - id: e3-advisor
+    type: design_decision
+    title: "What Advisor recommends"
+    speaker: mentor
+    objectives: [AZ104-1.14]
+    scenario: |
+      Azure Advisor's cost recommendations for the subscription, sorted by
+      claimed saving:
+
+      Buy a three-year reserved instance for the vm-wms01 size in Southeast
+      Asia. Estimated saving SGD 640 per year.
+
+      Right-size or shut down vm-wms-dr01, average CPU 3 percent over 30 days.
+      Estimated saving SGD 210 per month.
+
+      Delete 6 unattached managed disks. Estimated saving SGD 88 per month.
+
+      Priya, reading over your shoulder: "vm-wms-dr01 is the warm standby.
+      It is supposed to be idle. That is the entire point of it."
+
+      Desmond adds the part he always adds. "Advisor measures. It does not know
+      what anything is for. Everything on that list is a hypothesis."
+
+      The WMS went live eight weeks ago and the Johor ramp is still adding load,
+      so its steady-state size is not yet known. Reservations commit to a
+      specific size and region for the term, with limited exchange and refund
+      options.
+    prompt: "Which recommendation do you act on this week?"
+    options:
+      - id: opt-disks
+        label: "Delete the six unattached disks after confirming with the WMS team that none are pending restores, and revisit the reservation once the ramp settles"
+        correct: true
+        explain: >
+          Unattached disks bill for capacity while serving nothing, so this is
+          the recommendation with a real saving, no service impact, and a short
+          verification step - confirm none are staged for a restore or attached
+          to a machine that is deallocated. The reservation is the larger number
+          but the least reversible commitment, and committing three years to a
+          VM size that is still changing is how organizations end up paying for
+          the wrong size.
+        rep: 12
+      - id: opt-shutdown-dr
+        label: "Shut down vm-wms-dr01 as Advisor recommends - three percent CPU over thirty days is not a workload"
+        correct: false
+        consequence: >
+          The standby is discovered to be off during the next failover test.
+        explain: >
+          Advisor reads utilization, not intent, and Priya has already told you
+          what this machine is for. A warm standby is idle by design; low
+          utilization is the expected reading, not a finding. Recommendations
+          are inputs to a decision, and the decision needs context the platform
+          does not have.
+        rep: -12
+      - id: opt-reservation
+        label: "Buy the three-year reservation first because it is the largest single saving on the list"
+        correct: false
+        consequence: >
+          Six weeks later the Johor load requires a larger size, and the reservation covers a size you no longer run.
+        explain: >
+          Reservations are the strongest cost lever in Azure and the least
+          reversible - they commit to a size and region for the term, and
+          exchanges and refunds are limited. They pay off on workloads with a
+          known steady state. An eight-week-old system still taking on load is
+          the textbook case for waiting.
+        rep: -10
+      - id: opt-dismiss
+        label: "Dismiss the recommendations - Advisor's figures are estimates, so they are not worth acting on"
+        correct: false
+        explain: >
+          The figures are estimates and the observations behind them are real
+          measurements: six disks genuinely are unattached and genuinely are
+          billing. Treating the whole feed as noise means giving up a free
+          inventory of waste because part of it needs judgment.
+        rep: -8
+    next: e4-check
+
+  - id: e4-check
+    type: knowledge_check
+    title: "One last thing before the board pack"
+    speaker: mentor
+    objectives: [AZ104-1.14]
+    scenario: |
+      Desmond signs off the report and then does the thing he does.
+
+      "Your budget is on the production subscription. Eight thousand a month,
+      an actual-cost alert at eighty percent, and a forecasted alert at a
+      hundred and ten percent. It is the seventeenth. Actual spend so far is
+      four thousand four hundred. Forecast for the month is eight thousand nine
+      hundred."
+
+      He does not look up.
+    question: >
+      What has happened, and what will Azure do about the spend?
+    options:
+      - id: opt-forecast-only
+        label: "The forecasted alert has fired because 8,900 exceeds 110 percent of 8,000; the actual alert has not, and nothing is stopped or blocked"
+        correct: true
+        explain: >
+          Forecasted and actual conditions are evaluated separately. The
+          projection of 8,900 is above the 8,800 forecast threshold so that
+          alert fires, while actual spend of 4,400 is 55 percent of budget and
+          well under the 80 percent actual threshold. A budget is a notification
+          mechanism - it never blocks a deployment or deallocates a resource.
+      - id: opt-blocks
+        label: "Azure blocks new resource creation in the subscription until the next billing period begins"
+        correct: false
+        explain: >
+          Nothing in a budget enforces anything. Blocking creation would require
+          a Deny policy, and stopping resources would require automation
+          triggered from the budget's action group - both of which you would
+          have to build deliberately.
+      - id: opt-actual-fires
+        label: "The 80 percent actual alert fires, because the forecast exceeding the budget means the actual threshold has effectively been reached"
+        correct: false
+        explain: >
+          Actual-cost alerts evaluate spend already incurred, which is 4,400 or
+          55 percent. A forecast is a projection and never satisfies an actual
+          condition. Confusing the two is why budgets are often configured with
+          only actual alerts and then surprise everyone in the final week.
+      - id: opt-reset
+        label: "The budget resets and rebaselines to the forecast, since the forecast has exceeded the configured amount"
+        correct: false
+        explain: >
+          A budget resets only on its own reset period - monthly, quarterly, or
+          annually - and always to the amount you configured. It never adjusts
+          itself to observed spend, which is what makes it useful as a fixed
+          line to measure against.
+    next: END

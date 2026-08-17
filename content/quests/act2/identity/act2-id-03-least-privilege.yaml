@@ -1,0 +1,367 @@
+schema_version: 1
+id: act2-id-03-least-privilege
+title: "Least Privilege, Most Argument"
+act: 2
+chapter: act2-identity
+domain: az305-d1
+order: 3
+role: associate-architect
+checkpoint: true
+summary: "Fourteen offshore operators, six standing Owners, and a guest list nobody has read since March."
+entry: e1-noc-rbac
+
+encounters:
+  - id: e1-noc-rbac
+    type: design_decision
+    title: "What the NOC actually needs"
+    speaker: noc
+    objectives: [AZ305-1.6]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2id-noc-manila
+          label: "NOC Manila operators"
+          kind: user
+          group: grp-platform
+          status: planned
+    scenario: |
+      The NOC Manila shift lead joins the call from a room with fourteen people
+      in it and a whiteboard listing every night they were unable to do their
+      job.
+
+      "We get paged, we look at the alert, and then we open a ticket with your
+      team and wait. Half of those tickets are restart the virtual machine.
+      We can see the alert and we cannot touch the machine."
+
+      What they need is specific: restart virtual machines in production, read
+      metrics and logs, and acknowledge or close alerts. What they must not have
+      is equally specific. Marcus has written it down.
+
+      They must not be able to change network configuration. They must not be
+      able to read customer manifests in the archive storage account, which is
+      PDPA-regulated personal data. And every action must be attributable, which
+      matters because the NOC is a third-party company with its own tenant and
+      its own staff turnover - the roster changes monthly, and last quarter's
+      access review found three accounts belonging to people who had left.
+
+      "Fourteen today," the shift lead says. "Probably eighteen once Jakarta
+      goes live. I do not want to email you every time someone joins."
+    prompt: "How do you design authorization for NOC Manila?"
+    options:
+      - id: opt-custom-role-group
+        label: "A custom role granting virtual machine restart and read, plus Monitoring Contributor, assigned to one Entra group at the Production management group scope, with NOC staff added as B2B guests in that group"
+        correct: true
+        explain: >
+          No built-in role expresses restart without also granting resize,
+          delete, and extension management, so a custom role with
+          Microsoft.Compute/virtualMachines/restart/action and read permissions
+          is the honest fit for the requirement. Assigning it to a group rather
+          than to people means the monthly roster change is a group membership
+          change, not a role assignment change, which is what fixes the stale
+          access finding. Scoping at the Production management group covers
+          Singapore and Indonesia without a second assignment, and the guests
+          remain individually named in the sign-in and activity logs.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: a2id-noc-manila, status: healthy}
+          - op: add_edge
+            edge:
+              id: a2id-e-noc-prod
+              source: a2id-noc-manila
+              target: sub-prod2
+              kind: identity
+              label: "custom operator role"
+              status: healthy
+      - id: opt-contributor
+        label: "Contributor at the production subscription scope, which grants everything operational but not the ability to grant access to others"
+        correct: false
+        consequence: >
+          Marcus runs the permission report and finds that fourteen contractors
+          can list the archive storage account keys.
+        explain: >
+          Contributor withholds role assignment and little else. It permits every
+          network change on the prohibited list, and critically it permits
+          listing storage account keys - and a storage account key is full data
+          plane access, so the manifests Marcus fenced off are readable in one
+          step. The control plane and data plane are not separate permission
+          worlds when key access is in scope.
+        rep: -12
+      - id: opt-vm-contributor
+        label: "Virtual Machine Contributor at the production subscription, which is scoped to compute only and therefore cannot touch networking or storage"
+        correct: false
+        consequence: >
+          An operator resizes a warehouse app node during a quiet shift to see
+          whether it helps. It does not.
+        explain: >
+          It is the closest built-in role and it is still too much: Virtual
+          Machine Contributor grants delete, resize, and virtual machine
+          extension management, and extension management is arbitrary code
+          execution inside the machine. It also does not cover the alert and
+          metric permissions the NOC asked for, so you would end up composing it
+          with a second role anyway. Compose the minimum instead.
+        rep: -8
+      - id: opt-per-person
+        label: "Assign the operator role directly to each NOC guest account, so every assignment is individually visible in the access report"
+        correct: false
+        consequence: >
+          By March there are twenty-two assignments for eighteen people, and
+          nobody can say which four are wrong.
+        explain: >
+          Individual assignments are auditable in the narrow sense and
+          unmaintainable in the practical one. A monthly roster change becomes a
+          role assignment change on a third party's schedule, leavers are removed
+          only if someone remembers, and the stale accounts finding recurs
+          exactly as it did last quarter. Group-based assignment moves the
+          lifecycle to one object that can be reviewed and automated.
+        rep: -6
+    next: e2-privileged-access
+
+  - id: e2-privileged-access
+    type: design_decision
+    title: "Six people are Owner"
+    speaker: security
+    objectives: [AZ305-1.6, AZ305-1.11]
+    scenario: |
+      Marcus has the privileged access report open and has not said anything for
+      a while, which is how he expresses alarm.
+
+      "Six standing Owners on production. Four permanent Global Administrators.
+      One of them is a service account created in 2021 whose password is in a
+      vault nobody can find. Chen and Partners will open with this."
+
+      His requirement is a number. Standing privileged access must be zero,
+      except for accounts that exist specifically to recover the tenant. Every
+      elevation must carry a justification and an approver, and the record must
+      survive the person who made it.
+
+      Evelyn's constraint is also a number: sixty Entra ID P2 licenses, already
+      allocated to the administrators and the security team.
+
+      Desmond has a practical objection. "If everything needs approval, who
+      approves at 03:00 when the tenant is broken and the approver's phone is on
+      the nightstand? I have seen a company lock itself out of its own
+      subscription. I would like us not to be that story."
+    prompt: "How do you design privileged access?"
+    options:
+      - id: opt-pim
+        label: "Privileged Identity Management: eligible assignments for Global Administrator, Privileged Role Administrator, and subscription Owner, with approval, justification, and time-bound activation, plus two excluded cloud-only break-glass accounts on FIDO2 keys and alerts on their use"
+        correct: true
+        explain: >
+          Eligible assignments give zero standing privilege while keeping the
+          path to elevation short, and activation records the justification, the
+          approver, and the window, which is the evidence Marcus needs. The two
+          break-glass accounts answer Desmond: cloud-only so they do not depend
+          on directory sync, excluded from Conditional Access so a policy error
+          cannot lock the tenant, on hardware keys rather than a shared password,
+          and alerted on so their use is never quiet. Covering subscription Owner
+          matters as much as Global Administrator, because Azure resource roles
+          are where the production estate lives.
+        rep: 12
+      - id: opt-standing-reviewed
+        label: "Keep the six standing Owners but add a quarterly access review and stronger multifactor authentication on those accounts"
+        correct: false
+        consequence: >
+          The service account from 2021 passes the review, because its listed
+          owner left in 2023 and the review defaults to approve.
+        explain: >
+          Stronger authentication on a standing privileged account reduces the
+          chance of compromise and does nothing about the ninety days between
+          reviews when six accounts can do anything at any time. The requirement
+          on the page was zero standing privileged access, and a review cadence
+          is not a substitute for a time bound. It also leaves the orphaned
+          service account exactly where it is.
+        rep: -10
+      - id: opt-pim-entra-only
+        label: "Apply Privileged Identity Management to the Entra directory roles only, and leave Azure resource roles as standing assignments so operations are not delayed"
+        correct: false
+        consequence: >
+          The next incident is caused by a standing Owner deleting a resource
+          group in the wrong subscription. Nobody has to approve anything for it
+          to happen.
+        explain: >
+          It halves the problem and calls it solved. Privileged Identity
+          Management governs Azure resource roles as well as directory roles, and
+          subscription Owner is the assignment that can delete production, grant
+          itself data access, and change policy exemptions. Leaving it standing
+          fails the stated requirement and leaves the highest blast radius role
+          in the estate outside the control.
+        rep: -8
+      - id: opt-jit-vm
+        label: "Enable just-in-time virtual machine access in Defender for Cloud so privileged access is granted only when requested"
+        correct: false
+        explain: >
+          Just-in-time virtual machine access opens network security group rules
+          for management ports for a limited window. It is a good control and it
+          governs network reachability to a virtual machine, not role
+          assignments in Entra or Azure. Nothing about it removes a standing
+          Owner or a permanent Global Administrator, so every requirement on the
+          page is left unmet.
+        rep: -8
+    next: e3-access-reviews
+
+  - id: e3-access-reviews
+    type: design_decision
+    title: "The guests nobody removed"
+    speaker: security
+    objectives: [AZ305-1.11]
+    scenario: |
+      Two months into the Sunda transition, the guest list has grown from thirty
+      to sixty-one. Marcus can account for forty of them.
+
+      "The rest are people someone invited for a workshop, a consultant on the
+      integration, and at least two who have left Sunda. I found the leavers
+      because their names came up in a different conversation, not because
+      anything told me."
+
+      The requirements are firm. Access for a departed Sunda employee must be
+      gone within seven days, because that is what Meridian committed to in the
+      due diligence questionnaire. There must be documented evidence that access
+      was reviewed by someone who knows the person, not by the platform team who
+      does not. And Meridian has no HR feed from Sunda and will not have one
+      before the tenants merge - Sunda's HR system is a Jakarta-hosted product
+      that does not integrate with anything.
+
+      Evelyn has already funded Entra ID Governance for the guest population,
+      which she agreed to on the grounds that it was cheaper than the finding.
+
+      "I do not need this to be clever," Marcus says. "I need it to happen
+      whether or not I remember."
+    prompt: "How do you govern the guest lifecycle?"
+    options:
+      - id: opt-access-reviews
+        label: "Recurring monthly access reviews over the guest group with the Sunda dispatch manager as reviewer, auto-apply results, remove access on no response, plus a review of inactive guest accounts"
+        correct: true
+        explain: >
+          Access reviews turn the requirement into a schedule that runs without
+          Marcus. Making the Sunda dispatch manager the reviewer satisfies the
+          clause about someone who knows the person, and it works precisely
+          because there is no HR feed - a human who sees the team daily is the
+          available signal. Auto-apply is what makes the seven-day commitment
+          real rather than aspirational, and removing access when a reviewer does
+          not respond fails closed. The review record is the evidence the
+          questionnaire promised.
+        rep: 10
+      - id: opt-invite-expiry
+        label: "Set an expiration date on each B2B invitation so guest accounts lapse automatically at the end of the engagement"
+        correct: false
+        consequence: >
+          Nobody's access lapses. The consultant from March is still in the
+          directory in November.
+        explain: >
+          B2B invitations have a redemption flow, not an account lifetime: once
+          redeemed, the guest object persists until something removes it. There
+          is no built-in expiry date on the invitation that revokes the account
+          later, which is why entitlement management and access reviews exist.
+          The seven-day removal requirement would be silently unmet, which is the
+          worst kind of unmet.
+        rep: -8
+      - id: opt-manual-quarterly
+        label: "Have Desmond export the guest list quarterly and circulate it to managers for confirmation"
+        correct: false
+        consequence: >
+          The Q2 export goes out in week three of the quarter. Two of the names
+          on it left in week one.
+        explain: >
+          A quarterly manual cycle cannot meet a seven-day removal commitment
+          even when it runs on time, and it depends on one person remembering
+          during a quarter that will contain a migration. It also produces a
+          spreadsheet rather than an auditable review record tied to the
+          directory object, so the evidence requirement is met only by
+          assertion.
+        rep: -8
+      - id: opt-dynamic-group
+        label: "Build a dynamic membership group keyed on the department attribute so guests fall out of the group automatically when their attribute changes"
+        correct: false
+        consequence: >
+          The rule matches zero users. Guest objects created by invitation carry
+          almost no attributes.
+        explain: >
+          Dynamic membership is only as good as the attribute feeding it, and the
+          scenario states there is no HR feed from Sunda - nothing writes or
+          clears a department value on those guest objects. A rule with no
+          authoritative source silently evaluates to nothing, and a group that
+          never changes provides no lifecycle at all.
+        rep: -6
+    next: e4-entitlement
+
+  - id: e4-entitlement
+    type: design_decision
+    title: "Nine days to onboard a dispatcher"
+    speaker: manager
+    objectives: [AZ305-1.11]
+    scenario: |
+      Priya has the onboarding numbers and they are embarrassing.
+
+      "Nine days. A new Jakarta dispatcher waits nine days to get the warehouse
+      system, the freight rates site, and the shift roster site. Six of those
+      days are tickets sitting in a queue waiting for someone to confirm they
+      are allowed."
+
+      What the process needs to become is clear enough that she has written it
+      as four bullets on a napkin.
+
+      A new dispatcher, or their manager, requests access themselves rather than
+      opening a ticket. One request grants the whole bundle - the application
+      role, the two SharePoint sites, and the group behind the warehouse system.
+      Approval comes from their own manager at Sunda, who knows whether the
+      person is real, not from Meridian's service desk, who does not. And access
+      expires after one hundred and eighty days unless it is renewed, because
+      the transition ends.
+
+      "They are guests," Priya adds. "Most of them do not have a Meridian
+      account until the moment they are approved. Whatever you design has to
+      cope with that."
+    prompt: "What do you recommend for onboarding Sunda dispatchers?"
+    options:
+      - id: opt-access-package
+        label: "An entitlement management access package containing the group, the application role, and both sites, published to a connected organization for Sunda, approved by the requester's Sunda sponsor, with a one hundred and eighty day expiry"
+        correct: true
+        explain: >
+          Entitlement management exists for this exact shape of problem. The
+          access package bundles every resource so one approval grants the whole
+          set, the connected organization lets someone with no Meridian account
+          request access and be created as a guest on approval, and the sponsor
+          model puts the decision with the person who can actually verify the
+          requester. The expiry turns the transition's end date into a property
+          of the access rather than a task in someone's calendar.
+        rep: 12
+      - id: opt-selfservice-groups
+        label: "Enable self-service group management so dispatchers can request membership of the warehouse system group directly"
+        correct: false
+        consequence: >
+          Dispatchers get the group on day one and still wait six days for the
+          two sites, which nobody thought to include.
+        explain: >
+          Self-service group membership solves one third of the bundle and none
+          of the rest: it does not package the application role or the SharePoint
+          sites, it has no expiry, and it cannot be requested by someone who does
+          not yet exist in the directory. The requirement was one request for the
+          whole set, granted to an external person who has no account.
+        rep: -6
+      - id: opt-lifecycle-workflows
+        label: "Configure lifecycle workflows to provision access automatically on the joiner event"
+        correct: false
+        consequence: >
+          The workflow never fires. There is no joiner event, because nothing
+          tells Meridian that Jakarta hired anyone.
+        explain: >
+          Lifecycle workflows automate joiner, mover, and leaver tasks for
+          internal employees, driven by attributes such as employee hire date
+          that arrive from an HR source. Sunda's dispatchers are external, have
+          no Meridian employee record, and there is no HR feed. It is the right
+          tool for Meridian's own staff and the wrong one for this population.
+        rep: -6
+      - id: opt-logic-app
+        label: "Build a request form with a Logic App that creates the guest, adds the group, and assigns the sites on approval"
+        correct: false
+        consequence: >
+          It works for four months. Then the developer who wrote it moves teams
+          and the NOC inherits an automation nobody can explain to an auditor.
+        explain: >
+          It would function, and it recreates entitlement management with none of
+          the audit surface: no catalog, no policy-based approval record, no
+          access review integration, no expiry that the governance tooling knows
+          about. Marcus's evidence requirement is met by a run history in a Logic
+          App, which is a support burden dressed as a feature.
+        rep: -8
+    next: END

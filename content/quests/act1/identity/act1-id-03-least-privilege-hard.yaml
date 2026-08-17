@@ -1,0 +1,235 @@
+schema_version: 1
+id: act1-id-03-least-privilege-hard
+title: "Least Privilege, Loudly (Hard)"
+act: 1
+chapter: act1-identity
+domain: az104-d1
+order: 3
+role: junior-cloud-admin
+checkpoint: true
+bonus_variant_of: act1-id-03-least-privilege
+summary: "Marcus is not finished with the night shift's access, and neither is the access review."
+entry: e1-custom-role
+
+encounters:
+  - id: e1-custom-role
+    type: design_decision
+    title: "Restart, and only restart"
+    speaker: security
+    objectives: [AZ104-1.6]
+    scenario: |
+      Marcus comes back a week after the NOC assignment lands, holding a printed
+      role definition, which is a bad sign.
+
+      "Virtual Machine Contributor grants Microsoft.Compute/virtualMachines/*.
+      That includes delete. Your runbook says read metrics and restart. I want
+      the gap closed before the next access review."
+
+      He is right that the built-in is wider than the duty. He is also aware,
+      because he always is, that the alternative has costs.
+
+      What you know about custom roles: they are defined with Actions,
+      NotActions, DataActions, and AssignableScopes, and NotActions subtract
+      only from the Actions listed in the same definition - they do not subtract
+      from permissions granted by any other assignment. AssignableScopes lists
+      where the role may be assigned. Creating one requires
+      Microsoft.Authorization/roleDefinitions/write, which Owner and User Access
+      Administrator hold. Custom roles are maintained by Meridian, not by
+      Microsoft, so new resource provider actions do not appear in them.
+
+      Deny assignments exist in Azure but cannot be authored directly - they are
+      created by Azure managed applications, not by administrators.
+    prompt: "How do you close the gap between the runbook and the role?"
+    options:
+      - id: opt-custom
+        label: "Define a custom role with read on virtual machines and metrics plus Microsoft.Compute/virtualMachines/restart/action, with AssignableScopes limited to rg-ops-sea"
+        correct: true
+        explain: >
+          When no built-in role matches the duty and the gap is a genuine risk
+          rather than a tidiness preference, a custom role is the supported
+          answer. Listing only read and restart makes delete unavailable by
+          construction rather than by convention, and constraining
+          AssignableScopes stops the role being reused somewhere nobody
+          reviewed. Accept the maintenance cost knowingly: this definition will
+          not gain new actions when Microsoft adds them.
+        rep: 12
+      - id: opt-accept
+        label: "Keep Virtual Machine Contributor and record the delete capability as an accepted risk in the register"
+        correct: false
+        consequence: >
+          The access review reopens the same finding in April, with the risk register entry attached as evidence that you knew.
+        explain: >
+          Documenting a risk is not mitigating it, and this one has a supported
+          mitigation that costs an afternoon. Accepting risk is legitimate when
+          the remedy is disproportionate; here the remedy is one role definition
+          and the exposure is unattended delete rights over the production
+          warehouse system.
+        rep: -8
+      - id: opt-deny-assignment
+        label: "Keep Virtual Machine Contributor and add a deny assignment blocking delete for grp-noc-manila"
+        correct: false
+        consequence: >
+          There is no portal blade, no CLI command, and no template for it.
+        explain: >
+          Deny assignments are a real Azure construct and they are not something
+          you can author - they are created by Azure managed applications on the
+          resources they manage. Treating them as a general subtraction tool for
+          RBAC is a common misreading of the documentation. Where you want a
+          principal to lack an action, do not grant it.
+        rep: -6
+      - id: opt-notactions
+        label: "Assign Virtual Machine Contributor as it is, and add a second custom role whose NotActions remove the delete action"
+        correct: false
+        consequence: >
+          The night shift deletes nothing, because they never try. The review finds the capability anyway.
+        explain: >
+          NotActions only subtract from the Actions in the same role definition -
+          they are not a global veto. Azure RBAC is additive across
+          assignments, so the Virtual Machine Contributor assignment still
+          grants delete regardless of what a second role says it does not grant.
+          Subtraction across assignments is exactly what deny assignments do,
+          and you cannot create those.
+        rep: -10
+    next: e2-two-scopes
+
+  - id: e2-two-scopes
+    type: design_decision
+    title: "Two resource groups, not the third"
+    speaker: manager
+    objectives: [AZ104-1.7]
+    scenario: |
+      The WMS vendor's support engineer now needs read access to two places: the
+      production warehouse resource group and the new development one. He must
+      not be able to see rg-hub-sea, which holds the domain controller and the
+      shared network.
+
+      Priya wants one answer, not a conversation.
+
+      The constraints, restated plainly. Azure RBAC has no customer-authorable
+      deny primitive, so you cannot grant broadly and subtract narrowly.
+      Assignments are inherited from the scope named downward and never upward.
+      Management groups contain subscriptions and other management groups; they
+      do not contain resource groups. Resource locks control write and delete
+      operations and have no effect on read access.
+
+      All three resource groups are in the same subscription, and that is not
+      changing this quarter.
+    prompt: "How do you grant read on two resource groups but not the third?"
+    options:
+      - id: opt-two-assignments
+        label: "Two Reader assignments, one on rg-wms-prod-sea and one on rg-wms-dev-sea"
+        correct: true
+        explain: >
+          Without a deny primitive, the only way to express "these and not that"
+          is to assign at each scope you mean. Two assignments is the honest
+          shape of the requirement: each is independently reviewable, each can be
+          removed on its own when the engagement ends, and neither reaches the
+          hub. If the count grew to fifteen, that would be a signal to move the
+          workloads into their own subscription, not to widen the grant.
+        rep: 12
+      - id: opt-sub-notactions
+        label: "Reader at the subscription, plus a custom role whose NotActions exclude the hub's resources"
+        correct: false
+        explain: >
+          NotActions exclude actions, not resources - a role definition has no
+          way to name rg-hub-sea. Even if it could, it would only subtract from
+          its own Actions and not from the separate subscription-scope Reader
+          assignment. Scope is expressed in the assignment, never inside the
+          role.
+        rep: -10
+      - id: opt-mg-for-rgs
+        label: "Create a management group containing the two warehouse resource groups and assign Reader there"
+        correct: false
+        explain: >
+          Management groups hold subscriptions and other management groups. A
+          resource group belongs to exactly one subscription and cannot be
+          placed in a management group, so there is no such container to create.
+          The scope ladder is management group, subscription, resource group,
+          resource, and it is not rearrangeable.
+        rep: -8
+      - id: opt-lock
+        label: "Reader at the subscription, and a lock on rg-hub-sea to keep him out of it"
+        correct: false
+        consequence: >
+          The vendor's first ticket includes a screenshot of the domain controller's network configuration.
+        explain: >
+          Locks constrain write and delete operations; they do nothing to read
+          access, so the subscription-scope Reader still sees every hub resource
+          in full detail. Two different controls for two different problems -
+          locks protect against change, RBAC decides visibility.
+        rep: -10
+    next: e3-elevate
+
+  - id: e3-elevate
+    type: design_decision
+    title: "The access review question"
+    speaker: mentor
+    objectives: [AZ104-1.8]
+    scenario: |
+      Desmond runs the access review the way he runs everything, which is by
+      asking one question and waiting.
+
+      On the screen, Priya Raman's access:
+
+      She holds the Global Administrator directory role in Meridian's Entra ID
+      tenant.
+
+      She is a member of grp-cloud-platform, which holds Owner on the production
+      subscription.
+
+      She holds Reader directly at mg-meridian, the top-level management group.
+
+      There are no deny assignments and no locks anywhere in the tenant.
+
+      "Finance wants to know whether Global Administrator is the reason she can
+      see everything," Desmond says. "Answer it properly, because the wrong
+      answer here is the one that ends up in a policy document."
+    prompt: "What does each of Priya's three roles actually give her over Azure resources?"
+    options:
+      - id: opt-ga-implies-owner
+        label: "Global Administrator implies Owner on every subscription in the tenant, so the other two assignments are redundant"
+        correct: false
+        explain: >
+          Entra ID directory roles and Azure RBAC roles are separate systems
+          over separate resources. Global Administrator manages the directory -
+          users, groups, applications, tenant settings - and by default confers
+          no permission over Azure resources at all. Writing the opposite into a
+          policy document is how organizations end up with an access model that
+          does not match reality.
+        rep: -10
+      - id: opt-correct
+        label: "Reader everywhere below mg-meridian and Owner on the production subscription; Global Administrator adds no Azure access unless she uses elevate access, which grants User Access Administrator at root scope and is logged"
+        correct: true
+        explain: >
+          Her Azure access is the union of the two Azure assignments: Reader
+          inherited from the management group across everything beneath it, and
+          Owner on the production subscription through her group. Global
+          Administrator is a directory role and stands outside that union - its
+          one connection to Azure is the elevate access toggle, which
+          temporarily grants User Access Administrator at the root scope, is
+          explicitly opt-in, and appears in the directory audit log. That is the
+          precise answer finance needs.
+        rep: 12
+      - id: opt-conflict
+        label: "The assignments conflict, and the most privileged one applies, so she is effectively Owner everywhere"
+        correct: false
+        explain: >
+          Azure RBAC assignments do not conflict; they accumulate, each within
+          its own scope. Owner on the production subscription does not extend to
+          a sibling subscription just because it is the highest role she holds.
+          The union is computed per scope, not tenant-wide.
+        rep: -8
+      - id: opt-no-path
+        label: "Global Administrator gives nothing over Azure and there is no supported way for it to obtain any, so it is irrelevant to the review"
+        correct: false
+        consequence: >
+          The review signs off. Six weeks later someone elevates access and nobody has a control for it.
+        explain: >
+          The first half is right and the conclusion is wrong. A Global
+          Administrator can elevate access at any time to gain User Access
+          Administrator at the tenant root scope, from which they can assign
+          themselves anything. The role is therefore very much in scope for the
+          review - what it needs is monitoring of the elevation, not a claim
+          that the path does not exist.
+        rep: -6
+    next: END

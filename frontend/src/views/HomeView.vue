@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 
 import AppFooter from '@/components/AppFooter.vue'
 import ThemeToggle from '@/components/hud/ThemeToggle.vue'
-import { chapterQuests, chapters, manifest } from '@/content'
+import { chapterProgress, chapterQuests, chapters, manifest, nextQuest } from '@/content'
 import { useAccountStore } from '@/stores/account'
 import { useGameStore } from '@/stores/game'
 import * as localSave from '@/persistence/localSave'
@@ -58,6 +58,24 @@ function wipe() {
   game.wipe()
   savedAt.value = null
   confirmingWipe.value = false
+}
+
+function progressFor(chapterId: string) {
+  return chapterProgress(chapterId, game.state.completedQuestIds, game.bonusUnlocked)
+}
+
+function isDone(questId: string) {
+  return game.state.completedQuestIds.includes(questId)
+}
+
+async function play(questId: string) {
+  await game.startQuest(questId)
+  router.push('/play')
+}
+
+async function playChapter(chapterId: string) {
+  const target = nextQuest(chapterId, game.state.completedQuestIds)
+  if (target) await play(target.id)
 }
 
 function formatDate(iso: string) {
@@ -153,9 +171,20 @@ function formatDate(iso: string) {
             <div class="flex flex-wrap items-baseline justify-between gap-2">
               <h3 class="text-[0.9375rem] font-semibold">{{ chapter.title }}</h3>
               <span class="eyebrow">
-                Act {{ chapter.act }} &middot; {{ chapterQuests(chapter.id).length }} jobs
+                Act {{ chapter.act }}
+                <template v-if="progressFor(chapter.id)">
+                  &middot;
+                  <span
+                    class="readout"
+                    :class="progressFor(chapter.id)!.done ? 'text-[var(--color-healthy)]' : ''"
+                  >
+                    {{ progressFor(chapter.id)!.completed }}/{{ progressFor(chapter.id)!.total }}
+                  </span>
+                  jobs
+                </template>
               </span>
             </div>
+
             <ul
               v-if="chapterQuests(chapter.id).length"
               class="mt-3 space-y-1.5 border-l border-[var(--rule)] pl-3"
@@ -163,17 +192,57 @@ function formatDate(iso: string) {
               <li
                 v-for="quest in chapterQuests(chapter.id)"
                 :key="quest.id"
-                class="text-[0.8125rem] leading-snug"
+                class="flex items-baseline gap-2 text-[0.8125rem] leading-snug"
               >
-                <span class="font-medium">{{ quest.title }}</span>
-                <span v-if="quest.summary" class="text-[var(--ink-muted)]">
-                  &mdash; {{ quest.summary }}
+                <span
+                  class="mt-1.5 inline-block h-1.5 w-1.5 shrink-0"
+                  :class="
+                    isDone(quest.id) ? 'bg-[var(--color-healthy)]' : 'bg-[var(--rule-strong)]'
+                  "
+                />
+                <span class="min-w-0">
+                  <span class="font-medium">{{ quest.title }}</span>
+                  <span v-if="quest.summary" class="text-[var(--ink-muted)]">
+                    &mdash; {{ quest.summary }}
+                  </span>
                 </span>
               </li>
             </ul>
-            <p v-else class="mt-2 text-[0.8125rem] text-[var(--ink-muted)]">
-              Not written yet.
-            </p>
+            <p v-else class="mt-2 text-[0.8125rem] text-[var(--ink-muted)]">Not written yet.</p>
+
+            <!-- Exam-hard variants, once standing is high enough and the
+                 original job is cleared. -->
+            <div
+              v-if="progressFor(chapter.id)?.bonusAvailable.length"
+              class="mt-3 border-t border-[var(--rule)] pt-3"
+            >
+              <p class="eyebrow mb-1.5">Exam-hard variants unlocked</p>
+              <ul class="space-y-1.5">
+                <li
+                  v-for="bonus in progressFor(chapter.id)!.bonusAvailable"
+                  :key="bonus.id"
+                  class="flex flex-wrap items-baseline gap-2 text-[0.8125rem]"
+                >
+                  <span class="font-medium">{{ bonus.title }}</span>
+                  <button
+                    type="button"
+                    class="btn btn-quiet !min-h-8 !px-2 !text-[0.75rem]"
+                    @click="play(bonus.id)"
+                  >
+                    Take it on
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            <button
+              v-if="hasSave && !progressFor(chapter.id)?.done && chapterQuests(chapter.id).length"
+              type="button"
+              class="btn btn-quiet mt-3 !min-h-9 !px-3 !text-[0.8125rem]"
+              @click="playChapter(chapter.id)"
+            >
+              {{ progressFor(chapter.id)?.started ? 'Resume this chapter' : 'Jump to this chapter' }}
+            </button>
           </li>
         </ul>
       </section>

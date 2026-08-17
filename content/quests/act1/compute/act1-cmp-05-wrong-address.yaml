@@ -1,0 +1,325 @@
+schema_version: 1
+id: act1-cmp-05-wrong-address
+title: "The Wrong Address"
+act: 1
+chapter: act1-compute
+domain: az104-d3
+order: 5
+role: cloud-admin
+checkpoint: true
+summary: "The batch machine sits in the resource group where the warehouse app lives. Everyone with rights to one has rights to the other."
+entry: e1-move-rg
+
+encounters:
+  - id: e1-move-rg
+    type: design_decision
+    title: "A boundary, not a label"
+    speaker: cfo
+    objectives: [AZ104-3.8]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: cmp-rg-batch
+          label: "rg-batch-sea"
+          kind: resource-group
+          group: grp-ops
+          status: planned
+    scenario: |
+      Evelyn has hired a two-person analytics team to own the route optimizer, and
+      they start on Monday.
+
+      "They need to run the job, restart the machine, and change its schedule.
+      They do not need to touch the warehouse application, and if the auditor asks
+      me whether they can, I would like the answer to be no rather than a
+      paragraph."
+
+      vm-route01 currently sits in rg-ops-sea alongside vm-wms01, the warehouse
+      VNet and the NSG that Marcus is still slightly annoyed about. The batch
+      machine has a NIC, an operating system disk and one data disk. It has no
+      public IP address and no backup configured yet.
+    prompt: "How do you give the analytics team what they need and nothing else?"
+    options:
+      - id: opt-move-with-deps
+        label: "Move vm-route01 together with its NIC and both managed disks into a new resource group, rg-batch-sea, and grant the analytics team Contributor there"
+        correct: true
+        explain: >
+          A resource group is an RBAC scope, so separating the machine separates
+          the permissions - which is the requirement Evelyn actually stated. A
+          move is metadata only: the resources keep their region, their private IP
+          and their data, and the VM does not need to be stopped. Every dependent
+          resource must travel in the same request, and both resource groups are
+          locked for writes while the move runs.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: cmp-rg-batch, status: healthy}
+      - id: opt-tags
+        label: "Tag the VM with costCenter=analytics and leave it where it is, then report on the tag in Cost Management"
+        correct: false
+        explain: >
+          Tags are excellent for cost allocation and terrible for authorization.
+          A role assignment is scoped to a management group, subscription,
+          resource group or individual resource - never to a tag - so the
+          analytics team would still hold their rights across everything in
+          rg-ops-sea. The requirement was a boundary, and a tag is a label.
+        rep: -10
+      - id: opt-resource-scope
+        label: "Leave the VM where it is and assign the analytics team Virtual Machine Contributor directly on vm-route01"
+        correct: false
+        explain: >
+          This is closer than it looks and worth understanding. Assigning at the
+          resource scope does confine their rights to that one machine, so the
+          audit answer is defensible today. What it does not do is survive growth:
+          the second batch machine, its storage account and its schedule each need
+          their own assignment, and one forgotten assignment is either a blocked
+          team or an over-permissioned one. A resource group makes the boundary
+          the default.
+        rep: -5
+      - id: opt-new-subscription
+        label: "Move the VM into a separate subscription so the analytics costs appear on their own invoice and the permissions are unquestionably separate"
+        correct: false
+        consequence: >
+          The move succeeds. On Monday the team cannot see the machine, because
+          none of the role assignments came with it.
+        explain: >
+          Cross-subscription moves are supported and are the right call when you
+          need a hard billing or policy boundary. They are also heavier: quota is
+          per subscription, policy assignments differ, and role assignments do not
+          follow the resource. For a permissions boundary inside one subscription,
+          a resource group is the lighter instrument that does the job.
+        rep: -8
+    next: e2-move-incident
+
+  - id: e2-move-incident
+    type: troubleshoot
+    title: "P2: Move failed, batch VM left deallocated"
+    speaker: noc
+    objectives: [AZ104-3.8]
+    ticket:
+      id: "MER-4977"
+      reporter: "NOC Manila"
+      priority: "P2"
+      opened: "22:47"
+      body: |
+        Change MER-4960, move vm-route01 to rg-batch-sea. Runbook step 1 says
+        deallocate the VM. Done at 22:31. Step 2 move command returned an error at
+        22:44. VM still in rg-ops-sea and still deallocated. Route optimizer
+        starts at 23:00. Advise.
+    on_enter_diagram_ops:
+      - {op: set_status, node: cmp-vm-route01, status: broken}
+      - {op: set_status, node: cmp-rg-batch, status: warning}
+    scenario: |
+      Thirteen minutes until the route optimizer is supposed to start, and the
+      machine it runs on is deallocated in a resource group it was supposed to
+      have left.
+
+      The error the NOC pasted:
+
+      Code: ResourceMoveValidationFailed. Message: Resource
+      /subscriptions/8f3d.../providers/Microsoft.Compute/virtualMachines/vm-route01
+      references /subscriptions/8f3d.../providers/Microsoft.Network/networkInterfaces/nic-route01
+      which is not in the move request. Add it to the move request and retry.
+
+      Priya is not awake. Desmond is, because he is always awake when something
+      involves a runbook written by somebody else.
+    time_budget: 6
+    investigate:
+      - id: inv-noc
+        label: "Ask the NOC for the exact move command"
+        speaker: noc
+        reveals: >
+          "az resource move --destination-group rg-batch-sea --ids
+          /subscriptions/8f3d.../virtualMachines/vm-route01. One id. That is what
+          the runbook has in it."
+      - id: inv-runbook
+        label: "Read the runbook for MER-4960"
+        speaker: ticket
+        reveals: >
+          Step 1: "Deallocate the VM to avoid disruption." Step 2: the single-id
+          move command. Step 3: "Start the VM in the new resource group." The
+          runbook was adapted from a wiki page about moving storage accounts.
+      - id: inv-desmond
+        label: "Ask Desmond about the deallocate step"
+        speaker: mentor
+        reveals: >
+          "It was never needed. A move rewrites where a resource is filed, not
+          where it runs - the VM can stay up the whole time. Somebody copied a
+          precaution from a page about something else, and now the precaution is
+          the outage. Fix the move, then fix the runbook."
+      - id: inv-marcus
+        label: "Check with Marcus whether a lock or policy is blocking the move"
+        speaker: security
+        reveals: >
+          "No locks on either group, I checked when the change came through. There
+          is a policy requiring a costCenter tag on new resource groups and
+          rg-batch-sea has one. Nothing from my side."
+    commands:
+      - id: cmd-list-resources
+        label: "List the resources belonging to vm-route01"
+        command: "az resource list -g rg-ops-sea --query \"[?contains(name,'route01')].{name:name,type:type}\" -o table"
+        output: |
+          Name                  Type
+          --------------------  -------------------------------------
+          vm-route01            Microsoft.Compute/virtualMachines
+          nic-route01           Microsoft.Network/networkInterfaces
+          disk-route01-os       Microsoft.Compute/disks
+          disk-route01-data     Microsoft.Compute/disks
+        time_cost: 1
+        note: "Four resources make up one machine. The move request named one of them."
+      - id: cmd-validate-move
+        label: "Validate the move as the runbook submitted it"
+        command: "az rest --method post --url \"https://management.azure.com/subscriptions/8f3d/resourceGroups/rg-ops-sea/validateMoveResources?api-version=2021-04-01\" --body '{\"resources\":[\"/subscriptions/8f3d/resourceGroups/rg-ops-sea/providers/Microsoft.Compute/virtualMachines/vm-route01\"],\"targetResourceGroup\":\"/subscriptions/8f3d/resourceGroups/rg-batch-sea\"}'"
+        output: |
+          Conflict({"error":{"code":"ResourceMoveValidationFailed","message":
+          "Resource .../virtualMachines/vm-route01 references
+          .../networkInterfaces/nic-route01 which is not in the move request."}})
+        time_cost: 2
+        note: "Validation reproduces the failure without touching anything. Run it before the move, not after."
+      - id: cmd-locks
+        label: "List locks on both resource groups"
+        command: "az lock list --resource-group rg-ops-sea -o table && az lock list --resource-group rg-batch-sea -o table"
+        output: |
+          (empty)
+          (empty)
+        time_cost: 1
+      - id: cmd-power
+        label: "Check the power state of vm-route01"
+        command: "az vm get-instance-view -g rg-ops-sea -n vm-route01 --query \"instanceView.statuses[].displayStatus\" -o tsv"
+        output: |
+          Provisioning succeeded
+          VM deallocated
+        time_cost: 1
+        note: "Deallocated since 22:31, which is why the job has nothing to start on."
+      - id: cmd-regions
+        label: "Compare the regions of the source and destination resource groups"
+        command: "az group show -n rg-ops-sea --query location -o tsv && az group show -n rg-batch-sea --query location -o tsv"
+        output: |
+          southeastasia
+          southeastasia
+        time_cost: 1
+        note: "Same region, though a move does not require it - resources keep their own region regardless of where the group lives."
+    fixes:
+      - id: fix-move-all
+        label: "Resubmit the move with the VM, its NIC and both managed disks in one request, then start the VM"
+        correct: true
+        explain: >
+          A move request has to be self-consistent: every resource that the moving
+          resources depend on must either travel with them or already be at the
+          destination. A VM references its NIC and its disks, so all four ids go in
+          one call. Once the move completes, starting the VM allocates it again
+          and the 23:00 run has its machine back. The deallocation was never
+          required and the runbook should lose that step.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: cmp-vm-route01, status: healthy}
+          - {op: set_status, node: cmp-rg-batch, status: healthy}
+      - id: fix-start-abandon
+        label: "Start the VM where it is, close the change as failed, and raise a new one to rebuild the machine in rg-batch-sea next month"
+        correct: false
+        consequence: >
+          The job runs. The analytics team starts on Monday with Contributor over
+          the warehouse application, and the rebuild change is still in the backlog
+          in November.
+        explain: >
+          It restores service, which is worth something, and then abandons a
+          supported four-id operation in favor of a rebuild that would recreate the
+          NIC, the private IP and the extensions for no benefit. The failure was a
+          malformed request, not an unsupported one, and the corrected request
+          takes about the same time as the start command.
+        rep: -8
+      - id: fix-disks-first
+        label: "Move the disks first so they are already at the destination, then move the VM and NIC in a second request"
+        correct: false
+        consequence: >
+          The first request fails too, with the same class of error pointing the
+          other way.
+        explain: >
+          A managed disk attached to a VM cannot be filed away from that VM: the
+          validation checks the relationship in both directions. Splitting a
+          machine's resources across two requests produces two invalid requests
+          rather than a working sequence. The unit of a move is the dependency
+          graph, not the resource.
+        rep: -8
+      - id: fix-delete-nic
+        label: "Delete nic-route01 so the VM has no external reference, move the VM alone, then create a new NIC at the destination"
+        correct: false
+        consequence: >
+          The delete is rejected. The VM is still deallocated and it is now 22:58.
+        explain: >
+          A NIC attached to a VM cannot be deleted, and if it could you would lose
+          the private IP address, the subnet association and any NSG applied at
+          the interface. Removing dependencies to satisfy a validation error is
+          the wrong direction: the error is telling you what to include, not what
+          to destroy.
+        rep: -12
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: e3-move-region
+
+  - id: e3-move-region
+    type: design_decision
+    title: "Can we just move it to Australia"
+    speaker: manager
+    objectives: [AZ104-3.8]
+    scenario: |
+      The route optimizer starts at 23:04 and finishes early. The runbook loses a
+      step.
+
+      Two days later Priya arrives with the next thing, cheerfully.
+
+      "The board is talking about a second regional hub in Sydney, and somebody
+      asked whether the batch machine should live in Australia East to be near the
+      new depot data. Before I say anything clever in the meeting - can we just
+      move it there the way you moved it last week?"
+
+      The machine is a single VM with two managed disks and a NIC, running a
+      vendor application with a license tied to its host name.
+    prompt: "What do you tell Priya?"
+    options:
+      - id: opt-resource-mover
+        label: "No - a resource move changes the resource group or subscription, never the region. Moving to Australia East means replicating the machine there with Azure Resource Mover and cutting over"
+        correct: true
+        explain: >
+          The move operation rewrites where a resource is filed inside the same
+          region; a resource group's own location is only where its metadata
+          lives. Relocating compute to another region means creating new resources
+          from replicated disks and switching over, which is what Azure Resource
+          Mover orchestrates - it validates dependencies, provisions the target,
+          and leaves you to delete the source once you are satisfied.
+        rep: 10
+      - id: opt-move-command
+        label: "Yes - create a resource group in Australia East and run the same az resource move with that group as the destination"
+        correct: false
+        consequence: >
+          The command is accepted and the VM appears in the new resource group,
+          still running in Southeast Asia, exactly as far from Sydney as before.
+        explain: >
+          This is the trap in the phrase "move to another region." The destination
+          resource group's location has no effect on where its contents run - a
+          resource group in Australia East can hold resources in six regions.
+          Nothing fails, which is what makes the misunderstanding survive so long.
+        rep: -10
+      - id: opt-snapshot-copy
+        label: "Snapshot both disks, copy the snapshots to Australia East, and build a new VM from them by hand"
+        correct: false
+        explain: >
+          This is essentially what Resource Mover automates, and for one machine it
+          is a defensible manual path. Doing it by hand means you own the
+          dependency list, the NIC and address planning, the extensions and the
+          cutover timing, with no validation step to tell you what you forgot. It
+          is the fallback, not the first answer.
+        rep: -5
+      - id: opt-template-location
+        label: "Change the location property in the machine's template to australiaeast and redeploy it"
+        correct: false
+        consequence: >
+          The deployment fails with PropertyChangeNotAllowed and Priya's meeting
+          is in ten minutes.
+        explain: >
+          Location is immutable on an existing resource. Redeploying the same
+          resource name with a different location is rejected rather than
+          relocated, because ARM will not silently destroy and recreate something
+          you asked it to update. To land in another region you deploy new
+          resources there and migrate the data.
+        rep: -8
+    next: END

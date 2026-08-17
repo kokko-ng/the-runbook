@@ -1,0 +1,346 @@
+schema_version: 1
+id: act2-inf-02-migration-waves
+title: "Waves"
+act: 2
+chapter: act2-infrastructure
+domain: az305-d4
+order: 2
+role: associate-architect
+checkpoint: true
+summary: "Two hundred servers, forty-eight terabytes, and a six-hour window at Lunar New Year."
+entry: e1-waves
+
+encounters:
+  - id: e1-waves
+    type: design_decision
+    title: "Wave one"
+    speaker: manager
+    objectives: [AZ305-4.14]
+    scenario: |
+      The disposition list is signed. Now it has to become a schedule.
+
+      Priya has the constraints on a single slide, which for her is restraint.
+
+      - Lease ends in 34 weeks; last server out at week 30, four weeks of contingency
+      - Jakarta has one 200 Mbps internet link; the ExpressRoute circuit is ordered but not provisioned for six to eight weeks
+      - The ERP cannot move until the SAP contractor is onboarded, week 12 at the earliest
+      - Sunda's freight billing depends on the ERP for master data, and on nothing else
+      - The document store depends on nothing and is depended on by nothing
+      - NOC Manila can support two cutover weekends per month, no more
+
+      "Desmond's exact words were 'do not give me the hard one first and the easy
+      one at the end, because then I am tired for both'."
+    prompt: "How do you order the migration waves?"
+    options:
+      - id: opt-erp-first
+        label: "ERP first because it is the highest risk, then billing, then the documents and the low-value servers"
+        correct: false
+        consequence: >
+          Weeks one to eleven produce nothing. At week twelve the contractor is a
+          fortnight late and the whole plan slips with him.
+        explain: >
+          Leading with the highest-risk workload is a defensible instinct, but the
+          scenario states the ERP is blocked until week 12 by contractor
+          onboarding. A wave plan that starts with a blocked workload wastes the
+          weeks you have and concentrates every remaining wave into the back half,
+          against a NOC that can only absorb two cutovers a month.
+        rep: -8
+      - id: opt-dependency-waves
+        label: "Wave one: the document store and standalone servers, starting bulk data transfer immediately. Wave two: the ERP from week 12. Wave three: billing after the ERP, since it depends on it"
+        correct: true
+        explain: >
+          The order falls out of the two constraints that are real: dependency
+          direction and lead time. The document store depends on nothing, so it
+          can start now and its 48 TB transfer runs in the background while the
+          contractor is onboarded and the circuit is provisioned. The ERP goes as
+          soon as it is unblocked, and billing follows it because it reads the
+          ERP's master data - migrating it first would leave it reaching back to
+          Jakarta over a link you are trying to switch off.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: a2inf-sunda-files, status: degraded}
+      - id: opt-billing-first
+        label: "Billing first as a low-risk proof of concept, then the documents, then the ERP last"
+        correct: false
+        consequence: >
+          For eleven weeks, every billing run pulls master data from Jakarta
+          across the 200 Mbps link. Month end takes nine hours.
+        explain: >
+          Billing is not standalone - the scenario states it depends on the ERP
+          for master data. Moving a dependent workload ahead of what it depends on
+          creates a chatty cross-premises path that lasts until the other end
+          moves, and it does so over the one link you already know is the
+          bottleneck. Proof-of-concept waves should be genuinely standalone; the
+          document store is the workload with no dependencies.
+        rep: -8
+      - id: opt-big-bang
+        label: "One coordinated cutover weekend at week 28 with everything moving together, to avoid running a hybrid estate"
+        correct: false
+        explain: >
+          Hybrid state is uncomfortable and a big-bang cutover is worse. It
+          violates the stated NOC capacity of two cutover weekends a month by
+          compressing every workload into one, removes the contingency the lease
+          date requires, and leaves no earlier wave to learn from. Waves exist so
+          the first mistakes happen on the workloads that matter least.
+        rep: -10
+    next: e2-database
+
+  - id: e2-database
+    type: design_decision
+    title: "Three hundred and forty gigabytes"
+    speaker: mentor
+    objectives: [AZ305-4.15]
+    scenario: |
+      Desmond has the billing database open and is not enjoying it.
+
+      "SQL Server 2014, 340 gigabytes, one instance. Data Migration Assistant
+      reports zero blocking issues for Managed Instance. Runs at about 900 IOPS
+      steady, spikes to four thousand at month end."
+
+      He scrolls.
+
+      "Here is the annoying part. Finance runs invoicing continuously through the
+      Jakarta business day. The maximum downtime they will sign is fifteen
+      minutes and it has to be inside a Sunday. And the source stays live until
+      we cut over, so whatever we do has to keep catching up with changes."
+
+      The ExpressRoute circuit is live by this point in the plan. The target is
+      Azure SQL Managed Instance, General Purpose, in Southeast Asia.
+    prompt: "How do you migrate the billing database?"
+    options:
+      - id: opt-dms-online
+        label: "Azure Database Migration Service in online mode: seed the target, replicate continuously, then cut over inside the fifteen-minute window on a Sunday"
+        correct: true
+        explain: >
+          Online migration is what a downtime ceiling buys you. DMS takes a full
+          backup and restore to seed Managed Instance, then continuously applies
+          changes from the live source, so the transfer of 340 GB happens while
+          finance keeps invoicing. The cutover itself is only the final catch-up
+          and the connection-string change, which fits fifteen minutes. Offline
+          methods would need the whole 340 GB to move inside the window.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-sqlmi-sunda
+              label: "sql-mi-sunda (Managed Instance, GP)"
+              kind: sql-database
+              group: grp-sea
+              status: planned
+          - op: add_edge
+            edge: {id: a2inf-e-sunda-sqlmi, source: a2inf-sub-sunda, target: a2inf-sqlmi-sunda, kind: dependency}
+      - id: opt-backup-restore
+        label: "Take a full backup to Blob storage on Saturday night and restore it to Managed Instance before Monday"
+        correct: false
+        consequence: >
+          The restore finishes at 04:50 Monday. Every invoice raised in Jakarta
+          after Saturday's backup is missing.
+        explain: >
+          Native backup and restore to Managed Instance is a genuinely good
+          offline path and it fails the two stated requirements: the source stays
+          live, so anything written after the backup is lost, and the restore of
+          340 GB will not reliably complete inside a fifteen-minute window. Offline
+          migration is correct when the application can be stopped; here finance
+          said it cannot.
+        rep: -8
+      - id: opt-vm-lift
+        label: "Rehost SQL Server 2014 onto an Azure VM with Site Recovery replication, keeping the version and the patching as they are"
+        correct: false
+        consequence: >
+          Extended support for the 2014 engine becomes Evelyn's problem, and then
+          yours.
+        explain: >
+          Site Recovery gives a short cutover, so it meets the downtime
+          requirement, but the previous quest's assessment established that
+          Managed Instance has zero blocking issues for this database. Choosing
+          IaaS anyway keeps you patching an out-of-support engine and paying for a
+          VM you have to manage, with no compatibility justification. Rehost when
+          the assessment finds a blocker, not by default.
+        rep: -6
+      - id: opt-bacpac
+        label: "Export a BACPAC from the source and import it into Azure SQL Database"
+        correct: false
+        explain: >
+          BACPAC is a schema-and-data snapshot with no change capture, so it has
+          the same data-loss problem as the offline backup, and it is slow at 340
+          GB. Azure SQL Database is also the wrong target shape for an instance
+          migration - Managed Instance preserves instance-scoped features such as
+          cross-database references and Agent jobs, which is why the assessment
+          pointed at it.
+        rep: -8
+    next: e3-unstructured
+
+  - id: e3-unstructured
+    type: design_decision
+    title: "Forty-eight terabytes of paper"
+    speaker: cfo
+    objectives: [AZ305-4.16]
+    scenario: |
+      Evelyn Koh has found the line item and wants to talk about it.
+
+      "Forty-eight terabytes of scanned delivery notes. Why do we have them."
+
+      "Indonesian customs retention. Ten years."
+
+      "Fine. Then tell me what it costs." She has the assessment open. "Your own
+      report says ninety-two percent of these files have not been opened in
+      eighteen months. The other eight percent is the current quarter, and the
+      customs officers do open those, over SMB, from a Windows client that
+      nobody is rewriting."
+
+      The numbers on the page:
+
+      - 48 TB total, roughly 140 million files, average 350 KB
+      - Current quarter working set: 3.8 TB, accessed daily over SMB
+      - Jakarta uplink: 200 Mbps until ExpressRoute lands, then 1 Gbps
+      - Retention: ten years, immutable for the first three
+      - Transfer must not saturate the link during business hours
+    prompt: "How do you migrate and store 48 TB of scanned documents?"
+    options:
+      - id: opt-single-tier
+        label: "Copy everything into a single Azure Files premium share so the SMB clients see no change at all"
+        correct: false
+        consequence: >
+          Evelyn circles the monthly figure twice and writes "for paper?" beside it.
+        explain: >
+          It satisfies the SMB requirement and fails the cost requirement badly.
+          Premium file shares are provisioned SSD capacity billed whether the data
+          is touched or not, and 92 percent of this data is cold by the
+          assessment's own measurement. One tier for a workload with two clearly
+          different access patterns is the expensive answer.
+        rep: -8
+      - id: opt-split-tiers
+        label: "Azure File Sync for the 3.8 TB working set on an Azure Files share, and Data Box plus AzCopy to move the cold archive into Blob cool and archive tiers with an immutability policy"
+        correct: true
+        explain: >
+          The two access patterns get two answers. The current quarter stays SMB
+          on Azure Files, so the customs clients are unchanged, with File Sync
+          handling the seeding and cloud tiering. The cold 44 TB goes to Blob,
+          where cool and archive tiers price for data that is written once and
+          rarely read, and where an immutable time-based retention policy
+          satisfies the three-year hold. Data Box carries the bulk offline, which
+          is the only way 44 TB moves without occupying a 200 Mbps link for weeks.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-st-sunda
+              label: "st-sundadocs (Files + Blob, immutable)"
+              kind: storage-account
+              group: grp-sea
+              status: planned
+          - op: add_edge
+            edge: {id: a2inf-e-sunda-st, source: a2inf-sub-sunda, target: a2inf-st-sunda, kind: dependency}
+          - op: add_edge
+            edge: {id: a2inf-e-files-st, source: a2inf-sunda-files, target: a2inf-st-sunda, kind: replication, label: "Data Box + File Sync"}
+      - id: opt-wire-only
+        label: "AzCopy the entire 48 TB over the wire, throttled to run overnight only"
+        correct: false
+        consequence: >
+          The transfer calculator says nineteen weeks of night-only windows. The
+          lease has thirty-four.
+        explain: >
+          Throttling respects the business-hours requirement and then loses to
+          arithmetic: 48 TB across a shared 200 Mbps link, running nights only,
+          does not finish in time to leave contingency. Offline transfer with Data
+          Box exists for exactly this ratio of data volume to available bandwidth.
+          The wire is right for the delta and the working set, not for the bulk.
+        rep: -8
+      - id: opt-archive-all
+        label: "Data Box everything straight into the archive tier, and rehydrate the current quarter on demand"
+        correct: false
+        consequence: >
+          A customs officer requests a February delivery note and is told to come
+          back in some hours.
+        explain: >
+          Archive is offline storage: reads require rehydration measured in hours
+          for standard priority, and the scenario states the current quarter is
+          accessed daily. It also breaks the SMB access requirement, since archive
+          is blob-only. Tiering has to follow the measured access pattern, and the
+          assessment gave you the split.
+        rep: -10
+    next: e4-cutover
+
+  - id: e4-cutover
+    type: design_decision
+    title: "The ERP weekend"
+    speaker: mentor
+    objectives: [AZ305-4.14, AZ305-4.15]
+    scenario: |
+      Wave two. Eleven SAP servers, the contractor finally onboarded, and a
+      cutover weekend that Priya has already promised the board.
+
+      Desmond lays out what is agreed:
+
+      - Target: Azure VMs, SAP-certified sizes, in the Sunda landing zone
+      - Window: 18:00 Friday to 06:00 Monday, Jakarta time
+      - Business acceptance testing needs six hours inside that window, with the system live
+      - If testing fails, the ERP must be back in Jakarta by 06:00 Monday
+      - The SAP database is 2.1 TB and changes continuously until the freeze at 18:00 Friday
+
+      "The contractor keeps saying 'we will just restore the backup'," Desmond
+      says. "I keep saying 'and if the test fails at four on Sunday morning'. We
+      have been going round for two days."
+    prompt: "How do you design the ERP cutover?"
+    options:
+      - id: opt-asr
+        label: "Replicate the application servers with Azure Site Recovery and the SAP database with database-native log shipping, run a documented test failover beforehand, and keep the Jakarta systems intact but shut down as the fallback"
+        correct: true
+        explain: >
+          Two replication mechanisms because there are two kinds of workload:
+          Site Recovery handles the stateless SAP application servers, while the
+          2.1 TB database is replicated by the database engine's own log shipping,
+          which is what SAP-supported migrations use and what keeps the delta
+          small at freeze time. The test failover proves the runbook before the
+          weekend rather than during it. Leaving Jakarta shut down but intact is
+          the only thing that makes the 06:00 Monday rollback requirement real.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: a2inf-vm-sap
+              label: "SAP ECC (11 VMs, IaaS)"
+              kind: vm
+              group: grp-sea
+              status: planned
+          - op: add_edge
+            edge: {id: a2inf-e-sunda-vmsap, source: a2inf-sub-sunda, target: a2inf-vm-sap, kind: dependency}
+          - op: add_edge
+            edge: {id: a2inf-e-sap-erp, source: a2inf-sunda-erp, target: a2inf-vm-sap, kind: replication, label: "ASR + log shipping"}
+      - id: opt-backup-restore
+        label: "Freeze at 18:00 Friday, back up everything to Blob, and restore into the Azure VMs over the weekend"
+        correct: false
+        consequence: >
+          The 2.1 TB restore finishes at 11:00 Saturday. Testing starts eight
+          hours behind and the rollback plan is a phone call to the contractor.
+        explain: >
+          Cold backup and restore spends the window moving bytes that could have
+          been replicated during the preceding weeks, which squeezes the six hours
+          of acceptance testing the requirement guarantees. It also leaves no
+          tested rollback: if the test fails on Sunday morning, restoring back to
+          Jakarta is another full-length restore you do not have time for.
+        rep: -10
+      - id: opt-decommission
+        label: "Replicate with Site Recovery, and decommission the Jakarta servers on Friday evening to free the rack space early"
+        correct: false
+        consequence: >
+          Acceptance testing finds a printer integration nobody documented. There
+          is nothing to go back to.
+        explain: >
+          The replication design is right and the decommission timing destroys the
+          stated rollback requirement. Source systems stay intact and powered down
+          until acceptance testing passes and a stabilization period ends -
+          usually days, not hours. Rack space is not on the critical path; the
+          lease has weeks of contingency for exactly this.
+        rep: -12
+      - id: opt-live-migrate
+        label: "Run the ERP in both locations over the weekend and let the business use whichever responds faster"
+        correct: false
+        explain: >
+          Two writable copies of an ERP is a split-brain, not a migration. Master
+          data and document numbers would diverge within minutes and no
+          reconciliation exists that finance would accept. Cutover designs make
+          exactly one system authoritative at any moment; the rollback plan
+          changes which one, it does not add a second.
+        rep: -12
+    next: END
