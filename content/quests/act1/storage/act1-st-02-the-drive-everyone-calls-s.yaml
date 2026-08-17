@@ -1,0 +1,423 @@
+schema_version: 1
+id: act1-st-02-the-drive-everyone-calls-s
+title: "The Drive Everyone Calls S"
+act: 1
+chapter: act1-storage
+domain: az104-d2
+order: 2
+role: junior-cloud-admin
+checkpoint: true
+summary: "The ops team's shared drive lives on a server nobody will admit to owning. It is time it did not."
+entry: e1-file-share
+
+encounters:
+  - id: e1-file-share
+    type: design_decision
+    title: "Four hundred gigabytes of tender documents"
+    speaker: manager
+    objectives: [AZ104-2.11, AZ104-2.6]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: st-ops-files
+          label: "stmeridianops (ops file share)"
+          kind: storage-account
+          group: grp-corp
+          status: planned
+    scenario: |
+      "S drive," says Priya. "Everyone calls it S. Nobody knows what the server
+      is called. Facilities found it behind a printer in 2021 and left it there."
+
+      Four hundred gigabytes of tender documents, rate cards, customs
+      declarations, and one folder of photographs from the 2019 company dinner
+      that Legal has asked twice to have removed. Around sixty people open files
+      from it, from domain-joined Windows laptops, by double-clicking a mapped
+      drive letter. Nothing is streamed, nothing is a database, and the busiest
+      hour of the day is Monday morning at nine.
+
+      "The requirement is that S keeps being S," Priya says. "If people have to
+      learn a new way to open a spreadsheet, they will keep the spreadsheet on
+      their desktop instead, and then we have sixty copies of the rate card."
+
+      Desmond, without looking up: "Whatever you pick, tell me what protocol the
+      laptops will speak to it."
+    prompt: "How do you replace the S drive?"
+    options:
+      - id: opt-standard-share
+        label: "An Azure Files share on a standard general-purpose v2 account, hot tier, mounted over SMB as S:"
+        correct: true
+        explain: >
+          Azure Files serves SMB natively, so a mapped drive letter keeps working
+          and nobody learns anything new. A standard account bills for what you
+          store rather than what you provision, and the hot file share tier suits
+          documents opened through the day. Sixty people opening spreadsheets is
+          a modest transaction load, well inside what standard shares handle.
+        rep: 8
+        diagram_ops:
+          - {op: set_status, node: st-ops-files, status: healthy}
+          - op: add_edge
+            edge:
+              id: st-e-rghub-opsfiles
+              source: rg-hub
+              target: st-ops-files
+              kind: dependency
+      - id: opt-premium-share
+        label: "A premium file share on a FileStorage account, so Monday morning never drags"
+        correct: false
+        consequence: >
+          Evelyn asks why a document share costs more per month than the
+          warehouse management server.
+        explain: >
+          Premium file shares are provisioned, not consumption-billed: you pay
+          for the size you provision, with a 100 GiB floor, and the IOPS and
+          throughput scale with it. That is worth buying for databases or
+          latency-sensitive line-of-business applications. Opening Word documents
+          at nine on a Monday does not need single-digit millisecond latency.
+        rep: -8
+      - id: opt-blob-container
+        label: "A blob container, with everyone using Azure Storage Explorer to get at the documents"
+        correct: false
+        explain: >
+          Blob storage has no SMB surface, so every user needs a client and every
+          edit becomes download, change, upload, with no file locking to stop two
+          people saving over each other. The requirement was explicitly that a
+          drive letter keeps behaving like a drive letter, and blob storage is the
+          wrong shape for shared read-write documents.
+        rep: -10
+      - id: opt-data-disk
+        label: "A larger data disk on vm-wms01, sharing the folder from there"
+        correct: false
+        consequence: >
+          The ops share is now a dependency of the warehouse management server,
+          and the next patch reboot logs sixty people out of S.
+        explain: >
+          This moves the printer-cupboard server into Azure without removing any
+          of its problems: a machine to patch, a single point of failure, a
+          capacity ceiling you resize by hand, and a file share coupled to an
+          unrelated application's uptime. Azure Files is the managed service that
+          exists so a share does not need a server.
+        rep: -8
+    next: e2-identity
+
+  - id: e2-identity
+    type: design_decision
+    title: "Who is allowed to open the rate card"
+    speaker: security
+    objectives: [AZ104-2.5]
+    scenario: |
+      Marcus Lim has read the design and has one question, which he asks in the
+      tone of a man who has asked it before.
+
+      "When Sharon in tendering opens the rate card, what does the storage
+      account think her name is?"
+
+      On the old S drive, the answer was MERIDIAN\sharon.tan, and the folder
+      permissions had been curated over six years: tendering can write, finance
+      can read, everyone else cannot see the folder at all. Meridian runs a real
+      Active Directory Domain Services forest on vm-dc01. Every ops laptop is
+      domain-joined to it. There is no Entra join anywhere in the estate yet.
+
+      "Audit asks me quarterly who opened a tender document," Marcus says. "I
+      would like to keep being able to answer, and I would like the answer to be
+      a person."
+    prompt: "How do you configure access to the share?"
+    options:
+      - id: opt-adds
+        label: "Enable AD DS authentication on the storage account, grant share-level access with RBAC roles, and keep the existing NTFS ACLs on the directories"
+        correct: true
+        explain: >
+          Identity-based access for Azure Files over AD DS registers the storage
+          account in the existing domain, so clients authenticate with their own
+          Kerberos tickets and the storage account sees MERIDIAN\sharon.tan.
+          Access is two layers: an RBAC role such as Storage File Data SMB Share
+          Contributor grants access to the share, and Windows ACLs on directories
+          and files carry the six years of curated permissions across unchanged.
+        rep: 10
+      - id: opt-account-key
+        label: "Mount the share on each laptop using the storage account name and access key"
+        correct: false
+        consequence: >
+          Two months later a laptop is stolen, and every mapped credential in the
+          company has to be replaced in an afternoon.
+        explain: >
+          The account key authenticates as the storage account itself, which is
+          full control over everything in it, so every user becomes a superuser
+          and NTFS ACLs are bypassed. Audit logs would show one identity for
+          sixty people, and rotating the key breaks every mount at once. Keys are
+          for services you cannot give an identity, not for users who already have
+          one.
+        rep: -16
+      - id: opt-entra-kerberos
+        label: "Enable Microsoft Entra Kerberos authentication on the share, so identities come from the cloud directory"
+        correct: false
+        explain: >
+          Entra Kerberos for Azure Files is a genuine option, but it authenticates
+          Entra-joined or Entra hybrid-joined clients using hybrid identities
+          synchronized from on-premises AD. Meridian's laptops are joined to AD DS
+          only and nothing is synchronized to Entra yet, so no client could obtain
+          a ticket. It is the right feature for an estate two projects further
+          along than this one.
+        rep: -6
+      - id: opt-entra-ds
+        label: "Deploy Microsoft Entra Domain Services and join the storage account to that managed domain"
+        correct: false
+        explain: >
+          Entra Domain Services provides a managed domain for estates that do not
+          have a domain controller of their own. Meridian has one, running, on
+          vm-dc01, holding the exact user accounts and group memberships this
+          share depends on. Standing up a second directory adds monthly cost and a
+          synchronization boundary to solve a problem that is already solved.
+        rep: -8
+    next: e3-protection
+
+  - id: e3-protection
+    type: design_decision
+    title: "The folder that was there yesterday"
+    speaker: mentor
+    objectives: [AZ104-2.15]
+    scenario: |
+      The migration lands on a Thursday. On Friday, a coordinator in tendering
+      drags the Vietnam 2027 folder into Archive 2019, notices nothing, and goes
+      home.
+
+      Nobody spots it until Monday. The folder is recovered from the old NAS,
+      which still exists because Desmond refused to decommission it for thirty
+      days, and he is now making a point about it at some length.
+
+      "That NAS goes off in three weeks. After that, what recovers a folder
+      somebody quietly moved on a Friday afternoon. And separately, because these
+      are separate problems, what recovers the whole share if somebody deletes
+      the share."
+
+      Priya wants a number she can tell people: how far back can we go, and how
+      long does it take.
+    prompt: "What protection do you configure on the file share?"
+    options:
+      - id: opt-snapshots-softdelete
+        label: "Scheduled share snapshots for point-in-time recovery of contents, plus soft delete on the file share with a 14-day retention"
+        correct: true
+        explain: >
+          These cover the two different failures the scenario names. A share
+          snapshot is a read-only point-in-time copy of the whole share, so a
+          folder mangled on Friday is restored from Thursday's snapshot, and users
+          can browse snapshots from the Previous Versions tab themselves. Soft
+          delete works one level up: it retains a deleted share for the retention
+          period so the share itself can be undeleted. Neither substitutes for the
+          other.
+        rep: 10
+      - id: opt-softdelete-only
+        label: "Soft delete on the file share with a 30-day retention, which covers deletion at every level"
+        correct: false
+        consequence: >
+          The next misplaced folder is unrecoverable, and the answer to Priya's
+          question turns out to be "we cannot."
+        explain: >
+          Soft delete for Azure Files retains deleted shares, and on accounts with
+          it enabled, deleted files within a share - but it captures nothing about
+          a file that was moved or overwritten rather than deleted, which is
+          exactly what happened here. Point-in-time recovery of share contents
+          comes from snapshots.
+        rep: -10
+      - id: opt-versioning
+        label: "Turn on blob versioning so every change to a document keeps the previous version"
+        correct: false
+        explain: >
+          Blob versioning is a Blob service feature and does not apply to Azure
+          Files shares - the setting is not available on the file share at all.
+          The equivalent capability for Files is the share snapshot. Mapping a
+          blob feature onto a file share is a common exam trap and a common
+          design-review one.
+        rep: -8
+      - id: opt-nightly-azcopy
+        label: "Copy the whole share to a second storage account every night with AzCopy"
+        correct: false
+        explain: >
+          It produces a recovery point, at the cost of a second full copy of 400
+          GB, a job to babysit, and a recovery process that involves you. Snapshots
+          are incremental, are billed only for changed data, and let a coordinator
+          restore her own folder from Previous Versions without opening a ticket.
+        rep: -6
+    next: e4-mount-failure
+
+  - id: e4-mount-failure
+    type: troubleshoot
+    title: "P2: Kallang cannot map the new share"
+    speaker: ticket
+    objectives: [AZ104-2.11, AZ104-2.1]
+    ticket:
+      id: "MER-4718"
+      reporter: "Ops coordinator, Kallang"
+      priority: "P2"
+      opened: "08:41"
+      body: |
+        Nobody in the Kallang office can map S: to the new share. Error is
+        "System error 53 has occurred. The network path was not found."
+        Same laptop, same login, works fine when connected from the Azure
+        virtual desktop. Tendering has a bid due at noon.
+    on_enter_diagram_ops:
+      - {op: set_status, node: st-ops-files, status: warning}
+      - {op: set_status, node: dc-kallang, status: warning}
+    scenario: |
+      The share works. That is what makes it irritating.
+
+      Mounts from Azure virtual machines succeed instantly. Mounts from the
+      Kallang office fail on every laptop, on every account, with the same error.
+      The permissions you spent Tuesday on are provably fine, because the same
+      users reach the same folders from the virtual desktop.
+
+      Desmond reads the ticket, puts his cup down, and says nothing, which is his
+      way of telling you to go and find it yourself.
+
+      Priya has already forwarded the bid deadline twice.
+    time_budget: 6
+    investigate:
+      - id: inv-coordinator
+        label: "Ask the coordinator exactly which machines fail"
+        speaker: ticket
+        reveals: >
+          Every laptop physically in the Kallang office fails. The same laptops
+          on the same accounts succeed through the Azure virtual desktop. One user
+          tried from her home internet connection and also failed.
+      - id: inv-marcus
+        label: "Ask Marcus whether the storage firewall is turned on yet"
+        speaker: security
+        reveals: >
+          "Not yet. That change is next sprint and it is in my queue, not yours.
+          The account still accepts traffic from anywhere, which is a thing I
+          would like to stop being true, but it is not your outage today."
+      - id: inv-desmond
+        label: "Ask Desmond why one client can reach it and another cannot"
+        speaker: mentor
+        reveals: >
+          "Error 53 is not authentication. It is a name or a socket. You proved
+          the name resolves. So ask what sits between a laptop in Kallang and TCP
+          port 445 on a public endpoint, and remember who runs that path."
+      - id: inv-isp
+        label: "Check the Kallang office egress rules with the network team"
+        speaker: noc
+        reveals: >
+          The office breaks out to the internet through a business broadband
+          service. Outbound TCP 445 has been blocked at the provider edge since
+          the SMB worm advisories of 2017. The block is not configurable by
+          Meridian, and most providers refuse to lift it.
+    commands:
+      - id: cmd-test-445-office
+        label: "Test port 445 from a Kallang laptop"
+        command: "Test-NetConnection stmeridianops.file.core.windows.net -Port 445"
+        output: |
+          ComputerName     : stmeridianops.file.core.windows.net
+          RemoteAddress    : 20.150.34.36
+          RemotePort       : 445
+          InterfaceAlias   : Wi-Fi
+          TcpTestSucceeded : False
+        time_cost: 1
+        note: "The name resolves. The socket never opens."
+      - id: cmd-test-445-vm
+        label: "Test port 445 from vm-wms01"
+        command: "az vm run-command invoke -g rg-ops-sea -n vm-wms01 --command-id RunPowerShellScript --scripts 'Test-NetConnection stmeridianops.file.core.windows.net -Port 445'"
+        output: |
+          RemoteAddress    : 20.150.34.36
+          RemotePort       : 445
+          TcpTestSucceeded : True
+        time_cost: 1
+        note: "Same destination, same port, different source network."
+      - id: cmd-network-rules
+        label: "Show the storage account's network rule set"
+        command: "az storage account show -n stmeridianops --query 'networkRuleSet' -o json"
+        output: |
+          {
+            "bypass": "AzureServices",
+            "defaultAction": "Allow",
+            "ipRules": [],
+            "virtualNetworkRules": []
+          }
+        time_cost: 1
+        note: "Nothing is being denied by the account itself."
+      - id: cmd-share-show
+        label: "Show the file share properties"
+        command: "az storage share-rm show -g rg-hub-sea --storage-account stmeridianops -n ops-shared -o table"
+        output: |
+          Name         AccessTier    QuotaGiB    EnabledProtocols    ProvisionedIngressMBps
+          -----------  ------------  ----------  ------------------  ------------------------
+          ops-shared   Hot           1024        SMB                 -
+        time_cost: 1
+      - id: cmd-smb-settings
+        label: "Show the account's SMB protocol settings"
+        command: "az storage account file-service-properties show -n stmeridianops -g rg-hub-sea --query 'protocolSettings.smb' -o json"
+        output: |
+          {
+            "authenticationMethods": "Kerberos",
+            "channelEncryption": "AES-128-GCM;AES-256-GCM",
+            "versions": "SMB3.0;SMB3.1.1"
+          }
+        time_cost: 2
+        note: "Encryption and SMB version negotiation only matter after a socket opens."
+    fixes:
+      - id: fix-private-endpoint
+        label: "Give the storage account a private endpoint in the hub VNet and let Kallang reach it over the site-to-site VPN"
+        correct: true
+        explain: >
+          A private endpoint puts the file service on a private IP inside the hub
+          VNet, so the Kallang laptops reach port 445 across the VPN tunnel rather
+          than across the public internet, and the provider's edge block never
+          sees the traffic. It also means SMB never traverses the internet at all,
+          which is the reason Microsoft recommends this path rather than asking
+          for 445 to be opened. The privatelink.file.core.windows.net zone linked
+          to the hub makes the standard hostname resolve to the private address.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: st-ops-files, status: healthy}
+          - {op: set_status, node: dc-kallang, status: healthy}
+          - op: add_node
+            node:
+              id: st-pe-files
+              label: "pe-opsfiles (private endpoint)"
+              kind: private-endpoint
+              group: grp-corp
+              status: healthy
+          - op: add_edge
+            edge:
+              id: st-e-pefiles-snetshared
+              source: st-pe-files
+              target: snet-shared
+              kind: private-link
+              label: "private endpoint"
+      - id: fix-ask-isp
+        label: "Raise a request with the broadband provider to unblock outbound TCP 445 for the Kallang office"
+        correct: false
+        consequence: >
+          The provider declines in writing, quoting its acceptable use policy.
+          The bid is submitted from a personal laptop over a mobile hotspot.
+        explain: >
+          Providers block 445 outbound as standard practice and almost never lift
+          it, so this parks the outage behind someone else's change process. Even
+          granted, it would put SMB traffic on the public internet from every
+          branch office, which is the exposure the private path removes.
+        rep: -8
+      - id: fix-allow-smb21
+        label: "Allow SMB 2.1 on the account so older clients can negotiate a session"
+        correct: false
+        consequence: >
+          Marcus notices that unencrypted SMB is now permitted on a share holding
+          tender documents, and the mount still fails.
+        explain: >
+          Protocol negotiation happens after a TCP connection is established, and
+          Test-NetConnection never got that far. Allowing SMB 2.1 also permits
+          sessions without encryption in transit, which Azure Files only accepts
+          within the same region on a VNet path anyway. This weakens the account
+          and changes nothing about the symptom.
+        rep: -12
+      - id: fix-key-mount
+        label: "Have the laptops mount with the storage account key instead of their domain credentials"
+        correct: false
+        explain: >
+          Error 53 means the network path was not found, not that credentials were
+          rejected - the same accounts already mount successfully from the virtual
+          desktop. Swapping to a key would hand every laptop full control of the
+          account and would still fail at the same socket. Read the error class
+          before changing the authentication model.
+        rep: -12
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: END

@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.13'
+  NODE_VERSION: '24'
+
+jobs:
+  content:
+    name: Content lint and coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --python ${{ env.PYTHON_VERSION }}
+      - name: Validate content and build the coverage matrix
+        working-directory: backend
+        run: |
+          uv run python manage.py validate_content --matrix | tee matrix.txt
+      - name: Publish the coverage matrix
+        if: always()
+        working-directory: backend
+        run: |
+          {
+            echo '## Objective coverage'
+            echo '```'
+            cat matrix.txt || echo 'validation failed before the matrix was built'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --python ${{ env.PYTHON_VERSION }}
+      - name: Check for missing migrations
+        working-directory: backend
+        run: uv run python manage.py makemigrations --check --dry-run
+      - name: Run tests
+        working-directory: backend
+        run: uv run pytest -q
+
+  frontend:
+    name: Frontend tests and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --python ${{ env.PYTHON_VERSION }}
+      - name: Compile content
+        working-directory: backend
+        run: uv run python manage.py compile_content
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Typecheck
+        working-directory: frontend
+        run: npx vue-tsc --noEmit
+      - name: Engine tests
+        working-directory: frontend
+        run: npx vitest run
+      - name: Production build
+        working-directory: frontend
+        run: npx vite build
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 5

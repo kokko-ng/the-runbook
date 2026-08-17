@@ -1,0 +1,415 @@
+schema_version: 1
+id: act1-id-03-least-privilege
+title: "Least Privilege, Loudly"
+act: 1
+chapter: act1-identity
+domain: az104-d1
+order: 3
+role: junior-cloud-admin
+checkpoint: true
+summary: "Manila needs to restart a VM at two in the morning. Everyone has an opinion about how much that should cost."
+entry: e1-role
+
+encounters:
+  - id: e1-role
+    type: design_decision
+    title: "What the night shift actually needs"
+    speaker: mentor
+    objectives: [AZ104-1.6]
+    scenario: |
+      NOC Manila covers Meridian's nights. Their runbook for the warehouse
+      management system has three steps: read the alert, check the VM's metrics,
+      and if the app tier has stopped responding, restart it. Anything else,
+      wake Desmond.
+
+      Right now they cannot do step two or step three. They have no access to
+      the subscription at all, which is why Desmond has been woken four times
+      this month.
+
+      "So give them what the runbook needs," he says. "Not what makes the ticket
+      go away fastest. Every extra permission you hand out at two in the morning
+      is something you get to explain to Marcus at ten."
+
+      The VMs in question all live in rg-ops-sea. The domain controller, the
+      hub network, and everything else shared lives in rg-hub-sea. There is a
+      security group, grp-noc-manila, that contains the six night shift
+      engineers.
+
+      Azure's built-in roles include Owner, Contributor, Reader, Virtual Machine
+      Contributor, and Virtual Machine User Login, among several hundred others.
+    prompt: "Which built-in role do you assign to grp-noc-manila?"
+    options:
+      - id: opt-owner
+        label: "Owner - the night shift is unsupervised, so they should not be blocked by anything"
+        correct: false
+        consequence: >
+          Marcus schedules the ten o'clock meeting before you have finished typing the command.
+        explain: >
+          Owner is Contributor plus the ability to grant access to others, which
+          means the night shift can quietly widen their own permissions and
+          anyone else's. Being unsupervised is an argument for less privilege,
+          not more - there is nobody awake to notice.
+        rep: -15
+      - id: opt-contributor
+        label: "Contributor at the subscription - they can manage anything they need without being able to hand out access"
+        correct: false
+        consequence: >
+          Six engineers now have delete rights over the domain controller.
+        explain: >
+          Contributor withholds exactly one thing, access management, and grants
+          everything else across every resource in the subscription - including
+          rg-hub-sea, which holds vm-dc01. The runbook covers restarting one
+          workload's VMs; the grant covers deleting the company's authentication.
+        rep: -10
+      - id: opt-vm-contributor
+        label: "Virtual Machine Contributor on rg-ops-sea"
+        correct: true
+        explain: >
+          Virtual Machine Contributor is the built-in role that covers reading,
+          starting, restarting, and resizing virtual machines, which is exactly
+          the runbook, and scoping it to rg-ops-sea keeps the hub out of reach.
+          Reach for a built-in role first and only define a custom role when no
+          built-in one fits - built-ins are maintained by Microsoft as new
+          resource providers appear, and custom roles are not.
+        rep: 10
+      - id: opt-vm-login
+        label: "Reader on the subscription plus Virtual Machine User Login, since they need to log in to restart the machine"
+        correct: false
+        explain: >
+          Virtual Machine User Login is a data plane role: it authorizes signing
+          in to the operating system as a standard user through Entra ID
+          authentication. It confers nothing on the control plane, so a restart
+          issued through the portal or the CLI is still denied. Reader plus a
+          login role reads the machine and gets inside it, but cannot manage it.
+        rep: -8
+    next: e2-scope
+
+  - id: e2-scope
+    type: design_decision
+    title: "Two more requests, two different jobs"
+    speaker: manager
+    objectives: [AZ104-1.7]
+    scenario: |
+      Priya brings two access requests she has already promised, in the tone of
+      someone who knows this.
+
+      "First. The warehouse app vendor has a support engineer, Rohit, who needs
+      to see the warehouse resources when we raise a ticket. Configuration,
+      logs, metrics. He does not deploy anything and he never touches the hub."
+
+      "Second. Evelyn's analyst, Cheryl, needs to pull spend across everything
+      we run in Azure so the month-end pack stops being my problem. Costs only.
+      She does not need to see inside a single resource."
+
+      Scopes available to you, from broadest to narrowest: management group,
+      subscription, resource group, and the individual resource. A role
+      assignment applies at the scope you choose and is inherited by everything
+      below it, and never upward.
+
+      Cost data in Azure rolls up and is reported at the subscription and
+      billing scopes. Cost Management Reader is a built-in role that grants
+      cost and budget visibility without resource access.
+    prompt: "At which scopes do you assign these two?"
+    options:
+      - id: opt-both-sub
+        label: "Reader at the subscription for both - simpler to reason about, and Reader cannot change anything"
+        correct: false
+        consequence: >
+          Rohit's first support ticket includes a screenshot of the domain controller's configuration.
+        explain: >
+          Reader cannot change anything, but it can see everything, and
+          "everything" at subscription scope includes the hub, the domain
+          controller, and any workload added later. Read access is still access;
+          least privilege applies to visibility as much as to actions. Cheryl
+          also gets resource visibility she never asked for.
+        rep: -8
+      - id: opt-correct-scopes
+        label: "Reader on rg-ops-sea for Rohit; Cost Management Reader at the subscription for Cheryl"
+        correct: true
+        explain: >
+          Each assignment sits at the narrowest scope that still covers the job.
+          Rohit's work is bounded by a resource group, so the resource group is
+          the right scope and every VM added to it later is covered
+          automatically. Cheryl's work is inherently subscription-wide because
+          that is where cost rolls up, and Cost Management Reader gives her the
+          spend without the resources - scope and role are two separate dials
+          and you turn both.
+        rep: 10
+        diagram_ops:
+          - op: add_node
+            node:
+              id: id-grp-vendor
+              label: "Rohit (vendor) - Reader on rg-ops-sea"
+              kind: user
+              group: grp-ops
+              status: healthy
+          - op: add_edge
+            edge:
+              id: id-e-vendor-rgops
+              source: id-grp-vendor
+              target: rg-ops
+              kind: identity
+              label: "Reader"
+      - id: opt-per-resource
+        label: "Reader on each resource in rg-ops-sea individually for Rohit; Cost Management Reader at the subscription for Cheryl"
+        correct: false
+        consequence: >
+          Two weeks later a new VM is deployed and Rohit cannot see it.
+        explain: >
+          Cheryl's half is right. Rohit's half turns one assignment into a dozen
+          and, worse, only covers resources that exist today - assignments do
+          not attach themselves to resources created later. Assign at the level
+          the responsibility actually sits, which here is the resource group.
+        rep: -5
+      - id: opt-mg
+        label: "Reader at the management group for both, so future subscriptions are covered without another change"
+        correct: false
+        explain: >
+          Inheritance flows downward, so a management group assignment reaches
+          every current and future subscription beneath it - including ones
+          neither person has any business seeing. Assigning high to avoid future
+          work grants access to workloads that do not exist yet and nobody has
+          reviewed.
+        rep: -10
+    next: e3-noc-locked-out
+
+  - id: e3-noc-locked-out
+    type: troubleshoot
+    title: "P2: NOC cannot restart the app tier"
+    speaker: noc
+    objectives: [AZ104-1.7, AZ104-1.8]
+    ticket:
+      id: "MER-4501"
+      reporter: "NOC Manila (overnight shift)"
+      priority: "P2"
+      opened: "02:41"
+      body: |
+        WMS app tier stopped responding at 02:33. Followed the runbook. Portal
+        refuses the restart with an authorization error. Tried the CLI, same
+        result. Cannot page Desmond - his phone is off. Pick wave starts at
+        05:00. Escalating.
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: id-grp-noc
+          label: "grp-noc-manila"
+          kind: user
+          group: grp-corp
+          status: broken
+      - op: add_edge
+        edge:
+          id: id-e-entra-grpnoc
+          source: id-entra
+          target: id-grp-noc
+          kind: identity
+          label: "member of"
+      - {op: set_status, node: vm-wms01, status: warning}
+    scenario: |
+      You wake up to eleven messages, the last of which is in capitals. The pick
+      wave starts at 05:00 and it is 03:10.
+
+      The access you set up on Tuesday was supposed to make this exact night
+      unnecessary. Manila has the group, the group has the role, and yet the
+      restart is being refused.
+
+      Desmond's phone is off, which is a policy he defends in writing. Priya is
+      awake, because Priya is always awake, and has already asked whether this
+      is "the permissions thing from Tuesday."
+
+      It is 03:10. You have time to look before you touch, but not much of it.
+    time_budget: 6
+    investigate:
+      - id: inv-noc-error
+        label: "Ask the NOC to paste the exact error text"
+        speaker: noc
+        reveals: >
+          "AuthorizationFailed: The client 'nadia.hassan@meridianlogistics.com'
+          with object id '...' does not have authorization to perform action
+          'Microsoft.Compute/virtualMachines/restart/action' over scope
+          '/subscriptions/8f2c1d34.../resourceGroups/rg-ops-sea/providers/
+          Microsoft.Compute/virtualMachines/vm-wms01'."
+      - id: inv-change
+        label: "Pull up the change record for Tuesday's access request"
+        speaker: ticket
+        reveals: >
+          Change MER-4494, closed successfully. The command was copied from the
+          onboarding runbook, which was last used to grant a vendor access to
+          the hub, and the resource group argument was never edited.
+      - id: inv-priya
+        label: "Tell Priya what you know so far"
+        speaker: manager
+        reveals: >
+          "Restart it yourself right now so the wave lands, then find the real
+          problem before the next shift. I would rather you fixed it properly at
+          four in the morning than fixed it twice."
+      - id: inv-marcus
+        label: "Ask Marcus whether anything on the security side would block this"
+        speaker: security
+        reveals: >
+          "No deny assignments in this subscription - we do not use Blueprints
+          and there is no managed application here. Privileged Identity
+          Management is not licensed. Conditional Access is still report-only.
+          Whatever this is, it is a plain role assignment problem."
+    commands:
+      - id: cmd-assignee
+        label: "List every role assignment held by grp-noc-manila"
+        command: "az role assignment list --assignee grp-noc-manila --all -o table"
+        output: |
+          Principal          Role                          Scope
+          -----------------  ----------------------------  ------------------------------------------------------------
+          grp-noc-manila     Virtual Machine Contributor   /subscriptions/8f2c1d34.../resourceGroups/rg-hub-sea
+        time_cost: 1
+        note: "One assignment. Correct role, correct group, and a resource group that holds no warehouse VMs."
+      - id: cmd-scope-ops
+        label: "List assignments effective on rg-ops-sea, including inherited ones"
+        command: "az role assignment list --scope /subscriptions/8f2c1d34.../resourceGroups/rg-ops-sea --include-inherited -o table"
+        output: |
+          Principal              Role       Scope
+          ---------------------  ---------  ---------------------------------------------
+          grp-cloud-platform     Owner      /subscriptions/8f2c1d34...
+          grp-meridian-it        Reader     /subscriptions/8f2c1d34...
+        time_cost: 2
+        note: "Nothing for the NOC. Inheritance runs downward from rg-hub-sea, which does not pass through here."
+      - id: cmd-members
+        label: "Confirm the night shift are members of the group"
+        command: "az ad group member list --group grp-noc-manila --query \"[].userPrincipalName\" -o tsv"
+        output: |
+          nadia.hassan@meridianlogistics.com
+          jomar.delacruz@meridianlogistics.com
+          rhea.santos@meridianlogistics.com
+          ... 3 more
+        time_cost: 1
+        note: "Group membership is fine. The reported user is in it."
+      - id: cmd-roledef
+        label: "Check what Virtual Machine Contributor actually permits"
+        command: "az role definition list --name \"Virtual Machine Contributor\" --query \"[0].permissions[0].actions\" -o tsv"
+        output: |
+          Microsoft.Compute/virtualMachines/*
+          Microsoft.Compute/availabilitySets/*
+          Microsoft.Network/networkInterfaces/read
+          Microsoft.Network/loadBalancers/*/read
+          Microsoft.Storage/storageAccounts/read
+        time_cost: 1
+        note: "Microsoft.Compute/virtualMachines/* covers restart/action. The role is not the gap."
+      - id: cmd-vm-state
+        label: "Check the state of vm-wms01"
+        command: "az vm get-instance-view -g rg-ops-sea -n vm-wms01 --query \"instanceView.statuses[1].displayStatus\" -o tsv"
+        output: |
+          VM running
+        time_cost: 1
+        note: "Running, and not responding. A restart is still the right action - the NOC just cannot issue it."
+    fixes:
+      - id: fix-right-scope
+        label: "Create the Virtual Machine Contributor assignment for grp-noc-manila at rg-ops-sea, then delete the stray one on rg-hub-sea"
+        correct: true
+        explain: >
+          A role assignment is a triple of principal, role, and scope, and this
+          one had the wrong third element - inheritance travels down from the
+          scope you name, so an assignment on rg-hub-sea grants nothing in
+          rg-ops-sea. Creating it at the right resource group covers every
+          warehouse VM including ones deployed later, and removing the hub
+          assignment matters just as much: it was never intended and it grants
+          the night shift management rights over the domain controller.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: id-grp-noc, status: healthy}
+          - {op: set_status, node: vm-wms01, status: healthy}
+      - id: fix-subscription
+        label: "Assign Contributor to grp-noc-manila at the subscription so scope can never be the problem again"
+        correct: false
+        consequence: >
+          The restart succeeds at 03:20 and the access review in April takes four hours.
+        explain: >
+          This works tonight by granting far more than the runbook needs, and it
+          repeats the original error in the opposite direction - the scope is
+          still not the one that matches the responsibility. Subscription-scope
+          Contributor lets the night shift delete vm-dc01 at two in the morning
+          with nobody awake to notice.
+        rep: -12
+      - id: fix-resource-only
+        label: "Assign Virtual Machine Contributor directly on vm-wms01, since that is the machine in the ticket"
+        correct: false
+        consequence: >
+          Two weeks later the database tier hangs and the NOC calls Desmond again.
+        explain: >
+          It resolves tonight's ticket and nothing else. The NOC runbook covers
+          the warehouse workload, not one machine, and resource-scope assignments
+          do not extend to resources created afterwards. Assign at the boundary
+          that matches the duty, which is the resource group.
+        rep: -6
+      - id: fix-vm-login
+        label: "Add Virtual Machine Administrator Login so they can sign in to the machine and restart it from inside"
+        correct: false
+        consequence: >
+          The NOC still cannot reach the machine, because it has stopped responding.
+        explain: >
+          Virtual Machine Administrator Login is a data plane role for signing in
+          to the operating system through Entra ID; it does not grant the
+          control plane action the error names. It also fails on its own terms
+          here - an unresponsive VM is exactly the case where an in-guest
+          restart is unavailable, which is why the runbook uses a platform
+          restart.
+        rep: -8
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: e4-interpret
+
+  - id: e4-interpret
+    type: knowledge_check
+    title: "Desmond reads the assignments back to you"
+    speaker: mentor
+    objectives: [AZ104-1.8]
+    scenario: |
+      Desmond turns his phone back on at seven and reads the whole thread
+      without comment. Then he writes four lines on the whiteboard.
+
+      Nadia Hassan is a member of grp-noc-manila and of grp-meridian-it.
+
+      grp-meridian-it holds Reader at the subscription.
+
+      grp-noc-manila holds Virtual Machine Contributor on rg-ops-sea.
+
+      Nadia also holds Reader directly on vm-dc01.
+
+      "There are no deny assignments and no locks anywhere in this
+      subscription," he says. "Tell me what she can do."
+    question: >
+      What can Nadia do to vm-wms01 in rg-ops-sea, and to vm-dc01 in rg-hub-sea?
+    options:
+      - id: opt-additive
+        label: "Read both; also restart, resize, and delete vm-wms01, but nothing beyond reading on vm-dc01"
+        correct: true
+        explain: >
+          Azure RBAC is additive: a principal's effective permissions are the
+          union of every assignment reaching them, whether granted directly or
+          through a group. Reader at the subscription inherits down to both
+          machines, and Virtual Machine Contributor on rg-ops-sea adds full VM
+          management there and only there. The direct Reader on vm-dc01 adds
+          nothing she did not already inherit.
+      - id: opt-rollup
+        label: "Read and manage both, because the resource group assignment rolls up to the subscription she also has access to"
+        correct: false
+        explain: >
+          Inheritance runs in one direction only - from the scope named in the
+          assignment down to everything inside it. A resource group assignment
+          never widens to its parent subscription, which is the whole reason
+          scope is a useful control.
+      - id: opt-most-specific
+        label: "Full control of vm-wms01 and nothing at all on vm-dc01, since the most specific assignment replaces the broader one"
+        correct: false
+        explain: >
+          Specificity does not override in Azure RBAC; assignments accumulate.
+          A narrow assignment adds to whatever is inherited rather than
+          replacing it, so the subscription Reader still applies inside
+          rg-ops-sea and on vm-dc01. Overriding behavior belongs to deny
+          assignments, and Marcus confirmed there are none.
+      - id: opt-most-restrictive
+        label: "Read both and nothing more, because Reader is the least privileged of her assignments and the least privileged wins"
+        correct: false
+        explain: >
+          There is no most-restrictive-wins rule in Azure RBAC - that intuition
+          comes from file system permissions. Roles are unioned, so holding
+          Reader alongside Virtual Machine Contributor gives her both sets of
+          actions, not the smaller one.
+    next: END

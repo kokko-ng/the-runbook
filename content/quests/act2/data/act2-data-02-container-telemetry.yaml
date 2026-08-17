@@ -1,0 +1,367 @@
+schema_version: 1
+id: act2-data-02-container-telemetry
+title: "Twelve Thousand Boxes That Talk"
+act: 2
+chapter: act2-data
+domain: az305-d2
+order: 2
+role: associate-architect
+checkpoint: true
+summary: "The tracked container fleet ships next quarter and nobody has decided where its telemetry lands."
+entry: e1-store
+
+encounters:
+  - id: e1-store
+    type: design_decision
+    title: "Where telemetry lands"
+    speaker: manager
+    objectives: [AZ305-2.5]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2data-cosmos-telemetry
+          label: "Container telemetry store (undecided)"
+          kind: cosmos-db
+          group: grp-sea
+          status: planned
+    scenario: |
+      Priya has a tracker unit on the desk between you. It is the size of a
+      paperback and has a solar panel glued to one face.
+
+      "Twelve thousand of these. Every reefer and every high-value container
+      across both fleets, fitted over the next two quarters. Ops sold the board
+      on live positions, and Sunda's insurers cut their premium if we can prove
+      door events. So it is happening."
+
+      What the vendor's integration document says:
+
+      - One telemetry document per container per 30 seconds. Roughly 400 writes
+        per second sustained, about 900 per second when a vessel berths and
+        several hundred units come back into coverage at once.
+      - Documents are JSON, around 1.5 KB. Fields differ by tracker generation -
+        gen2 reports door and shock, gen3 adds temperature and humidity - and
+        the vendor ships firmware quarterly, adding fields without notice.
+      - The ops console reads one container's last 24 hours by container ID.
+        Under 20 ms at the 99th percentile, or the map stutters.
+      - Within twelve months Jakarta operations will write to the same data set
+        from Indonesia, not just read it.
+      - 90 days queryable online. Seven years retained for insurance claims.
+
+      "Desmond's position is that it should go in the WMS database because
+      that's where everything else is. Convince me or agree with him."
+    prompt: "Which store do you recommend for container telemetry?"
+    options:
+      - id: opt-mi-json
+        label: "A telemetry table on sqlmi-meridian-sea with the payload in an nvarchar(max) JSON column"
+        correct: false
+        consequence: >
+          Two firmware releases later the parsing code has eleven special cases
+          and the scanner write latency has crept to 9 ms.
+        explain: >
+          It keeps one platform, which is a real virtue, and it fails three
+          stated requirements. Relational schema plus quarterly unannounced
+          field changes means a migration every quarter. Multi-region writes
+          from Jakarta are not something a single Managed Instance offers. And
+          400 sustained writes per second onto the instance that carries the
+          scanner path spends the 5 ms write budget you defended last month.
+        rep: -8
+      - id: opt-cosmos
+        label: "Azure Cosmos DB for NoSQL, one container for telemetry"
+        correct: true
+        explain: >
+          Cosmos DB is the fit for semi-structured documents whose shape changes
+          under you: no schema to migrate when gen3 firmware adds humidity, and
+          the default indexing policy makes new fields queryable without action.
+          It gives single-digit millisecond point reads at the 99th percentile
+          under SLA, horizontal write scale well past 900 per second, and
+          multi-region writes as a configuration change when Jakarta comes
+          online - which is the requirement that rules out almost everything
+          else on this list.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: a2data-cosmos-telemetry, status: healthy}
+          - {op: set_label, node: a2data-cosmos-telemetry, label: "cosmos-telemetry (NoSQL API)"}
+          - op: add_edge
+            edge:
+              id: a2data-e-wms-cosmos
+              source: wms-sea
+              target: a2data-cosmos-telemetry
+              kind: dependency
+      - id: opt-table
+        label: "Azure Table storage, partitioned by container, as the cheapest schemaless option"
+        correct: false
+        explain: >
+          Table storage is genuinely cheap and genuinely schemaless, and it
+          indexes exactly two things: partition key and row key. Anything else -
+          "which containers reported a door event in the last hour" - becomes a
+          scan. It also offers no multi-region write capability and no latency
+          SLA at a percentile. Cheapest is the right answer only when the
+          feature requirements are already met.
+        rep: -6
+      - id: opt-eventhub
+        label: "Event Hubs with Capture writing Avro files to a storage account"
+        correct: false
+        consequence: >
+          The ops console team asks how to read one container's last day and
+          gets an answer involving a Spark job.
+        explain: >
+          Event Hubs is an excellent front door for 900 events per second and
+          you may well want one in front of whatever you choose. It is not a
+          store you query: Capture writes time-ordered Avro blobs, so a
+          by-container lookup means reading files. That fails the 20 ms
+          99th-percentile read outright. Ingest and serving are separate
+          decisions.
+        rep: -6
+    next: e2-partition
+
+  - id: e2-partition
+    type: design_decision
+    title: "The partition key argument"
+    speaker: mentor
+    objectives: [AZ305-2.5, AZ305-2.3]
+    scenario: |
+      Desmond accepts Cosmos DB with the enthusiasm of a man conceding a point
+      he intends to win back later.
+
+      "Fine. Then you pick the partition key, in writing, because it is the one
+      thing I cannot change afterwards without rebuilding the container and
+      replaying ninety days."
+
+      The facts on the table:
+
+      - 12,000 container IDs, and the fleet grows, not shrinks.
+      - Three tracker generations across the fleet: about 400 gen1, 7,000 gen2,
+        4,600 gen3.
+      - Every read the ops console issues filters on a single container ID and
+        a time range. There is no query in the design that reads across
+        containers.
+      - Writes arrive continuously and are spread evenly across the fleet.
+      - Documents live 90 days. One container accumulates roughly 390 MB in
+        that window.
+      - A logical partition has a hard 20 GB ceiling and a 10,000 RU/s ceiling.
+
+      "And before you say it," he adds, "yes, I have seen someone partition
+      time-series data by date. I was the one who had to fix it."
+    prompt: "What do you recommend as the partition key?"
+    options:
+      - id: opt-containerid
+        label: "/containerId"
+        correct: true
+        explain: >
+          It satisfies both halves of the partition key test at once. Cardinality
+          is high - 12,000 values and rising - and writes spread evenly across
+          them, so no physical partition becomes a hotspot. Every authored query
+          filters on it, which makes them single-partition queries: cheap in RU
+          and predictable in latency. And 390 MB per container over 90 days sits
+          two orders of magnitude below the 20 GB logical partition ceiling.
+        rep: 12
+      - id: opt-generation
+        label: "/trackerGeneration, so documents with the same shape sit together"
+        correct: false
+        consequence: >
+          Desmond writes "7,000" on the whiteboard and underlines it.
+        explain: >
+          Three distinct values means three logical partitions carrying the
+          entire fleet. The gen2 partition alone would take roughly 2.7 TB over
+          90 days against a 20 GB ceiling, and its share of the write rate
+          against a 10,000 RU/s ceiling. Grouping by document shape is a
+          relational instinct; Cosmos DB does not need it and cardinality
+          punishes it.
+        rep: -10
+      - id: opt-date
+        label: "/eventDate as yyyy-MM-dd, which keeps a day's telemetry together for the archive job"
+        correct: false
+        consequence: >
+          Every write in the estate lands on one logical partition at a time.
+          The throttling starts inside the hour.
+        explain: >
+          This is the classic time-series anti-pattern. All 34 million documents
+          for a given day target one logical partition, so the write rate for
+          the entire fleet contends for one partition's 10,000 RU/s, and the
+          partition passes 20 GB before the day is out. Convenient archive
+          grouping is not worth serializing your ingest.
+        rep: -10
+      - id: opt-id
+        label: "/id, guaranteeing perfectly even distribution across partitions"
+        correct: false
+        explain: >
+          Distribution would be flawless and every query would be a
+          cross-partition fan-out, because the reads filter on container ID and
+          the engine has no way to narrow the search. RU cost and latency both
+          scale with the number of physical partitions touched. An even spread
+          that nobody can query efficiently is only half the test.
+        rep: -8
+    next: e3-consistency
+
+  - id: e3-consistency
+    type: design_decision
+    title: "Consistency, and what it costs"
+    speaker: cfo
+    objectives: [AZ305-2.7]
+    scenario: |
+      Evelyn has learned what a request unit is, which is either encouraging or
+      ominous.
+
+      "Explain the two settings that change this bill. I am told one of them is
+      called consistency and that the strongest is the most expensive, and I
+      would like to know why we would not simply pick the cheapest."
+
+      The requirements you have:
+
+      - The account will have write regions in Southeast Asia and, from next
+        year, Jakarta.
+      - The driver app reads its own writes. A driver logs a broken seal, the
+        screen refreshes, and the seal event must be there. Not eventually.
+      - Every other reader - the ops map, the insurer feed - tolerates a few
+        seconds of staleness without anyone noticing.
+      - Measured demand: about 1,200 RU/s sustained, rising to roughly 3,000
+        RU/s for ninety minutes at each of the two berthing windows.
+      - Reads at the two strongest consistency levels cost twice the request
+        units of the weaker levels.
+      - Evelyn's ceiling for telemetry is SGD 2,000 per month.
+    prompt: "Which consistency level and throughput mode do you recommend?"
+    options:
+      - id: opt-strong
+        label: "Strong consistency, 3,000 RU/s provisioned"
+        correct: false
+        consequence: >
+          The portal declines to enable multi-region writes on the account and
+          Desmond forwards you the error without comment.
+        explain: >
+          Strong consistency is not available on an account with more than one
+          write region, so this design fails the Jakarta requirement outright
+          rather than expensively. It also doubles read RU charges and fixes
+          throughput at the ninety-minute peak, paying for that peak twenty-two
+          hours a day.
+        rep: -10
+      - id: opt-session-autoscale
+        label: "Session consistency with autoscale throughput, 300 to 3,000 RU/s"
+        correct: true
+        explain: >
+          Session is the default for a reason: it guarantees read-your-own-writes
+          within a session, which is exactly and only what the driver app needs,
+          at the read RU cost of the weaker levels. Autoscale tracks a workload
+          that sits near 1,200 RU/s and spikes predictably to 3,000, billing the
+          scaled value per hour with a floor of ten percent of the maximum,
+          rather than the peak around the clock.
+        rep: 12
+      - id: opt-eventual
+        label: "Eventual consistency, 1,200 RU/s provisioned"
+        correct: false
+        consequence: >
+          A driver photographs a broken seal, saves it, refreshes, sees nothing,
+          and logs it a second time. Then a third.
+        explain: >
+          Eventual is the cheapest level and breaks the one hard requirement in
+          the scenario: it offers no read-your-own-writes guarantee, so the
+          driver's screen can legitimately come back without the event just
+          written. Fixed 1,200 RU/s also throttles through both berthing windows
+          every day, returning 429s at exactly the moment the fleet reconnects.
+        rep: -8
+      - id: opt-bounded
+        label: "Bounded staleness at five seconds, 3,000 RU/s provisioned"
+        correct: false
+        explain: >
+          It does satisfy the staleness tolerance and the driver requirement, so
+          it is not wrong on correctness - it is wrong on cost, which the
+          scenario states as a constraint. Bounded staleness charges reads at
+          double request units for a guarantee no reader in this design asked
+          for, and fixed provisioning pays peak rate for a two-hour peak.
+          Session buys the same behavior for the driver at half the read cost.
+        rep: -5
+    next: e4-lifecycle
+
+  - id: e4-lifecycle
+    type: design_decision
+    title: "Ninety days, then seven years"
+    speaker: cfo
+    objectives: [AZ305-2.7, AZ305-2.8]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2data-lake-telemetry
+          label: "Telemetry archive (undecided)"
+          kind: storage-account
+          group: grp-sea
+          status: planned
+    scenario: |
+      Evelyn has run the arithmetic herself and is unhappy with it.
+
+      "Twelve thousand containers, one and a half kilobytes every thirty
+      seconds. That is around 52 gigabytes a day. Ninety days is under five
+      terabytes and I can live with that. Seven years is roughly 130 terabytes
+      and at document-database storage rates that is not a data platform, it is
+      a mortgage."
+
+      The retention requirements, as agreed with the insurers and Marcus:
+
+      - 90 days must stay queryable at ops-console latency.
+      - Seven years must be retrievable for insurance claims. Claims run at
+        about twenty per year and the loss adjuster's window is five working
+        days, so retrieval measured in hours is fine.
+      - The archived copy must survive the loss of a datacenter.
+      - Nothing may depend on a scheduled job that fails silently. Marcus was
+        specific after the last audit finding.
+    prompt: "How do you handle the ninety-day and seven-year tiers?"
+    options:
+      - id: opt-ttl-changefeed
+        label: "Set a 90-day TTL on the Cosmos container, and use the change feed to land batched Parquet in ADLS Gen2 with a lifecycle rule to archive tier"
+        correct: true
+        explain: >
+          Time-to-live expiry is a background process inside the engine using
+          leftover throughput, so there is no scheduled job to fail silently and
+          no delete query competing with ingest. The change feed gives an
+          ordered, resumable read of every write, so the archive is built from
+          the same stream the store is - a missed batch resumes rather than
+          disappears. Parquet in the archive tier moves 130 TB to the cheapest
+          durable storage Azure sells, with rehydration in hours, comfortably
+          inside a five-day adjuster window.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2data-lake-telemetry, status: healthy}
+          - {op: set_label, node: a2data-lake-telemetry, label: "Telemetry lake (ADLS Gen2, hot to archive)"}
+          - op: add_edge
+            edge:
+              id: a2data-e-cosmos-lake
+              source: a2data-cosmos-telemetry
+              target: a2data-lake-telemetry
+              kind: replication
+              label: "change feed"
+      - id: opt-keep-all
+        label: "Keep all seven years in Cosmos DB with no TTL, so there is one store and one query language"
+        correct: false
+        consequence: >
+          Evelyn forwards the storage line to the board with no covering note,
+          which is worse than a covering note.
+        explain: >
+          Operationally simple and financially indefensible: 130 TB at document
+          database storage rates against a stated SGD 2,000 monthly ceiling.
+          Balancing features, performance, and cost means noticing when 99.9
+          percent of the data serves twenty queries a year and moving it to
+          storage priced for that.
+        rep: -10
+      - id: opt-nightly-purge
+        label: "A nightly Azure Function that queries the day's expired documents, writes them to blob, then deletes them"
+        correct: false
+        consequence: >
+          The function times out on a berthing day, and nobody notices until the
+          container is 40 percent over its expected size.
+        explain: >
+          It reaches roughly the right end state through the most expensive
+          route. Cross-partition delete queries burn request units that ingest
+          then cannot use, and the whole retention policy now depends on a
+          scheduled job completing - the exact failure mode Marcus ruled out.
+          TTL and change feed do the same work as engine features that cannot
+          silently skip a night.
+        rep: -8
+      - id: opt-backup
+        label: "Set a 90-day TTL and satisfy the seven-year requirement from Cosmos DB continuous backup"
+        correct: false
+        explain: >
+          Backups are a recovery mechanism, not a retention tier: continuous
+          backup restores a point in time within a 30-day window at most, so
+          seven years is not on offer at any price. Even if it were, satisfying
+          a query requirement by restoring an account and searching it is not a
+          design a loss adjuster's five-day window survives.
+        rep: -8
+    next: END

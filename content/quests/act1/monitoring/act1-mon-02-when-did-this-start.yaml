@@ -1,0 +1,304 @@
+schema_version: 1
+id: act1-mon-02-when-did-this-start
+title: "When Did This Start"
+act: 1
+chapter: act1-monitoring
+domain: az104-d5
+order: 2
+role: senior-cloud-admin
+checkpoint: true
+summary: "Everyone agrees the picking app got slower. Nobody agrees when. The workspace knows."
+entry: e1-kql
+
+encounters:
+  - id: e1-kql
+    type: design_decision
+    title: "The question behind the question"
+    speaker: manager
+    objectives: [AZ104-5.3, AZ104-5.1]
+    scenario: |
+      Priya brings the question in the form it always arrives in.
+
+      "The pickers say the app is slower than it used to be. Ops says nothing
+      changed. I need to know when it started, because whatever changed that
+      week is the thing we roll back."
+
+      Two weeks of AppRequests are in law-meridian, one row per HTTP request,
+      with DurationMs, Name, ResultCode and TimeGenerated. Volume is roughly
+      forty thousand rows an hour, so the table is far too large to read and the
+      query needs to do the work.
+
+      Desmond, without looking up. "Slower is a distribution, not a number. And
+      when did it start is a shape over time. Write something that answers both
+      in one chart, or you will be back here on Thursday."
+    prompt: "Which query do you run?"
+    options:
+      - id: opt-percentile-bin
+        label: "AppRequests | where TimeGenerated > ago(14d) | summarize p95 = percentile(DurationMs, 95) by bin(TimeGenerated, 1h) | render timechart"
+        correct: true
+        explain: >
+          Two operators do the work. The bin function buckets TimeGenerated into
+          hours, which is what gives the result a time axis and therefore a
+          start point, and percentile reports the slow tail rather than the
+          middle - the pickers feel the ninety-fifth percentile, not the mean.
+          Rendering it as a timechart makes the step change visible without
+          reading numbers.
+        rep: 10
+      - id: opt-avg
+        label: "AppRequests | where TimeGenerated > ago(14d) | summarize avg(DurationMs)"
+        correct: false
+        consequence: >
+          The query returns 240. Priya asks what 240 means. You have no second
+          answer.
+        explain: >
+          A summarize with no by clause collapses two weeks into one scalar, so
+          there is no time axis and no possible answer to when. Averaging also
+          hides the tail: a fifth of requests tripling barely moves the mean,
+          and the mean is not what a user experiences.
+        rep: -8
+      - id: opt-take
+        label: "AppRequests | where TimeGenerated > ago(14d) | take 1000"
+        correct: false
+        explain: >
+          take returns an arbitrary thousand rows with no ordering and no
+          guarantee of being a representative sample - it is a shape-of-the-data
+          command for when you do not yet know the column names. Sampling by
+          accident and then reasoning about performance from it is how you
+          conclude the wrong week changed.
+        rep: -10
+      - id: opt-count-slow
+        label: "AppRequests | where TimeGenerated > ago(14d) | where DurationMs > 5000 | count"
+        correct: false
+        explain: >
+          This answers how many requests were slow, using a threshold nobody
+          agreed to, and still returns a single number with no time dimension.
+          It is also brittle: if the regression moved typical requests from 200
+          to 900 milliseconds, this query reports zero and you declare the
+          problem imaginary.
+        rep: -8
+    next: e2-missing-logs
+
+  - id: e2-missing-logs
+    type: troubleshoot
+    title: "P3: Storage logs stop nine days ago"
+    speaker: self
+    objectives: [AZ104-5.2, AZ104-5.3]
+    ticket:
+      id: "MER-5108"
+      reporter: "You, to yourself, at 16:20"
+      priority: "P3"
+      opened: "16:20"
+      body: |
+        The p95 chart shows the regression starting on the 4th. Correlating it
+        against storage transactions to see whether the invoice account is the
+        cause. StorageBlobLogs returns rows up to the 4th and then nothing at
+        all. AppRequests, Heartbeat and the flow logs are unbroken across the
+        same window. Workspace looks healthy.
+    on_enter_diagram_ops:
+      - {op: set_edge_status, edge: mon-e-stg-law, status: broken}
+      - {op: set_status, node: mon-stg-invoices, status: warning}
+      - {op: set_status, node: mon-law, status: warning}
+    scenario: |
+      The chart is unambiguous. The ninety-fifth percentile steps from 310
+      milliseconds to 1,900 on the afternoon of the fourth and stays there.
+
+      The obvious next move is to lay storage transactions over the top and see
+      whether stinvoicesprod started throttling on the same afternoon. So you
+      query StorageBlobLogs, and the rows stop dead on the fourth.
+
+      Everything else in the workspace kept flowing. Heartbeat, AppRequests, the
+      NSG flow logs - all continuous through the fourth and out the other side.
+      Only this one resource went quiet, on the same day the application got
+      slower, which is either the strongest lead of the week or a coincidence
+      that will waste the rest of it.
+    time_budget: 6
+    investigate:
+      - id: inv-desmond
+        label: "Ask Desmond how a single resource stops logging"
+        speaker: mentor
+        reveals: >
+          "Three ways. The resource stopped existing, the workspace stopped
+          accepting, or the thing that tells the resource where to send its logs
+          went away. Two of those would have taken the other tables with it.
+          Start with the third."
+      - id: inv-noc
+        label: "Ask NOC Manila whether the storage account had an incident on the fourth"
+        speaker: noc
+        reveals: >
+          "Nothing raised. The account has been serving traffic the whole time -
+          we can see the invoice service reading from it right now. If it were
+          down, the invoice queue would have told us."
+      - id: inv-change
+        label: "Search the change record for anything touching rg-ops-sea on the fourth"
+        speaker: ticket
+        reveals: >
+          Change MER-5061, approved and closed. "Remove unused diagnostic
+          settings flagged by the cost review." Six settings removed. The
+          attached list is by resource id, and one of them ends in
+          stinvoicesprod.
+      - id: inv-marcus
+        label: "Ask Marcus whether a policy remediation could have removed it"
+        speaker: security
+        reveals: >
+          "Our policies deploy diagnostic settings, they do not delete them. And
+          a DeployIfNotExists remediation would have put one back by now if it
+          were assigned to that scope. It is not - only the hub is in scope."
+    commands:
+      - id: cmd-diag-list
+        label: "List diagnostic settings on the storage account"
+        command: "az monitor diagnostic-settings list --resource /subscriptions/8f2c/resourceGroups/rg-ops-sea/providers/Microsoft.Storage/storageAccounts/stinvoicesprod/blobServices/default -o table"
+        output: |
+          (empty)
+        time_cost: 1
+        note: "No setting on the blob service. Nothing is being told where to send logs."
+      - id: cmd-last-row
+        label: "Ask the workspace when the last storage log row arrived"
+        command: "az monitor log-analytics query -w law-meridian --analytics-query 'StorageBlobLogs | summarize LastRow = max(TimeGenerated), Rows = count() by _ResourceId' -o table"
+        output: |
+          _ResourceId                                LastRow                  Rows
+          -----------------------------------------  -----------------------  --------
+          .../storageaccounts/stinvoicesprod         2026-08-04T14:12:41Z     1284993
+        time_cost: 1
+        note: "Ingestion stopped mid-afternoon on the fourth, not at midnight. That is a change, not a schedule."
+      - id: cmd-activity-log
+        label: "Search the activity log for diagnostic setting operations"
+        command: "az monitor activity-log list --resource-group rg-ops-sea --offset 12d --query \"[?contains(operationName.value, 'diagnosticSettings')].{op:operationName.value, who:caller, when:eventTimestamp}\" -o table"
+        output: |
+          Op                                                          Who                        When
+          ----------------------------------------------------------  -------------------------  ---------------------
+          microsoft.insights/diagnosticSettings/delete                 d.toh@meridianlog.com      2026-08-04T14:11:58Z
+        time_cost: 2
+        note: "Deleted 43 seconds before the last row landed. That is the cause, not a coincidence."
+      - id: cmd-retention
+        label: "Check the workspace retention and daily cap"
+        command: "az monitor log-analytics workspace show -g rg-hub-sea -n law-meridian --query '{retention:retentionInDays, cap:workspaceCapping.dailyQuotaGb}' -o json"
+        output: |
+          {
+            "retention": 90,
+            "cap": -1.0
+          }
+
+        time_cost: 1
+        note: "Ninety days of retention and no cap. Neither would explain one table stopping."
+      - id: cmd-usage
+        label: "Compare ingested volume per table across the gap"
+        command: "az monitor log-analytics query -w law-meridian --analytics-query 'Usage | where TimeGenerated > ago(14d) | summarize Gb = sum(Quantity)/1024 by DataType, bin(TimeGenerated, 1d) | where DataType in (\"StorageBlobLogs\", \"AppRequests\")' -o table"
+        output: |
+          DataType          TimeGenerated    Gb
+          ----------------  ---------------  ------
+          AppRequests       2026-08-03       4.11
+          StorageBlobLogs   2026-08-03       2.88
+          AppRequests       2026-08-04       4.06
+          StorageBlobLogs   2026-08-04       1.63
+          AppRequests       2026-08-05       4.19
+          StorageBlobLogs   2026-08-05       0.00
+        time_cost: 2
+        note: "AppRequests is flat. Only the storage table falls off, and it falls off part way through the fourth."
+    fixes:
+      - id: fix-recreate-diag
+        label: "Recreate the diagnostic setting on stinvoicesprod, sending StorageRead, StorageWrite, StorageDelete and the Transaction metric to law-meridian"
+        correct: true
+        explain: >
+          A resource emits resource logs only while a diagnostic setting tells it
+          where to send them, and deleting the setting silently stops ingestion
+          for that resource alone - which is exactly the pattern in the Usage
+          table. Recreating it restores the flow from now on. It does not
+          recover the missing nine days, and that is the real lesson: diagnostic
+          settings are not retroactive, so a deleted one costs you the window
+          between the deletion and the discovery.
+        rep: 12
+        diagram_ops:
+          - {op: set_edge_status, edge: mon-e-stg-law, status: healthy}
+          - {op: set_status, node: mon-stg-invoices, status: healthy}
+          - {op: set_status, node: mon-law, status: healthy}
+      - id: fix-retention
+        label: "Raise workspace retention to 180 days so the missing rows come back into range"
+        correct: false
+        consequence: >
+          The retention change applies immediately and the table still ends on
+          the fourth.
+        explain: >
+          Retention governs how long ingested data is kept, not whether it was
+          ever ingested. The workspace was already at ninety days and the gap
+          starts nine days ago, so retention was never the constraint - and no
+          retention setting can create rows for a period in which the resource
+          was not sending any.
+        rep: -8
+      - id: fix-azurediagnostics
+        label: "Query AzureDiagnostics instead, since storage may be writing to the legacy table"
+        correct: false
+        explain: >
+          Worth knowing that some services still land in the shared
+          AzureDiagnostics table while others use resource-specific tables like
+          StorageBlobLogs - but the diagnostic setting is gone, so neither table
+          is receiving anything from this account. Checking the destination table
+          is a reasonable instinct applied after you have confirmed the source is
+          still emitting.
+        rep: -5
+      - id: fix-daily-cap
+        label: "Remove the workspace daily cap that must have started dropping the noisiest table"
+        correct: false
+        consequence: >
+          You spend ten minutes looking for a cap that is set to minus one.
+        explain: >
+          A daily cap would have been a plausible cause - except that caps stop
+          ingestion for the whole workspace once hit, not for one table, and they
+          reset at the daily reset hour rather than stopping permanently
+          mid-afternoon. The workspace query already showed no cap configured.
+        rep: -6
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: e3-arg-max
+
+  - id: e3-arg-max
+    type: knowledge_check
+    title: "One row per machine"
+    speaker: mentor
+    objectives: [AZ104-5.3]
+    scenario: |
+      Desmond wants the fleet view before he signs off the postmortem.
+
+      "Every VM sends a Heartbeat row every minute, with Computer, OSType,
+      Version and TimeGenerated. I want one row per machine: the latest
+      heartbeat, and the other columns from that same heartbeat, so I can see
+      which machines are stale and what they were running when they went quiet."
+    question: "Which query returns the most recent heartbeat row per machine, with all its columns intact?"
+    options:
+      - id: opt-argmax
+        label: "Heartbeat | summarize arg_max(TimeGenerated, *) by Computer"
+        correct: true
+        explain: >
+          arg_max returns the row that holds the maximum of the first argument,
+          and the asterisk carries every other column from that same row. That is
+          the operator built for latest-record-per-key questions, which is one of
+          the most common shapes in operational KQL.
+        rep: 8
+      - id: opt-max
+        label: "Heartbeat | summarize max(TimeGenerated) by Computer"
+        correct: false
+        explain: >
+          This gives the right timestamps and throws away everything else -
+          summarize only keeps the aggregated expressions and the by columns, so
+          OSType and Version are gone. It answers when but not what, which is
+          half the question.
+        rep: -5
+      - id: opt-top
+        label: "Heartbeat | top 1 by TimeGenerated desc"
+        correct: false
+        explain: >
+          top with no grouping returns one row for the whole table - the single
+          most recent heartbeat in the estate, from whichever machine happened to
+          report last. Per-key results need summarize with a by clause, not a
+          table-wide sort.
+        rep: -6
+      - id: opt-distinct
+        label: "Heartbeat | distinct Computer, OSType, Version"
+        correct: false
+        explain: >
+          distinct returns every unique combination that ever appeared, so a
+          machine that was patched shows up once per version and nothing carries
+          a timestamp. It lists what has existed rather than what is current,
+          which cannot identify a stale machine.
+        rep: -5
+    next: END

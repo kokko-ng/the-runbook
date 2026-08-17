@@ -212,9 +212,15 @@ def _compile_manifest(tree: ContentTree) -> dict[str, Any]:
             "edges": [_compile_edge(edge) for edge in data.get("edges", [])],
         }
 
+    order_of = registry.chapter_order
     quests = sorted(
         (item.data for item in tree.quests),
-        key=lambda quest: (quest["act"], quest["chapter"], quest.get("order", 1), quest["id"]),
+        key=lambda quest: (
+            quest["act"],
+            order_of.get(quest["chapter"], 999),
+            quest.get("order", 1),
+            quest["id"],
+        ),
     )
 
     chapters: dict[str, dict[str, Any]] = {}
@@ -238,7 +244,7 @@ def _compile_manifest(tree: ContentTree) -> dict[str, Any]:
         "exams": exams,
         "chapters": [
             chapters[key]
-            for key in sorted(chapters, key=lambda k: (chapters[k]["act"], chapters[k]["id"]))
+            for key in sorted(chapters, key=lambda k: (chapters[k]["act"], order_of.get(k, 999)))
         ],
         "quests": [
             {

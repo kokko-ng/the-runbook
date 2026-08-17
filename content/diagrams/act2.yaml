@@ -1,0 +1,157 @@
+schema_version: 1
+id: act2
+title: "Meridian Logistics - the estate you inherited"
+
+# Act 2 opens on the environment Act 1 built, seen from an architect's altitude:
+# management groups and landing zones rather than subnets and NICs. Quests add
+# the regional expansion, the data platform, and the DR footprint.
+
+groups:
+  - id: grp-platform
+    label: "Platform"
+  - id: grp-landing
+    label: "Landing zones"
+  - id: grp-sea
+    label: "Southeast Asia (primary)"
+  - id: grp-onprem2
+    label: "On-premises"
+
+nodes:
+  - id: mg-meridian
+    label: "Meridian (root management group)"
+    kind: management-group
+    group: grp-platform
+    position: {x: 0, y: 0}
+
+  - id: mg-platform
+    label: "Platform"
+    kind: management-group
+    group: grp-platform
+    position: {x: -220, y: 110}
+
+  - id: mg-workloads
+    label: "Workloads"
+    kind: management-group
+    group: grp-landing
+    position: {x: 220, y: 110}
+
+  - id: sub-connectivity
+    label: "Connectivity"
+    kind: subscription
+    group: grp-platform
+    position: {x: -340, y: 230}
+
+  - id: sub-identity
+    label: "Identity"
+    kind: subscription
+    group: grp-platform
+    position: {x: -120, y: 230}
+
+  - id: sub-prod2
+    label: "Production"
+    kind: subscription
+    group: grp-landing
+    position: {x: 140, y: 230}
+
+  - id: sub-nonprod
+    label: "Non-production"
+    kind: subscription
+    group: grp-landing
+    position: {x: 360, y: 230}
+
+  - id: entra-meridian
+    label: "Meridian tenant"
+    kind: entra-id
+    group: grp-platform
+    position: {x: -120, y: 350}
+
+  - id: vnet-hub-sea2
+    label: "vnet-hub-sea"
+    kind: vnet
+    group: grp-sea
+    position: {x: -340, y: 350}
+
+  - id: wms-sea
+    label: "Warehouse management system"
+    kind: app-service
+    group: grp-sea
+    position: {x: 140, y: 350}
+
+  - id: sql-wms
+    label: "sql-wms-sea"
+    kind: sql-database
+    group: grp-sea
+    position: {x: 360, y: 350}
+
+  - id: st-archive2
+    label: "Manifest and photo archive"
+    kind: storage-account
+    group: grp-sea
+    position: {x: 140, y: 470}
+
+  - id: law-meridian2
+    label: "law-meridian"
+    kind: log-analytics
+    group: grp-platform
+    position: {x: -340, y: 470}
+
+  - id: erp-kallang
+    label: "ERP (Kallang)"
+    kind: on-premises
+    group: grp-onprem2
+    position: {x: -120, y: 590}
+
+edges:
+  - id: e2-mg-platform
+    source: mg-meridian
+    target: mg-platform
+    kind: dependency
+  - id: e2-mg-workloads
+    source: mg-meridian
+    target: mg-workloads
+    kind: dependency
+  - id: e2-platform-connectivity
+    source: mg-platform
+    target: sub-connectivity
+    kind: dependency
+  - id: e2-platform-identity
+    source: mg-platform
+    target: sub-identity
+    kind: dependency
+  - id: e2-workloads-prod
+    source: mg-workloads
+    target: sub-prod2
+    kind: dependency
+  - id: e2-workloads-nonprod
+    source: mg-workloads
+    target: sub-nonprod
+    kind: dependency
+  - id: e2-identity-entra
+    source: sub-identity
+    target: entra-meridian
+    kind: identity
+  - id: e2-connectivity-hub
+    source: sub-connectivity
+    target: vnet-hub-sea2
+    kind: dependency
+  - id: e2-prod-wms
+    source: sub-prod2
+    target: wms-sea
+    kind: dependency
+  - id: e2-wms-sql
+    source: wms-sea
+    target: sql-wms
+    kind: dependency
+  - id: e2-wms-archive
+    source: wms-sea
+    target: st-archive2
+    kind: dependency
+  - id: e2-hub-erp
+    source: vnet-hub-sea2
+    target: erp-kallang
+    kind: vpn
+    label: "site-to-site"
+  - id: e2-law-hub
+    source: law-meridian2
+    target: vnet-hub-sea2
+    kind: dependency

@@ -21,10 +21,14 @@ INSTALLED_APPS = [
     "accounts",
     "analytics",
     "content_pipeline",
+    "saves",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # WhiteNoise serves the Vue build and Django admin assets straight from the
+    # WSGI process, so the deployment needs no host-level static file mappings.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -38,7 +42,9 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [FRONTEND_DIST],
+        # The Vue build supplies index.html; BASE_DIR/templates supplies the
+        # password-reset email bodies.
+        "DIRS": [FRONTEND_DIST, BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -68,6 +74,29 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# The Vue build is collected alongside Django's own static files. Vite is
+# configured with base '/static/' so the hashed asset URLs line up.
+# Prefixed so the build lands at staticfiles/assets/, matching the /static/assets/
+# URLs Vite emits. Vite already fingerprints filenames, so the plain compressed
+# storage is right here - the manifest variant would try to rewrite them again.
+STATICFILES_DIRS = []
+if (FRONTEND_DIST / "assets").is_dir():
+    STATICFILES_DIRS.append(("assets", FRONTEND_DIST / "assets"))
+if (REPO_DIR / "frontend" / "public").is_dir():
+    # Vite rewrites index.html's favicon reference to /static/, so the public
+    # files need collecting too; WHITENOISE_ROOT separately keeps /robots.txt
+    # answering at the site root where crawlers look for it.
+    STATICFILES_DIRS.append(REPO_DIR / "frontend" / "public")
+
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
+}
+
+# Serves the build's root files (favicon, robots.txt) at the site root, where
+# crawlers and browsers expect them, rather than under /static/.
+WHITENOISE_ROOT = FRONTEND_DIST if FRONTEND_DIST.is_dir() else None
+WHITENOISE_INDEX_FILE = False
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

@@ -1,0 +1,428 @@
+schema_version: 1
+id: act1-st-03-the-key-in-the-script
+title: "The Key in the Script"
+act: 1
+chapter: act1-storage
+domain: az104-d2
+order: 3
+role: junior-cloud-admin
+checkpoint: true
+summary: "One credential opens everything, and it is written down in four places. Two of them are wikis."
+entry: e1-account-keys
+
+encounters:
+  - id: e1-account-keys
+    type: design_decision
+    title: "Found in a scheduled task"
+    speaker: security
+    objectives: [AZ104-2.4]
+    on_enter_diagram_ops:
+      - {op: set_status, node: st-pod-archive, status: warning}
+    scenario: |
+      Marcus Lim forwards you a screenshot at 07:50, which for Marcus is a
+      raised voice.
+
+      The nightly job that uploads the day's proof-of-delivery photos runs as a
+      scheduled task on vm-wms01. Its command line contains the storage account
+      name and an 88-character key, in the clear. The same key appears in a
+      Confluence page titled Storage Notes, in a 2024 email thread with a
+      contractor who no longer works here, and, Desmond suspects, in somebody's
+      Notes app.
+
+      "That key is full control of the account," Marcus says. "Read, write,
+      delete, change every setting on every container. There is no scope on it
+      and no name attached to it, so when it is used I cannot tell you who used
+      it."
+
+      The upload job is a script on a virtual machine in the same subscription.
+      The account has two keys. Rotating a key takes effect immediately for
+      everything signing with it.
+    prompt: "What do you propose to Marcus?"
+    options:
+      - id: opt-managed-identity
+        label: "Move the upload job to a system-assigned managed identity with the Storage Blob Data Contributor role, then regenerate key1 and key2 in turn and set allow-shared-key-access to false"
+        correct: true
+        explain: >
+          A managed identity removes the secret rather than hiding it: the VM
+          gets an Entra identity, the data-plane role scopes it to blob writes on
+          one account, and every request carries a name that shows up in logs.
+          Regenerating the keys one at a time is how key rotation is meant to
+          work, since the second key keeps other consumers alive while the first
+          is replaced. Disabling shared key authorization afterward stops the old
+          pattern from quietly returning.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: st-pod-archive, status: healthy}
+      - id: opt-rotate-both
+        label: "Regenerate both access keys immediately, then paste the new key1 into the scheduled task"
+        correct: false
+        consequence: >
+          The 01:15 upload fails, and so does a reporting job in finance that
+          nobody had mentioned was using the same key.
+        explain: >
+          Regenerating both keys at once takes every consumer offline
+          simultaneously, including the ones you did not know about - the point of
+          having two keys is that consumers move to the second while the first is
+          replaced. It also leaves the design unchanged: a new key in the same
+          plaintext command line is the same exposure with a different 88
+          characters.
+        rep: -12
+      - id: opt-key-vault
+        label: "Store the account key as a Key Vault secret and have the script fetch it at run time"
+        correct: false
+        explain: >
+          This is a genuine improvement and it stops short of the answer. The
+          script still ends up holding a credential that grants full control of
+          the whole account, the secret still has to be rotated in two places,
+          and something has to authenticate to Key Vault anyway - which is a
+          managed identity. Once the VM has an identity, use it against storage
+          directly and delete the secret.
+        rep: -5
+      - id: opt-restrict-wiki
+        label: "Lock the Confluence page down to the infrastructure team and leave the job as it is"
+        correct: false
+        consequence: >
+          Marcus asks what you plan to do about the contractor's mailbox, the
+          backup of the contractor's mailbox, and the Notes app.
+        explain: >
+          A credential that has been in a wiki, an email thread, and a scheduled
+          task must be treated as disclosed, and restricting one of its four
+          locations does not undo the other three. Exposure is a property of the
+          secret, not of the page it was on. Rotate first, then remove the need
+          for the secret.
+        rep: -14
+    next: e2-partner-sas
+
+  - id: e2-partner-sas
+    type: design_decision
+    title: "The customer who sends files at midnight"
+    speaker: manager
+    objectives: [AZ104-2.2]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: st-edi-drop
+          label: "stmeridianedi (customer EDI drop)"
+          kind: storage-account
+          group: grp-ops
+          status: planned
+    scenario: |
+      Priya has signed a customer, and the customer has an integration team.
+
+      "Tan Chuan Freight sends us their booking file every night. Their software
+      posts to a URL with a token on the end of it. It is fifteen years old, it
+      runs on a server in Johor, and it cannot log in to anything - no
+      certificate, no directory, no interactive anything. It takes a URL."
+
+      The requirement, as far as anyone can establish it: their job creates one
+      file per night in a container called edi-inbound. It never needs to read
+      what is already there, never needs to list the container, and never touches
+      anything else in the account. The contract runs for a year and Priya wants
+      the credential reviewed quarterly. If the relationship goes sideways,
+      Meridian must be able to cut access the same afternoon without breaking any
+      other consumer of the account.
+    prompt: "What credential do you issue to Tan Chuan Freight?"
+    options:
+      - id: opt-service-sas
+        label: "A service SAS scoped to the edi-inbound container, create and write permissions only, HTTPS only"
+        correct: true
+        explain: >
+          A shared access signature is exactly the tool for a client that can
+          hold a URL and nothing else. Scoping it to one container as a service
+          SAS limits the blast radius to that container, and granting only create
+          and write means a leaked token cannot read back the files other
+          customers dropped. Restricting to HTTPS stops the token being sent in
+          the clear, where anyone on the path could reuse it.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: st-edi-drop, status: healthy}
+          - op: add_edge
+            edge:
+              id: st-e-rgops-edidrop
+              source: rg-ops
+              target: st-edi-drop
+              kind: dependency
+      - id: opt-account-sas
+        label: "An account SAS with write permission, so the same token works if they ever need a second container"
+        correct: false
+        consequence: >
+          The token is later found in a support ticket the partner raised with
+          their own vendor.
+        explain: >
+          An account SAS spans services and containers and can carry
+          service-level operations such as listing containers or reading account
+          properties. Issuing one to cover a future requirement that may never
+          arrive trades a real reduction in blast radius for convenience. Scope
+          the credential to what tonight's job actually does.
+        rep: -10
+      - id: opt-user-delegation
+        label: "A user delegation SAS, since it is signed with Entra credentials rather than the account key"
+        correct: false
+        explain: >
+          User delegation SAS is the strongest blob SAS available and it does not
+          fit here: it is capped at seven days, so a token reviewed quarterly
+          would need reissuing weekly to a partner who cannot automate collecting
+          it, and it cannot be associated with a stored access policy. Its
+          advantages assume a client that can be updated easily. This one cannot.
+        rep: -5
+      - id: opt-share-key
+        label: "Send them key2 and keep key1 for internal use, so the two consumers can be rotated separately"
+        correct: false
+        consequence: >
+          Marcus finds a third party holding full control of a Meridian storage
+          account and asks who authorized it.
+        explain: >
+          The two access keys are not two identities: both grant full control of
+          the entire account, so the partner could read every customer's files
+          and delete containers. They exist to allow rotation without downtime,
+          not to be handed out as per-consumer credentials. Anything external gets
+          a SAS or an identity, never a key.
+        rep: -16
+    next: e3-stored-policy
+
+  - id: e3-stored-policy
+    type: design_decision
+    title: "Revoking a token you already sent"
+    speaker: mentor
+    objectives: [AZ104-2.3]
+    scenario: |
+      Desmond looks at your draft SAS and asks the question he always asks.
+
+      "Good. Now cancel it."
+
+      You explain that the token is valid until the expiry baked into it. He
+      nods, because that was the point. A SAS is signed, not stored: the service
+      validates the signature and the fields inside it, and there is nothing to
+      look up and nothing to switch off. Shortening the expiry means signing a
+      new token and getting a fifteen-year-old job in Johor to adopt it.
+
+      "There are two ways to invalidate a signed token," he says. "Regenerate the
+      key that signed it, which takes out every other token signed with that key
+      as well. Or make the token point at something you control."
+
+      Priya has already promised the customer a quarterly review, which means
+      changing the expiry three more times this year without a change window on
+      their side.
+    prompt: "How do you issue the partner's SAS?"
+    options:
+      - id: opt-stored-policy
+        label: "Define a stored access policy on the edi-inbound container carrying the permissions and expiry, and sign the SAS with a reference to that policy id"
+        correct: true
+        explain: >
+          A stored access policy moves the permissions and expiry off the token
+          and into the container, where you can change them. Editing the policy
+          changes every SAS issued under it, and deleting the policy invalidates
+          them immediately, so a quarterly review becomes a server-side edit and
+          revocation becomes a single delete. The partner's URL never changes.
+          Note the limit: five stored access policies per container.
+        rep: 12
+      - id: opt-long-expiry
+        label: "Issue an ad hoc SAS with a one-year expiry to match the contract, and diary a reminder to reissue it"
+        correct: false
+        consequence: >
+          In August the partner is acquired, and the only way to cut access is to
+          regenerate the account key, which takes the finance reporting job down
+          with it.
+        explain: >
+          An ad hoc SAS carries its own permissions and expiry in the signature,
+          so for a year the only revocation lever is regenerating the signing key
+          - a blunt instrument that invalidates every other SAS signed with it.
+          Long-lived ad hoc tokens are the specific failure mode stored access
+          policies exist to prevent.
+        rep: -12
+      - id: opt-short-sas
+        label: "Issue a one-hour SAS and have the partner request a fresh one before each upload"
+        correct: false
+        explain: >
+          Short lifetimes are the right instinct and the wrong client: this job
+          takes a static URL and cannot call an issuing API, so somebody at
+          Meridian would be emailing a token nightly. When the consumer cannot
+          refresh, put the control server-side with a stored access policy instead
+          of pushing the problem onto a system that cannot carry it.
+        rep: -6
+      - id: opt-full-perms
+        label: "Use a stored access policy, but grant read, add, create, write, delete, and list so future requirements are already covered"
+        correct: false
+        consequence: >
+          Six weeks in, a bug in the partner's retry logic deletes the previous
+          night's file before uploading the new one, and nobody notices for
+          three days.
+        explain: >
+          Getting the revocation mechanism right and then granting everything
+          undoes the benefit: the policy now hands a third party the ability to
+          read other customers' bookings and delete what is already there.
+          Permissions are set from what the job does today, and widened
+          deliberately when something changes.
+        rep: -10
+    next: e4-sas-broken
+
+  - id: e4-sas-broken
+    type: troubleshoot
+    title: "P1: Partner uploads failing since 02:00"
+    speaker: noc
+    objectives: [AZ104-2.4, AZ104-2.2, AZ104-2.3]
+    ticket:
+      id: "MER-4772"
+      reporter: "NOC Manila (overnight shift)"
+      priority: "P1"
+      opened: "02:14"
+      body: |
+        Tan Chuan Freight integration mailbox has sent nine failure notices since
+        02:00. Their uploader reports HTTP 403 AuthenticationFailed against
+        stmeridianedi. No bookings received tonight. Customer service says the
+        Johor team goes home at 06:00 and will not retry until tomorrow.
+    on_enter_diagram_ops:
+      - {op: set_status, node: st-edi-drop, status: broken}
+    scenario: |
+      You did the key work yesterday, exactly as agreed with Marcus: the upload
+      job moved to a managed identity, then key1 regenerated at 01:52 and key2 at
+      01:58, one after the other, with a check in between.
+
+      The photo upload job ran fine at 02:15 on its new identity. Every other
+      internal consumer is fine.
+
+      Tan Chuan Freight is not fine. Their token has not expired - the stored
+      access policy runs to the end of the quarter, and nobody has touched the
+      policy.
+
+      Desmond, from the doorway with his coat still on: "You rotated a key. Go
+      and work out what else was leaning on it."
+    time_budget: 6
+    investigate:
+      - id: inv-noc-detail
+        label: "Ask NOC Manila for the exact error body the partner received"
+        speaker: noc
+        reveals: >
+          "AuthenticationFailed, and the message says the signature did not
+          match. Not expired, not authorized, not found. The service read the
+          token and disagreed with the signature on it."
+      - id: inv-change
+        label: "Re-read your own change record from last night"
+        speaker: narrator
+        reveals: >
+          MER-4766 covers the managed identity move and both key regenerations.
+          The consumer inventory attached to it lists two internal jobs. It does
+          not list the partner SAS, because you issued that from the portal and
+          the portal did not ask which key to sign with.
+      - id: inv-desmond
+        label: "Ask Desmond how a stored access policy relates to the account key"
+        speaker: mentor
+        reveals: >
+          "The policy holds the permissions and the expiry. The signature is
+          still computed from an account key, unless it is a user delegation SAS.
+          Change the key, and every service SAS signed with it stops verifying -
+          policy or no policy."
+      - id: inv-marcus
+        label: "Check with Marcus whether security blocked the partner's address overnight"
+        speaker: security
+        reveals: >
+          "Nothing from us. And a firewall block would not return
+          AuthenticationFailed - you would get a 403 with AuthorizationFailure,
+          or nothing at all. Your error says the credential is wrong."
+    commands:
+      - id: cmd-keys-list
+        label: "List the account keys and their creation times"
+        command: "az storage account keys list -n stmeridianedi -g rg-ops-sea --query '[].{name:keyName,created:creationTime,permissions:permissions}' -o table"
+        output: |
+          Name    Created                    Permissions
+          ------  -------------------------  -------------
+          key1    2027-03-18T01:52:07+0000   Full
+          key2    2027-03-18T01:58:41+0000   Full
+        time_cost: 1
+        note: "Both keys are minutes old. Nothing signed before 01:52 still verifies."
+      - id: cmd-policy-list
+        label: "List stored access policies on the edi-inbound container"
+        command: "az storage container policy list -c edi-inbound --account-name stmeridianedi --auth-mode login -o table"
+        output: |
+          Name                  Permission    Start                 Expiry
+          --------------------  ------------  --------------------  --------------------
+          edi-partner-2027q1    cw            2027-01-01T00:00:00Z  2027-03-31T23:59:00Z
+        time_cost: 1
+        note: "The policy is intact, still in date, still create and write."
+      - id: cmd-test-upload
+        label: "Replay the partner's upload with their token"
+        command: "az storage blob upload --blob-url 'https://stmeridianedi.blob.core.windows.net/edi-inbound/test.txt?sv=2024-11-04&si=edi-partner-2027q1&sr=c&sig=REDACTED' --file ./test.txt"
+        output: |
+          RESPONSE Status: 403 Server failed to authenticate the request.
+          ErrorCode: AuthenticationFailed
+          Message: Signature did not match. String to sign used was
+          /blob/stmeridianedi/edi-inbound
+        time_cost: 2
+        note: "The service parsed the token and rejected the signature."
+      - id: cmd-activity-log
+        label: "Search the activity log for key operations overnight"
+        command: "az monitor activity-log list -g rg-ops-sea --offset 8h --query \"[?contains(operationName.value,'regenerateKey')].{time:eventTimestamp,status:status.value,caller:caller}\" -o table"
+        output: |
+          Time                       Status      Caller
+          -------------------------  ----------  ----------------------------
+          2027-03-18T01:52:07Z       Succeeded   you@meridianlogistics.com
+          2027-03-18T01:58:41Z       Succeeded   you@meridianlogistics.com
+        time_cost: 1
+      - id: cmd-shared-key
+        label: "Check whether shared key authorization is still permitted on the account"
+        command: "az storage account show -n stmeridianedi -g rg-ops-sea --query '{sharedKey:allowSharedKeyAccess,https:supportsHttpsTrafficOnly,publicAccess:allowBlobPublicAccess}' -o json"
+        output: |
+          {
+            "https": true,
+            "publicAccess": false,
+            "sharedKey": true
+          }
+        time_cost: 1
+        note: "Shared key auth is still on, so a correctly signed SAS would work."
+    fixes:
+      - id: fix-reissue-sas
+        label: "Reissue the partner's SAS signed with the current key, still referencing the edi-partner-2027q1 stored access policy, and send them the new URL"
+        correct: true
+        explain: >
+          Regenerating an account key invalidates every service SAS signed with
+          it, because the signature is computed from that key - the stored access
+          policy governs permissions and expiry, not the signature. Signing a
+          fresh token against the current key restores access, and because the
+          token still points at the policy, the quarterly review and the
+          revocation lever are unchanged. The lasting fix is to add every SAS
+          consumer to the key rotation inventory.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: st-edi-drop, status: healthy}
+      - id: fix-regenerate-again
+        label: "Regenerate key2 again in case the rotation half-applied, then have the partner retry"
+        correct: false
+        consequence: >
+          Nothing changes for the partner, and an internal job that was still
+          signing with key2 now fails as well.
+        explain: >
+          The keys list already shows both keys created in the last half hour, so
+          the rotation applied cleanly. Repeating it invalidates any remaining
+          tokens signed with key2 and moves the outage outward. When a signature
+          fails to verify, you re-sign the token, not the key.
+        rep: -12
+      - id: fix-delete-policy
+        label: "Delete and recreate the stored access policy, since the partner's token points at it"
+        correct: false
+        consequence: >
+          Every SAS issued under that policy is now invalid, including the two
+          you issued to the customs broker last week.
+        explain: >
+          Deleting a stored access policy immediately revokes every SAS that
+          references it, which is precisely the emergency lever you built and
+          precisely the wrong tool here. The policy validated correctly; the
+          signature did not. Fix the layer the error names.
+        rep: -14
+      - id: fix-anonymous
+        label: "Allow anonymous access on the edi-inbound container so tonight's file can land while you investigate"
+        correct: false
+        consequence: >
+          Marcus revokes your standing change permission for a fortnight, and the
+          container holding four customers' booking files spends ninety minutes
+          readable by anyone.
+        explain: >
+          Anonymous access would let anyone on the internet read and enumerate
+          other customers' commercial data, and the account has
+          allowBlobPublicAccess set to false, so it would also mean weakening an
+          account-level control. Availability pressure is not a reason to remove
+          authentication; a correctly signed SAS takes two minutes to produce.
+        rep: -18
+    rewards:
+      under_budget_bonus: 4
+      skill_points: 1
+    next: END

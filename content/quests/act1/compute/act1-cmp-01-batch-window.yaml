@@ -1,0 +1,286 @@
+schema_version: 1
+id: act1-cmp-01-batch-window
+title: "The Batch Window"
+act: 1
+chapter: act1-compute
+domain: az104-d3
+order: 1
+role: cloud-admin
+checkpoint: true
+summary: "The route optimizer runs on a tower under a desk in Kallang. It has five hours a night and no second chance."
+entry: e1-first-vm
+
+encounters:
+  - id: e1-first-vm
+    type: design_decision
+    title: "Five hours, once a night"
+    speaker: manager
+    objectives: [AZ104-3.6, AZ104-3.11]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: cmp-vm-route01
+          label: "vm-route01 (route optimizer)"
+          kind: vm
+          group: grp-ops
+          status: planned
+      - op: add_edge
+        edge:
+          id: cmp-e-snetapp-route01
+          source: snet-app
+          target: cmp-vm-route01
+          kind: dependency
+          status: planned
+    scenario: |
+      Priya puts a photograph on your desk. It is a beige tower computer under a
+      desk in Kallang with a printed sign taped to it reading DO NOT SWITCH OFF.
+
+      "That is the route optimizer. It starts at 23:00, reads the day's
+      consignments, and writes tomorrow's drop sequences. If it has not finished
+      by 05:00 the drivers get yesterday's routes and we hear about it from every
+      depot at once. It has failed twice this year, both times because someone
+      unplugged it."
+
+      The job is single-process. It does not cluster, it does not shard, and the
+      vendor's support contract says one instance. What it needs is a machine in
+      Azure that survives a data center losing power, in Southeast Asia, and
+      Evelyn is watching the line item.
+    prompt: "How do you place the virtual machine?"
+    options:
+      - id: opt-zonal
+        label: "Create a single VM pinned to availability zone 2 in Southeast Asia, with a Premium SSD OS disk"
+        correct: true
+        explain: >
+          A zone is a physically separate data center inside the region, so a
+          zonal VM survives the failure Priya described. A single instance still
+          carries an SLA when every operating system and data disk is Premium SSD
+          or better, and pinning the zone now means a second instance in another
+          zone can be added later without rebuilding this one. Zone placement is
+          set at creation and cannot be changed afterward.
+        rep: 8
+        diagram_ops:
+          - {op: set_status, node: cmp-vm-route01, status: healthy}
+          - {op: set_edge_status, edge: cmp-e-snetapp-route01, status: healthy}
+      - id: opt-avset-single
+        label: "Create the VM inside a new availability set so it is covered by the availability SLA"
+        correct: false
+        consequence: >
+          The set is created, the machine is created, and the design review asks
+          what the other member of the set is called.
+        explain: >
+          An availability set spreads members across fault and update domains, so
+          a set with one member spreads nothing. The multi-instance SLA needs two
+          or more VMs in the set, and an existing VM cannot be moved into or out
+          of a set later without recreating it. A set is also regional, not
+          zonal, so it does not protect against a data center failure.
+        rep: -8
+      - id: opt-regional-hdd
+        label: "Create a regional VM with no zone and a Standard HDD OS disk, since the job runs overnight and can be restarted"
+        correct: false
+        explain: >
+          Two problems. Without a zone the VM sits wherever the platform places it
+          and a data center failure takes it with it, which is the exact scenario
+          Priya raised. A single-instance VM also only carries an SLA when its
+          disks are Premium SSD or better, so a Standard HDD boot disk gives up
+          the guarantee to save a few dollars on a machine with a five-hour
+          window.
+        rep: -10
+      - id: opt-two-vms
+        label: "Build two VMs in an availability set so one can take over if the other fails"
+        correct: false
+        consequence: >
+          Evelyn asks which of the two machines is doing work at 02:00. The
+          honest answer is one of them.
+        explain: >
+          The job is single-process and unsupported in a clustered configuration,
+          so the second machine cannot process anything - it is a cold spare that
+          would still need someone to notice and fail over manually. You would pay
+          twice, gain no automatic recovery, and the set is regional so both
+          machines can still be in the same data center.
+        rep: -6
+    next: e2-disks
+
+  - id: e2-disks
+    type: design_decision
+    title: "Where the checkpoints go"
+    speaker: mentor
+    objectives: [AZ104-3.10]
+    scenario: |
+      Desmond reads the build sheet without sitting down.
+
+      "It reads a 40 GB history extract at the start of every run, and it writes a
+      checkpoint every ten minutes so it can resume instead of starting over. Five
+      hours of work a night, nineteen hours doing nothing. Where does the data
+      live."
+
+      The size you picked comes with a 300 GB temporary disk attached as /dev/sdb,
+      which the vendor's install guide cheerfully suggests using because it is
+      fast and already there.
+    prompt: "How do you lay out the disks?"
+    options:
+      - id: opt-premium-data
+        label: "Attach a Premium SSD data disk sized for the throughput the job needs, set host caching to ReadOnly, and keep the operating system disk out of the data path"
+        correct: true
+        explain: >
+          Managed data disks persist across deallocation, host maintenance and
+          resize, which is what a checkpoint file requires. ReadOnly host caching
+          suits a workload that reads the same extract repeatedly and writes
+          elsewhere, and sizing the disk by tier sets both the capacity and the
+          IOPS ceiling. Keeping data off the operating system disk also lets you
+          resize or reimage the machine without touching the working set.
+        rep: 8
+      - id: opt-temp-disk
+        label: "Use the temporary disk for the extract and the checkpoints, as the vendor's install guide recommends"
+        correct: false
+        consequence: >
+          The VM is deallocated on the first cost-saving schedule. At 23:00 the
+          job finds an empty disk and starts from nothing.
+        explain: >
+          The temporary disk is local to the host. Its contents are lost on
+          deallocation, on a resize, and whenever the platform moves the VM to
+          another host for maintenance - none of which are failures, they are
+          normal operations. It is legitimate for scratch space that can be
+          rebuilt in seconds, and a checkpoint is the opposite of that.
+        rep: -12
+      - id: opt-os-disk
+        label: "Put everything on a larger operating system disk so there is one thing to back up"
+        correct: false
+        explain: >
+          It persists, so it is not wrong the way the temporary disk is wrong, but
+          it couples the data to the machine image. Every reimage, every operating
+          system disk swap and every restore now carries 40 GB of working data,
+          and the operating system disk's caching defaults are tuned for boot
+          traffic rather than a sequential read of an extract.
+        rep: -5
+      - id: opt-ultra
+        label: "Attach an Ultra Disk so the checkpoint writes are never the bottleneck"
+        correct: false
+        explain: >
+          Ultra Disk gives you IOPS and throughput independent of capacity, which
+          is genuinely useful for databases with sustained low-latency demands. It
+          also costs considerably more, cannot use host caching, must sit in the
+          same zone as the VM, and requires the ultra capability enabled on the
+          VM. A checkpoint written every ten minutes does not need any of that.
+        rep: -6
+    next: e3-encryption
+
+  - id: e3-encryption
+    type: design_decision
+    title: "Marcus reads the build sheet"
+    speaker: security
+    objectives: [AZ104-3.7]
+    scenario: |
+      Marcus Lim forwards the build sheet back with one paragraph highlighted.
+
+      "The history extract contains consignee names and delivery addresses. Our
+      policy says that data is encrypted everywhere it exists. Managed disks are
+      encrypted at rest by the platform, I know that. What I want to hear is what
+      happens to the copy sitting in the host's disk cache and the copy the job
+      spills onto the temporary disk while it sorts. Those are on the host, not in
+      the storage service, and the last audit asked about them by name."
+
+      He is not in a hurry. He has been right about this sort of thing for three
+      years and expects to be right again.
+    prompt: "What do you configure on vm-route01?"
+    options:
+      - id: opt-encryption-at-host
+        label: "Enable encryption at host on the VM, after registering the EncryptionAtHost feature on the subscription"
+        correct: true
+        explain: >
+          Encryption at host encrypts the data flowing between the host and the
+          storage service, which covers exactly the two copies Marcus named: the
+          host disk cache and the temporary disk. It runs on the host rather than
+          inside the guest, so there is no agent, no key vault dependency and no
+          impact on boot. The feature must be registered on the subscription
+          first, the VM size must support it, and the VM must be deallocated when
+          you turn it on.
+        rep: 10
+      - id: opt-sse-default
+        label: "Point at the default server-side encryption with platform-managed keys, which is already on for every managed disk"
+        correct: false
+        consequence: >
+          The audit response comes back with the same question underlined twice.
+        explain: >
+          Server-side encryption does protect the managed disks at rest, and it is
+          on by default. It is also precisely the answer Marcus pre-empted: it
+          covers the data in the storage service and says nothing about the host
+          cache or the temporary disk, which never reach that service. The gap he
+          asked about is still open.
+        rep: -8
+      - id: opt-ade
+        label: "Deploy Azure Disk Encryption so the volumes are encrypted inside the guest with dm-crypt and a key vault key"
+        correct: false
+        explain: >
+          Azure Disk Encryption does encrypt volumes, but at the guest layer: it
+          needs an extension, a key vault with the right access policy, and it
+          adds a dependency to the boot path of a machine that has a five-hour
+          window. It also cannot be combined with encryption at host - the two are
+          mutually exclusive - so choosing it closes the door on the lighter
+          answer for no additional coverage here.
+        rep: -6
+      - id: opt-cmk
+        label: "Create a disk encryption set with a customer-managed key and attach the disks to it"
+        correct: false
+        explain: >
+          A customer-managed key changes who controls the key protecting data at
+          rest, which is a real requirement in some organizations but not the one
+          on the page. It does not extend encryption to the host cache or the
+          temporary disk, so the audit finding stands, and it adds key rotation
+          and vault availability to your operational surface.
+        rep: -6
+    next: e4-second-instance
+
+  - id: e4-second-instance
+    type: knowledge_check
+    title: "Desmond checks your work"
+    speaker: mentor
+    objectives: [AZ104-3.11]
+    scenario: |
+      The machine builds clean. Desmond looks at the zone field for slightly
+      longer than necessary.
+
+      "Fine. Now the vendor releases the clustered version next year and Priya
+      asks for a second instance. One question, because half the people who pass
+      this exam still get it wrong."
+    question: >
+      vm-route01 is deployed into availability zone 2 in Southeast Asia. To give
+      the pair the strongest availability inside the region, where does vm-route02
+      go, and what does that choice rule out?
+    options:
+      - id: opt-other-zone
+        label: "Another zone in the same region; the pair cannot also be in an availability set, because a VM is either zonal or in a set"
+        correct: true
+        explain: >
+          Two instances spread across zones sit in physically separate data
+          centers with independent power, cooling and networking, which is the
+          highest in-region availability tier and carries the strongest SLA for a
+          multi-instance workload. Zones and availability sets are alternative
+          placement models: a VM is created into one or the other, never both, and
+          neither can be changed after creation.
+      - id: opt-same-zone-avset
+        label: "The same zone, both members of an availability set, so they get fault domain separation as well as zone placement"
+        correct: false
+        explain: >
+          This combination does not exist. An availability set is a regional
+          construct and cannot contain zonal VMs, so the create call fails. Even
+          if it worked it would be the weaker design, because both instances would
+          be in the one data center that the zone represents.
+      - id: opt-same-zone-fd
+        label: "The same zone but a different fault domain, which keeps latency low between the two instances"
+        correct: false
+        explain: >
+          Fault domains are a property of availability sets and scale sets, not
+          something you assign to a standalone zonal VM. Low latency between the
+          pair is a real consideration for chatty clusters, but the requirement
+          here is surviving the loss of a data center, and same-zone placement
+          fails that by definition.
+      - id: opt-other-region
+        label: "Another region entirely, with Traffic Manager directing work to whichever instance is healthy"
+        correct: false
+        explain: >
+          Cross-region placement protects against a regional outage, which is a
+          different and more expensive problem than the one on the table. It also
+          puts the second instance far from the consignment data it has to read
+          every night, and Traffic Manager resolves DNS for clients rather than
+          coordinating a batch job that must not run twice.
+    next: END

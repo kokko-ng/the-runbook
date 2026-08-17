@@ -1,0 +1,304 @@
+schema_version: 1
+id: act1-st-04-the-front-door
+title: "The Front Door"
+act: 1
+chapter: act1-storage
+domain: az104-d2
+order: 4
+role: cloud-admin
+checkpoint: true
+summary: "Every storage account at Meridian accepts traffic from the entire internet. Marcus has a sprint for it."
+entry: e1-firewall
+
+encounters:
+  - id: e1-firewall
+    type: design_decision
+    title: "Deny by default"
+    speaker: security
+    objectives: [AZ104-2.1]
+    scenario: |
+      "You are a cloud admin as of Monday," Priya says. "Marcus has a change he
+      has been carrying for two quarters. It is yours now."
+
+      The change is short. Every Meridian storage account has its network rule
+      set at default action Allow, which means the endpoint accepts a request
+      from any address on the internet and relies entirely on the credential
+      being right. Marcus wants deny by default.
+
+      Who actually reaches stmeridianedi: the WMS server in snet-wms-app, which
+      writes the nightly export; Tan Chuan Freight's uploader in Johor, from a
+      single static NAT address their integration team has confirmed in writing;
+      and you, from the office, occasionally, through the portal.
+
+      Desmond adds the caution: "Deny by default means deny. Anything you forget
+      is an outage at whatever hour it runs. Write the list before you flip the
+      switch, and remember the portal is on the internet like everyone else."
+    prompt: "How do you configure the storage account firewall?"
+    options:
+      - id: opt-deny-with-rules
+        label: "Set the default action to Deny, add a virtual network rule for snet-wms-app with the Microsoft.Storage service endpoint enabled, and add an IP rule for the partner's static NAT address"
+        correct: true
+        explain: >
+          Deny by default with an explicit allow list is the shape you want. A
+          virtual network rule keeps the WMS server's traffic on the Azure
+          backbone and identifies it by subnet rather than by address, so it
+          survives the VM being rebuilt. The partner arrives from the public
+          internet, so they need an IP rule with their NAT address. Your own
+          portal access needs an IP rule for the office too, or the data browser
+          stops working.
+        rep: 12
+        diagram_ops:
+          - {op: set_label, node: st-edi-drop, label: "stmeridianedi (firewall: deny)"}
+      - id: opt-private-only
+        label: "Set the default action to Deny with no rules at all, and give the account a private endpoint so everything comes in privately"
+        correct: false
+        consequence: >
+          The 02:00 upload from Johor fails, and the partner's integration team
+          asks whether Meridian has changed address.
+        explain: >
+          A private endpoint serves clients that can reach the VNet. Tan Chuan
+          Freight is a third party on the public internet with no tunnel to
+          Meridian, so a private-only posture cuts them off entirely. Private
+          endpoints and firewall rules solve different halves of the problem, and
+          an external partner needs the public endpoint with an IP allow rule.
+        rep: -12
+      - id: opt-private-ip-rule
+        label: "Set the default action to Deny and add IP rules for the WMS server's address 10.101.1.20 and the partner's NAT address"
+        correct: false
+        consequence: >
+          The rule for 10.101.1.20 is rejected outright, and the nightly export
+          fails at 01:15 with AuthorizationFailure.
+        explain: >
+          Storage firewall IP rules accept public IP addresses and ranges only -
+          private RFC 1918 addresses are not permitted, because the service never
+          sees them as a source. Traffic from inside a VNet is allowed by a
+          virtual network rule on the subnet, or by a private endpoint. The
+          partner half of this answer was right; the internal half cannot work.
+        rep: -10
+      - id: opt-leave-open
+        label: "Leave the default action at Allow, since every caller already presents a SAS or a managed identity"
+        correct: false
+        explain: >
+          Credentials are the primary control and the network rule set is the
+          second one, which is the point of having both: a leaked SAS used from
+          an unexpected network is refused before the signature is even checked.
+          Deny by default converts a stolen credential from an incident into a
+          failed request from an address that was never on the list.
+        rep: -8
+    next: e2-trusted-services
+
+  - id: e2-trusted-services
+    type: design_decision
+    title: "The thing you forgot"
+    speaker: mentor
+    objectives: [AZ104-2.1]
+    scenario: |
+      The change goes in at 21:00. At 21:06 the diagnostic settings on
+      stmeridianedi stop delivering logs, and at 23:40 the customs broker's
+      Logic App, which reads a manifest summary from the account twice a night,
+      starts failing with 403 AuthorizationFailure.
+
+      Desmond, who predicted both, is not gracious about it.
+
+      "Two different problems that look identical. The log export is a first
+      party platform service with no fixed address you could ever allow. The
+      Logic App is one specific resource in our own subscription with a managed
+      identity and no stable outbound address either, because it is shared
+      infrastructure."
+
+      Neither has a public IP you can write down. Neither lives in a VNet you can
+      name in a virtual network rule. Both need to keep working, and the firewall
+      needs to stay at deny.
+    prompt: "How do you let these two callers back in?"
+    options:
+      - id: opt-bypass-and-instance
+        label: "Enable the trusted Azure services exception for the platform log export, and add a resource instance rule naming the Logic App's resource id"
+        correct: true
+        explain: >
+          The bypass setting readmits Microsoft first-party services on the
+          trusted list, which is how diagnostic log delivery and backup reach an
+          otherwise closed account. A resource instance rule is narrower and newer:
+          it names one specific resource by id, so only that Logic App is
+          admitted rather than every service of its type, and it still has to
+          present a valid managed identity. Together they cover both callers
+          without a single address in the list.
+        rep: 12
+      - id: opt-allow-azure-ranges
+        label: "Download the Azure IP ranges for Southeast Asia and add them as IP rules"
+        correct: false
+        consequence: >
+          The list is 340 entries, exceeds the rule limit, and is out of date the
+          following Wednesday.
+        explain: >
+          Azure service tags and published ranges change constantly and the
+          firewall caps you at 200 IP rules, so this is unmaintainable before it
+          is finished. It is also enormously wide: allowing an entire region's
+          public ranges admits every Azure tenant that happens to be in it, which
+          is worse than the posture you started from.
+        rep: -12
+      - id: opt-bypass-only
+        label: "Enable the trusted Azure services exception, which covers anything running in Azure"
+        correct: false
+        consequence: >
+          The log export recovers. The Logic App keeps failing, and you spend
+          another hour on it.
+        explain: >
+          The bypass admits a defined list of Microsoft first-party services
+          acting on your behalf, not everything hosted in Azure. Logic Apps is
+          not on that list, so the second failure persists. Where a specific
+          resource in your own tenant needs access, a resource instance rule is
+          the mechanism.
+        rep: -6
+      - id: opt-revert
+        label: "Revert the firewall to Allow overnight and reapply it once the dependencies are mapped"
+        correct: false
+        explain: >
+          Reverting restores service and loses the only reliable way you have of
+          finding the remaining dependencies, which is watching what breaks.
+          Both failures here have targeted, supported fixes available in minutes.
+          A control that gets switched off whenever it is inconvenient is a
+          control nobody will trust again.
+        rep: -8
+    next: e3-encryption
+
+  - id: e3-encryption
+    type: design_decision
+    title: "Who holds the key"
+    speaker: security
+    objectives: [AZ104-2.9]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: st-kv-storage
+          label: "kv-meridian-storage"
+          kind: key-vault
+          group: grp-corp
+          status: planned
+    scenario: |
+      The customs audit questionnaire arrives with 84 questions. Marcus has
+      answered 83.
+
+      Question 61: "Who controls the encryption keys protecting the retained
+      delivery evidence, and by what process can the organization revoke access
+      to that data."
+
+      "Microsoft-managed keys are perfectly good encryption," Marcus says. "But
+      the honest answer to question 61 is currently 'Microsoft', and the auditor
+      wants to hear that we can revoke it ourselves. I do not want an argument
+      about whether that is meaningful. I want an answer I can write down."
+
+      Evelyn's contribution is a single line: whatever this is, it must not
+      require re-uploading four years of photographs.
+    prompt: "What do you configure on the proof-of-delivery account?"
+    options:
+      - id: opt-cmk
+        label: "Customer-managed keys: an RSA key in a Key Vault with soft delete and purge protection enabled, granted to the storage account's managed identity for wrap and unwrap"
+        correct: true
+        explain: >
+          A customer-managed key encrypts the account encryption key rather than
+          the data itself, so switching to CMK is a metadata operation and no blob
+          is rewritten - which is Evelyn's requirement met. Meridian then controls
+          rotation and can revoke access by removing the access policy or
+          disabling the key version, which is the answer to question 61. The vault
+          must have soft delete and purge protection on, otherwise a deleted key
+          would make the data permanently unreadable.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: st-kv-storage, status: healthy}
+          - op: add_edge
+            edge:
+              id: st-e-kv-podarchive
+              source: st-kv-storage
+              target: st-pod-archive
+              kind: dependency
+              label: "customer-managed key"
+      - id: opt-turn-off
+        label: "Turn off platform encryption and encrypt the photos in the upload job before they are written"
+        correct: false
+        consequence: >
+          You spend twenty minutes looking for the setting before concluding it
+          does not exist.
+        explain: >
+          Encryption at rest in Azure Storage is always on and cannot be
+          disabled - every blob is written encrypted with 256-bit AES regardless
+          of settings. Client-side encryption is a legitimate additional layer for
+          specific workloads, but it means Meridian owns key distribution to every
+          reader, and the claims desk would no longer be able to open a photo from
+          a link.
+        rep: -10
+      - id: opt-infra-encryption
+        label: "Enable infrastructure encryption on the account for a second layer of platform encryption"
+        correct: false
+        explain: >
+          Infrastructure encryption adds a second encryption pass using
+          Microsoft-managed keys, which is a defense-in-depth measure and not an
+          answer to who holds the key - both layers would still be Microsoft's.
+          It also can only be enabled when the account is created, so it would
+          mean a new account and a four-year copy, which Evelyn ruled out.
+        rep: -8
+      - id: opt-scopes
+        label: "Create an encryption scope on the container so the photos are encrypted separately from the rest of the account"
+        correct: false
+        explain: >
+          Encryption scopes are useful when different containers or blobs in one
+          account must be isolated under different keys, typically per tenant or
+          per customer. A scope using a Microsoft-managed key changes nothing
+          about control; a scope using a customer-managed key is really the CMK
+          answer applied at a narrower level than this single-purpose account
+          needs.
+        rep: -5
+    next: e4-encryption-check
+
+  - id: e4-encryption-check
+    type: knowledge_check
+    title: "What the auditor will ask next"
+    speaker: mentor
+    objectives: [AZ104-2.9]
+    scenario: |
+      Desmond reviews your CMK change before it goes to the auditor, and stops
+      on the sentence where you claim the four-year archive has been re-encrypted
+      under Meridian's key.
+
+      "Careful. That sentence is wrong in a way an auditor will enjoy."
+    question: "Which statement about Azure Storage encryption is accurate?"
+    options:
+      - id: opt-always-on
+        label: "Data is always encrypted at rest with 256-bit AES; customer-managed keys change who controls the key that protects the account encryption key, not whether encryption occurs"
+        correct: true
+        explain: >
+          Storage service encryption is mandatory and cannot be switched off. A
+          customer-managed key wraps the account encryption key, so adopting CMK
+          takes effect immediately for existing and new data without rewriting any
+          blob - the key hierarchy changes above the data, not the data itself.
+          That is what makes the switch cheap and what makes the claim of
+          re-encryption inaccurate.
+        rep: 8
+      - id: opt-per-container
+        label: "Encryption at rest is enabled per container after the container is created"
+        correct: false
+        explain: >
+          There is no per-container switch for encryption at rest, because there
+          is no off state to switch from. Encryption scopes do operate at
+          container or blob level, but they select which key protects the data,
+          not whether it is protected.
+        rep: -6
+      - id: opt-reencrypt
+        label: "Switching to a customer-managed key re-encrypts every existing blob with the new key before the operation completes"
+        correct: false
+        explain: >
+          This is the misconception worth losing early. Blobs stay encrypted under
+          the account encryption key; the customer-managed key encrypts that key.
+          If a CMK switch really rewrote every blob, a four-year archive would be
+          a multi-day operation with a bill attached, and revoking a key would not
+          take effect in seconds.
+        rep: -6
+      - id: opt-infra-later
+        label: "Infrastructure encryption can be enabled on an existing account from the portal at any time"
+        correct: false
+        explain: >
+          Infrastructure encryption is a create-time property of the account. To
+          adopt it later you create a new account with it enabled and copy the
+          data across, which is why it is a decision to make deliberately at
+          creation for workloads that need double encryption.
+        rep: -5
+    next: END

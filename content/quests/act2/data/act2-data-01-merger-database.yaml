@@ -1,0 +1,397 @@
+schema_version: 1
+id: act2-data-01-merger-database
+title: "Two Companies, One Database"
+act: 2
+chapter: act2-data
+domain: az305-d2
+order: 1
+role: associate-architect
+checkpoint: true
+summary: "Meridian bought Sunda Freight. Now pick the relational platform that swallows both warehouse systems without a rewrite."
+entry: e1-platform
+
+encounters:
+  - id: e1-platform
+    type: design_decision
+    title: "One warehouse platform"
+    speaker: manager
+    objectives: [AZ305-2.1]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2data-sqlmi
+          label: "Merged WMS database (undecided)"
+          kind: sql-database
+          group: grp-sea
+          status: planned
+    scenario: |
+      Priya Raman has a new title for you on a printed org chart and a folder
+      thick enough to be a threat.
+
+      "Associate architect. Congratulations. The board signed Sunda Freight
+      yesterday - two hundred staff, Jakarta, and their own warehouse system.
+      You are not building this. You are writing what Desmond builds, and then
+      you are sitting in the review while Evelyn asks you why."
+
+      The folder is the Sunda technical due diligence.
+
+      Both firms run WMS-Pro from the same vendor. Meridian is on version 7
+      against Azure SQL Database. Sunda runs version 6.2 on SQL Server 2016
+      Standard in a Jakarta comms room. The board wants one system on one
+      database platform inside nine months.
+
+      The constraints, as written by the vendor and confirmed by Desmond:
+
+      - WMS-Pro 6.2 issues cross-database joins against a separate `wmsref`
+        catalog database, and the vendor will not change that.
+      - 37 SQL Server Agent jobs run the nightly wave planning.
+      - A linked server reaches the Kallang ERP for cost centers.
+      - 640 GB combined today, growing about 8 GB per month.
+      - Vendor supports database compatibility level 150 and above.
+      - No application code changes are funded this year.
+      - Cloud team is two people. Nobody is patching a guest OS.
+      - Database must be reachable on private addressing only.
+    prompt: "What relational platform do you recommend for the merged WMS?"
+    options:
+      - id: opt-sqldb-pool
+        label: "Azure SQL Database, both catalogs in one elastic pool"
+        correct: false
+        consequence: >
+          The vendor's response to the design is four words long and one of them
+          is "unsupported."
+        explain: >
+          Azure SQL Database is a single-database surface: there are no
+          cross-database joins between two databases in a pool, no SQL Server
+          Agent, and no linked servers. Every one of those is a stated,
+          unfunded requirement of WMS-Pro 6.2. Elastic pools solve shared
+          compute across many databases, not instance-level features.
+        rep: -8
+      - id: opt-mi
+        label: "Azure SQL Managed Instance, both catalogs on one instance"
+        correct: true
+        explain: >
+          Managed Instance is the platform-as-a-service surface that keeps the
+          instance-scoped features: cross-database queries inside the instance,
+          a real SQL Agent, linked servers, and compatibility level 150 or
+          higher. Microsoft patches the engine and the OS, so a two-person team
+          is not on the hook, and an instance deploys into your own subnet, so
+          private-only access is the default rather than a bolt-on.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: a2data-sqlmi, status: healthy}
+          - {op: set_label, node: a2data-sqlmi, label: "sqlmi-meridian-sea (Managed Instance)"}
+          - op: add_edge
+            edge:
+              id: a2data-e-wms-sqlmi
+              source: wms-sea
+              target: a2data-sqlmi
+              kind: dependency
+      - id: opt-iaas
+        label: "SQL Server 2022 on an Azure VM, lifted from the Jakarta comms room"
+        correct: false
+        consequence: >
+          Desmond reads it, looks at the ceiling, and says "so I patch it. Every
+          month. Forever."
+        explain: >
+          It satisfies every feature requirement, which is why it is tempting.
+          It fails the operational constraint: infrastructure-as-a-service hands
+          you guest OS patching, cluster configuration, and backup jobs, and the
+          stated team size is two. Choose a VM when you need something Managed
+          Instance genuinely cannot do - an unsupported engine version, or
+          filesystem access - not as the default landing spot for a migration.
+        rep: -6
+      - id: opt-postgres
+        label: "Azure Database for PostgreSQL Flexible Server, standardizing the estate on open source"
+        correct: false
+        explain: >
+          A reasonable long-term platform strategy and completely wrong here.
+          WMS-Pro is a closed vendor application written against T-SQL; moving
+          engines is an application rewrite, and the scenario states no
+          application code changes are funded. Engine migration is a program,
+          not a line item in an acquisition integration.
+        rep: -8
+    next: e2-tier
+
+  - id: e2-tier
+    type: design_decision
+    title: "Evelyn reads the price list"
+    speaker: cfo
+    objectives: [AZ305-2.2]
+    scenario: |
+      Evelyn Koh, CFO, has the Managed Instance pricing page open on one screen
+      and the merger integration budget on the other. She does not look up.
+
+      "I approved a platform. I did not approve a size. Tell me the tier and
+      tell me the number of cores, and then tell me why the cheaper one on this
+      page is wrong, because that is the question the board will ask me."
+
+      What you have measured on the two existing systems, combined:
+
+      - 640 GB today, forecast 1 TB inside 24 months.
+      - Sustained around 900 IOPS. Peak 3,200 IOPS in the 08:00 wave-planning
+        window, for roughly forty minutes.
+      - The scanner write path has a 5 ms budget at the database. Above that,
+        pickers see the tablet spinner and start writing on paper.
+      - The merger service schedule commits to 99.99 percent availability for
+        the warehouse system.
+      - Finance wants a read-only copy for reporting with no additional
+        licensing spend.
+      - Evelyn's ceiling for the database line is SGD 9,500 per month.
+    prompt: "Which service tier and compute size do you recommend?"
+    options:
+      - id: opt-gp8
+        label: "General Purpose, 8 vCores - cheapest tier that fits the storage and the budget"
+        correct: false
+        consequence: >
+          Six weeks after cutover the wave window produces 400 paper pick lists
+          and a very calm email from the Kallang floor supervisor.
+        explain: >
+          General Purpose separates compute from remote Azure premium storage,
+          which puts typical write latency in the 5 to 10 ms range - at or over
+          the stated 5 ms budget before you add any load. It also has no
+          readable secondary, so the reporting copy has to be built and paid for
+          separately. It fails the latency requirement and the free-read-replica
+          requirement.
+        rep: -8
+      - id: opt-bc8
+        label: "Business Critical, 8 vCores, with the built-in read-only replica used for reporting"
+        correct: true
+        explain: >
+          Business Critical places the data files on local SSD attached to the
+          compute node, which is the tier that meets a single-digit millisecond
+          write budget. It runs an Always On availability group under the
+          covers, giving the 99.99 percent SLA, and it includes one readable
+          secondary at no extra cost - the reporting copy Finance asked for.
+          Eight vCores covers 900 sustained IOPS with headroom for the
+          forty-minute peak, and lands inside Evelyn's ceiling.
+        rep: 10
+      - id: opt-bc32
+        label: "Business Critical, 32 vCores, sized so the 08:00 peak never touches a limit"
+        correct: false
+        consequence: >
+          Evelyn circles the monthly figure twice and writes "for forty minutes?"
+        explain: >
+          Sizing to a forty-minute daily peak means paying for that peak
+          continuously, and it breaks the stated SGD 9,500 ceiling. A cost
+          ceiling is a design requirement exactly like a latency budget.
+          Managed Instance vCores can be changed online, so the correct
+          treatment of an uncertain peak is to start sized for sustained load
+          and scale if the telemetry says so.
+        rep: -6
+      - id: opt-gp-plus-replica
+        label: "General Purpose, 8 vCores, plus a second General Purpose instance kept in sync for reporting"
+        correct: false
+        explain: >
+          Two General Purpose instances cost more than one Business Critical
+          instance of the same size, still have remote storage latency, and add
+          a replication relationship you now have to operate. Business Critical
+          already contains the second copy. Reaching for a second instance is
+          how you end up paying a premium for a worse answer.
+        rep: -6
+    next: e3-scale
+
+  - id: e3-scale
+    type: design_decision
+    title: "The typhoon read storm"
+    speaker: mentor
+    objectives: [AZ305-2.3]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2data-sqlmi-ro
+          label: "Read-only secondary (unrouted)"
+          kind: sql-database
+          group: grp-sea
+          status: planned
+    scenario: |
+      Desmond drops into the chair opposite you without being asked, which is
+      how he starts most conversations now that he no longer has to be polite
+      to you.
+
+      "Your tier is fine. Your read path is not. Look at last November."
+
+      He has the numbers. When a typhoon closed Kaohsiung for two days, every
+      consignee in the region opened the shipment-tracking page at once. The
+      tracking API went from 90 requests per second to 2,400 for six hours. It
+      is a read-only lookup: one shipment header, its events, its current
+      container position.
+
+      "The writes were fine. Scanners kept scanning. What fell over was the
+      tracking API hammering the same tables the pickers write to, and then the
+      pickers slowed down too."
+
+      Constraints on the fix:
+
+      - Tracking reads may be up to 60 seconds stale. Nobody has ever needed a
+        tracking page to be transactionally current.
+      - The write path must not degrade during a read storm.
+      - Peak lasts hours, not minutes, and arrives with two days of typhoon
+        warning.
+      - No vendor code change beyond the connection string.
+    prompt: "How do you scale the read path?"
+    options:
+      - id: opt-readintent
+        label: "Route the tracking API to the Business Critical readable secondary with ApplicationIntent=ReadOnly"
+        correct: true
+        explain: >
+          Business Critical already maintains a readable secondary replica; read
+          scale-out routes any session whose connection string carries
+          ApplicationIntent=ReadOnly to it, isolating the read workload from the
+          primary's compute entirely. It is a connection-string change, it costs
+          nothing extra on this tier, and the replica's small replication lag is
+          comfortably inside the 60-second staleness allowance.
+        rep: 10
+        diagram_ops:
+          - {op: set_status, node: a2data-sqlmi-ro, status: healthy}
+          - {op: set_label, node: a2data-sqlmi-ro, label: "Read scale-out replica (ApplicationIntent=ReadOnly)"}
+          - op: add_edge
+            edge:
+              id: a2data-e-sqlmi-ro
+              source: a2data-sqlmi
+              target: a2data-sqlmi-ro
+              kind: replication
+              label: "read scale-out"
+      - id: opt-scaleup
+        label: "Scale the instance to 24 vCores when a typhoon warning is issued, and back down after"
+        correct: false
+        consequence: >
+          It works, twice. The third time the warning comes at 02:00 on a public
+          holiday and nobody scales anything.
+        explain: >
+          Scaling up does add read capacity, but reads and writes still contend
+          for the same buffer pool and the same log on one node, so a heavy read
+          storm can still push write latency past the scanner budget. It also
+          makes availability depend on a human noticing a weather bulletin. Read
+          isolation beats vertical scaling when the workloads have different
+          shapes.
+        rep: -6
+      - id: opt-hyperscale
+        label: "Move the database to Hyperscale and add named read replicas for the tracking API"
+        correct: false
+        explain: >
+          Hyperscale with named replicas is a genuinely strong read scale-out
+          design, and it is the right answer for a 40 TB database with a dozen
+          distinct read workloads. Here it fails the size and the effort tests:
+          640 GB is far inside Business Critical's limits, the replica you need
+          is already included and already paid for, and a tier migration is a
+          cutover with risk attached. Do not re-platform to buy something you
+          already own.
+        rep: -4
+      - id: opt-cache
+        label: "Put Azure Cache for Redis in front of the tracking API and cache shipment lookups"
+        correct: false
+        consequence: >
+          The vendor quotes four months to add a cache layer to the tracking API.
+        explain: >
+          Caching is effective for a read-heavy lookup and worth doing later,
+          but it requires application changes to populate and invalidate the
+          cache, and the scenario allows no vendor code change beyond the
+          connection string. A cache is also a second system to size, secure,
+          and reason about during an incident.
+        rep: -4
+    next: e4-pii
+
+  - id: e4-pii
+    type: design_decision
+    title: "What NOC Manila can read"
+    speaker: security
+    objectives: [AZ305-2.4]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: a2data-kv-data
+          label: "kv-meridian-data (planned)"
+          kind: key-vault
+          group: grp-sea
+          status: planned
+    scenario: |
+      Marcus Lim brings the PDPA assessment and a printout of a table definition
+      with one column highlighted in yellow.
+
+      "Consignee identity. NRIC for Singapore, passport number for everyone
+      else. The drivers check it at handover, so we genuinely need it and I am
+      not going to pretend we can delete it."
+
+      He taps the highlight.
+
+      "NOC Manila are getting instance administrator rights on this thing
+      because they run it overnight. That means today they can select this
+      column. I want a design where they cannot, and where 'we trust them' is
+      not part of the control."
+
+      The requirements he will hold you to:
+
+      - Administrators of the instance must not be able to read identity values
+        in plaintext, by query or by restoring a backup elsewhere.
+      - The WMS still needs exact-match lookup on the column - the handover
+        screen searches by full identity number.
+      - No range queries, sorting, or LIKE patterns on the column. Marcus has
+        confirmed this with the vendor.
+      - The vendor's data access layer supports the feature natively with a
+        driver upgrade and a connection string flag. Nothing else is funded.
+      - The estate audit requires encryption at rest regardless.
+    prompt: "What do you recommend for the identity column?"
+    options:
+      - id: opt-tde-cmk
+        label: "Transparent Data Encryption with a customer-managed key in Azure Key Vault"
+        correct: false
+        consequence: >
+          Marcus runs a SELECT as the NOC service account in the review. The
+          numbers come back in plaintext on the projector.
+        explain: >
+          TDE encrypts data files, log files, and backups at rest, which
+          satisfies the audit requirement and should be on anyway. It does
+          nothing about the first requirement: decryption is transparent to any
+          authorized session, so an instance administrator simply queries the
+          column and reads it. TDE defends against a stolen file, not against a
+          privileged user.
+        rep: -8
+      - id: opt-ddm
+        label: "Dynamic Data Masking on the column, with the mask applied to the NOC role"
+        correct: false
+        consequence: >
+          A junior at NOC Manila discovers that a WHERE clause with a guessed
+          value still returns rows, and reports it, to his credit.
+        explain: >
+          Dynamic Data Masking rewrites query results at presentation time; the
+          underlying data is plaintext and remains plaintext in every backup.
+          Anyone holding UNMASK, or with the patience to infer values through
+          filtered queries, gets around it. Microsoft positions it as a
+          convenience control against accidental exposure, not a boundary
+          against a privileged administrator - which is exactly what Marcus
+          specified.
+        rep: -6
+      - id: opt-alwaysencrypted
+        label: "Always Encrypted with deterministic encryption, column master key in Azure Key Vault, key access denied to the DBA role"
+        correct: true
+        explain: >
+          Always Encrypted encrypts inside the client driver, so the engine only
+          ever holds ciphertext and an instance administrator without column
+          master key access sees ciphertext - including in a restored backup.
+          Deterministic encryption produces the same ciphertext for the same
+          input, which is what allows the exact-match lookup the handover screen
+          needs, and the scenario rules out the range and pattern queries
+          deterministic mode cannot serve. Keep TDE on underneath for the audit.
+        rep: 12
+        diagram_ops:
+          - {op: set_status, node: a2data-kv-data, status: healthy}
+          - {op: set_label, node: a2data-kv-data, label: "kv-meridian-data (column master keys)"}
+          - op: add_edge
+            edge:
+              id: a2data-e-sqlmi-kv
+              source: a2data-sqlmi
+              target: a2data-kv-data
+              kind: dependency
+              label: "Always Encrypted CMK"
+      - id: opt-deny
+        label: "DENY SELECT on the column to the NOC role and audit any attempt to read it"
+        correct: false
+        explain: >
+          Permissions are enforced by the engine, and an instance administrator
+          controls the engine: sysadmin can grant itself back anything it has
+          been denied, and can restore a backup onto a server where the DENY was
+          never written. Auditing tells you afterwards. Marcus asked for a
+          control that does not rest on trust, and a permission held by the
+          person you are controlling is exactly that.
+        rep: -6
+    next: END

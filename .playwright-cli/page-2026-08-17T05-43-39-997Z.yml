@@ -1,0 +1,36 @@
+- generic [ref=f6e3]:
+  - banner [ref=f6e4]:
+    - generic [ref=f6e5]:
+      - generic [ref=f6e6]: The Runbook
+      - button "Switch to dark theme" [ref=f6e7]: Dark
+  - main [ref=f6e8]:
+    - generic [ref=f6e9]:
+      - paragraph [ref=f6e10]: Meridian Logistics · Cloud operations
+      - heading "You are the new Azure admin at a freight company that cannot afford downtime." [level=1] [ref=f6e11]
+      - paragraph [ref=f6e12]: Tickets arrive. Peerings break at 09:12. The CFO asks what a gateway costs and the security officer asks why a domain controller has a public IP. Work the queue, survive the design reviews, and learn AZ-104 and AZ-305 the way you would actually meet them.
+      - button "Start your first day" [ref=f6e14]
+      - paragraph [ref=f6e15]: Free, no account needed. Every answer is a choice from a list, so there is nothing to type. Your progress saves in this browser.
+    - generic [ref=f6e16]:
+      - generic [ref=f6e17]:
+        - heading "The work" [level=2] [ref=f6e18]
+        - paragraph [ref=f6e19]: 6 jobs · 9 exam objectives
+      - list [ref=f6e20]:
+        - listitem [ref=f6e21]:
+          - generic [ref=f6e22]:
+            - heading "Configure and manage virtual networking" [level=3] [ref=f6e23]
+            - generic [ref=f6e24]: Act 1 · 6 jobs
+          - list [ref=f6e25]:
+            - listitem [ref=f6e26]: First Week, First Subnet — Meridian's warehouse app needs somewhere to live. Address space first, apologies later.
+            - listitem [ref=f6e27]: The Peering Problem — The spoke cannot reach the hub. Maintenance window says everything went fine.
+            - listitem [ref=f6e28]: Locked Out at 40 Degrees — Security tightened the rules on Friday. The scanners stopped on Monday.
+            - listitem [ref=f6e29]: It Resolves On My Machine — The storage endpoint resolves to a public address from inside the VNet. Nobody is happy about it.
+            - listitem [ref=f6e30]: The Route to Nowhere — Kallang finally gets its VPN. Then half the traffic stops coming back.
+            - listitem [ref=f6e31]: Peak Season — One front end held all year. Peak season starts in three weeks.
+  - contentinfo [ref=f6e32]:
+    - generic [ref=f6e33]:
+      - paragraph [ref=f6e34]: The Runbook is an independent study aid. It is not affiliated with, endorsed by, or sponsored by Microsoft. Azure, AZ-104, AZ-305, and Microsoft are trademarks of the Microsoft group of companies. Meridian Logistics and everyone who works there are fictional.
+      - navigation [ref=f6e35]:
+        - link "Privacy" [ref=f6e36] [cursor=pointer]:
+          - /url: /privacy
+        - link "Terms" [ref=f6e37] [cursor=pointer]:
+          - /url: /terms

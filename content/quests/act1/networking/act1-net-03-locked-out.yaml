@@ -15,7 +15,7 @@ encounters:
     type: design_decision
     title: "Marcus wants the rules tightened"
     speaker: security
-    objectives: [AZ104-4.3]
+    objectives: [AZ104-4.6]
     scenario: |
       Marcus Lim, Meridian's security officer, sends a calendar invite titled
       "15 min - NSG cleanup" that runs for fifty.
@@ -94,7 +94,7 @@ encounters:
     type: troubleshoot
     title: "P1: Handheld scanners cannot submit"
     speaker: noc
-    objectives: [AZ104-4.3, AZ104-4.4]
+    objectives: [AZ104-4.6, AZ104-4.7]
     ticket:
       id: "MER-4530"
       reporter: "Kallang shift supervisor"
@@ -250,7 +250,7 @@ encounters:
     type: knowledge_check
     title: "Desmond, later"
     speaker: mentor
-    objectives: [AZ104-4.4]
+    objectives: [AZ104-4.7]
     scenario: |
       Trucks load at 07:41, eleven minutes late, which the supervisor describes
       as "basically on time."

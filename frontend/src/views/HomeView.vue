@@ -5,18 +5,31 @@ import { useRouter } from 'vue-router'
 import AppFooter from '@/components/AppFooter.vue'
 import ThemeToggle from '@/components/hud/ThemeToggle.vue'
 import { chapterQuests, chapters, manifest } from '@/content'
+import { useAccountStore } from '@/stores/account'
 import { useGameStore } from '@/stores/game'
 import * as localSave from '@/persistence/localSave'
 
 const game = useGameStore()
+const account = useAccountStore()
 const router = useRouter()
 
 const savedAt = ref<string | null>(null)
 const confirmingWipe = ref(false)
 
-onMounted(() => {
+onMounted(async () => {
   const outcome = localSave.read()
   if (outcome.status === 'loaded') savedAt.value = outcome.updatedAt
+
+  // If an account is already signed in, take the newer of the two saves before
+  // the player picks Continue.
+  await account.restore()
+  if (!account.signedIn) return
+
+  const adopted = await account.pull(outcome.status === 'loaded' ? outcome.state : null)
+  if (adopted) {
+    await game.adopt(adopted)
+    savedAt.value = new Date().toISOString()
+  }
 })
 
 const hasSave = computed(() => savedAt.value !== null)
@@ -61,7 +74,12 @@ function formatDate(iso: string) {
     <header class="border-b border-[var(--rule)]">
       <div class="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
         <span class="eyebrow">The Runbook</span>
-        <ThemeToggle />
+        <div class="flex items-center gap-2">
+          <RouterLink to="/account" class="btn btn-quiet !min-h-9 !px-2.5 !text-[0.75rem]">
+            {{ account.signedIn ? 'Account' : 'Sync across devices' }}
+          </RouterLink>
+          <ThemeToggle />
+        </div>
       </div>
     </header>
 

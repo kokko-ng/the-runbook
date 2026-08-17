@@ -27,6 +27,15 @@ class Command(BaseCommand):
             action="store_true",
             help="Also fail when a domain has no authored quests (launch gate).",
         )
+        parser.add_argument(
+            "--domain",
+            default=None,
+            help=(
+                "Enforce coverage for one domain only, e.g. az104-d2. Schema and "
+                "lint checks still run over the whole tree. For authoring a single "
+                "chapter while others are in progress; CI never passes this."
+            ),
+        )
 
     def handle(self, *args, **options):
         root = Path(options["content_dir"])
@@ -46,7 +55,7 @@ class Command(BaseCommand):
         if options["matrix"]:
             self._print_matrix(coverage)
 
-        failures = coverage.failures(require_all=options["require_all"])
+        failures = coverage.failures(require_all=options["require_all"], only=options["domain"])
         for failure in failures:
             self.stderr.write(self.style.ERROR(f"coverage: {failure}"))
         if failures:

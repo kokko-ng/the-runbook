@@ -1,0 +1,308 @@
+schema_version: 1
+id: act1-st-01-the-photo-problem
+title: "Ten Thousand Photos a Day"
+act: 1
+chapter: act1-storage
+domain: az104-d2
+order: 1
+role: junior-cloud-admin
+checkpoint: true
+summary: "Four years of delivery photos have filled the NAS at Kallang. Something has to hold the next four."
+entry: e1-account-type
+
+encounters:
+  - id: e1-account-type
+    type: design_decision
+    title: "Somewhere to put the evidence"
+    speaker: manager
+    objectives: [AZ104-2.6]
+    on_enter_diagram_ops:
+      - op: add_node
+        node:
+          id: st-pod-archive
+          label: "stmeridianpod (proof of delivery)"
+          kind: storage-account
+          group: grp-ops
+          status: planned
+    scenario: |
+      Priya finds you before you have finished your first coffee, which at
+      Meridian counts as a courtesy.
+
+      "Every driver photographs the signed delivery slip on their handheld. Nine
+      thousand eight hundred photos a day, about four hundred kilobytes each.
+      They land on the NAS at Kallang, which is ninety-two percent full and has
+      been ninety-two percent full since March, because Facilities keeps deleting
+      things nobody asked them to delete."
+
+      The requirements fit on a sticky note. The handheld app speaks HTTPS and
+      REST, not SMB. Customs disputes can reach back seven years, so nothing gets
+      deleted before then. The last thirty days of photos are pulled constantly
+      by the claims desk. Anything older is read perhaps twice a year.
+
+      "Region is Southeast Asia, same as everything else. Evelyn has already
+      asked me what this costs and I have already told her I do not know yet."
+    prompt: "What kind of storage account do you create?"
+    options:
+      - id: opt-gpv2-standard
+        label: "A general-purpose v2 account, Standard performance, in Southeast Asia"
+        correct: true
+        explain: >
+          General-purpose v2 on Standard is the default for a reason: it holds
+          block blobs, supports the full set of access tiers including archive,
+          and accepts lifecycle management policies. The workload is roughly four
+          gigabytes a day of write-once objects with a read pattern that decays
+          sharply, which is exactly the shape tiering and lifecycle rules exist to
+          serve.
+        rep: 8
+        diagram_ops:
+          - {op: set_status, node: st-pod-archive, status: healthy}
+          - op: add_edge
+            edge:
+              id: st-e-rgops-podarchive
+              source: rg-ops
+              target: st-pod-archive
+              kind: dependency
+      - id: opt-premium-block
+        label: "A premium block blob account, for the claims desk read performance"
+        correct: false
+        consequence: >
+          Evelyn's spreadsheet gets a new row within the day, highlighted in a
+          color you have not seen her use before.
+        explain: >
+          Premium block blob storage buys single-digit millisecond latency and
+          very high transaction rates, priced per gigabyte at several times
+          Standard. It also does not support the cool, cold, or archive tiers, so
+          seven years of photos that are read twice a year would sit at premium
+          rates forever. Premium answers a latency problem; this is a capacity
+          and retention problem.
+        rep: -10
+      - id: opt-gpv1
+        label: "A general-purpose v1 account, since it is the simplest and the transaction rates are cheaper"
+        correct: false
+        explain: >
+          v1 transaction pricing can look cheaper on paper, but v1 accounts have
+          no access tiers and no lifecycle management, so every photo stays at
+          one price for seven years and nothing ages automatically. v2 is the
+          current general-purpose account type; v1 exists mainly so old estates
+          can be upgraded to v2 in place.
+        rep: -8
+      - id: opt-filestorage
+        label: "A premium file share so Kallang can keep mapping a drive to it"
+        correct: false
+        explain: >
+          A FileStorage account serves SMB and NFS shares, which suits software
+          that expects a mounted drive. The handheld app speaks HTTPS and REST,
+          so a file share would need a gateway or a sync job in front of it to be
+          usable at all - complexity added to preserve a protocol nothing in this
+          workload actually wants.
+        rep: -6
+    next: e2-redundancy
+
+  - id: e2-redundancy
+    type: design_decision
+    title: "How many copies is enough"
+    speaker: cfo
+    objectives: [AZ104-2.7]
+    scenario: |
+      Evelyn Koh has the spreadsheet open before she has sat down.
+
+      "I am told there are four redundancy options and that they differ by a
+      factor of two in price. Explain the one you want before you pick it."
+
+      The facts, such as they are. The photos are legal evidence in customs
+      disputes and cannot be reconstructed - the handheld deletes its local copy
+      once the upload returns a success. Meridian runs entirely in Southeast
+      Asia, which is a region with availability zones. There is no regulatory
+      requirement for a second region, and no application anywhere that would
+      read a secondary copy if one existed.
+
+      Marcus adds one line by email: losing a data center should not lose the
+      evidence.
+
+      "I am not paying for geo-redundancy so that a file can sit in Hong Kong
+      being ignored," Evelyn says. "But I am also not explaining to a customs
+      officer that we lost his proof of delivery."
+    prompt: "Which redundancy option do you configure on the account?"
+    options:
+      - id: opt-zrs
+        label: "Zone-redundant storage, three synchronous copies across three availability zones in Southeast Asia"
+        correct: true
+        explain: >
+          ZRS writes three synchronous replicas into three separate availability
+          zones inside the region, so the loss of one data center loses no data
+          and interrupts no writes. That is exactly Marcus's requirement, at
+          roughly a quarter more than LRS rather than double. With no second-region
+          requirement and no reader for a secondary copy, geo-redundancy would be
+          spend without a consumer.
+        rep: 10
+      - id: opt-lrs
+        label: "Locally redundant storage - three copies is three copies, and it is the cheapest line on the sheet"
+        correct: false
+        consequence: >
+          Six weeks later a zone-level incident makes the account unavailable for
+          five hours and the claims desk works from photographs of a monitor.
+        explain: >
+          LRS keeps all three copies inside one data center, so it protects
+          against drive and rack failures but not against losing the facility.
+          The stated requirement was that losing a data center must not lose the
+          evidence, and LRS is the one option that fails it. Copy count is not the
+          same as failure-domain count.
+        rep: -12
+      - id: opt-ragrs
+        label: "Read-access geo-redundant storage, so a second region always holds a readable copy"
+        correct: false
+        consequence: >
+          Evelyn finds the line item in the first monthly review and asks who
+          reads the Hong Kong copy. Nobody does.
+        explain: >
+          RA-GRS adds asynchronous replication to a paired region plus a readable
+          secondary endpoint, at the highest price of the four. Nothing in the
+          estate would issue a read against that endpoint, and there is no
+          regulatory driver for a second region. It is a correct answer to a
+          requirement Meridian does not have.
+        rep: -6
+      - id: opt-grs
+        label: "Geo-redundant storage, because seven-year evidence deserves a second region"
+        correct: false
+        explain: >
+          GRS protects against regional loss, but its primary copies are LRS
+          within the region, so a single-zone failure still takes the account
+          offline until Microsoft fails it over. For a zone-level concern in a
+          zone-capable region, ZRS is the direct answer; GZRS is the option that
+          combines both, and only when a second region is genuinely required.
+        rep: -6
+    next: e3-container
+
+  - id: e3-container
+    type: design_decision
+    title: "One container or ten thousand"
+    speaker: mentor
+    objectives: [AZ104-2.12]
+    scenario: |
+      Desmond Toh reviews your account before you create anything inside it,
+      which he describes as the only part of this job that pays for itself.
+
+      "Now the container. The claims desk needs to open a photo from a link in
+      the claims system. The claims system authenticates its users. The handheld
+      app writes with a credential we will deal with next week."
+
+      He writes three words on the whiteboard: private, blob, container. Under
+      them: "these are the three anonymous access levels, and two of them are the
+      same mistake at different sizes."
+
+      Paths will look like pod/2027/03/14/DO-448192-1.jpg. Roughly ten thousand
+      new blobs a day, forever.
+
+      "Do not tell me you are making a container per day. Blob storage is flat -
+      the slashes in that path are part of the name, not folders. A container is
+      a security and configuration boundary, not a filing cabinet."
+    prompt: "How do you create the container?"
+    options:
+      - id: opt-private
+        label: "One container named pod with public access set to private, and the date structure carried in the blob names"
+        correct: true
+        explain: >
+          Private is the default and the right one: every request must present a
+          credential, which the claims system already has. The virtual directory
+          structure lives in the blob name, so listing by prefix still works
+          without multiplying containers. One container keeps access policy,
+          lifecycle rules, and soft delete settings in a single place instead of
+          across thousands of objects.
+        rep: 8
+      - id: opt-blob-anon
+        label: "One container with public access set to Blob, so the claims system can link straight to the image"
+        correct: false
+        consequence: >
+          Marcus finds a signed delivery slip, complete with the customer's name
+          and address, returned by an unauthenticated request from his phone.
+        explain: >
+          Blob-level anonymous access means anyone holding a URL can read the
+          object with no credential at all, and delivery photos carry customer
+          names, addresses, and signatures. Convenient linking is not worth
+          publishing personal data. Where a link genuinely must be handed out, a
+          time-limited SAS does it without opening the container.
+        rep: -14
+      - id: opt-container-anon
+        label: "One container with public access set to Container, so the claims system can also list what exists"
+        correct: false
+        consequence: >
+          Within a week a scraper has enumerated four years of delivery numbers.
+        explain: >
+          Container-level access is blob-level access plus anonymous listing,
+          which turns the whole archive into a browsable index. It is the same
+          mistake as anonymous blob access with the blast radius enlarged.
+          Listing is a capability to grant deliberately, to an authenticated
+          identity.
+        rep: -16
+      - id: opt-per-day
+        label: "A container per day, named pod-2027-03-14, so old days can be deleted as a unit"
+        correct: false
+        explain: >
+          It sounds tidy and ages badly: about 2,500 containers a year, each
+          needing its own access configuration, and any policy change becomes a
+          scripted sweep. Blob storage is flat by design, prefixes give you the
+          same grouping for free, and lifecycle rules already delete by prefix
+          and age.
+        rep: -6
+    next: e4-tier-check
+
+  - id: e4-tier-check
+    type: knowledge_check
+    title: "Which tier do the photos land in"
+    speaker: cfo
+    objectives: [AZ104-2.13]
+    scenario: |
+      Evelyn read an article about archive storage on the flight back from
+      Jakarta and has come to your desk with a number circled.
+
+      "One tenth of the price. Why is anything not in archive?"
+
+      The claims desk opens photos from the last thirty days constantly. After
+      that, a given photo is read perhaps twice a year, usually during a customs
+      dispute, and when it is needed it is needed inside the hour.
+    question: "Which access tier should new proof-of-delivery blobs be written to?"
+    options:
+      - id: opt-hot
+        label: "Hot, with a lifecycle rule moving them down as they age"
+        correct: true
+        explain: >
+          Hot has the highest storage price and the lowest access price, which
+          suits objects being read constantly for their first thirty days.
+          Tiering is not a one-time decision: a lifecycle rule moves each blob to
+          cool and then archive on its own schedule, so the archive discount is
+          collected later without paying rehydration on the photos still in
+          active use.
+        rep: 8
+      - id: opt-archive-now
+        label: "Archive on write, and rehydrate the few that the claims desk asks for"
+        correct: false
+        consequence: >
+          The first day's claims take between one and fifteen hours to answer.
+        explain: >
+          Archive is offline storage. A blob in archive cannot be read at all
+          until it is rehydrated to hot or cool, which takes up to fifteen hours
+          at standard priority, and it carries a 180-day early deletion charge.
+          Applying it to objects that are read daily converts a cheap tier into an
+          expensive outage.
+        rep: -12
+      - id: opt-cool-now
+        label: "Cool on write, since even new photos are only read by one team"
+        correct: false
+        explain: >
+          Cool cuts the storage price but raises the per-gigabyte read price and
+          carries a 30-day minimum retention charge. With the claims desk reading
+          these objects constantly for their first month, the access charges
+          outweigh the storage saving and any early move down costs the balance of
+          the 30 days anyway.
+        rep: -6
+      - id: opt-cold
+        label: "Cold, as the middle ground between cool and archive"
+        correct: false
+        explain: >
+          Cold is a real online tier, cheaper to store and dearer to read than
+          cool, with a 90-day minimum retention. It suits data kept online but
+          genuinely rarely touched, which describes these photos at six months
+          old and not at six days old. The tier has to match the age of the
+          object, which is what lifecycle rules are for.
+        rep: -5
+    next: END

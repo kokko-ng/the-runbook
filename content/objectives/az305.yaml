@@ -1,0 +1,180 @@
+schema_version: 1
+exam: az305
+title: "Designing Microsoft Azure Infrastructure Solutions (AZ-305)"
+act: 2
+source_url: "https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/az-305"
+fetched_on: "2026-08-17"
+
+# Mirrors the published study guide, skills measured as of April 17, 2026.
+# Act 2 is design work: the player is an architect recommending solutions rather
+# than an admin configuring them, which is why almost every objective here
+# starts with "Recommend".
+domains:
+  - id: az305-d1
+    title: "Design identity, governance, and monitoring solutions"
+    chapter: act2-identity
+    weight: "25-30%"
+    clusters:
+      - id: cluster-logging-design
+        title: "Logging and monitoring"
+        objectives:
+          - id: AZ305-1.1
+            text: "Recommend a logging solution"
+          - id: AZ305-1.2
+            text: "Recommend a solution for routing logs"
+          - id: AZ305-1.3
+            text: "Recommend a monitoring solution"
+
+      - id: cluster-authn-design
+        title: "Authentication and authorization"
+        objectives:
+          - id: AZ305-1.4
+            text: "Recommend an authentication solution"
+          - id: AZ305-1.5
+            text: "Recommend an identity management solution"
+          - id: AZ305-1.6
+            text: "Recommend a solution for authorizing access to Azure resources"
+          - id: AZ305-1.7
+            text: "Recommend a solution for authorizing access to on-premises resources"
+          - id: AZ305-1.8
+            text: "Recommend a solution to manage secrets, certificates, and keys"
+
+      - id: cluster-governance-design
+        title: "Governance"
+        requires: [cluster-authn-design]
+        objectives:
+          - id: AZ305-1.9
+            text: "Recommend a structure for management groups, subscriptions, and resource groups, and a strategy for resource tagging"
+          - id: AZ305-1.10
+            text: "Recommend a solution for managing compliance"
+          - id: AZ305-1.11
+            text: "Recommend a solution for identity governance"
+
+  - id: az305-d2
+    title: "Design data storage solutions"
+    chapter: act2-data
+    weight: "20-25%"
+    clusters:
+      - id: cluster-relational-design
+        title: "Relational data"
+        objectives:
+          - id: AZ305-2.1
+            text: "Recommend a solution for storing relational data"
+          - id: AZ305-2.2
+            text: "Recommend a database service tier and compute tier"
+          - id: AZ305-2.3
+            text: "Recommend a solution for database scalability"
+          - id: AZ305-2.4
+            text: "Recommend a solution for data protection"
+
+      - id: cluster-unstructured-design
+        title: "Semi-structured and unstructured data"
+        objectives:
+          - id: AZ305-2.5
+            text: "Recommend a solution for storing semi-structured data"
+          - id: AZ305-2.6
+            text: "Recommend a solution for storing unstructured data"
+          - id: AZ305-2.7
+            text: "Recommend a data storage solution to balance features, performance, and costs"
+          - id: AZ305-2.8
+            text: "Recommend a data solution for protection and durability"
+
+      - id: cluster-integration-design
+        title: "Data integration"
+        requires: [cluster-relational-design]
+        objectives:
+          - id: AZ305-2.9
+            text: "Recommend a solution for data integration"
+          - id: AZ305-2.10
+            text: "Recommend a solution for data analysis"
+
+  - id: az305-d3
+    title: "Design business continuity solutions"
+    chapter: act2-continuity
+    weight: "15-20%"
+    clusters:
+      - id: cluster-dr-design
+        title: "Backup and disaster recovery"
+        objectives:
+          - id: AZ305-3.1
+            text: "Recommend a recovery solution for Azure and hybrid workloads that meets recovery objectives"
+          - id: AZ305-3.2
+            text: "Recommend a backup and recovery solution for compute"
+          - id: AZ305-3.3
+            text: "Recommend a backup and recovery solution for databases"
+          - id: AZ305-3.4
+            text: "Recommend a backup and recovery solution for unstructured data"
+
+      - id: cluster-ha-design
+        title: "High availability"
+        requires: [cluster-dr-design]
+        objectives:
+          - id: AZ305-3.5
+            text: "Recommend a high availability solution for compute"
+          - id: AZ305-3.6
+            text: "Recommend a high availability solution for relational data"
+          - id: AZ305-3.7
+            text: "Recommend a high availability solution for semi-structured and unstructured data"
+
+  - id: az305-d4
+    title: "Design infrastructure solutions"
+    chapter: act2-infrastructure
+    weight: "30-35%"
+    clusters:
+      - id: cluster-compute-design
+        title: "Compute solutions"
+        objectives:
+          - id: AZ305-4.1
+            text: "Specify components of a compute solution based on workload requirements"
+          - id: AZ305-4.2
+            text: "Recommend a virtual machine-based solution"
+          - id: AZ305-4.3
+            text: "Recommend a container-based solution"
+          - id: AZ305-4.4
+            text: "Recommend a serverless-based solution"
+          - id: AZ305-4.5
+            text: "Recommend a compute solution for batch processing"
+
+      - id: cluster-app-design
+        title: "Application architecture"
+        objectives:
+          - id: AZ305-4.6
+            text: "Recommend a messaging architecture"
+          - id: AZ305-4.7
+            text: "Recommend an event-driven architecture"
+          - id: AZ305-4.8
+            text: "Recommend a solution for API integration"
+          - id: AZ305-4.9
+            text: "Recommend a caching solution for applications"
+          - id: AZ305-4.10
+            text: "Recommend an application configuration management solution"
+          - id: AZ305-4.11
+            text: "Recommend an automated deployment solution for applications"
+
+      - id: cluster-migration-design
+        title: "Migrations"
+        objectives:
+          - id: AZ305-4.12
+            text: "Evaluate a migration solution that leverages the Microsoft Cloud Adoption Framework for Azure"
+          - id: AZ305-4.13
+            text: "Evaluate on-premises servers, data, and applications for migration"
+          - id: AZ305-4.14
+            text: "Recommend a solution for migrating workloads to infrastructure as a service (IaaS) and platform as a service (PaaS)"
+          - id: AZ305-4.15
+            text: "Recommend a solution for migrating databases"
+          - id: AZ305-4.16
+            text: "Recommend a solution for migrating unstructured data"
+
+      - id: cluster-network-design
+        title: "Network solutions"
+        objectives:
+          - id: AZ305-4.17
+            text: "Recommend a connectivity solution that connects Azure resources to the internet"
+          - id: AZ305-4.18
+            text: "Recommend a connectivity solution that connects Azure resources to on-premises networks"
+          - id: AZ305-4.19
+            text: "Recommend a solution to optimize network performance"
+          - id: AZ305-4.20
+            text: "Recommend a solution to optimize network security"
+          - id: AZ305-4.21
+            text: "Recommend a load-balancing and routing solution"

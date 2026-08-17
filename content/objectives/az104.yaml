@@ -5,52 +5,262 @@ act: 1
 source_url: "https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/az-104"
 fetched_on: "2026-08-17"
 
-# M1 authors the Virtual Networking domain only. M2 fetches the current study
-# guide and fills in the remaining four domains before any of them is enforced.
+# Mirrors the published study guide, skills measured as of April 17, 2026.
+# Domains are chapters, the guide's sub-headings are skill tree clusters, and
+# each bullet is one objective. Re-fetch the guide before editing: Microsoft
+# revises these periodically and the linter enforces full coverage.
 domains:
+  - id: az104-d1
+    title: "Manage Azure identities and governance"
+    chapter: act1-identity
+    weight: "20-25%"
+    clusters:
+      - id: cluster-entra-users
+        title: "Microsoft Entra users and groups"
+        objectives:
+          - id: AZ104-1.1
+            text: "Create users and groups"
+          - id: AZ104-1.2
+            text: "Manage user and group properties"
+          - id: AZ104-1.3
+            text: "Manage licenses in Microsoft Entra ID"
+          - id: AZ104-1.4
+            text: "Manage external users"
+          - id: AZ104-1.5
+            text: "Configure self-service password reset (SSPR)"
+
+      - id: cluster-rbac
+        title: "Access to Azure resources"
+        requires: [cluster-entra-users]
+        objectives:
+          - id: AZ104-1.6
+            text: "Manage built-in Azure roles"
+          - id: AZ104-1.7
+            text: "Assign roles at different scopes"
+          - id: AZ104-1.8
+            text: "Interpret access assignments"
+
+      - id: cluster-governance
+        title: "Subscriptions and governance"
+        requires: [cluster-rbac]
+        objectives:
+          - id: AZ104-1.9
+            text: "Implement and manage Azure Policy"
+          - id: AZ104-1.10
+            text: "Configure resource locks"
+          - id: AZ104-1.11
+            text: "Apply and manage tags on resources"
+          - id: AZ104-1.12
+            text: "Manage resource groups"
+          - id: AZ104-1.13
+            text: "Manage subscriptions"
+          - id: AZ104-1.14
+            text: "Manage costs by using alerts, budgets, and Azure Advisor recommendations"
+          - id: AZ104-1.15
+            text: "Configure management groups"
+
+  - id: az104-d2
+    title: "Implement and manage storage"
+    chapter: act1-storage
+    weight: "15-20%"
+    clusters:
+      - id: cluster-storage-access
+        title: "Access to storage"
+        objectives:
+          - id: AZ104-2.1
+            text: "Configure Azure Storage firewalls and virtual networks"
+          - id: AZ104-2.2
+            text: "Create and use shared access signature (SAS) tokens"
+          - id: AZ104-2.3
+            text: "Configure stored access policies"
+          - id: AZ104-2.4
+            text: "Manage access keys"
+          - id: AZ104-2.5
+            text: "Configure identity-based access for Azure Files"
+
+      - id: cluster-storage-accounts
+        title: "Storage accounts"
+        objectives:
+          - id: AZ104-2.6
+            text: "Create and configure storage accounts"
+          - id: AZ104-2.7
+            text: "Configure Azure Storage redundancy"
+          - id: AZ104-2.8
+            text: "Configure object replication"
+          - id: AZ104-2.9
+            text: "Configure storage account encryption"
+          - id: AZ104-2.10
+            text: "Manage data by using Azure Storage Explorer and AzCopy"
+
+      - id: cluster-files-blobs
+        title: "Azure Files and Blob Storage"
+        requires: [cluster-storage-accounts]
+        objectives:
+          - id: AZ104-2.11
+            text: "Create and configure a file share in Azure Files"
+          - id: AZ104-2.12
+            text: "Create and configure a container in Azure Blob Storage"
+          - id: AZ104-2.13
+            text: "Configure storage tiers"
+          - id: AZ104-2.14
+            text: "Configure soft delete for blobs and containers"
+          - id: AZ104-2.15
+            text: "Configure snapshots and soft delete for Azure Files"
+          - id: AZ104-2.16
+            text: "Configure blob lifecycle management"
+          - id: AZ104-2.17
+            text: "Configure blob versioning"
+
+  - id: az104-d3
+    title: "Deploy and manage Azure compute resources"
+    chapter: act1-compute
+    weight: "20-25%"
+    clusters:
+      - id: cluster-iac
+        title: "ARM templates and Bicep"
+        objectives:
+          - id: AZ104-3.1
+            text: "Interpret an Azure Resource Manager template or a Bicep file"
+          - id: AZ104-3.2
+            text: "Modify an existing Azure Resource Manager template"
+          - id: AZ104-3.3
+            text: "Modify an existing Bicep file"
+          - id: AZ104-3.4
+            text: "Deploy resources by using an Azure Resource Manager template or a Bicep file"
+          - id: AZ104-3.5
+            text: "Export a deployment as an Azure Resource Manager template or convert an Azure Resource Manager template to a Bicep file"
+
+      - id: cluster-vms
+        title: "Virtual machines"
+        objectives:
+          - id: AZ104-3.6
+            text: "Create a virtual machine"
+          - id: AZ104-3.7
+            text: "Configure encryption at host for Azure virtual machines"
+          - id: AZ104-3.8
+            text: "Move a virtual machine to another resource group, subscription, or region"
+          - id: AZ104-3.9
+            text: "Manage virtual machine sizes"
+          - id: AZ104-3.10
+            text: "Manage virtual machine disks"
+          - id: AZ104-3.11
+            text: "Deploy virtual machines to availability zones and availability sets"
+          - id: AZ104-3.12
+            text: "Deploy and configure an Azure Virtual Machine Scale Sets"
+
+      - id: cluster-containers
+        title: "Containers"
+        objectives:
+          - id: AZ104-3.13
+            text: "Create and manage an Azure Container Registry"
+          - id: AZ104-3.14
+            text: "Provision a container by using Azure Container Instances"
+          - id: AZ104-3.15
+            text: "Provision a container by using Azure Container Apps"
+          - id: AZ104-3.16
+            text: "Manage sizing and scaling for containers, including Azure Container Instances and Azure Container Apps"
+
+      - id: cluster-app-service
+        title: "Azure App Service"
+        objectives:
+          - id: AZ104-3.17
+            text: "Provision an App Service plan"
+          - id: AZ104-3.18
+            text: "Configure scaling for an App Service plan"
+          - id: AZ104-3.19
+            text: "Create an App Service"
+          - id: AZ104-3.20
+            text: "Configure certificates and Transport Layer Security (TLS) for an App Service"
+          - id: AZ104-3.21
+            text: "Map an existing custom DNS name to an App Service"
+          - id: AZ104-3.22
+            text: "Configure backup for an App Service"
+          - id: AZ104-3.23
+            text: "Configure networking settings for an App Service"
+          - id: AZ104-3.24
+            text: "Configure deployment slots for an App Service"
+
   - id: az104-d4
-    title: "Configure and manage virtual networking"
+    title: "Implement and manage virtual networking"
     chapter: act1-networking
     weight: "15-20%"
     clusters:
       - id: cluster-vnets
-        title: "Virtual networks and subnets"
+        title: "Virtual networks in Azure"
         objectives:
           - id: AZ104-4.1
             text: "Create and configure virtual networks and subnets"
           - id: AZ104-4.2
             text: "Create and configure virtual network peering"
-
-      - id: cluster-nsg
-        title: "Network security groups"
-        requires: [cluster-vnets]
-        objectives:
           - id: AZ104-4.3
-            text: "Configure network security groups and application security groups"
+            text: "Configure public IP addresses"
           - id: AZ104-4.4
-            text: "Evaluate effective security rules and troubleshoot network connectivity"
-
-      - id: cluster-dns
-        title: "Azure DNS and name resolution"
-        requires: [cluster-vnets]
-        objectives:
+            text: "Configure user-defined routes"
           - id: AZ104-4.5
-            text: "Configure public and private DNS zones and name resolution for virtual networks"
+            text: "Troubleshoot network connectivity"
 
-      - id: cluster-routing
-        title: "Routing and hybrid connectivity"
+      - id: cluster-secure-access
+        title: "Secure access to virtual networks"
         requires: [cluster-vnets]
         objectives:
           - id: AZ104-4.6
-            text: "Configure user-defined routes and route tables"
+            text: "Create and configure network security groups (NSGs) and application security groups"
           - id: AZ104-4.7
-            text: "Configure hybrid connectivity with VPN gateways and virtual network gateways"
+            text: "Evaluate effective security rules in NSGs"
+          - id: AZ104-4.8
+            text: "Implement Azure Bastion"
+          - id: AZ104-4.9
+            text: "Configure service endpoints for Azure platform as a service (PaaS)"
+          - id: AZ104-4.10
+            text: "Configure private endpoints for Azure PaaS"
 
-      - id: cluster-loadbalancing
-        title: "Load balancing"
+      - id: cluster-dns-lb
+        title: "Name resolution and load balancing"
         requires: [cluster-vnets]
         objectives:
-          - id: AZ104-4.8
-            text: "Configure Azure Load Balancer, including health probes and backend pools"
-          - id: AZ104-4.9
-            text: "Configure Azure Application Gateway and choose an appropriate load balancing solution"
+          - id: AZ104-4.11
+            text: "Configure Azure DNS"
+          - id: AZ104-4.12
+            text: "Configure an internal or public load balancer"
+          - id: AZ104-4.13
+            text: "Troubleshoot load balancing"
+
+  - id: az104-d5
+    title: "Monitor and maintain Azure resources"
+    chapter: act1-monitoring
+    weight: "10-15%"
+    clusters:
+      - id: cluster-monitor
+        title: "Monitoring resources"
+        objectives:
+          - id: AZ104-5.1
+            text: "Interpret metrics in Azure Monitor"
+          - id: AZ104-5.2
+            text: "Configure log settings in Azure Monitor"
+          - id: AZ104-5.3
+            text: "Query and analyze logs in Azure Monitor"
+          - id: AZ104-5.4
+            text: "Set up alert rules, action groups, and alert processing rules in Azure Monitor"
+          - id: AZ104-5.5
+            text: "Configure and interpret monitoring of virtual machines, storage accounts, and networks by using Azure Monitor Insights"
+          - id: AZ104-5.6
+            text: "Use Azure Network Watcher and Connection monitor"
+
+      - id: cluster-backup
+        title: "Backup and recovery"
+        requires: [cluster-monitor]
+        objectives:
+          - id: AZ104-5.7
+            text: "Create a Recovery Services vault"
+          - id: AZ104-5.8
+            text: "Create an Azure Backup vault"
+          - id: AZ104-5.9
+            text: "Create and configure a backup policy"
+          - id: AZ104-5.10
+            text: "Perform backup and restore operations by using Azure Backup"
+          - id: AZ104-5.11
+            text: "Configure Azure Site Recovery for Azure resources"
+          - id: AZ104-5.12
+            text: "Perform a failover to a secondary region by using Site Recovery"
+          - id: AZ104-5.13
+            text: "Configure and interpret reports and alerts for backups"
