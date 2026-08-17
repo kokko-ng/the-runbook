@@ -18,3 +18,7 @@ frontend/src/generated/
 
 # Local env
 .env
+
+# Playwright CLI session artifacts
+.playwright-cli/
+.playwright/
