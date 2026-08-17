@@ -1,0 +1,131 @@
+- generic [ref=e38]:
+  - banner [ref=e39]:
+    - generic [ref=e40]:
+      - link "The Runbook First Week, First Subnet" [ref=e41] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e42]: The Runbook
+        - generic [ref=e43]: First Week, First Subnet
+      - generic [ref=e44]:
+        - img "Standing 40 of 100, Solid" [ref=e131]:
+          - generic [ref=e57]: "40"
+          - generic [ref=e58]: Solid
+        - button "Skills" [ref=e59]
+        - button "Switch to dark theme" [ref=e60]: Dark
+  - main [ref=e61]:
+    - generic [ref=e63]:
+      - generic [ref=e132]:
+        - generic [ref=e133]:
+          - paragraph [ref=e135]: You chose
+          - paragraph [ref=e136]: 10.10.0.0/16 - matches the Kallang scheme, so it will be familiar to the network team
+        - generic [ref=e139]:
+          - paragraph [ref=e140]: Desmond puts the printout back on your desk without sitting down.
+          - paragraph [ref=e141]: Why that fails
+          - paragraph [ref=e142]: Overlapping address space is the one networking mistake Azure cannot route around. VNet peering and site-to-site VPN both require non-overlapping ranges; peering will refuse to be created and the VPN would blackhole traffic between the sites. Familiarity is not worth an address space you can never connect to anything.
+        - paragraph [ref=e145]: "-10 standing → 40"
+      - generic [ref=e64]:
+        - generic [ref=e65]:
+          - paragraph [ref=e66]: Address space
+          - paragraph [ref=e67]: Desmond Toh · Senior cloud admin
+          - generic [ref=e68]:
+            - paragraph [ref=e69]: Desmond Toh has been Meridian's senior cloud admin for six years and looks like he has slept through none of them. He drops a printout on your desk on your third morning.
+            - paragraph [ref=e70]: "\"New warehouse management system. Ops wants it in Azure by month end. You're building the network. I'm reviewing it, which means I'm going to find something wrong, so make it something small.\""
+            - paragraph [ref=e71]: The printout is a spreadsheet of every network Meridian runs. On-premises uses 10.10.0.0/16 in Kallang and 10.20.0.0/16 in the Johor cross-dock. The hub VNet in Azure is 10.100.0.0/16. There is a site-to-site VPN planned between Kallang and the hub before the end of the quarter.
+            - paragraph [ref=e72]: "\"Warehouse app needs room for about forty machines today,\" Desmond says, \"and Ops will ask for more, because Ops always asks for more. Pick the address space for the new spoke VNet.\""
+        - paragraph [ref=e73]: Which address space do you assign to vnet-warehouse-sea?
+        - list [ref=e74]:
+          - listitem [ref=e75]:
+            - button "10.10.0.0/16 - matches the Kallang scheme, so it will be familiar to the network team" [disabled] [ref=e76]
+          - listitem [ref=e77]:
+            - button "10.101.0.0/26 - exactly 64 addresses, sized to the 40 machines requested" [ref=e78]
+          - listitem [ref=e79]:
+            - button "10.101.0.0/16 - non-overlapping with on-premises and the hub, with room to subnet" [ref=e80]
+          - listitem [ref=e81]:
+            - button "172.16.0.0/16 - a different private range entirely, to avoid any chance of collision" [ref=e82]
+    - complementary [ref=e83]:
+      - generic [ref=e85]:
+        - generic [ref=e87]:
+          - paragraph [ref=e88]: Meridian estate
+          - paragraph [ref=e89]: 12 resources
+        - generic [ref=e93]:
+          - generic:
+            - img:
+              - img "Edge from sub-prod to rg-hub"
+            - img:
+              - img "Edge from sub-prod to rg-ops"
+            - img:
+              - img "Edge from rg-hub to vnet-hub"
+            - img:
+              - img "Edge from rg-ops to vnet-warehouse"
+            - img:
+              - img "Edge from vnet-hub to snet-shared"
+            - img:
+              - img "Edge from vnet-hub to snet-gateway"
+            - img:
+              - img "Edge from snet-shared to vm-dc01"
+            - img:
+              - img "Edge from vnet-warehouse to snet-app"
+            - img:
+              - img "Edge from snet-app to vm-wms01"
+            - img:
+              - img "Edge from nsg-app to snet-app":
+                - generic [ref=e94] [cursor=pointer]: associated
+            - generic:
+              - group:
+                - generic:
+                  - generic: SUB
+                  - generic "Meridian Production"
+              - group:
+                - generic:
+                  - generic: RG
+                  - generic "rg-hub-sea"
+              - group:
+                - generic:
+                  - generic: VN
+                  - generic "vnet-hub-sea"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "snet-shared-services"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "GatewaySubnet"
+              - group:
+                - generic:
+                  - generic: VM
+                  - generic "vm-dc01 (domain controller)"
+              - group:
+                - generic:
+                  - generic: RG
+                  - generic "rg-ops-sea"
+              - group:
+                - generic:
+                  - generic: VN
+                  - generic "vnet-warehouse-sea"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "snet-wms-app"
+              - group:
+                - generic:
+                  - generic: VM
+                  - generic "vm-wms01 (warehouse mgmt)"
+              - group:
+                - generic:
+                  - generic: SEC
+                  - generic "nsg-wms-app"
+              - group:
+                - generic:
+                  - generic: DC
+                  - generic "Kallang data center"
+  - generic [ref=e123]:
+    - generic [ref=e124]: Perks
+    - button "Hint 0" [disabled] [ref=e125]:
+      - text: Hint
+      - generic [ref=e126]: "0"
+    - button "Overtime 0" [disabled] [ref=e127]:
+      - text: Overtime
+      - generic [ref=e128]: "0"
+    - button "Rep Shield 0" [disabled] [ref=e129]:
+      - text: Rep Shield
+      - generic [ref=e130]: "0"

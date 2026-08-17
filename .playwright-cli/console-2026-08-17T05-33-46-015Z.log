@@ -1,0 +1,24 @@
+[   51006ms] [WARNING] [Vue warn]: Property "showsScenario" was accessed during render but is not defined on instance. 
+  at <EncounterPanel key=2 class="mt-2" > 
+  at <PlayView onVnodeUnmounted=fn<onVnodeUnmounted> ref=Ref< Proxy(Object) > > 
+  at <RouterView> 
+  at <App> @ http://localhost:5173/node_modules/.vite/deps/chunk-47A5N3YI.js?v=c23bcad8:2229
+[   85934ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/api/events:0
+[   89681ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/api/events:0
+[   93091ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/api/events:0
+[   96422ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/api/events:0
+[   98325ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:5173/api/events:0
+[  251987ms] [WARNING] [Vue Flow]: Viewport not initialized yet. @ http://localhost:5173/node_modules/.vite/deps/chunk-Z4E7RXBQ.js?v=c23bcad8:4729
+[  257751ms] [WARNING] [Vue Flow]: Viewport not initialized yet. @ http://localhost:5173/node_modules/.vite/deps/chunk-Z4E7RXBQ.js?v=c23bcad8:4729
+[  257923ms] [WARNING] [Vue Flow]: Viewport not initialized yet. @ http://localhost:5173/node_modules/.vite/deps/chunk-Z4E7RXBQ.js?v=c23bcad8:4729
+[  258060ms] [WARNING] [Vue Flow]: Viewport not initialized yet. @ http://localhost:5173/node_modules/.vite/deps/chunk-Z4E7RXBQ.js?v=c23bcad8:4729
+[  258200ms] [WARNING] [Vue Flow]: Viewport not initialized yet. @ http://localhost:5173/node_modules/.vite/deps/chunk-Z4E7RXBQ.js?v=c23bcad8:4729
+[  258244ms] [WARNING] [Vue Flow]: Viewport not initialized yet. @ http://localhost:5173/node_modules/.vite/deps/chunk-Z4E7RXBQ.js?v=c23bcad8:4729
+[  258270ms] [WARNING] [Vue Flow]: Viewport not initialized yet. @ http://localhost:5173/node_modules/.vite/deps/chunk-Z4E7RXBQ.js?v=c23bcad8:4729
+[  258310ms] [WARNING] [Vue Flow]: Viewport not initialized yet. @ http://localhost:5173/node_modules/.vite/deps/chunk-Z4E7RXBQ.js?v=c23bcad8:4729
+[  258365ms] [WARNING] [Vue Flow]: Viewport not initialized yet. @ http://localhost:5173/node_modules/.vite/deps/chunk-Z4E7RXBQ.js?v=c23bcad8:4729
+[  258397ms] [WARNING] [Vue Flow]: Viewport not initialized yet. @ http://localhost:5173/node_modules/.vite/deps/chunk-Z4E7RXBQ.js?v=c23bcad8:4729
+[  258509ms] [WARNING] [Vue Flow]: Viewport not initialized yet. @ http://localhost:5173/node_modules/.vite/deps/chunk-Z4E7RXBQ.js?v=c23bcad8:4729
+[  258547ms] [WARNING] [Vue Flow]: Viewport not initialized yet. @ http://localhost:5173/node_modules/.vite/deps/chunk-Z4E7RXBQ.js?v=c23bcad8:4729
+[  258649ms] [WARNING] [Vue Flow]: Viewport not initialized yet. @ http://localhost:5173/node_modules/.vite/deps/chunk-Z4E7RXBQ.js?v=c23bcad8:4729
+[  258876ms] [WARNING] [Vue Flow]: Viewport not initialized yet. @ http://localhost:5173/node_modules/.vite/deps/chunk-Z4E7RXBQ.js?v=c23bcad8:4729

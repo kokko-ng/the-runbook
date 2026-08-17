@@ -1,0 +1,156 @@
+- generic [ref=f1e3]:
+  - banner [ref=f1e4]:
+    - generic [ref=f1e5]:
+      - link "The Runbook The Peering Problem" [ref=f1e213] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f1e7]: The Runbook
+        - generic [ref=f1e8]: The Peering Problem
+      - generic [ref=f1e9]:
+        - img "Standing 58 of 100, Solid" [ref=f1e188]:
+          - generic [ref=f1e22]: "58"
+          - generic [ref=f1e23]: Solid
+        - button "Skills 2" [ref=f1e151]:
+          - text: Skills
+          - generic [ref=f1e110]: "2"
+        - button "Switch to dark theme" [ref=f1e25]: Dark
+  - main [ref=f1e26]:
+    - generic [ref=f1e214]:
+      - generic [ref=f1e229]:
+        - generic [ref=f1e230]:
+          - paragraph [ref=f1e231]: Diagnose
+          - paragraph [ref=f1e232]: Every command spends time against the incident budget.
+        - generic [ref=f1e233]:
+          - generic [ref=f1e234]: Time
+          - img "6 of 6 time units left" [ref=f1e235]
+          - generic [ref=f1e242]: 6/6
+      - list [ref=f1e255]:
+        - listitem [ref=f1e256]:
+          - button "az network vnet peering list -g rg-hub-sea --vnet-name vnet-hub-sea -o table 1 time" [ref=f1e257]:
+            - generic [ref=f1e258]: az network vnet peering list -g rg-hub-sea --vnet-name vnet-hub-sea -o table
+            - generic [ref=f1e259]: 1 time
+        - listitem [ref=f1e260]:
+          - button "az network vnet peering list -g rg-ops-sea --vnet-name vnet-warehouse-sea -o table 1 time" [ref=f1e261]:
+            - generic [ref=f1e262]: az network vnet peering list -g rg-ops-sea --vnet-name vnet-warehouse-sea -o table
+            - generic [ref=f1e263]: 1 time
+        - listitem [ref=f1e264]:
+          - button "az network nic show-effective-route-table -g rg-ops-sea -n nic-wms01 -o table 2 time" [ref=f1e265]:
+            - generic [ref=f1e266]: az network nic show-effective-route-table -g rg-ops-sea -n nic-wms01 -o table
+            - generic [ref=f1e267]: 2 time
+        - listitem [ref=f1e268]:
+          - button "az network nic list-effective-nsg -g rg-ops-sea -n nic-wms01 -o table 2 time" [ref=f1e269]:
+            - generic [ref=f1e270]: az network nic list-effective-nsg -g rg-ops-sea -n nic-wms01 -o table
+            - generic [ref=f1e271]: 2 time
+        - listitem [ref=f1e272]:
+          - button "az vm get-instance-view -g rg-hub-sea -n vm-dc01 --query instanceView.statuses[1] -o table 1 time" [ref=f1e273]:
+            - generic [ref=f1e274]: az vm get-instance-view -g rg-hub-sea -n vm-dc01 --query instanceView.statuses[1] -o table
+            - generic [ref=f1e275]: 1 time
+        - listitem [ref=f1e276]:
+          - button "az network watcher test-connectivity --source-resource vm-wms01 --dest-address 10.100.1.10 --dest-port 389 -o table 2 time" [ref=f1e277]:
+            - generic [ref=f1e278]: az network watcher test-connectivity --source-resource vm-wms01 --dest-address 10.100.1.10 --dest-port 389 -o table
+            - generic [ref=f1e279]: 2 time
+      - generic [ref=f1e280]:
+        - button "Apply a fix" [ref=f1e281]
+        - button "Back to asking around" [ref=f1e282]
+    - complementary [ref=f1e42]:
+      - generic [ref=f1e44]:
+        - generic [ref=f1e46]:
+          - paragraph [ref=f1e47]: Meridian estate
+          - paragraph [ref=f1e48]: 14 resources
+        - generic [ref=f1e52]:
+          - generic:
+            - img:
+              - img "Edge from sub-prod to rg-hub"
+            - img:
+              - img "Edge from sub-prod to rg-ops"
+            - img:
+              - img "Edge from rg-hub to vnet-hub"
+            - img:
+              - img "Edge from rg-ops to vnet-warehouse"
+            - img:
+              - img "Edge from vnet-hub to snet-shared"
+            - img:
+              - img "Edge from vnet-hub to snet-gateway"
+            - img:
+              - img "Edge from snet-shared to vm-dc01"
+            - img:
+              - img "Edge from vnet-warehouse to snet-app"
+            - img:
+              - img "Edge from snet-app to vm-wms01"
+            - img:
+              - img "Edge from nsg-app to snet-app":
+                - generic [ref=f1e53] [cursor=pointer]: associated
+            - img:
+              - img "Edge from vnet-warehouse to snet-web"
+            - img:
+              - img "Edge from vnet-warehouse to snet-data"
+            - img:
+              - img "Edge from vnet-hub to vnet-warehouse":
+                - generic [ref=f1e172] [cursor=pointer]: peering
+            - generic:
+              - group:
+                - generic:
+                  - generic: SUB
+                  - generic "Meridian Production"
+              - group:
+                - generic:
+                  - generic: RG
+                  - generic "rg-hub-sea"
+              - group:
+                - generic:
+                  - generic: VN
+                  - generic "vnet-hub-sea"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "snet-shared-services"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "GatewaySubnet"
+              - group:
+                - generic:
+                  - generic: VM
+                  - generic "vm-dc01 (domain controller)"
+              - group:
+                - generic:
+                  - generic: RG
+                  - generic "rg-ops-sea"
+              - group:
+                - generic:
+                  - generic: VN
+                  - generic "vnet-warehouse-sea (10.101.0.0/16)"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "snet-wms-app"
+              - group:
+                - generic:
+                  - generic: VM
+                  - generic "vm-wms01 (warehouse mgmt)"
+              - group:
+                - generic:
+                  - generic: SEC
+                  - generic "nsg-wms-app"
+              - group:
+                - generic:
+                  - generic: DC
+                  - generic "Kallang data center"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "snet-wms-web (10.101.1.0/24)"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "snet-wms-data (10.101.3.0/24)"
+  - generic [ref=f1e82]:
+    - generic [ref=f1e83]: Perks
+    - button "Hint 0" [disabled] [ref=f1e84]:
+      - text: Hint
+      - generic [ref=f1e85]: "0"
+    - button "Overtime 0" [disabled] [ref=f1e86]:
+      - text: Overtime
+      - generic [ref=f1e87]: "0"
+    - button "Rep Shield 0" [disabled] [ref=f1e88]:
+      - text: Rep Shield
+      - generic [ref=f1e89]: "0"

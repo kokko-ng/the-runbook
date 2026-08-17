@@ -1,0 +1,160 @@
+- generic [ref=f4e38]:
+  - banner [ref=f4e39]:
+    - generic [ref=f4e40]:
+      - link "The Runbook The Peering Problem" [ref=f4e274] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f4e42]: The Runbook
+        - generic [ref=f4e43]: The Peering Problem
+      - generic [ref=f4e44]:
+        - img "Standing 76 of 100, Trusted" [ref=f4e249]:
+          - generic [ref=f4e57]: "76"
+          - generic [ref=f4e58]: Trusted
+        - button "Skills 3" [ref=f4e212]:
+          - text: Skills
+          - generic [ref=f4e133]: "3"
+        - button "Switch to dark theme" [ref=f4e60]: Dark
+  - main [ref=f4e61]:
+    - generic [ref=f4e275]:
+      - generic [ref=f4e276]:
+        - paragraph [ref=f4e277]: "P2: Warehouse app cannot authenticate"
+        - article [ref=f4e278]:
+          - generic [ref=f4e279]:
+            - generic [ref=f4e280]: MER-4412
+            - generic [ref=f4e281]: P2
+            - generic [ref=f4e282]: NOC Manila (overnight shift) · 09:12
+          - paragraph [ref=f4e284]: Pickers at Kallang cannot log in to the warehouse app. App tier is up, web tier is up, database responds. Application log shows repeated "domain controller unreachable" on vm-wms01. Nothing changed on our side. Escalating to cloud team.
+        - paragraph [ref=f4e285]: NOC Manila · Network operations
+        - generic [ref=f4e286]:
+          - paragraph [ref=f4e287]: The NOC pings you at 09:12. Forty tablets on the warehouse floor are showing a login spinner and the shift supervisor has started counting pallets on paper, which he is enjoying and no one else is.
+          - paragraph [ref=f4e288]: Desmond is in a design review until ten. Priya has already asked twice whether it is "the Azure thing from last week."
+          - paragraph [ref=f4e289]: The app itself is healthy. What it cannot do is reach vm-dc01 in the hub - the peering you built in your first week.
+      - generic [ref=f4e290]:
+        - generic [ref=f4e291]:
+          - paragraph [ref=f4e292]: Investigate
+          - paragraph [ref=f4e293]: Ask around and read what came in. This costs little.
+        - generic [ref=f4e294]:
+          - generic [ref=f4e295]: Time
+          - img "6 of 6 time units left" [ref=f4e296]
+          - generic [ref=f4e303]: 6/6
+      - list [ref=f4e304]:
+        - listitem [ref=f4e305]:
+          - button "Ask the NOC what ran during the overnight maintenance window" [ref=f4e306]
+        - listitem [ref=f4e307]:
+          - button "Read the application log on vm-wms01" [ref=f4e308]
+        - listitem [ref=f4e309]:
+          - button "Ask Marcus Lim whether security changed any rules overnight" [ref=f4e310]
+        - listitem [ref=f4e311]:
+          - button "Interrupt Desmond in the design review" [ref=f4e312]
+      - generic [ref=f4e313]:
+        - button "Open a terminal" [ref=f4e314]
+        - button "Go straight to the fix" [ref=f4e315]
+    - complementary [ref=f4e83]:
+      - generic [ref=f4e85]:
+        - generic [ref=f4e87]:
+          - paragraph [ref=f4e88]: Meridian estate
+          - paragraph [ref=f4e89]: 14 resources · 2 needing attention
+        - generic [ref=f4e93]:
+          - generic:
+            - img:
+              - img "Edge from sub-prod to rg-hub"
+            - img:
+              - img "Edge from sub-prod to rg-ops"
+            - img:
+              - img "Edge from rg-hub to vnet-hub"
+            - img:
+              - img "Edge from rg-ops to vnet-warehouse"
+            - img:
+              - img "Edge from vnet-hub to snet-shared"
+            - img:
+              - img "Edge from vnet-hub to snet-gateway"
+            - img:
+              - img "Edge from snet-shared to vm-dc01"
+            - img:
+              - img "Edge from vnet-warehouse to snet-app"
+            - img:
+              - img "Edge from snet-app to vm-wms01"
+            - img:
+              - img "Edge from nsg-app to snet-app":
+                - generic [ref=f4e94] [cursor=pointer]: associated
+            - img:
+              - img "Edge from vnet-warehouse to snet-web"
+            - img:
+              - img "Edge from vnet-warehouse to snet-data"
+            - img:
+              - img "Edge from vnet-hub to vnet-warehouse":
+                - generic [ref=f4e233] [cursor=pointer]: peering
+            - generic:
+              - group:
+                - generic:
+                  - generic: SUB
+                  - generic "Meridian Production"
+              - group:
+                - generic:
+                  - generic: RG
+                  - generic "rg-hub-sea"
+              - group:
+                - generic:
+                  - generic: VN
+                  - generic "vnet-hub-sea"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "snet-shared-services"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "GatewaySubnet"
+              - group:
+                - generic:
+                  - generic: VM
+                  - generic "vm-dc01 (domain controller)"
+              - group:
+                - generic:
+                  - generic: RG
+                  - generic "rg-ops-sea"
+              - group:
+                - generic:
+                  - generic: VN
+                  - generic "vnet-warehouse-sea (10.101.0.0/16)"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "snet-wms-app"
+              - group:
+                - generic:
+                  - generic: VM
+                  - generic "vm-wms01 (warehouse mgmt)"
+              - group:
+                - generic:
+                  - generic: SEC
+                  - generic "nsg-wms-app"
+              - group:
+                - generic:
+                  - generic: DC
+                  - generic "Kallang data center"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "snet-wms-web (10.101.1.0/24)"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "snet-wms-data (10.101.3.0/24)"
+        - list [ref=f4e317]:
+          - listitem [ref=f4e318]:
+            - generic [ref=f4e320]: vnet-warehouse-sea (10.101.0.0/16)
+            - generic [ref=f4e321]: warning
+          - listitem [ref=f4e322]:
+            - generic [ref=f4e324]: vm-wms01 (warehouse mgmt)
+            - generic [ref=f4e325]: broken
+  - generic [ref=f4e123]:
+    - generic [ref=f4e124]: Perks
+    - button "Hint 0" [disabled] [ref=f4e125]:
+      - text: Hint
+      - generic [ref=f4e126]: "0"
+    - button "Overtime 0" [disabled] [ref=f4e127]:
+      - text: Overtime
+      - generic [ref=f4e128]: "0"
+    - button "Rep Shield 0" [disabled] [ref=f4e129]:
+      - text: Rep Shield
+      - generic [ref=f4e130]: "0"

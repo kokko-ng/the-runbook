@@ -112,6 +112,8 @@ encounters:
         stmeridianexports egressing to a public Azure address instead of staying
         on the private endpoint we paid for. Traffic is TLS so content is fine,
         but this was supposed to be private. Please explain by close of business.
+    on_enter_diagram_ops:
+      - {op: set_status, node: snet-data, status: warning}
     scenario: |
       Meridian's nightly manifest export writes to a storage account,
       stmeridianexports. Two weeks ago you deployed a private endpoint for it so
@@ -216,6 +218,7 @@ encounters:
           account is the sensible follow-up once the private path is proven.
         rep: 10
         diagram_ops:
+          - {op: set_status, node: snet-data, status: healthy}
           - op: add_node
             node:
               id: pe-exports

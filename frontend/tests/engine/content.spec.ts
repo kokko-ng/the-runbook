@@ -134,6 +134,36 @@ describe('compiled content', () => {
     expect(ids).toContain('agw-portal')
   })
 
+  it('leaves the estate healthy when every quest is solved correctly', () => {
+    // An incident that reddens the map must have a fix that repairs it. Without
+    // this, a quest can leave a permanently broken node and every later quest
+    // inherits the damage.
+    let state: GameState | undefined
+    for (const quest of inPlayOrder) {
+      state = playThrough(quest, state)
+    }
+
+    const unhealthy = state!.diagram.nodes.filter((node) => node.status !== 'healthy')
+    const brokenEdges = state!.diagram.edges.filter((edge) => edge.status !== 'healthy')
+
+    expect(unhealthy.map((node) => `${node.id}=${node.status}`)).toEqual([])
+    expect(brokenEdges.map((edge) => `${edge.id}=${edge.status}`)).toEqual([])
+  })
+
+  it('breaks something on the map during every troubleshooting incident', () => {
+    // The living map is the point: an incident the player cannot see is a
+    // missed teaching opportunity.
+    for (const quest of quests) {
+      for (const encounter of quest.encounters) {
+        if (encounter.type !== 'troubleshoot') continue
+        expect(
+          encounter.onEnterDiagramOps.length,
+          `${quest.id}:${encounter.id} does not show up on the map`,
+        ).toBeGreaterThan(0)
+      }
+    }
+  })
+
   it('carries diagram changes forward from one quest to the next', () => {
     const first = playThrough(inPlayOrder[0]!)
     const second = playThrough(inPlayOrder[1]!, first)

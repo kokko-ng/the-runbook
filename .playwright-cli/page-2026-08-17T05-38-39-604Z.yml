@@ -1,0 +1,115 @@
+- generic [ref=f4e38]:
+  - banner [ref=f4e39]:
+    - generic [ref=f4e40]:
+      - link "The Runbook First Week, First Subnet" [ref=f4e41] [cursor=pointer]:
+        - /url: /
+        - generic [ref=f4e42]: The Runbook
+        - generic [ref=f4e43]: First Week, First Subnet
+      - generic [ref=f4e44]:
+        - img "Standing 58 of 100, Solid" [ref=f4e131]:
+          - generic [ref=f4e57]: "58"
+          - generic [ref=f4e58]: Solid
+        - button "Skills 1" [ref=f4e132]:
+          - text: Skills
+          - generic [ref=f4e133]: "1"
+        - button "Switch to dark theme" [ref=f4e60]: Dark
+  - main [ref=f4e61]:
+    - generic [ref=f4e63]:
+      - generic [ref=f4e134]:
+        - generic [ref=f4e135]:
+          - paragraph [ref=f4e137]: You chose
+          - paragraph [ref=f4e138]: 10.101.0.0/16 - non-overlapping with on-premises and the hub, with room to subnet
+        - generic [ref=f4e141]:
+          - paragraph [ref=f4e142]: Why that works
+          - paragraph [ref=f4e143]: Non-overlapping with 10.10.0.0/16, 10.20.0.0/16, and the 10.100.0.0/16 hub, which keeps both peering and the planned VPN viable, and large enough to carve subnets for app, data, and management tiers without revisiting the address space. Private address space is free; running out of it is not.
+        - paragraph [ref=f4e146]: +8 standing → 58
+        - paragraph [ref=f4e149]: +1 skill point
+      - button "Carry on" [ref=f4e151]
+    - complementary [ref=f4e83]:
+      - generic [ref=f4e85]:
+        - generic [ref=f4e87]:
+          - paragraph [ref=f4e88]: Meridian estate
+          - paragraph [ref=f4e89]: 12 resources
+        - generic [ref=f4e93]:
+          - generic:
+            - img:
+              - img "Edge from sub-prod to rg-hub"
+            - img:
+              - img "Edge from sub-prod to rg-ops"
+            - img:
+              - img "Edge from rg-hub to vnet-hub"
+            - img:
+              - img "Edge from rg-ops to vnet-warehouse"
+            - img:
+              - img "Edge from vnet-hub to snet-shared"
+            - img:
+              - img "Edge from vnet-hub to snet-gateway"
+            - img:
+              - img "Edge from snet-shared to vm-dc01"
+            - img:
+              - img "Edge from vnet-warehouse to snet-app"
+            - img:
+              - img "Edge from snet-app to vm-wms01"
+            - img:
+              - img "Edge from nsg-app to snet-app":
+                - generic [ref=f4e94] [cursor=pointer]: associated
+            - generic:
+              - group:
+                - generic:
+                  - generic: SUB
+                  - generic "Meridian Production"
+              - group:
+                - generic:
+                  - generic: RG
+                  - generic "rg-hub-sea"
+              - group:
+                - generic:
+                  - generic: VN
+                  - generic "vnet-hub-sea"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "snet-shared-services"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "GatewaySubnet"
+              - group:
+                - generic:
+                  - generic: VM
+                  - generic "vm-dc01 (domain controller)"
+              - group:
+                - generic:
+                  - generic: RG
+                  - generic "rg-ops-sea"
+              - group:
+                - generic:
+                  - generic: VN
+                  - generic "vnet-warehouse-sea (10.101.0.0/16)"
+              - group:
+                - generic:
+                  - generic: SN
+                  - generic "snet-wms-app"
+              - group:
+                - generic:
+                  - generic: VM
+                  - generic "vm-wms01 (warehouse mgmt)"
+              - group:
+                - generic:
+                  - generic: SEC
+                  - generic "nsg-wms-app"
+              - group:
+                - generic:
+                  - generic: DC
+                  - generic "Kallang data center"
+  - generic [ref=f4e123]:
+    - generic [ref=f4e124]: Perks
+    - button "Hint 0" [disabled] [ref=f4e125]:
+      - text: Hint
+      - generic [ref=f4e126]: "0"
+    - button "Overtime 0" [disabled] [ref=f4e127]:
+      - text: Overtime
+      - generic [ref=f4e128]: "0"
+    - button "Rep Shield 0" [disabled] [ref=f4e129]:
+      - text: Rep Shield
+      - generic [ref=f4e130]: "0"

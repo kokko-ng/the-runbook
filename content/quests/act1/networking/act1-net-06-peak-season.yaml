@@ -104,6 +104,9 @@ encounters:
         application gateway. Roughly one request in three. Both backend instances
         are running and respond when we curl them directly from inside the VNet.
         Gateway itself shows Healthy in the portal blade.
+    on_enter_diagram_ops:
+      - {op: set_status, node: agw-portal, status: broken}
+      - {op: set_status, node: snet-web, status: warning}
     scenario: |
       Peak season, day one, 11:41. The application gateway went in two weeks ago
       with three portal instances behind it and it has been flawless in testing.

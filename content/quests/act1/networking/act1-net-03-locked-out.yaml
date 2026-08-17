@@ -104,6 +104,9 @@ encounters:
         Morning shift started. Handheld scanners scan a pallet and hang on
         submit. All 60 units, both floors. Web portal on desktops works fine.
         We are recording movements on paper. Trucks start loading at 07:30.
+    on_enter_diagram_ops:
+      - {op: set_status, node: nsg-app, status: broken}
+      - {op: set_status, node: vm-wms01, status: broken}
     scenario: |
       06:04 on a Monday. The scanners talk to a submission endpoint on the app
       tier over TCP 8443 - a detail nobody wrote down anywhere.
