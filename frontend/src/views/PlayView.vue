@@ -40,6 +40,27 @@ const nextQuest = computed(() => {
   return core[position + 1] ?? null
 })
 
+// After a performance improvement plan the engine drops the active run and
+// points the save at the chapter's checkpoint, which may be an earlier quest.
+const onPip = computed(
+  () => Boolean(quest.value) && !run.value && !finished.value && Boolean(save.value?.position),
+)
+
+const checkpointQuest = computed(() => {
+  const questId = save.value?.position?.quest_id
+  if (!questId || !chapter.value) return null
+  return chapter.value.quests.find((entry) => entry.id === questId) ?? null
+})
+
+async function pickItUpAgain(): Promise<void> {
+  const target = checkpointQuest.value?.id ?? props.questId
+  if (target !== props.questId) {
+    await router.push(`/play/${target}`)
+    return
+  }
+  await game.startQuest(target)
+}
+
 const progressLabel = computed(() => {
   if (!quest.value || !save.value?.position) return ''
   return `Encounter ${save.value.position.encounter_index + 1} of ${quest.value.encounters.length}`
@@ -173,6 +194,23 @@ watch(() => props.questId, () => {
         <button class="btn-primary" type="button" @click="game.dispatch({ type: 'advance' })">
           Continue
         </button>
+      </section>
+
+      <section v-else-if="onPip" class="card space-y-3 border-l-4 border-l-broken p-4 sm:p-5">
+        <h2 class="text-base font-semibold">Dana pulls you off the ticket</h2>
+        <p class="prose-beat">
+          Your reputation hit zero, so you are on a performance improvement plan. Nothing you
+          have already closed is lost: the chapter picks up again at
+          <span class="font-medium">{{ checkpointQuest?.title ?? 'its checkpoint' }}</span>, and
+          you start from 40.
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <button class="btn-primary" type="button" @click="pickItUpAgain">
+            Pick it up again
+          </button>
+          <RouterLink to="/career" class="btn-quiet">Back to the queue</RouterLink>
+          <RouterLink to="/skills" class="btn-quiet">Spend skill points</RouterLink>
+        </div>
       </section>
 
       <section v-else-if="finished" class="card space-y-4 p-4 sm:p-5">
