@@ -1,0 +1,164 @@
+# Objective inventory for Exam AZ-305: Designing Microsoft Azure Infrastructure
+# Solutions. Same rule as AZ-104: re-fetch the official study guide before every
+# content milestone rather than trusting this file to still be current.
+exam: AZ-305
+act: 2
+title: Designing Microsoft Azure Infrastructure Solutions
+source_url: https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/az-305
+skills_measured_as_of: "2026-04-17"
+fetched_on: "2026-08-24"
+domains:
+  - id: AZ305-1
+    title: Design identity, governance, and monitoring solutions
+    weight: 25-30%
+    chapter: act2-identity
+    groups:
+      - id: AZ305-1.1
+        title: Design solutions for logging and monitoring
+        objectives:
+          - id: AZ305-1.1.1
+            text: Recommend a logging solution
+          - id: AZ305-1.1.2
+            text: Recommend a solution for routing logs
+          - id: AZ305-1.1.3
+            text: Recommend a monitoring solution
+      - id: AZ305-1.2
+        title: Design authentication and authorization solutions
+        objectives:
+          - id: AZ305-1.2.1
+            text: Recommend an authentication solution
+          - id: AZ305-1.2.2
+            text: Recommend an identity management solution
+          - id: AZ305-1.2.3
+            text: Recommend a solution for authorizing access to Azure resources
+          - id: AZ305-1.2.4
+            text: Recommend a solution for authorizing access to on-premises resources
+          - id: AZ305-1.2.5
+            text: Recommend a solution to manage secrets, certificates, and keys
+      - id: AZ305-1.3
+        title: Design governance
+        objectives:
+          - id: AZ305-1.3.1
+            text: Recommend a structure for management groups, subscriptions, and resource groups, and a strategy for resource tagging
+          - id: AZ305-1.3.2
+            text: Recommend a solution for managing compliance
+          - id: AZ305-1.3.3
+            text: Recommend a solution for identity governance
+  - id: AZ305-2
+    title: Design data storage solutions
+    weight: 20-25%
+    chapter: act2-data
+    groups:
+      - id: AZ305-2.1
+        title: Design data storage solutions for relational data
+        objectives:
+          - id: AZ305-2.1.1
+            text: Recommend a solution for storing relational data
+          - id: AZ305-2.1.2
+            text: Recommend a database service tier and compute tier
+          - id: AZ305-2.1.3
+            text: Recommend a solution for database scalability
+          - id: AZ305-2.1.4
+            text: Recommend a solution for data protection
+      - id: AZ305-2.2
+        title: Design data storage solutions for semi-structured and unstructured data
+        objectives:
+          - id: AZ305-2.2.1
+            text: Recommend a solution for storing semi-structured data
+          - id: AZ305-2.2.2
+            text: Recommend a solution for storing unstructured data
+          - id: AZ305-2.2.3
+            text: Recommend a data storage solution to balance features, performance, and costs
+          - id: AZ305-2.2.4
+            text: Recommend a data solution for protection and durability
+      - id: AZ305-2.3
+        title: Design data integration
+        objectives:
+          - id: AZ305-2.3.1
+            text: Recommend a solution for data integration
+          - id: AZ305-2.3.2
+            text: Recommend a solution for data analysis
+  - id: AZ305-3
+    title: Design business continuity solutions
+    weight: 15-20%
+    chapter: act2-continuity
+    groups:
+      - id: AZ305-3.1
+        title: Design solutions for backup and disaster recovery
+        objectives:
+          - id: AZ305-3.1.1
+            text: Recommend a recovery solution for Azure and hybrid workloads that meets recovery objectives
+          - id: AZ305-3.1.2
+            text: Recommend a backup and recovery solution for compute
+          - id: AZ305-3.1.3
+            text: Recommend a backup and recovery solution for databases
+          - id: AZ305-3.1.4
+            text: Recommend a backup and recovery solution for unstructured data
+      - id: AZ305-3.2
+        title: Design for high availability
+        objectives:
+          - id: AZ305-3.2.1
+            text: Recommend a high availability solution for compute
+          - id: AZ305-3.2.2
+            text: Recommend a high availability solution for relational data
+          - id: AZ305-3.2.3
+            text: Recommend a high availability solution for semi-structured and unstructured data
+  - id: AZ305-4
+    title: Design infrastructure solutions
+    weight: 30-35%
+    chapter: act2-infrastructure
+    groups:
+      - id: AZ305-4.1
+        title: Design compute solutions
+        objectives:
+          - id: AZ305-4.1.1
+            text: Specify components of a compute solution based on workload requirements
+          - id: AZ305-4.1.2
+            text: Recommend a virtual machine-based solution
+          - id: AZ305-4.1.3
+            text: Recommend a container-based solution
+          - id: AZ305-4.1.4
+            text: Recommend a serverless-based solution
+          - id: AZ305-4.1.5
+            text: Recommend a compute solution for batch processing
+      - id: AZ305-4.2
+        title: Design an application architecture
+        objectives:
+          - id: AZ305-4.2.1
+            text: Recommend a messaging architecture
+          - id: AZ305-4.2.2
+            text: Recommend an event-driven architecture
+          - id: AZ305-4.2.3
+            text: Recommend a solution for API integration
+          - id: AZ305-4.2.4
+            text: Recommend a caching solution for applications
+          - id: AZ305-4.2.5
+            text: Recommend an application configuration management solution
+          - id: AZ305-4.2.6
+            text: Recommend an automated deployment solution for applications
+      - id: AZ305-4.3
+        title: Design migrations
+        objectives:
+          - id: AZ305-4.3.1
+            text: Evaluate a migration solution that leverages the Microsoft Cloud Adoption Framework for Azure
+          - id: AZ305-4.3.2
+            text: Evaluate on-premises servers, data, and applications for migration
+          - id: AZ305-4.3.3
+            text: Recommend a solution for migrating workloads to infrastructure as a service (IaaS) and platform as a service (PaaS)
+          - id: AZ305-4.3.4
+            text: Recommend a solution for migrating databases
+          - id: AZ305-4.3.5
+            text: Recommend a solution for migrating unstructured data
+      - id: AZ305-4.4
+        title: Design network solutions
+        objectives:
+          - id: AZ305-4.4.1
+            text: Recommend a connectivity solution that connects Azure resources to the internet
+          - id: AZ305-4.4.2
+            text: Recommend a connectivity solution that connects Azure resources to on-premises networks
+          - id: AZ305-4.4.3
+            text: Recommend a solution to optimize network performance
+          - id: AZ305-4.4.4
+            text: Recommend a solution to optimize network security
+          - id: AZ305-4.4.5
+            text: Recommend a load-balancing and routing solution

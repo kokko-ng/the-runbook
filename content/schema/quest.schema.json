@@ -1,0 +1,586 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-runbook.dev/schema/quest.schema.json",
+  "title": "Quest",
+  "description": "One quest file. A quest holds 3-6 encounters and targets 8-15 minutes of play.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "chapter",
+    "title",
+    "summary",
+    "objectives",
+    "encounters"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "chapter": {
+      "type": "string",
+      "pattern": "^act[12]-[a-z0-9-]+$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 60
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 200
+    },
+    "variant": {
+      "enum": [
+        "core",
+        "bonus"
+      ],
+      "default": "core"
+    },
+    "bonus_of": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "estimated_minutes": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 25
+    },
+    "objectives": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/objectiveId"
+      }
+    },
+    "brief": {
+      "type": "string",
+      "minLength": 10
+    },
+    "debrief": {
+      "type": "string",
+      "minLength": 10
+    },
+    "encounters": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 6,
+      "items": {
+        "$ref": "#/$defs/encounter"
+      }
+    }
+  },
+  "$defs": {
+    "objectiveId": {
+      "type": "string",
+      "pattern": "^AZ(104|305)-\\d+\\.\\d+\\.\\d+$"
+    },
+    "localId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*$"
+    },
+    "speaker": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 40
+    },
+    "diagramOps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/diagramOp"
+      }
+    },
+    "diagramOp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op"
+      ],
+      "properties": {
+        "op": {
+          "enum": [
+            "add_node",
+            "remove_node",
+            "set_status",
+            "set_detail",
+            "add_edge",
+            "remove_edge",
+            "set_edge_status"
+          ]
+        },
+        "node": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "edge": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "status": {
+          "enum": [
+            "healthy",
+            "degraded",
+            "broken",
+            "planned"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "maxLength": 120
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "enum": [
+                  "add_node",
+                  "remove_node",
+                  "set_status",
+                  "set_detail"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "node"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "enum": [
+                  "add_edge",
+                  "remove_edge",
+                  "set_edge_status"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "edge"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "set_status"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "status"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "set_edge_status"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "status"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "op": {
+                "const": "set_detail"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "detail"
+            ]
+          }
+        }
+      ]
+    },
+    "option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "correct",
+        "rep",
+        "explain"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/localId"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 220
+        },
+        "correct": {
+          "type": "boolean"
+        },
+        "rep": {
+          "type": "integer",
+          "minimum": -15,
+          "maximum": 10
+        },
+        "consequence": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 500
+        },
+        "explain": {
+          "type": "string",
+          "minLength": 20
+        },
+        "diagram": {
+          "$ref": "#/$defs/diagramOps"
+        }
+      }
+    },
+    "encounter": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "title",
+        "intro"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/localId"
+        },
+        "type": {
+          "enum": [
+            "design",
+            "troubleshoot",
+            "knowledge"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 70
+        },
+        "intro": {
+          "type": "string",
+          "minLength": 40
+        },
+        "speaker": {
+          "$ref": "#/$defs/speaker"
+        },
+        "objectives": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/objectiveId"
+          }
+        },
+        "on_enter": {
+          "$ref": "#/$defs/diagramOps"
+        },
+        "resolution": {
+          "type": "string",
+          "minLength": 10
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "design"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/designEncounter"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "troubleshoot"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/troubleshootEncounter"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "knowledge"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/knowledgeEncounter"
+          }
+        }
+      ]
+    },
+    "designEncounter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "title",
+        "intro",
+        "prompt",
+        "options"
+      ],
+      "properties": {
+        "id": true,
+        "type": {
+          "const": "design"
+        },
+        "title": true,
+        "intro": true,
+        "speaker": true,
+        "objectives": true,
+        "on_enter": true,
+        "resolution": true,
+        "prompt": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 200
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/option"
+          }
+        }
+      }
+    },
+    "knowledgeEncounter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "title",
+        "intro",
+        "speaker",
+        "question",
+        "options"
+      ],
+      "properties": {
+        "id": true,
+        "type": {
+          "const": "knowledge"
+        },
+        "title": true,
+        "intro": true,
+        "speaker": true,
+        "objectives": true,
+        "on_enter": true,
+        "resolution": true,
+        "question": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 240
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/option"
+          }
+        }
+      }
+    },
+    "troubleshootEncounter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "title",
+        "intro",
+        "ticket",
+        "time_budget",
+        "investigate",
+        "commands",
+        "fixes"
+      ],
+      "properties": {
+        "id": true,
+        "type": {
+          "const": "troubleshoot"
+        },
+        "title": true,
+        "intro": true,
+        "speaker": true,
+        "objectives": true,
+        "on_enter": true,
+        "resolution": true,
+        "ticket": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ref",
+            "opened",
+            "reporter",
+            "summary"
+          ],
+          "properties": {
+            "ref": {
+              "type": "string",
+              "pattern": "^[A-Z]{3}-\\d{3,6}$"
+            },
+            "opened": {
+              "type": "string",
+              "pattern": "^\\d{2}:\\d{2}$"
+            },
+            "reporter": {
+              "type": "string",
+              "minLength": 2
+            },
+            "summary": {
+              "type": "string",
+              "minLength": 10,
+              "maxLength": 200
+            },
+            "severity": {
+              "enum": [
+                "sev1",
+                "sev2",
+                "sev3",
+                "sev4"
+              ],
+              "default": "sev3"
+            }
+          }
+        },
+        "time_budget": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 12
+        },
+        "investigate": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "action",
+              "reveals"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/localId"
+              },
+              "action": {
+                "type": "string",
+                "minLength": 8,
+                "maxLength": 160
+              },
+              "speaker": {
+                "$ref": "#/$defs/speaker"
+              },
+              "reveals": {
+                "type": "string",
+                "minLength": 15
+              },
+              "time_cost": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3,
+                "default": 0
+              }
+            }
+          }
+        },
+        "commands": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "cmd",
+              "output"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/localId"
+              },
+              "cmd": {
+                "type": "string",
+                "minLength": 5,
+                "maxLength": 300
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 120
+              },
+              "output": {
+                "type": "string",
+                "minLength": 5
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 240
+              },
+              "time_cost": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3,
+                "default": 1
+              }
+            }
+          }
+        },
+        "fixes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/option"
+          }
+        }
+      }
+    }
+  }
+}

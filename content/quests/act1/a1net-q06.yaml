@@ -1,0 +1,313 @@
+id: a1net-q06
+chapter: act1-networking
+title: Half the Scanners
+summary: Intake works for some uploads and fails for others, and the pattern is exactly fifty per cent.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ104-4.3.2
+  - AZ104-4.3.3
+  - AZ104-4.1.4
+brief: >
+  Scale-out went in last month. The intake endpoint now sits behind a load
+  balancer, which is either the reason today is fine or the reason today is not.
+debrief: >
+  The probe now asks the application whether it is well, rather than asking the
+  operating system whether it is awake.
+encounters:
+  - id: a
+    type: design
+    title: Two endpoints, one address
+    speaker: Marek Sobczak
+    objectives: [AZ104-4.3.2]
+    intro: >
+      Two things need balancing and Marek wants both designed before either is
+      built.
+
+
+      The first is intake: scanners across five countries upload over the internet
+      to a fixed public address, hitting a scale set of four instances in
+      snet-app. The second is the transport application's internal API, which is
+      called only by other virtual machines inside vnet-app and must never be
+      reachable from outside.
+
+
+      "Same product, two shapes," he says. "Tell me the shapes."
+    prompt: What do you propose?
+    options:
+      - id: a
+        label: >
+          A public Standard Load Balancer for intake and an internal Standard Load Balancer
+          for the API, both with health probes on the application port
+        correct: true
+        rep: 8
+        consequence: >
+          Marek writes both into the design document under your name, which is either trust
+          or a trap.
+        explain: >
+          A public load balancer has a public frontend and serves internet clients; an
+          internal one has a private frontend inside the virtual network and is unreachable
+          from outside. The Standard SKU is the current one, supports availability zones and
+          is required with Standard public IP addresses.
+        diagram:
+          - {op: add_node, node: lb-pod}
+          - {op: add_node, node: lb-internal-tms}
+          - {op: add_node, node: vmss-intake}
+          - {op: add_edge, edge: e-lb-vmss}
+          - {op: add_edge, edge: e-lb-pip}
+          - {op: add_edge, edge: e-internet-lb}
+      - id: b
+        label: >
+          One public load balancer for both, with the API on a second frontend port restricted
+          by a security group
+        correct: false
+        rep: -8
+        consequence: >
+          Wei Lin's next scan reports an internal API answering on a public address, and the
+          security group rule is the only thing standing between them.
+        explain: >
+          It puts an internal-only service on a public frontend and makes a security group
+          rule the sole control. An internal load balancer has no public frontend at all,
+          which is a stronger statement than a rule someone can edit.
+      - id: c
+        label: A public Basic Load Balancer for intake and an internal Basic one for the API
+        correct: false
+        rep: -6
+        consequence: >
+          The deployment fails against the Standard public IP address you already gave
+          Hendrik, and Basic is on its way out anyway.
+        explain: >
+          Basic Load Balancer is retired, has no zone support, and cannot be used with a
+          Standard SKU public IP address. Standard is the default choice now.
+      - id: d
+        label: Skip the internal load balancer and let callers use Azure DNS round robin across the API instances
+        correct: false
+        rep: -7
+        consequence: >
+          When one instance dies, a third of internal calls fail for as long as the record's
+          time to live, and nothing takes it out of rotation.
+        explain: >
+          DNS round robin has no health awareness and no fast failover. A load balancer with
+          a health probe takes an unhealthy instance out of rotation in seconds.
+  - id: b
+    type: troubleshoot
+    title: INC-4611
+    speaker: Joana Reyes
+    objectives: [AZ104-4.3.3]
+    intro: >
+      "Roughly half of scanner uploads fail," says Joana, "and the half is not the
+      same scanners each time. Retry usually works. It started at 06:40 and no
+      change went in this morning."
+
+
+      The intake endpoint is lb-pod-intake, a public Standard Load Balancer, in
+      front of a four-instance scale set. Its health probe was configured during
+      the scale-out project last month by someone who has since left.
+    ticket:
+      ref: INC-4611
+      opened: "06:40"
+      reporter: Joana Reyes
+      summary: About half of scanner uploads fail at the intake endpoint. Retries succeed.
+      severity: sev2
+    time_budget: 6
+    on_enter:
+      - {op: set_status, node: lb-pod, status: degraded}
+      - {op: set_status, node: vmss-intake, status: degraded}
+    investigate:
+      - id: a
+        action: Ask Hendrik what the failure looks like at the depot
+        speaker: Hendrik Salim
+        reveals: >
+          "Handheld says upload failed, try again. Second attempt usually goes. Third
+          always does. The drivers have started just pressing it twice out of habit,
+          which I would like to stop."
+      - id: b
+        action: Ask what changed on the scale set overnight
+        speaker: Marek Sobczak
+        reveals: >
+          "Automatic operating system image upgrade ran at 06:10 across the scale set,
+          one instance at a time. It finished at 06:35 and reported success."
+      - id: c
+        action: Ask whether the application starts by itself after a reboot
+        speaker: Marek Sobczak
+        reveals: >
+          "The intake service is installed as a custom script extension. It runs on
+          provisioning. Nobody ever set it to start on boot, because nobody ever
+          rebooted these."
+    commands:
+      - id: a
+        label: Show the load balancer health probe
+        cmd: az network lb probe list -g rg-app --lb-name lb-pod-intake -o table
+        output: |
+          Name          Protocol    Port    IntervalInSeconds    NumberOfProbes
+          ------------  ----------  ------  -------------------  ----------------
+          probe-intake  Tcp         22      5                    2
+        note: The probe checks whether port 22 accepts a connection. The intake service listens on 8443.
+        time_cost: 1
+      - id: b
+        label: Show the backend pool health
+        cmd: az network lb show -g rg-app -n lb-pod-intake --query "backendAddressPools[0].loadBalancerBackendAddresses[].name" -o tsv
+        output: |
+          vmss-intake_0
+          vmss-intake_1
+          vmss-intake_2
+          vmss-intake_3
+        time_cost: 1
+      - id: c
+        label: Look at the health probe status metric for the last hour
+        cmd: az monitor metrics list --resource lb-pod-intake -g rg-app --resource-type Microsoft.Network/loadBalancers --metric DipAvailability --interval PT5M --query "value[0].timeseries[0].data[-3:]" -o table
+        output: |
+          Average    TimeStamp
+          ---------  -------------------
+          100.0      2026-08-24T06:45:00Z
+          100.0      2026-08-24T06:50:00Z
+          100.0      2026-08-24T06:55:00Z
+        note: The platform believes all four instances are healthy.
+        time_cost: 2
+      - id: d
+        label: Ask each instance directly whether the application answers
+        cmd: az vmss run-command invoke -g rg-app -n vmss-intake --instance-id 2 --command-id RunShellScript --scripts "curl -s -o /dev/null -w '%{http_code}' http://localhost:8443/health"
+        output: |
+          {
+            "value": [
+              {
+                "message": "000",
+                "code": "ComponentStatus/StdOut/succeeded"
+              }
+            ]
+          }
+        note: Nothing is listening on 8443 on instance 2. Instances 0 and 1 answer 200.
+        time_cost: 2
+      - id: e
+        label: Check the load balancing rule
+        cmd: az network lb rule list -g rg-app --lb-name lb-pod-intake -o table
+        output: |
+          Name         Protocol    FrontendPort    BackendPort    IdleTimeout    EnableTcpReset
+          -----------  ----------  --------------  -------------  -------------  ----------------
+          rule-intake  Tcp         443             8443           4              True
+        time_cost: 1
+      - id: f
+        label: Check the security group on the application subnet
+        cmd: az network nsg rule list -g rg-app --nsg-name nsg-app -o table
+        output: |
+          Name              Priority  Direction  Access  SourceAddressPrefix        DestinationPortRange
+          ----------------  --------  ---------  ------  -------------------------  --------------------
+          AllowLbProbe      200       Inbound    Allow   AzureLoadBalancer          *
+          AllowIntake       210       Inbound    Allow   Internet                   8443
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Change the probe to an HTTP probe against the application's health path on port 8443,
+          and set the intake service to start on boot
+        correct: true
+        rep: 10
+        consequence: >
+          The two instances that never restarted the service drop out of rotation within
+          fifteen seconds, uploads stop failing, and the scale set repairs itself on the next
+          image upgrade.
+        explain: >
+          A TCP probe on port 22 only proves the operating system is up, so instances where
+          the application never started stayed in rotation and took their share of traffic.
+          A probe must test the thing that serves the traffic: an HTTP or HTTPS probe against
+          a health path on the backend port. Fixing the probe stops the bleeding; making the
+          service start on boot stops it recurring.
+        diagram:
+          - {op: set_status, node: lb-pod, status: healthy}
+          - {op: set_status, node: vmss-intake, status: healthy}
+      - id: b
+        label: Increase the probe interval and the unhealthy threshold so instances are not flapping
+        correct: false
+        rep: -8
+        consequence: >
+          Nothing changes, because nothing was flapping, and the next engineer to read the
+          configuration has one more thing to be confused by.
+        explain: >
+          The metric showed a steady 100 per cent availability, so the probe was not flapping,
+          it was passing when it should have failed. Tuning thresholds on a probe that checks
+          the wrong port cannot help.
+      - id: c
+        label: Scale the set out to eight instances so there is more capacity behind the endpoint
+        correct: false
+        rep: -9
+        consequence: >
+          Priya asks why intake compute doubled, and the failure rate stays at roughly half
+          because half the new instances have the same problem.
+        explain: >
+          The instances were not overloaded, they were dead and still in rotation. Scaling out
+          adds more of both kinds, so the ratio does not move and the bill does.
+      - id: d
+        label: Add a security group rule allowing the AzureLoadBalancer service tag inbound on 8443
+        correct: false
+        rep: -6
+        consequence: >
+          The rule is redundant with one already in place, and uploads keep failing at the
+          same rate.
+        explain: >
+          AllowLbProbe already permits the AzureLoadBalancer service tag, and the probe was
+          succeeding anyway. It is a real cause of probe failures, just not this one.
+  - id: c
+    type: design
+    title: Everything through the appliance
+    speaker: Wei Lin Tan
+    objectives: [AZ104-4.1.4]
+    intro: >
+      "New control," says Wei Lin. "All outbound internet traffic from the depot
+      subnet must pass through the inspection appliance in the hub. It is deployed
+      at 10.10.1.4 and its vendor calls it transparent, whatever that means."
+
+
+      Today snet-depot has the default routes only: the local virtual network
+      prefix, and 0.0.0.0/0 pointing straight at the internet.
+    prompt: What do you configure?
+    options:
+      - id: a
+        label: >
+          A route table on snet-depot with 0.0.0.0/0 to next hop Virtual appliance at
+          10.10.1.4, and IP forwarding enabled on the appliance NIC
+        correct: true
+        rep: 9
+        consequence: >
+          Traffic starts appearing in the appliance's logs within a minute, and Wei Lin
+          confirms the control is in place.
+        explain: >
+          A user-defined route on the subnet overrides the default route for the prefix it
+          covers. The next hop type Virtual appliance takes an address, and Azure will drop
+          traffic forwarded by a virtual machine unless IP forwarding is enabled on its
+          network interface. Both halves are needed.
+        diagram:
+          - {op: add_node, node: rt-depot}
+          - {op: add_node, node: nva-hub}
+          - {op: add_edge, edge: e-rt-depot}
+          - {op: add_edge, edge: e-rt-nva}
+      - id: b
+        label: A route table on snet-depot with 0.0.0.0/0 to next hop Virtual appliance at 10.10.1.4
+        correct: false
+        rep: -7
+        consequence: >
+          Depot internet access stops completely, and the appliance's own logs show nothing at
+          all arriving.
+        explain: >
+          The route is right and the appliance cannot act on it. Azure drops packets a virtual
+          machine tries to forward unless IP forwarding is enabled on the network interface, so
+          traffic reaches the appliance and dies there.
+      - id: c
+        label: A route table on snet-depot with 0.0.0.0/0 to next hop Virtual network gateway
+        correct: false
+        rep: -8
+        consequence: >
+          Every depot request goes down the VPN tunnel to Jurong, which notices immediately.
+        explain: >
+          Virtual network gateway sends traffic to the VPN or ExpressRoute gateway, which is
+          how you force tunnel to on-premises. It is a legitimate pattern and not the one asked
+          for here.
+      - id: d
+        label: An outbound deny rule on nsg-depot for the internet, so traffic has to use the appliance
+        correct: false
+        rep: -9
+        consequence: >
+          Depot internet access stops and nothing routes to the appliance, because a security
+          group has never moved a packet anywhere.
+        explain: >
+          Security groups filter; route tables direct. Denying internet outbound removes access
+          without creating any path through the appliance.

@@ -1,0 +1,28 @@
+[project]
+name = "runbook-backend"
+version = "1.0.0"
+description = "API and content pipeline for The Runbook"
+requires-python = ">=3.13"
+dependencies = [
+    "django>=5.2,<6.0",
+    "django-ninja>=1.4",
+    "pyyaml>=6.0",
+    "jsonschema>=4.23",
+    "mysqlclient>=2.2; sys_platform == 'linux'",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-django>=4.9", "ruff>=0.6"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["test_*.py"]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

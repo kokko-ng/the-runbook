@@ -1,0 +1,102 @@
+@import 'tailwindcss';
+
+/* Manual theme switching on top of the system preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono',
+    monospace;
+
+  --color-ink-50: oklch(0.985 0.002 250);
+  --color-ink-100: oklch(0.96 0.004 250);
+  --color-ink-200: oklch(0.91 0.006 250);
+  --color-ink-300: oklch(0.83 0.008 250);
+  --color-ink-400: oklch(0.66 0.012 250);
+  --color-ink-500: oklch(0.53 0.014 250);
+  --color-ink-600: oklch(0.43 0.016 250);
+  --color-ink-700: oklch(0.34 0.018 250);
+  --color-ink-800: oklch(0.25 0.02 250);
+  --color-ink-900: oklch(0.19 0.022 252);
+  --color-ink-950: oklch(0.14 0.024 252);
+
+  --color-signal-400: oklch(0.72 0.13 245);
+  --color-signal-500: oklch(0.62 0.16 250);
+  --color-signal-600: oklch(0.54 0.17 252);
+
+  --color-healthy: oklch(0.68 0.14 155);
+  --color-degraded: oklch(0.78 0.15 80);
+  --color-broken: oklch(0.62 0.2 22);
+  --color-planned: oklch(0.7 0.02 250);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    @apply bg-ink-50 text-ink-900 font-sans antialiased;
+    /* Nothing in this app may push the page sideways, at any width. */
+    overflow-x: hidden;
+  }
+
+  .dark body {
+    @apply bg-ink-950 text-ink-100;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-signal-500;
+  }
+
+  /* Fluid type: readable on a 320 px phone, comfortable on a monitor. */
+  .prose-beat {
+    font-size: clamp(0.975rem, 0.94rem + 0.18vw, 1.075rem);
+    line-height: 1.65;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-ink-200 bg-white shadow-sm dark:border-ink-800 dark:bg-ink-900;
+  }
+
+  /* One shared base so every button is the same size and shape. Tailwind v4
+     will not let a custom class be @apply-ed, hence the selector list. */
+  .btn,
+  .btn-primary,
+  .btn-quiet {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2.5
+    text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply bg-signal-600 text-white hover:bg-signal-500 active:bg-signal-600;
+  }
+
+  .btn-quiet {
+    @apply border border-ink-200 bg-white text-ink-700 hover:bg-ink-100
+    dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200 dark:hover:bg-ink-800;
+  }
+
+  /* Every command output and log pane scrolls inside itself. */
+  .console {
+    @apply overflow-x-auto rounded-lg bg-ink-950 p-3 font-mono text-[0.8rem]
+    leading-relaxed text-ink-100 dark:bg-black/60;
+  }
+
+  .console pre {
+    @apply whitespace-pre;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

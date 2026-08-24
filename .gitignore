@@ -1,0 +1,27 @@
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.sqlite3
+.pytest_cache/
+.ruff_cache/
+
+# node
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+
+# generated content bundle
+frontend/public/content/
+content/coverage.json
+
+# tooling
+.DS_Store
+.legacy/
+.env
+*.log
+playwright-report/
+test-results/
+.playwright-mcp/

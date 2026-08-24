@@ -1,0 +1,228 @@
+id: a1net-q01
+chapter: act1-networking
+title: Address Space Roulette
+summary: A new depot needs a virtual network, and nobody has written down which ranges are already spoken for.
+variant: core
+estimated_minutes: 12
+objectives:
+  - AZ104-4.1.1
+  - AZ104-4.1.3
+brief: >
+  Meridian is opening a cross-dock in Johor and the depot systems have to live in
+  Azure from day one. You get to draw the network before anyone else draws it for you.
+debrief: >
+  The address space is on a wiki page now, which is more documentation than the
+  last three virtual networks got.
+encounters:
+  - id: a
+    type: design
+    title: Pick a range that will not bite
+    speaker: Dana Ong
+    objectives: [AZ104-4.1.1]
+    intro: >
+      Dana drops a chair next to your desk, which is how she asks for things.
+
+
+      "Johor cross-dock goes live in six weeks. Scanners, a print server, the
+      usual. Marek says you are drawing the virtual network." She slides over a
+      printout: vnet-hub is 10.10.0.0/16, vnet-app is 10.20.0.0/16, and the
+      Jurong data center advertises 172.16.0.0/12 over the site-to-site VPN.
+
+
+      "Whatever you pick has to peer to the hub and route back to Jurong. And
+      before you ask, no, we are not renumbering Jurong."
+    prompt: What address space do you put in the change request?
+    options:
+      - id: a
+        label: 10.30.0.0/16, peered to the hub
+        correct: true
+        rep: 7
+        consequence: Dana signs it without reading past the first line, which from her is a compliment.
+        explain: >
+          Address spaces that will ever route to each other must not overlap. 10.30.0.0/16
+          is clear of the hub, the application spoke and the on-premises 172.16.0.0/12
+          range, and a /16 leaves room for subnets you have not thought of yet.
+        diagram:
+          - {op: add_node, node: vnet-depot}
+      - id: b
+        label: 10.20.0.0/16, matching the application spoke for consistency
+        correct: false
+        rep: -10
+        consequence: >
+          Peering the two networks fails outright, and you spend the afternoon explaining
+          why "consistency" was the wrong word.
+        explain: >
+          Two virtual networks with overlapping address spaces cannot be peered at all.
+          Azure rejects the peering rather than silently doing something clever.
+      - id: c
+        label: 172.16.40.0/24, which is small and tidy
+        correct: false
+        rep: -8
+        consequence: >
+          Everything works until a scanner tries to reach the Jurong print queue, and
+          then it works even less.
+        explain: >
+          172.16.40.0/24 sits inside the 172.16.0.0/12 range Jurong already advertises
+          over the VPN. Overlapping with on-premises breaks routing in ways that look
+          like an application fault for the first two hours.
+      - id: d
+        label: 10.10.128.0/17, carved out of the hub range
+        correct: false
+        rep: -9
+        consequence: Marek asks, without looking up, which half of the hub you plan to break.
+        explain: >
+          10.10.128.0/17 is inside vnet-hub's 10.10.0.0/16. Peering requires distinct
+          address spaces; a subset is still an overlap.
+  - id: b
+    type: design
+    title: Carve the subnets
+    speaker: Marek Sobczak
+    objectives: [AZ104-4.1.1]
+    intro: >
+      Marek reviews the design the way he reviews everything, which is by finding
+      the smallest thing wrong with it first.
+
+
+      "Fine. Now subnets. You have got scanners, about forty of them, a print
+      server, and the security team will want Bastion in the hub eventually, not
+      here. What are you giving me?"
+
+
+      He writes 10.30.0.0/16 on the whiteboard and waits.
+    prompt: How do you carve up 10.30.0.0/16?
+    options:
+      - id: a
+        label: snet-depot 10.30.1.0/24 for the scanners and print server, leaving the rest unallocated
+        correct: true
+        rep: 6
+        consequence: >
+          Marek caps the marker. "Room to grow and nothing wasted. Put the spare ranges
+          on the wiki before you forget them."
+        explain: >
+          A /24 gives 251 usable addresses once Azure takes the first four and the last
+          one in every subnet, which is comfortable for forty scanners and a print
+          server. Leaving the remainder of the /16 unallocated is the point of taking a
+          /16 in the first place.
+        diagram:
+          - {op: add_node, node: snet-depot}
+      - id: b
+        label: One subnet, 10.30.0.0/16, so nothing ever needs resizing
+        correct: false
+        rep: -6
+        consequence: >
+          Wei Lin reads the design and asks how you plan to put a security group between
+          the scanners and anything else.
+        explain: >
+          A single flat subnet leaves nowhere to apply different network security groups
+          or route tables later, and Azure will not let you shrink a subnet that has
+          resources in it.
+      - id: c
+        label: snet-depot 10.30.1.0/29 for the scanners, sized exactly to the device count
+        correct: false
+        rep: -7
+        consequence: Deployment fails on the ninth scanner, at the depot, on a Saturday.
+        explain: >
+          A /29 has eight addresses, of which Azure reserves five: the network address,
+          the first three for the platform gateway and DNS, and the broadcast address.
+          That leaves three usable. Always size subnets with those five in mind.
+      - id: d
+        label: snet-depot 10.30.1.0/24 plus an AzureBastionSubnet at 10.30.2.0/27
+        correct: false
+        rep: -5
+        consequence: >
+          The Bastion deployment fails validation and you find out why in the activity
+          log rather than from the portal.
+        explain: >
+          Two problems. Bastion needs at least a /26, not a /27, and Marek just told you
+          Bastion belongs in the hub so one deployment can serve every spoke.
+  - id: c
+    type: design
+    title: One public address, chosen on purpose
+    speaker: Hendrik Salim
+    objectives: [AZ104-4.1.3]
+    intro: >
+      Hendrik calls from a warehouse floor, so half the sentence is a forklift.
+
+
+      "The Johor scanners hit an intake endpoint over the internet when the site
+      link drops. That endpoint has to keep the same address, because the handheld
+      firmware has it baked in and reflashing forty units means forty trips."
+
+
+      You are provisioning the public IP address for the intake load balancer this
+      afternoon. Meridian runs in Southeast Asia, which has availability zones, and
+      Hendrik has never once forgiven an address that moved.
+    prompt: Which public IP address configuration do you create?
+    options:
+      - id: a
+        label: Standard SKU, static allocation, zone-redundant
+        correct: true
+        rep: 7
+        consequence: >
+          Hendrik reads the address back to you twice, writes it on the whiteboard in
+          the depot office, and hangs up.
+        explain: >
+          Standard SKU public IP addresses are always statically allocated, support
+          availability zones, and are the only SKU a Standard Load Balancer accepts.
+          Zone-redundant keeps the address reachable if one zone goes.
+        diagram:
+          - {op: add_node, node: pip-lb-pod}
+      - id: b
+        label: Basic SKU, dynamic allocation, cheapest option
+        correct: false
+        rep: -9
+        consequence: >
+          The address changes the first time the resource is stopped, and forty handhelds
+          go quiet at once.
+        explain: >
+          A dynamic public IP address is released when the resource it is attached to is
+          deallocated, so it can come back different. Basic SKU public IP addresses are
+          also retired and cannot be used with a Standard Load Balancer.
+      - id: c
+        label: Standard SKU, static, but pinned to a single availability zone
+        correct: false
+        rep: -5
+        consequence: >
+          It works for eleven months, and then a zone has a bad afternoon and intake
+          stops with it.
+        explain: >
+          A zonal public IP address is only as available as its zone. Zone-redundant is
+          the right default in a region that offers zones unless something specifically
+          requires zonal alignment.
+  - id: d
+    type: knowledge
+    title: Marek checks you were listening
+    speaker: Marek Sobczak
+    objectives: [AZ104-4.1.1]
+    intro: >
+      He is refilling his mug, which means there is time for exactly one question.
+
+
+      "You gave the scanners a /24. Somebody in a review is going to ask you how
+      many addresses they actually get. What do you tell them?"
+    question: How many usable IP addresses does a /24 subnet give you in Azure?
+    options:
+      - id: a
+        label: 251, because Azure reserves five addresses in every subnet
+        correct: true
+        rep: 4
+        explain: >
+          Azure reserves the network address, the next three for the default gateway and
+          platform DNS, and the broadcast address. A /24 has 256 addresses, so 251 are
+          usable.
+      - id: b
+        label: 254, the same as any other /24
+        correct: false
+        rep: -5
+        consequence: The reviewer asks a follow-up question and you do not have an answer for it.
+        explain: >
+          That is the on-premises answer. Azure reserves three more addresses per subnet
+          than a traditional network does, which matters most on small subnets.
+      - id: c
+        label: 256, since Azure handles the gateway outside the subnet
+        correct: false
+        rep: -6
+        consequence: You size a /29 the same way three weeks later and it fails on deployment.
+        explain: >
+          Azure's default gateway lives inside the subnet, at the first usable address.
+          Five addresses per subnet are always reserved.

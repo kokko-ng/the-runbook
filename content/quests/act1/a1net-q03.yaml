@@ -1,0 +1,269 @@
+id: a1net-q03
+chapter: act1-networking
+title: Rules of Engagement
+summary: The security officer wants the scanner subnet locked down without a spreadsheet of IP addresses behind it.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ104-4.2.1
+  - AZ104-4.2.2
+brief: >
+  Wei Lin has an audit finding open against the depot network. You have two days
+  and a strong preference for never maintaining an IP list by hand again.
+debrief: >
+  The finding closes with a rule set that survives the next four scanners being
+  added, which is the only test that has ever mattered.
+encounters:
+  - id: a
+    type: design
+    title: Two groups, not forty addresses
+    speaker: Wei Lin Tan
+    objectives: [AZ104-4.2.1]
+    intro: >
+      Wei Lin sends the finding as a PDF, because of course she does.
+
+
+      "Finding NET-14. The depot subnet permits any host to reach the hub print
+      and license ports. It must permit only the scanner fleet, and only those
+      ports. I do not want to review this again in a month when four more scanners
+      arrive."
+
+
+      There are forty-one scanner virtual machines today and there will be more.
+      They already carry a common tag, and they all live in snet-depot alongside a
+      print relay that must not be allowed to talk to the hub at all.
+    prompt: How do you write the rule?
+    options:
+      - id: a
+        label: >
+          Put the scanner NICs in an application security group and write one rule with
+          that group as the source
+        correct: true
+        rep: 8
+        consequence: >
+          Wei Lin closes the finding and asks, almost warmly, whether you can do the same
+          thing for the application spoke.
+        explain: >
+          Application security groups let a rule name a set of network interfaces instead
+          of an address range. New scanners join the group at deployment time and inherit
+          the rule with no edit, and the print relay simply is not in the group.
+        diagram:
+          - {op: add_node, node: asg-web}
+          - {op: add_node, node: nsg-depot}
+      - id: b
+        label: List the forty-one scanner IP addresses in the source of a single rule
+        correct: false
+        rep: -7
+        consequence: >
+          It passes the audit this week and drifts out of date by the second week of next
+          month, when nobody remembers the rule exists.
+        explain: >
+          A security group rule can hold multiple prefixes, but every new scanner is a
+          manual edit that someone has to remember. That is exactly the review loop Wei Lin
+          asked you to remove.
+      - id: c
+        label: Allow the whole 10.30.1.0/24 subnet and rely on the hub to filter
+        correct: false
+        rep: -9
+        consequence: >
+          The finding stays open, is escalated, and now has Dana's name on it as well as
+          yours.
+        explain: >
+          That is the current configuration and the reason for the finding. It also permits
+          the print relay, which the requirement explicitly excludes.
+      - id: d
+        label: Apply a network security group to each scanner NIC individually with its own rule
+        correct: false
+        rep: -6
+        consequence: >
+          Forty-one security groups later, two of them disagree with each other and nobody
+          can say which is authoritative.
+        explain: >
+          Per-NIC security groups multiply the thing you have to keep consistent. One
+          subnet security group with an application security group as the source expresses
+          the same intent in one place.
+  - id: b
+    type: troubleshoot
+    title: INC-4502
+    speaker: Joana Reyes
+    objectives: [AZ104-4.2.2]
+    intro: >
+      The new rules went in at 18:00. At 18:20 the NOC calls.
+
+
+      "Scanners are printing. The monitoring agent on the print relay stopped
+      reporting, and the relay cannot reach the hub, which I gather is intentional.
+      But the depot supervisor also cannot reach the relay's web console from her
+      laptop in the same subnet, and that one surprised me."
+
+
+      Your change touched two things: a new subnet security group on snet-depot,
+      and the existing NIC-level group on the relay that predates you.
+    ticket:
+      ref: INC-4502
+      opened: "18:20"
+      reporter: Joana Reyes
+      summary: Depot supervisor cannot reach the print relay console after the security group change.
+      severity: sev3
+    time_budget: 5
+    on_enter:
+      - {op: set_status, node: nsg-depot, status: degraded}
+    investigate:
+      - id: a
+        action: Ask the supervisor what exactly she sees
+        speaker: Hendrik Salim
+        reveals: >
+          "Browser spins and gives up. Same laptop, same subnet, worked this morning
+          before your maintenance window."
+      - id: b
+        action: Check what your change actually contained
+        speaker: Meridian IT
+        reveals: >
+          CHG-2244 added nsg-depot to snet-depot with three rules: allow the scanner
+          group to the hub on 445, 631 and 27000, allow HTTPS inbound from the hub,
+          and a deny for everything else inbound at priority 4000.
+      - id: c
+        action: Ask Wei Lin whether the relay had its own rules already
+        speaker: Wei Lin Tan
+        reveals: >
+          "nsg-relay-legacy, applied to the relay NIC since before either of us was
+          here. It allows 443 inbound from the depot subnet. It has never been the
+          problem before."
+    commands:
+      - id: a
+        label: Show the effective security rules on the relay NIC
+        cmd: az network nic list-effective-nsg --name nic-relay01 -g rg-depot -o table
+        output: |
+          NsgName            Direction  Access  Priority  Source           DestinationPortRange
+          -----------------  ---------  ------  --------  ---------------  --------------------
+          nsg-depot          Inbound    Allow   300       10.10.1.0/24     443
+          nsg-depot          Inbound    Deny    4000      *                *
+          nsg-relay-legacy   Inbound    Allow   200       10.30.1.0/24     443
+          nsg-relay-legacy   Inbound    Deny    65500     *                *
+        note: "Two security groups are in play: one on the subnet, one on the network interface."
+        time_cost: 1
+      - id: b
+        label: Test the supervisor's laptop reaching the relay console
+        cmd: az network watcher test-ip-flow --vm vm-relay01 -g rg-depot --direction Inbound --protocol TCP --local 10.30.1.40:443 --remote 10.30.1.88:51544
+        output: |
+          {
+            "access": "Deny",
+            "ruleName": "nsg-depot/DenyAllInboundCustom"
+          }
+        time_cost: 1
+      - id: c
+        label: Show the rules on the subnet security group
+        cmd: az network nsg rule list -g rg-depot --nsg-name nsg-depot -o table
+        output: |
+          Name                     Priority  Direction  Access  SourceAddressPrefix   DestinationPortRange
+          -----------------------  --------  ---------  ------  --------------------  --------------------
+          AllowScannersToHub       200       Outbound   Allow   asg-scanners          445,631,27000
+          AllowHubHttpsInbound     300       Inbound    Allow   10.10.1.0/24          443
+          DenyAllInboundCustom     4000      Inbound    Deny    *                     *
+        time_cost: 1
+      - id: d
+        label: Check the relay is actually listening
+        cmd: Test-NetConnection -ComputerName 10.30.1.40 -Port 443 -InformationLevel Detailed
+        output: |
+          ComputerName     : 10.30.1.40
+          RemoteAddress    : 10.30.1.40
+          TcpTestSucceeded : False
+          PingSucceeded    : True
+        note: Run from the supervisor's laptop. The host answers ICMP, so the guest is up.
+        time_cost: 1
+      - id: e
+        label: Look for a recent change on the relay itself
+        cmd: az monitor activity-log list --resource-group rg-depot --offset 12h --query "[?contains(resourceId,'relay01')].{op:operationName.value,at:eventTimestamp}" -o table
+        output: |
+          (no results)
+        time_cost: 2
+    fixes:
+      - id: a
+        label: >
+          Add an inbound allow for 443 from the depot subnet to nsg-depot, above the custom
+          deny
+        correct: true
+        rep: 9
+        consequence: >
+          The console loads on the supervisor's next refresh, and the audit finding stays
+          closed because the scanner rule is untouched.
+        explain: >
+          For inbound traffic Azure evaluates the subnet security group first and the
+          network interface group second, and traffic must be allowed by both. The legacy
+          NIC rule allowed the laptop, but your new subnet deny stopped it before that rule
+          was ever reached. Rules are evaluated by priority, lowest number first, and the
+          first match wins.
+        diagram:
+          - {op: set_status, node: nsg-depot, status: healthy}
+      - id: b
+        label: Remove nsg-relay-legacy from the relay NIC, since two security groups conflict
+        correct: false
+        rep: -8
+        consequence: >
+          The console still does not load, and now the relay has lost the only rule that
+          was protecting it from the rest of the subnet.
+        explain: >
+          The NIC group was allowing the traffic, not blocking it. Removing it does nothing
+          to the subnet deny that the flow test named, and it widens exposure.
+      - id: c
+        label: Raise the custom deny to priority 100 so it is evaluated last
+        correct: false
+        rep: -9
+        consequence: >
+          Everything inbound stops, including the hub, and you are now the cause of two
+          incidents instead of one.
+        explain: >
+          Priority in Azure security groups runs lowest number first. Moving a deny to 100
+          makes it match before every allow rule you wrote.
+      - id: d
+        label: Restart the print relay, since the console may be stuck
+        correct: false
+        rep: -5
+        consequence: >
+          The relay comes back and refuses connections in exactly the same way, having lost
+          the print queue in the process.
+        explain: >
+          The flow test named a specific rule as the reason for the deny. Nothing about the
+          symptom pointed at the guest.
+  - id: c
+    type: knowledge
+    title: The rules you did not write
+    speaker: Marek Sobczak
+    objectives: [AZ104-4.2.2]
+    intro: >
+      Marek reads the incident note and finds the sentence he was waiting for.
+
+
+      "You said the deny at 4000 stopped it. Fine. Suppose you had never added a
+      deny at all. Two virtual machines in the same subnet, no custom rules
+      anywhere. Does the supervisor reach the console?"
+    question: With no custom rules at all, what happens to traffic between two VMs in the same virtual network?
+    options:
+      - id: a
+        label: >
+          It is allowed, by the default AllowVNetInBound rule at priority 65000
+        correct: true
+        rep: 4
+        explain: >
+          Every security group carries default rules that cannot be deleted:
+          AllowVNetInBound and AllowVNetOutBound at 65000, AllowAzureLoadBalancerInBound at
+          65001, and DenyAllInBound and DenyAllOutBound at 65500. Traffic inside the virtual
+          network is permitted until a custom rule with a lower number says otherwise.
+      - id: b
+        label: It is denied, because DenyAllInBound at 65500 is the last word
+        correct: false
+        rep: -5
+        consequence: You spend an afternoon writing rules that Azure was already applying for you.
+        explain: >
+          DenyAllInBound sits at 65500, but AllowVNetInBound at 65000 matches first for
+          traffic sourced inside the virtual network, and the first match wins.
+      - id: c
+        label: It depends on whether a security group is attached at all
+        correct: false
+        rep: -5
+        consequence: >
+          The answer sounds careful and gets you a follow-up question you cannot answer.
+        explain: >
+          With no security group attached, all traffic is permitted. With one attached and
+          no custom rules, the defaults still permit traffic inside the virtual network. The
+          outcome is the same either way.

@@ -1,0 +1,253 @@
+id: a1net-b01
+chapter: act1-networking
+title: The Peering Problem, Exam Hard
+summary: Spoke to spoke through the inspection appliance. Every route is right and nothing gets through.
+variant: bonus
+bonus_of: a1net-q02
+estimated_minutes: 12
+objectives:
+  - AZ104-4.1.2
+  - AZ104-4.1.5
+brief: >
+  The hardened version of a ticket you have already closed once. Less time, fewer
+  tells, and the distractors are all things a competent person would try.
+debrief: >
+  Two checkboxes on two peering objects. This is the failure people describe as
+  "peering is broken" for three hours before anyone reads the peering.
+encounters:
+  - id: a
+    type: troubleshoot
+    title: INC-4703
+    speaker: Joana Reyes
+    objectives: [AZ104-4.1.5, AZ104-4.1.2]
+    intro: >
+      The firmware push from the transport application to the depot scanners has
+      never worked. It was designed to go spoke to spoke through the inspection
+      appliance in the hub, because the security control says it must be inspected.
+
+
+      Both spokes are peered to the hub. Route tables on both subnets send the
+      other spoke's prefix to 10.10.1.4. IP forwarding is on. The appliance is
+      running and its logs are empty.
+
+
+      You have four time units, because the change window closes at 10:00.
+    ticket:
+      ref: INC-4703
+      opened: "08:05"
+      reporter: Joana Reyes
+      summary: Spoke-to-spoke traffic through the hub appliance never arrives. Appliance logs are empty.
+      severity: sev2
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what the appliance sees
+        speaker: Marek Sobczak
+        reveals: >
+          "Nothing. Not a dropped packet, not a rejected session. Its interface counters
+          move for hub traffic and never for spoke-to-spoke."
+      - id: b
+        action: Ask whether anything works between the two spokes
+        speaker: Joana Reyes
+        reveals: >
+          "Nothing at all between them. Both spokes reach the hub fine and both reach
+          Jurong over the VPN fine."
+      - id: c
+        action: Check who built the peerings and when
+        speaker: Meridian IT
+        reveals: >
+          Both peerings were created by template, three weeks apart, by different
+          people. Neither template mentions forwarded traffic.
+    commands:
+      - id: a
+        label: Show the effective routes on a scanner NIC
+        cmd: az network nic show-effective-route-table --name nic-scan01 -g rg-depot -o table
+        output: |
+          Source    State     AddressPrefix    NextHopType         NextHopIp
+          --------  --------  ---------------  ------------------  ----------
+          Default   Active    10.30.0.0/16     VnetLocal
+          Default   Active    10.10.0.0/16     VNetPeering
+          User      Active    10.20.0.0/16     VirtualAppliance    10.10.1.4
+          Default   Active    0.0.0.0/0        Internet
+        time_cost: 1
+      - id: b
+        label: Show the peering configuration on both hub peerings
+        cmd: az network vnet peering list -g rg-hub --vnet-name vnet-hub --query "[].{name:name,state:peeringState,fwd:allowForwardedTraffic,gw:allowGatewayTransit}" -o table
+        output: |
+          Name          State      Fwd    Gw
+          ------------  ---------  -----  -----
+          hub-to-app    Connected  False  True
+          hub-to-depot  Connected  False  True
+        time_cost: 1
+      - id: c
+        label: Test the flow from a scanner to the application subnet
+        cmd: az network watcher test-ip-flow --vm vm-scan01 -g rg-depot --direction Outbound --protocol TCP --local 10.30.1.14:51022 --remote 10.20.1.11:443
+        output: |
+          {
+            "access": "Allow",
+            "ruleName": "AllowVnetOutBound"
+          }
+        time_cost: 1
+      - id: d
+        label: Confirm IP forwarding on the appliance interface
+        cmd: az network nic show -n nic-nva-hub -g rg-hub --query "enableIPForwarding" -o tsv
+        output: |
+          true
+        time_cost: 1
+      - id: e
+        label: Check the appliance is passing traffic at all
+        cmd: az network watcher show-next-hop --vm nva-hub -g rg-hub --source-ip 10.10.1.4 --dest-ip 10.30.1.14
+        output: |
+          {
+            "nextHopIpAddress": "",
+            "nextHopType": "VnetPeering"
+          }
+        time_cost: 1
+    fixes:
+      - id: a
+        label: Enable Allow forwarded traffic on both hub peerings
+        correct: true
+        rep: 10
+        consequence: >
+          The appliance's counters move for the first time, the firmware push completes,
+          and the change window closes with eleven minutes to spare.
+        explain: >
+          Traffic arriving in a peered network that did not originate there is forwarded
+          traffic, and a peering drops it unless Allow forwarded traffic is set. Both
+          spokes send inspected traffic through the hub appliance, so both hub peerings
+          need it. Routes, security groups and IP forwarding were all correct; the peering
+          was silently discarding the packets.
+      - id: b
+        label: Peer vnet-app directly to vnet-depot so the traffic no longer needs the hub
+        correct: false
+        rep: -8
+        consequence: >
+          The firmware push works immediately and bypasses the inspection appliance, which
+          is the specific thing the security control forbids.
+        explain: >
+          It solves connectivity by removing the requirement. Direct spoke-to-spoke peering
+          is a legitimate design when nothing has to inspect the traffic, and here
+          something does.
+      - id: c
+        label: Add a user-defined route on the hub subnet sending both spoke prefixes to the appliance
+        correct: false
+        rep: -7
+        consequence: >
+          The route appears, the appliance logs stay empty, and you have spent one of your
+          four time units learning nothing.
+        explain: >
+          Traffic is not reaching the hub's data path at all. Adding routes inside the hub
+          cannot help when the peering discards the forwarded packets before any route in
+          the hub is consulted.
+      - id: d
+        label: Enable Use remote gateways on both spoke peerings
+        correct: false
+        rep: -9
+        consequence: >
+          One update fails validation and the other changes how the spoke reaches Jurong,
+          which is a second incident you did not have ten minutes ago.
+        explain: >
+          Gateway transit is about reaching a VPN or ExpressRoute gateway in the hub. It has
+          nothing to do with a peered network accepting traffic that originated in a third
+          network.
+  - id: b
+    type: design
+    title: The setting nobody sets
+    speaker: Marek Sobczak
+    objectives: [AZ104-4.1.2]
+    intro: >
+      "Right," says Marek, and pulls up the peering blade. "Four settings on every
+      peering and most people leave all four alone. Say what they do, in the order
+      they bite you."
+
+
+      He is not asking for a recital. He wants to know which one you would check
+      first next time.
+    prompt: Which statement is accurate?
+    options:
+      - id: a
+        label: >
+          Allow forwarded traffic lets a peered network accept traffic that originated
+          somewhere else, which is what any hub appliance design depends on
+        correct: true
+        rep: 6
+        explain: >
+          The four settings are: allow virtual network access, which permits the peered
+          address space at all; allow forwarded traffic, which permits traffic that
+          originated outside the peer; allow gateway transit, offered by the network that
+          has the gateway; and use remote gateways, set by the network that wants to use
+          somebody else's.
+      - id: b
+        label: >
+          Allow forwarded traffic controls whether the peering forwards traffic to a third
+          network on your behalf
+        correct: false
+        rep: -6
+        consequence: >
+          The next incident with an appliance in the path costs you another hour of the
+          wrong hypothesis.
+        explain: >
+          Peering never forwards on your behalf. It is not transitive, and the setting is
+          about what the receiving network accepts, not about what the peering will relay.
+      - id: c
+        label: >
+          Allow virtual network access must be disabled for an appliance design, so the
+          appliance is the only path
+        correct: false
+        rep: -7
+        consequence: >
+          Turning it off severs the peering's data path entirely, which is a memorable way
+          to learn what it does.
+        explain: >
+          Allow virtual network access is what makes the peered address space reachable at
+          all. Disabling it leaves the peering in place and stops traffic dead.
+  - id: c
+    type: design
+    title: The second region calls
+    speaker: Dana Ong
+    objectives: [AZ104-4.1.2]
+    intro: >
+      "Business continuity wants a presence in East Asia," says Dana. "Just a
+      landing spot for now, a virtual network in Hong Kong that our hub can reach,
+      and the Jurong link has to work from there too."
+
+
+      The hub is in Southeast Asia and holds the VPN gateway. The new network will
+      be small and will not have a gateway of its own.
+    prompt: How do you connect the new region?
+    options:
+      - id: a
+        label: >
+          A global virtual network peering from the hub, with gateway transit on the hub side
+          and use remote gateways on the new network
+        correct: true
+        rep: 7
+        consequence: >
+          The landing network comes up reaching both the hub and Jurong, on one peering pair
+          and no new gateway.
+        explain: >
+          Peering between virtual networks in different regions is global peering, configured
+          the same way as a local one. The remote network can use the hub's VPN gateway
+          through gateway transit, so on-premises connectivity comes with it.
+      - id: b
+        label: >
+          A second VPN gateway in East Asia with a virtual network to virtual network
+          connection back to the hub
+        correct: false
+        rep: -6
+        consequence: Priya sees a second gateway on the invoice and asks who approved it.
+        explain: >
+          It works and it costs a gateway, adds a tunnel to maintain and takes longer to
+          deploy. Global peering carries the traffic over the Microsoft backbone with no
+          gateway in the middle.
+      - id: c
+        label: >
+          Global peering from the hub, then a route table in East Asia sending Jurong's
+          prefixes to the hub's gateway address
+        correct: false
+        rep: -7
+        consequence: >
+          Traffic to Jurong disappears into a next hop that is not allowed to receive it.
+        explain: >
+          You cannot point a user-defined route at a VPN gateway in another virtual network.
+          Gateway transit is the supported way for a peered network to use a remote gateway.

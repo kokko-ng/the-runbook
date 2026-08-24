@@ -1,0 +1,251 @@
+id: a1net-b02
+chapter: act1-networking
+title: Half the Scanners, Exam Hard
+summary: Intake is healthy, the probe is right, and every outbound call from the backend now times out.
+variant: bonus
+bonus_of: a1net-q06
+estimated_minutes: 13
+objectives:
+  - AZ104-4.3.2
+  - AZ104-4.3.3
+  - AZ104-4.1.4
+brief: >
+  The version of this ticket where the load balancer is configured correctly and
+  is still the reason everything broke.
+debrief: >
+  Outbound is a thing you configure, not a thing you get. The exam asks this in
+  three different costumes.
+encounters:
+  - id: a
+    type: troubleshoot
+    title: INC-4744
+    speaker: Meridian NOC
+    objectives: [AZ104-4.3.3, AZ104-4.3.2]
+    intro: >
+      The intake scale set was rebuilt behind a new Standard Load Balancer at
+      21:00. Uploads work. The probe is an HTTPS check against the health path and
+      all four instances are healthy.
+
+
+      What does not work is anything the intake service calls outward. Customs
+      status lookups to a partner API time out. So does the operating system's own
+      update check, and so does the certificate revocation check that runs on
+      start.
+
+
+      The instances have no public IP addresses of their own. They never did.
+    ticket:
+      ref: INC-4744
+      opened: "21:40"
+      reporter: Meridian NOC
+      summary: Intake backend instances cannot reach any external service after the load balancer rebuild.
+      severity: sev2
+    time_budget: 5
+    investigate:
+      - id: a
+        action: Ask what the rebuild actually changed
+        speaker: Marek Sobczak
+        reveals: >
+          "New load balancer, new backend pool, same scale set image. The old one was
+          Basic. That is the only difference anyone wrote down."
+      - id: b
+        action: Ask whether inbound is genuinely fine
+        speaker: Joana Reyes
+        reveals: >
+          "Inbound is perfect. Uploads from every depot, no failures since 21:00.
+          It is only traffic the instances start themselves."
+      - id: c
+        action: Ask Wei Lin whether a security control changed
+        speaker: Wei Lin Tan
+        reveals: >
+          "Nothing from me tonight. nsg-app still allows outbound to the internet on
+          443, and I can show you the rule."
+    commands:
+      - id: a
+        label: Check the outbound rules on the load balancer
+        cmd: az network lb outbound-rule list -g rg-app --lb-name lb-pod-intake -o table
+        output: |
+          (no outbound rules found)
+        time_cost: 1
+      - id: b
+        label: Check whether the subnet has a NAT gateway
+        cmd: az network vnet subnet show -g rg-app --vnet-name vnet-app -n snet-app --query "{nat:natGateway.id,rt:routeTable.id}" -o table
+        output: |
+          Nat    Rt
+          -----  -------------------------------------------
+                 .../routeTables/rt-app
+        time_cost: 1
+      - id: c
+        label: Read the route table on the application subnet
+        cmd: az network route-table route list -g rg-app --route-table-name rt-app -o table
+        output: |
+          Name              AddressPrefix    NextHopType    NextHopIpAddress
+          ----------------  ---------------  -------------  ------------------
+          to-hub-services   10.10.0.0/16     VnetPeering
+        time_cost: 1
+      - id: d
+        label: Check the effective outbound security rules on a backend NIC
+        cmd: az network nic list-effective-nsg --name vmss-intake-nic-2 -g rg-app --query "value[0].effectiveSecurityRules[?direction=='Outbound'] | [0:3]" -o table
+        output: |
+          Name                    Access    Priority    DestinationPortRange
+          ----------------------  --------  ----------  ----------------------
+          AllowInternetOutbound   Allow     300         443
+          AllowVnetOutBound       Allow     65000       0-65535
+          AllowInternetOutBound   Allow     65001       0-65535
+        time_cost: 1
+      - id: e
+        label: Ask an instance what its outbound address is
+        cmd: az vmss run-command invoke -g rg-app -n vmss-intake --instance-id 2 --command-id RunShellScript --scripts "curl -s -m 5 https://ifconfig.me; echo rc=$?"
+        output: |
+          {
+            "value": [
+              {
+                "message": "rc=28",
+                "code": "ComponentStatus/StdOut/succeeded"
+              }
+            ]
+          }
+        note: Exit code 28 is a curl timeout. Nothing came back at all.
+        time_cost: 2
+    fixes:
+      - id: a
+        label: >
+          Give the subnet outbound connectivity explicitly, with a NAT gateway on snet-app
+        correct: true
+        rep: 10
+        consequence: >
+          Outbound calls succeed within a minute of the association, and the source address
+          is now one Meridian can give the partner for their allow list.
+        explain: >
+          Standard Load Balancer provides no outbound connectivity on its own, and backend
+          instances with no public IP address have none by default. Outbound has to be
+          explicit: a NAT gateway on the subnet, an outbound rule on the load balancer, or a
+          public IP on each instance. A NAT gateway is the current recommendation and gives a
+          stable, scalable source address.
+        diagram:
+          - {op: add_node, node: nat-hub}
+      - id: b
+        label: Add an inbound rule to nsg-app allowing the partner API's address range
+        correct: false
+        rep: -8
+        consequence: >
+          Nothing changes, and the security group now has a rule that implies the partner
+          initiates connections to Meridian, which they do not.
+        explain: >
+          These are outbound sessions the instances start, and the effective rules already
+          allow them. Return traffic for an allowed outbound flow does not need an inbound
+          rule; security groups are stateful.
+      - id: c
+        label: Attach a public IP address to each backend instance
+        correct: false
+        rep: -6
+        consequence: >
+          Outbound works, and Wei Lin's next scan finds four internet-facing instances that
+          were specifically designed not to have public addresses.
+        explain: >
+          It restores outbound connectivity and hands each instance a routable public
+          address, which is the exposure the design avoided. A NAT gateway gives outbound
+          without inbound.
+      - id: d
+        label: Revert to a Basic Load Balancer, since outbound worked before the rebuild
+        correct: false
+        rep: -9
+        consequence: >
+          Outbound comes back, along with a retired SKU, no zone support, and the same
+          conversation again in six months.
+        explain: >
+          Basic Load Balancer's implicit outbound access is exactly the behavior being
+          retired, and depending on it is the reason this failure was a surprise. Configure
+          outbound deliberately instead.
+  - id: b
+    type: design
+    title: Where the route table bites
+    speaker: Marek Sobczak
+    objectives: [AZ104-4.1.4]
+    intro: >
+      "Suppose we had put the appliance in the path for this subnet too," says
+      Marek. "0.0.0.0/0 to the appliance in the hub, and the NAT gateway you have
+      just associated. Which one wins for a packet heading to the partner API?"
+
+
+      He is testing whether you know how Azure picks a route, not whether you know
+      what a NAT gateway is.
+    prompt: What happens to that packet?
+    options:
+      - id: a
+        label: >
+          The user-defined route wins and the packet goes to the appliance, because
+          user-defined routes are preferred over the default route the NAT gateway relies on
+        correct: true
+        rep: 7
+        explain: >
+          Azure selects a route by longest prefix match, and for equal prefixes the order is
+          user-defined route, then BGP route, then system route. A 0.0.0.0/0 user-defined
+          route to an appliance overrides the system default that a NAT gateway uses, so the
+          NAT gateway stops seeing that traffic.
+      - id: b
+        label: The NAT gateway wins, because subnet-level outbound configuration is applied last
+        correct: false
+        rep: -6
+        consequence: >
+          You design a topology where inspection is quietly bypassed and nobody finds out for
+          a quarter.
+        explain: >
+          A NAT gateway performs source address translation for traffic that reaches it by
+          the system default route. If a user-defined route sends that traffic elsewhere
+          first, the NAT gateway is never in the path.
+      - id: c
+        label: Traffic is split between them, since both are valid outbound paths
+        correct: false
+        rep: -7
+        consequence: >
+          Half the sessions get inspected and half do not, and the diagnosis takes days
+          because it is intermittent.
+        explain: >
+          Azure does not load share between routes for the same prefix. One route is
+          selected, deterministically, by the precedence rules.
+  - id: c
+    type: design
+    title: Two frontends, one backend
+    speaker: Dana Ong
+    objectives: [AZ104-4.3.2]
+    intro: >
+      "Last thing before you go home," says Dana. "Legal want the customs status
+      feed on its own address, separate from scanner intake, but it is the same
+      four instances behind it. Do we need another load balancer?"
+    prompt: What do you tell her?
+    options:
+      - id: a
+        label: >
+          No. Add a second frontend IP configuration and a second rule on the existing load
+          balancer, pointing at the same backend pool
+        correct: true
+        rep: 6
+        consequence: >
+          It ships the same evening, with two addresses on one resource and one set of health
+          probes.
+        explain: >
+          A load balancer supports multiple frontend IP configurations and multiple rules over
+          the same backend pool. Separate addresses and ports do not require separate load
+          balancers.
+      - id: b
+        label: Yes. One load balancer can only have one frontend address.
+        correct: false
+        rep: -6
+        consequence: >
+          A second load balancer is deployed, and now two resources probe the same instances
+          and two configurations can drift apart.
+        explain: >
+          Frontend IP configurations are a list. Multiple frontends on one load balancer is a
+          normal pattern, and it keeps the health probes and backend pool in one place.
+      - id: c
+        label: >
+          Yes, because a backend pool can only be referenced by one load balancing rule at a
+          time
+        correct: false
+        rep: -5
+        consequence: >
+          The design gets more expensive for a constraint that does not exist.
+        explain: >
+          Several rules can share a backend pool. What must be unique is the combination of
+          frontend, protocol and port.

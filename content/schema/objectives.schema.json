@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-runbook.dev/schema/objectives.schema.json",
+  "title": "Exam objective inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["exam", "act", "title", "source_url", "skills_measured_as_of", "fetched_on", "domains"],
+  "properties": {
+    "exam": {"enum": ["AZ-104", "AZ-305"]},
+    "act": {"type": "integer", "enum": [1, 2]},
+    "title": {"type": "string", "minLength": 1},
+    "source_url": {"type": "string", "format": "uri"},
+    "skills_measured_as_of": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "fetched_on": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$"},
+    "domains": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "weight", "chapter", "groups"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^AZ(104|305)-\\d+$"},
+          "title": {"type": "string", "minLength": 1},
+          "weight": {"type": "string", "pattern": "^\\d+-\\d+%$"},
+          "chapter": {"type": "string", "pattern": "^act[12]-[a-z0-9-]+$"},
+          "groups": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "title", "objectives"],
+              "properties": {
+                "id": {"type": "string", "pattern": "^AZ(104|305)-\\d+\\.\\d+$"},
+                "title": {"type": "string", "minLength": 1},
+                "objectives": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["id", "text"],
+                    "properties": {
+                      "id": {"type": "string", "pattern": "^AZ(104|305)-\\d+\\.\\d+\\.\\d+$"},
+                      "text": {"type": "string", "minLength": 1}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
