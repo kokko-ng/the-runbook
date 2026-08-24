@@ -5,6 +5,17 @@ import { useContentStore } from '@/stores/content'
 
 const content = useContentStore()
 const exams = computed(() => content.index?.exams ?? [])
+const totals = computed(() => {
+  const chapters = content.index?.chapters ?? []
+  const quests = chapters.flatMap((chapter) => chapter.quests)
+  return {
+    chapters: chapters.length,
+    core: quests.filter((quest) => quest.variant !== 'bonus').length,
+    bonus: quests.filter((quest) => quest.variant === 'bonus').length,
+    encounters: quests.reduce((sum, quest) => sum + quest.encounter_count, 0),
+    version: content.index?.version ?? '-',
+  }
+})
 </script>
 
 <template>
@@ -52,6 +63,16 @@ const exams = computed(() => content.index?.exams ?? [])
           (<a class="text-signal-600 underline dark:text-signal-400" :href="exam.source_url" rel="noreferrer noopener">study guide</a>)
         </li>
       </ul>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-base font-semibold">This build</h2>
+      <p class="text-sm text-ink-600 dark:text-ink-300">
+        {{ totals.chapters }} chapters, {{ totals.core }} quests and
+        {{ totals.bonus }} exam-hard variants, {{ totals.encounters }} encounters.
+        Content version <code class="font-mono">{{ totals.version }}</code>, which is worth
+        quoting if you report a scenario that reads wrongly.
+      </p>
     </section>
 
     <section class="space-y-2">
