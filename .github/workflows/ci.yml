@@ -143,6 +143,26 @@ jobs:
         working-directory: frontend/dist
         run: tar -czf "${GITHUB_WORKSPACE}/dist.tar.gz" .
 
+      - name: Ensure the host's static file mappings exist
+        run: |
+          # The build is served off disk by the host rather than through Python.
+          # This is idempotent: it adds only the mappings that are missing.
+          api="https://${PA_HOST}/api/v0/user/${PA_USER}/webapps/${PA_DOMAIN}/static_files/"
+          existing=$(curl -sS -H "Authorization: Token ${PA_TOKEN}" "$api")
+          echo "$existing"
+          ensure() {
+            if echo "$existing" | grep -q "\"url\": \"$1\""; then
+              echo "mapping $1 already present"
+            else
+              echo "adding mapping $1 -> $2"
+              curl -sS -f -X POST -H "Authorization: Token ${PA_TOKEN}" \
+                --data-urlencode "url=$1" --data-urlencode "path=$2" "$api" > /dev/null
+            fi
+          }
+          ensure "/assets/"  "/home/${PA_USER}/the-runbook/frontend/dist/assets"
+          ensure "/content/" "/home/${PA_USER}/the-runbook/frontend/dist/content"
+          ensure "/static/"  "/home/${PA_USER}/the-runbook/backend/staticfiles"
+
       - name: Pack the source
         run: git archive --format=tar.gz -o source.tar.gz HEAD
 

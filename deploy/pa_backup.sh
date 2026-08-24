@@ -5,8 +5,18 @@
 #
 # Dumps the MySQL database to ~/backups and keeps the last eight files. There
 # are no scheduled jobs in the game itself; this is the only one.
+#
+# The host schedules tasks daily or hourly, so the weekly cadence is enforced
+# here: the script exits quietly on any day except RUNBOOK_BACKUP_DAY, which is
+# Sunday by default. Pass --force to take one on demand.
 
 set -uo pipefail
+
+BACKUP_DAY="${RUNBOOK_BACKUP_DAY:-7}"
+if [ "${1:-}" != "--force" ] && [ "$(date -u +%u)" != "${BACKUP_DAY}" ]; then
+    echo "not backup day (day $(date -u +%u), configured ${BACKUP_DAY}); nothing to do"
+    exit 0
+fi
 
 HOME_DIR="${HOME:-/home/manuelfdng}"
 BACKUP_DIR="${HOME_DIR}/backups"

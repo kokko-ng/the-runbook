@@ -29,6 +29,27 @@ def spa_index(request, *args, **kwargs):
     return response
 
 
+# Small files that live at the root of the built frontend. The host's static
+# mappings cover /assets/ and /content/; these few are served here so a fresh
+# deploy is correct even before the mappings exist.
+ROOT_FILES = {
+    "favicon.svg": "image/svg+xml",
+    "robots.txt": "text/plain; charset=utf-8",
+    "manifest.webmanifest": "application/manifest+json",
+}
+
+
+def dist_file(request, filename: str):
+    if filename not in ROOT_FILES:
+        raise Http404(filename)
+    path = settings.FRONTEND_DIST / filename
+    if not path.exists():
+        raise Http404(filename)
+    response = HttpResponse(path.read_bytes(), content_type=ROOT_FILES[filename])
+    response["Cache-Control"] = "public, max-age=3600"
+    return response
+
+
 def legal_page(request, page: str):
     source = settings.CONTENT_DIR / "legal" / f"{page}.md"
     if not source.exists():
