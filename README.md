@@ -30,6 +30,18 @@ companies. Meridian Logistics is fictional.
   encounter lights the objectives it covers, so the tree doubles as a readiness
   view.
 
+## What is in it
+
+Two acts, nine chapters, 57 core quests and 18 exam-hard bonus variants: 231
+encounters and about 94,000 words of authored scenario. Every one of the 131
+objectives on the current AZ-104 and AZ-305 study guides is covered by at least
+one core encounter, and the build fails if that stops being true.
+
+| Act | Chapters | Core quests | Bonus | Encounters |
+| --- | --- | --- | --- | --- |
+| 1 (AZ-104) | Identity, Storage, Compute, Networking, Monitoring | 33 | 10 | 133 |
+| 2 (AZ-305) | Identity and governance, Data, Continuity, Infrastructure | 24 | 8 | 98 |
+
 ## Layout
 
 ```
@@ -99,8 +111,27 @@ One YAML file per quest under `content/quests/act1` or `act2`, validated against
 `python manage.py validate_content --partial` relaxes the coverage gate while a
 chapter is half written. `--require-all-chapters` is the release gate.
 
+## Back office
+
+`/admin` is the support and content QA surface: player saves (read-only, with the
+blob pretty-printed), anonymous analytics events, a coverage matrix rendered from
+the same code the linter uses, and a quest browser that shows every encounter,
+option and command output without a checkout.
+
+Because the project collects no email address, Django's `createsuperuser` cannot
+run non-interactively. Use the command that does not need one:
+
+```bash
+python manage.py create_admin --username dana                 # prompts for a password
+python manage.py create_admin --username hendrik --player     # reset a player's password
+```
+
+That second form is the manual password reset the privacy page promises, since
+there is no self-serve reset without an email address.
+
 ## Deploying
 
 Push to `main`. CI lints the content, runs the tests, builds the frontend, and
 then the deploy job ships it to PythonAnywhere. See [DEPLOYMENT.md](DEPLOYMENT.md)
-for how the trigger works and what to do when it does not.
+for how the trigger works and what to do when it does not, and
+[docs/QA.md](docs/QA.md) for the cross-device matrix and what it does not cover.
