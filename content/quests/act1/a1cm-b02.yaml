@@ -1,0 +1,173 @@
+id: a1cm-b02
+chapter: act1-compute
+title: Going Live on the Portal, Exam Hard
+summary: Certificates, slots and networking, all of which look like they do the same thing until one of them does not.
+variant: bonus
+bonus_of: a1cm-q09
+estimated_minutes: 12
+objectives:
+  - AZ104-3.4.4
+  - AZ104-3.4.7
+  - AZ104-3.4.8
+brief: >
+  Launch went fine. The follow-up requests are where App Service gets interesting.
+debrief: >
+  Inbound and outbound are different problems with different features, and a swap
+  moves less than people expect.
+encounters:
+  - id: a
+    type: design
+    title: Two names, one app
+    speaker: Wei Lin Tan
+    objectives: [AZ104-3.4.4]
+    intro: >
+      A second customer wants the portal on their own branded name,
+      track.northgate.example, pointing at the same application. They will provide
+      the certificate for their domain, issued by their own authority.
+
+
+      The plan is Standard. Meridian's own certificate is a managed certificate on
+      track.meridianlogistics.com.
+    prompt: How do you add the second name?
+    options:
+      - id: a
+        label: >
+          Add the custom domain after they create the validation record, upload their PFX to
+          the app, and bind it with a name-based TLS binding
+        correct: true
+        rep: 8
+        consequence: >
+          Both names serve their own certificates from the same app, and the second customer
+          never sees a warning.
+        explain: >
+          An app can carry many custom domains, each with its own certificate binding. A
+          name-based binding uses server name indication, which is how one address serves
+          several certificates and is the normal choice. Ownership is still proved with a
+          record in their zone.
+      - id: b
+        label: Upload their certificate and bind it with an address-based TLS binding
+        correct: false
+        rep: -6
+        consequence: >
+          The binding consumes a dedicated inbound address, which is billed and which changes
+          the DNS the first customer already configured.
+        explain: >
+          Address-based bindings exist for clients that cannot do server name indication,
+          which in practice means very old ones. They allocate a dedicated address and are
+          rarely what you want now.
+      - id: c
+        label: Create a second app on the same plan with their domain and certificate
+        correct: false
+        rep: -5
+        consequence: >
+          Two apps now run the same code and drift apart at the first deployment that only
+          goes to one of them.
+        explain: >
+          It works and doubles the deployment surface for a branding difference. Multiple
+          bindings on one app is the feature for this.
+      - id: d
+        label: Ask them to CNAME to Meridian's name, so only one certificate is needed
+        correct: false
+        rep: -7
+        consequence: >
+          Their customers see a certificate for meridianlogistics.com on a northgate.example
+          address, which is the warning you were avoiding.
+        explain: >
+          The certificate presented has to match the name the browser asked for. A CNAME does
+          not change what the browser typed.
+  - id: b
+    type: design
+    title: In and out
+    speaker: Marek Sobczak
+    objectives: [AZ104-3.4.7]
+    intro: >
+      Two requirements arrive together.
+
+
+      The portal must reach the transport database privately, which it now does
+      through virtual network integration. And the security review wants the
+      portal itself unreachable from the public internet, because a partner-facing
+      gateway will front it.
+
+
+      "People mix these two up constantly," says Marek. "Say which is which."
+    prompt: What do you configure for the inbound requirement?
+    options:
+      - id: a
+        label: A private endpoint for the app, which gives it a private inbound address
+        correct: true
+        rep: 8
+        explain: >
+          Virtual network integration is outbound: it lets the app reach into a network.
+          A private endpoint is inbound: it gives the app a private address in your network
+          and, once public access is disabled, is the only way in. The two are complementary
+          and are configured separately.
+      - id: b
+        label: Access restrictions listing the gateway's outbound addresses
+        correct: false
+        rep: -5
+        consequence: >
+          It is a reasonable control and the app is still resolvable and reachable on its
+          public host name from anywhere the list allows.
+        explain: >
+          Access restrictions filter traffic at the front end and are useful. The requirement
+          was that it not be reachable publicly at all, which is what a private endpoint with
+          public access disabled achieves.
+      - id: c
+        label: Virtual network integration into the gateway's subnet
+        correct: false
+        rep: -6
+        consequence: >
+          Outbound traffic changes path and the app remains publicly reachable, which is the
+          opposite of the requirement.
+        explain: >
+          Integration is the outbound half. Using it for an inbound requirement is the exact
+          confusion this question is about.
+      - id: d
+        label: Set the app to accept only HTTPS and require client certificates
+        correct: false
+        rep: -5
+        consequence: >
+          Every legitimate browser is now asked for a client certificate it does not have.
+        explain: >
+          Client certificate authentication is a strong control for machine-to-machine calls.
+          It is not network isolation, and it breaks a browser-facing portal.
+  - id: c
+    type: knowledge
+    title: What a swap takes with it
+    speaker: Marek Sobczak
+    objectives: [AZ104-3.4.8]
+    intro: >
+      "Last one," says Marek. "You swap staging into production. Which of these
+      follows the code across: an app setting marked as a slot setting, an app
+      setting not marked, and the virtual network integration?"
+    question: What moves during a slot swap?
+    options:
+      - id: a
+        label: >
+          Unmarked app settings move with the code; slot settings stay with their slot; network
+          integration is not swapped at all
+        correct: true
+        rep: 6
+        explain: >
+          Settings and connection strings swap by default, which is why anything
+          environment-specific must be marked as a slot setting so it stays behind. Some
+          configuration is never swapped, including virtual network integration, private
+          endpoints, scale settings and always-on, and that is what caught the portal on
+          launch day.
+      - id: b
+        label: Everything swaps, which is what makes the slot an exact copy of production
+        correct: false
+        rep: -6
+        consequence: A staging connection string reaches production and the portal writes test data into the live database.
+        explain: >
+          Slot settings exist precisely because not everything should swap. Marking the
+          environment-specific ones is the mechanism.
+      - id: c
+        label: Nothing but the code swaps; all configuration stays with its slot
+        correct: false
+        rep: -5
+        consequence: An app setting added in staging is expected to arrive in production and does not, so the swap looks broken.
+        explain: >
+          Unmarked settings do move with the swap. That is the default, and marking is the
+          exception.

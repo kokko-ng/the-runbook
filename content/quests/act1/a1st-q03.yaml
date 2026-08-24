@@ -1,0 +1,253 @@
+id: a1st-q03
+chapter: act1-storage
+title: The Depot Share
+summary: Twenty-two depots mount a file share for label templates, and the permissions are whatever they were in 2019.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ104-2.3.1
+  - AZ104-2.1.5
+  - AZ104-2.3.5
+brief: >
+  The Jurong file server is being retired. The share on it has to move to Azure
+  Files, and the depots must not notice.
+debrief: >
+  A share the depots mount with their own domain accounts, and a snapshot
+  schedule so the next overwritten template is a five-minute problem.
+encounters:
+  - id: a
+    type: design
+    title: One share, twenty-two depots
+    speaker: Hendrik Salim
+    objectives: [AZ104-2.3.1]
+    intro: >
+      "Label templates, delivery note formats, the depot handbook," says Hendrik.
+      "Forty gigabytes, mostly small files. Every depot's print server mounts it
+      at boot. Nobody edits it much, but when a template changes, everyone needs
+      it that day."
+
+
+      The depots are on Windows machines that mount the current share over SMB.
+      Two of them are on a satellite link and complain about latency already.
+    prompt: What do you provision?
+    options:
+      - id: a
+        label: >
+          An Azure Files share on the transaction-optimized standard tier, mounted over SMB,
+          with the depots keeping their existing drive letter
+        correct: true
+        rep: 7
+        consequence: >
+          The depots remount to a new server name and nothing else changes. Two of them do
+          not notice at all.
+        explain: >
+          Azure Files serves SMB natively, so the existing mount pattern survives the move.
+          Standard tiers back onto hard disk storage and are priced for this kind of share;
+          premium file shares are solid state and exist for latency-sensitive workloads that
+          justify the cost.
+        diagram:
+          - {op: add_node, node: share-depot}
+          - {op: add_edge, edge: e-share-depot}
+      - id: b
+        label: A blob container, with the depots syncing it down with a scheduled job
+        correct: false
+        rep: -6
+        consequence: >
+          Every depot writes its own sync script, and by March there are three versions of
+          the label templates in circulation.
+        explain: >
+          Blob storage is not a file share and does not speak SMB. Turning a mount into a
+          sync job moves complexity out to twenty-two sites that have no one to maintain it.
+      - id: c
+        label: A premium file share, so the two satellite depots stop complaining about latency
+        correct: false
+        rep: -6
+        consequence: >
+          The bill triples and the satellite depots are exactly as slow, because the latency
+          is on the link and not in the storage.
+        explain: >
+          Premium file shares cut service-side latency. A satellite hop is measured in
+          hundreds of milliseconds and no storage tier changes that. Azure File Sync with a
+          local cache is the tool that would.
+      - id: d
+        label: A virtual machine running a file server, so the permissions model does not change
+        correct: false
+        rep: -7
+        consequence: >
+          Meridian retires one file server and gains another, with patching, backup and a
+          single point of failure.
+        explain: >
+          It is the migration that avoids learning anything. Azure Files supports the same
+          identity-based permissions model, so the reason to keep a server has largely gone.
+  - id: b
+    type: design
+    title: Who gets to write to it
+    speaker: Wei Lin Tan
+    objectives: [AZ104-2.1.5]
+    intro: >
+      "Right now the share uses a storage account key in the mount command, on
+      every depot print server," says Wei Lin. "Which means every depot has a
+      credential that can read and write every share in that account, and the
+      audit trail says the storage account did it."
+
+
+      Depot staff sign in with accounts from the Jurong Active Directory, which
+      syncs to Microsoft Entra ID. The template authors are a small group in head
+      office; everyone else reads.
+    prompt: How do you authenticate the mounts?
+    options:
+      - id: a
+        label: >
+          Identity-based access using the on-premises Active Directory Domain Services, with
+          share-level roles and NTFS permissions inside the share
+        correct: true
+        rep: 9
+        consequence: >
+          Depot machines mount with the computer account, the template authors keep write
+          access, and the account key comes out of twenty-two scripts.
+        explain: >
+          Azure Files supports identity-based authentication over SMB against on-premises
+          Active Directory Domain Services, Microsoft Entra Domain Services, or Entra
+          Kerberos for cloud-only identities. Access is share-level roles plus the familiar
+          file and directory permissions inside, and nobody handles the account key.
+        diagram:
+          - {op: set_detail, node: share-depot, detail: Identity-based access over SMB}
+      - id: b
+        label: Keep the account key in the mount command, but store it in each depot's key vault
+        correct: false
+        rep: -7
+        consequence: >
+          The credential is better protected and still grants full control of the account to
+          any process on a depot print server.
+        explain: >
+          Protecting a credential is not the same as narrowing it. The account key remains
+          all-or-nothing, and the audit trail still shows the storage account rather than a
+          person.
+      - id: c
+        label: Issue each depot a shared access signature for the share
+        correct: false
+        rep: -6
+        consequence: >
+          Twenty-two signatures with twenty-two expiry dates, and the first expiry lands on a
+          Sunday.
+        explain: >
+          Signatures work for file shares and give no user-level attribution, no NTFS
+          permissions and a renewal problem multiplied by the number of sites.
+      - id: d
+        label: Grant the depot computer accounts Storage File Data SMB Share Contributor at the account
+        correct: false
+        rep: -5
+        consequence: >
+          The depots can write to every share in the account, including one they should only
+          read.
+        explain: >
+          The share-level role is right and the scope is not. Assign it on the share, and let
+          the permissions inside the share do the rest.
+  - id: c
+    type: troubleshoot
+    title: INC-4510
+    speaker: Hendrik Salim
+    objectives: [AZ104-2.3.5]
+    intro: >
+      "Somebody has overwritten the Northgate delivery note template with the
+      Sriwijaya one," says Hendrik. "Every depot printed two hundred wrong notes
+      this morning before anyone noticed. I need the old file back, and I would
+      like to know how to get it back myself next time."
+
+
+      The share was migrated three weeks ago. Nobody has configured backup for it
+      yet.
+    ticket:
+      ref: INC-4510
+      opened: "09:45"
+      reporter: Hendrik Salim
+      summary: Delivery note template overwritten on the depot share. Previous version needed.
+      severity: sev3
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what was set up during the migration
+        speaker: Marek Sobczak
+        reveals: >
+          "Share, identity-based access, and I turned on soft delete for shares because it
+          is on by default anyway. Snapshots were on the list for after go-live."
+      - id: b
+        action: Ask exactly what happened to the file
+        speaker: Hendrik Salim
+        reveals: >
+          "Overwritten, not deleted. Same name, same folder, wrong content. Yesterday
+          afternoon some time."
+    commands:
+      - id: a
+        label: List snapshots on the share
+        cmd: az storage share list --account-name stmeridianpod --include-snapshots --query "[?name=='fs-depot-config'].{name:name,snapshot:snapshot}" -o table
+        output: |
+          Name              Snapshot
+          ----------------  ----------
+          fs-depot-config
+        note: One share, no snapshots. There is nothing to restore a single file from.
+        time_cost: 1
+      - id: b
+        label: Check the soft delete settings on the file service
+        cmd: az storage account file-service-properties show -n stmeridianpod -g rg-data --query "shareDeleteRetentionPolicy" -o json
+        output: |
+          {
+            "days": 7,
+            "enabled": true
+          }
+        note: Soft delete here protects the whole share from deletion, not individual files.
+        time_cost: 1
+      - id: c
+        label: Look for a backup of the share
+        cmd: az backup item list --vault-name rsv-meridian -g rg-ops --query "[?contains(name,'depot')]" -o table
+        output: |
+          (no results)
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Recover the file from the depot print server's local copy, then enable scheduled
+          share snapshots through Azure Backup
+        correct: true
+        rep: 9
+        consequence: >
+          A depot still has yesterday's template cached locally. It goes back on the share by
+          eleven, and the first scheduled snapshot runs that night.
+        explain: >
+          Share soft delete protects a deleted share, not an overwritten file. Point-in-time
+          recovery of individual files comes from share snapshots, which Azure Backup
+          schedules and retains for you. This time the recovery is luck; the fix is that next
+          time it is not.
+        diagram:
+          - {op: add_node, node: rsv-meridian}
+      - id: b
+        label: Restore the share from soft delete
+        correct: false
+        rep: -7
+        consequence: >
+          There is nothing in the soft delete list, because the share was never deleted.
+        explain: >
+          Soft delete for file shares applies to the share object. An overwrite inside a live
+          share never enters it.
+      - id: c
+        label: Restore the file from the storage account's blob versioning
+        correct: false
+        rep: -8
+        consequence: >
+          Ten minutes are spent looking for a versioning setting that does not apply to file
+          shares.
+        explain: >
+          Versioning and blob soft delete are blob service features. The file service has
+          share snapshots and share-level soft delete instead, and knowing which is which is
+          the exam's favorite corner of this topic.
+      - id: d
+        label: Ask the template author to rebuild the file and move on
+        correct: false
+        rep: -5
+        consequence: >
+          It takes two days, and the same overwrite happens again in November with no more
+          protection than before.
+        explain: >
+          Rebuilding is sometimes the answer, and leaving the share with no recovery point
+          means the next incident is identical. The durable part of this fix is the snapshot
+          schedule.

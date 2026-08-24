@@ -1,0 +1,250 @@
+id: a1id-q04
+chapter: act1-identity
+title: Hauliers and Helpdesk
+summary: Two outside firms need access to the tracking portal, and the helpdesk is drowning in password resets.
+variant: core
+estimated_minutes: 13
+objectives:
+  - AZ104-1.1.4
+  - AZ104-1.1.5
+brief: >
+  Meridian subcontracts long-haul to two partners. Their planners need in, they
+  are not Meridian staff, and nobody wants to run accounts for another company.
+debrief: >
+  Guests get their own accounts and their own tenant's problems, and the helpdesk
+  gets its Monday mornings back.
+encounters:
+  - id: a
+    type: design
+    title: Somebody else's staff
+    speaker: Dana Ong
+    objectives: [AZ104-1.1.4]
+    intro: >
+      "Sriwijaya Haulage and Northgate Freight both need their planners in the
+      tracking portal," says Dana. "Six people at one, eleven at the other. They
+      have their own IT, their own laptops and, I am told, their own Microsoft
+      tenant."
+
+
+      They need to see shipments assigned to their firm and nothing else. Their
+      staff turn over often, and Meridian will not be told promptly when someone
+      leaves.
+    prompt: How do you give them access?
+    options:
+      - id: a
+        label: >
+          Invite them as guest users, put each firm's guests in its own group, and grant
+          access to the portal through that group
+        correct: true
+        rep: 8
+        consequence: >
+          Both firms are in by Wednesday. When a Northgate planner leaves, their home
+          tenant disables the account and the guest sign-in stops working.
+        explain: >
+          Business-to-business collaboration invites the partner's own identity as a guest
+          in your tenant. They authenticate against their home tenant, so their employer's
+          joiner and leaver process does the work, and you keep no passwords for people who
+          do not work for you.
+        diagram:
+          - {op: add_node, node: entra-guests}
+      - id: b
+        label: Create member accounts for them in the Meridian tenant with new passwords
+        correct: false
+        rep: -9
+        consequence: >
+          Seventeen accounts for people you cannot reach, and in March a Sriwijaya planner
+          who left in January is still signing in.
+        explain: >
+          Member accounts make Meridian responsible for the credentials and lifecycle of
+          another firm's staff, with no visibility of their leavers. That is the exact
+          problem business-to-business guests exist to solve.
+      - id: c
+        label: Give each firm one shared account with the portal role
+        correct: false
+        rep: -12
+        consequence: >
+          Wei Lin finds it during the audit sample and it becomes the headline finding.
+        explain: >
+          Shared credentials remove attribution, cannot be revoked for one person, and are
+          typically an explicit breach of the customer contracts a logistics firm signs.
+      - id: d
+        label: Publish the portal anonymously and filter shipments by a partner code in the URL
+        correct: false
+        rep: -13
+        consequence: >
+          A guessable code exposes another customer's shipment data, and that is a
+          notifiable incident rather than a ticket.
+        explain: >
+          Access control by unguessable string is not access control. Shipment data is
+          commercial data belonging to named customers.
+  - id: b
+    type: design
+    title: Monday morning at the helpdesk
+    speaker: Marek Sobczak
+    objectives: [AZ104-1.1.5]
+    intro: >
+      Marek drops the helpdesk report on your desk with one number circled.
+
+
+      "Sixty-one per cent of tickets last month were password resets. Most on a
+      Monday, most from depot staff who were off for a week. Every one of them
+      costs somebody ten minutes and a phone call to verify who they are."
+
+
+      Depot staff sign in with accounts synced from the Jurong Active Directory.
+      Office staff are cloud-only.
+    prompt: What do you propose?
+    options:
+      - id: a
+        label: >
+          Enable self-service password reset for all users, with password writeback so
+          synced depot accounts are reset on-premises too
+        correct: true
+        rep: 8
+        consequence: >
+          Ticket volume drops by half in a month, and the depots stop phoning Cebu about
+          passwords at six in the morning.
+        explain: >
+          Self-service password reset lets users reset their own password after proving
+          themselves with registered authentication methods. For accounts synced from
+          Active Directory, password writeback is what pushes the new password back
+          on-premises so the two stay in step.
+        diagram:
+          - {op: add_node, node: entra-sspr}
+      - id: b
+        label: Enable self-service password reset for cloud-only users and leave the depots as they are
+        correct: false
+        rep: -6
+        consequence: >
+          The office stops raising tickets and the depots, who raised most of them, carry
+          on exactly as before.
+        explain: >
+          It helps the group that was not the problem. Password writeback is the piece that
+          extends this to synced accounts, and it is the one worth configuring.
+      - id: c
+        label: Lengthen the password expiry so people are asked to change passwords less often
+        correct: false
+        rep: -7
+        consequence: >
+          Reset volume drifts down slightly and then returns, because most resets follow
+          people forgetting rather than expiring.
+        explain: >
+          Expiry policy and forgetting are different problems. Current guidance moves away
+          from forced expiry anyway, in favor of longer passwords and strong second
+          factors.
+      - id: d
+        label: Give the depot supervisors permission to reset their team's passwords
+        correct: false
+        rep: -8
+        consequence: >
+          A supervisor resets a password over the phone for someone who turns out to be a
+          contractor from another firm.
+        explain: >
+          It delegates an identity-verification decision to people who are not equipped to
+          make it, and it keeps a human in a loop that a self-service flow removes.
+  - id: c
+    type: troubleshoot
+    title: INC-4441
+    speaker: Joana Reyes
+    objectives: [AZ104-1.1.4]
+    intro: >
+      Self-service reset went in on Tuesday and works. On Thursday the guests
+      start complaining.
+
+
+      "Northgate say the portal link takes them to a sign-in page, they sign in
+      with their own work account, and then it tells them they need a code from an
+      email they never receive. Sriwijaya are fine."
+    ticket:
+      ref: INC-4441
+      opened: "14:02"
+      reporter: Joana Reyes
+      summary: Guests from one partner cannot complete sign-in to the tracking portal.
+      severity: sev3
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what is different about the two partners
+        speaker: Marek Sobczak
+        reveals: >
+          "Sriwijaya are on Microsoft 365 with their own tenant. Northgate use a
+          different provider entirely; their planners' addresses are on their own
+          mail domain but there is no Entra tenant behind it."
+      - id: b
+        action: Ask the Northgate planners exactly what the screen says
+        speaker: Hendrik Salim
+        reveals: >
+          "One of them read it out: enter the code we sent to your email address. They
+          say the code never arrives, and their IT says our mail is being dropped by
+          their filter."
+    commands:
+      - id: a
+        label: Look at how one guest was invited
+        cmd: az ad user list --filter "userType eq 'Guest'" --query "[?contains(mail,'northgate')].{upn:userPrincipalName,type:userType,state:externalUserState}" -o table
+        output: |
+          Upn                                            Type    State
+          ---------------------------------------------  ------  -----------------
+          p.tan_northgate.example#EXT#@meridian...       Guest   PendingAcceptance
+        time_cost: 1
+      - id: b
+        label: Check a Sriwijaya guest for comparison
+        cmd: az ad user list --filter "userType eq 'Guest'" --query "[?contains(mail,'sriwijaya')].{upn:userPrincipalName,type:userType,state:externalUserState}" -o table
+        output: |
+          Upn                                            Type    State
+          ---------------------------------------------  ------  -----------------
+          a.putri_sriwijaya.example#EXT#@meridian...     Guest   Accepted
+        time_cost: 1
+      - id: c
+        label: Check the group membership of the failing guest
+        cmd: az ad user get-member-groups --id "p.tan_northgate.example#EXT#@meridianlogistics.com" -o table
+        output: |
+          DisplayName
+          --------------------
+          sg-partner-northgate
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Work with Northgate's IT to get Meridian's invitation mail delivered, then have
+          the guests accept the invitation
+        correct: true
+        rep: 8
+        consequence: >
+          Their filter releases the message the same afternoon and eleven guests move from
+          pending to accepted within the hour.
+        explain: >
+          A guest without a Microsoft tenant behind their address authenticates with a
+          one-time passcode sent by email, and the invitation itself has to be accepted the
+          same way. If the partner's mail filter drops those messages, no amount of
+          reconfiguring on your side helps. The state field said PendingAcceptance, which
+          named the problem.
+      - id: b
+        label: Re-invite the guests as member accounts so they get Meridian passwords
+        correct: false
+        rep: -9
+        consequence: >
+          Eleven Meridian passwords now exist for people at another company, and the finding
+          you avoided last week comes back.
+        explain: >
+          Turning guests into members moves the credential lifecycle to Meridian for people
+          it does not employ. The delivery problem is a mail problem, and it is fixable.
+      - id: c
+        label: Remove the multi-factor requirement for the partner group
+        correct: false
+        rep: -10
+        consequence: >
+          Access does not improve, because the missing code is the sign-in itself, and the
+          security posture is now worse for everyone in that group.
+        explain: >
+          The email one-time passcode is how these guests authenticate at all, not a second
+          factor layered on top. Weakening controls to work around a mail delivery failure
+          is a bad trade in both directions.
+      - id: d
+        label: Ask Northgate to create Microsoft accounts for each planner
+        correct: false
+        rep: -5
+        consequence: >
+          Northgate's IT declines, politely, and two weeks pass before anyone tells you.
+        explain: >
+          It would work, and it asks another company to change its identity platform to
+          suit yours. Email one-time passcode exists precisely so that is not necessary.

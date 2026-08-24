@@ -1,0 +1,248 @@
+id: a1cm-q05
+chapter: act1-compute
+title: Move It, Encrypt It
+summary: The auditor wants encryption of the temporary disk and cache, and the finance team wants their machines in their own subscription.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ104-3.2.2
+  - AZ104-3.2.3
+brief: >
+  Two requests that both start with the word simply, and neither of which is.
+debrief: >
+  Encryption at host on, and a move that was planned around what actually moves
+  rather than what people assume does.
+encounters:
+  - id: a
+    type: design
+    title: The disk you forgot about
+    speaker: Wei Lin Tan
+    objectives: [AZ104-3.2.2]
+    intro: >
+      "Managed disks are encrypted at rest, which the auditor accepts," says Wei
+      Lin. "What she asked about next was the temporary disk and the host cache.
+      Her words were: data that leaves the managed disk and sits on the physical
+      host."
+
+
+      The reporting machines write large intermediate files to the temporary disk
+      because it is fast and free.
+    prompt: What do you enable?
+    options:
+      - id: a
+        label: Encryption at host on each virtual machine, after enabling the feature on the subscription
+        correct: true
+        rep: 8
+        consequence: >
+          The setting goes on during the next maintenance window and the auditor's question
+          is answered in one line.
+        explain: >
+          Encryption at host encrypts the temporary disk and the disk and image caches on the
+          host itself, end to end from the host to the storage service. It is a per-machine
+          setting that requires the feature to be registered for the subscription, and the
+          machine must be deallocated to turn it on.
+        diagram:
+          - {op: set_detail, node: vm-tms01, detail: "Encryption at host enabled"}
+      - id: b
+        label: Azure Disk Encryption inside the guest with BitLocker or dm-crypt
+        correct: false
+        rep: -6
+        consequence: >
+          Two machines fail to boot after the extension runs, and the key vault becomes a
+          single point of failure for the fleet.
+        explain: >
+          Guest-based disk encryption is a real option and it encrypts inside the operating
+          system, which does not cover the host cache and brings boot-time key dependencies.
+          For this requirement, encryption at host is the direct answer.
+      - id: c
+        label: Customer-managed keys on the managed disks
+        correct: false
+        rep: -5
+        consequence: >
+          Key custody improves and the auditor's actual question is still unanswered.
+        explain: >
+          Customer-managed keys change who controls the key for data at rest on the disk.
+          They say nothing about the temporary disk or the host cache.
+      - id: d
+        label: Stop the reporting machines from using the temporary disk
+        correct: false
+        rep: -7
+        consequence: >
+          The reporting job takes four times as long and the host cache is still unencrypted.
+        explain: >
+          Removing the workload to avoid the control is a poor trade when a platform setting
+          covers it. The host cache applies to managed disks regardless.
+  - id: b
+    type: design
+    title: The move that finance asked for
+    speaker: Dana Ong
+    objectives: [AZ104-3.2.3]
+    intro: >
+      "Finance want their two reporting machines in the new non-production
+      subscription, so their costs stop landing on production," says Dana. "They
+      have been told it is a right-click operation."
+
+
+      The machines are in rg-app with the transport application, use disks in the
+      same resource group, sit on a subnet in vnet-app, and one of them has a
+      public IP address for a partner feed.
+    prompt: What do you tell her about the move?
+    options:
+      - id: a
+        label: >
+          Move each machine with its disks, interfaces and public address as one operation,
+          and expect the virtual network to be the hard part
+        correct: true
+        rep: 9
+        consequence: >
+          The move is scheduled with a window and a rollback plan, and the surprise about
+          the subnet is found on paper rather than at midnight.
+        explain: >
+          Moving a resource means moving everything it depends on in the same operation:
+          disks, network interfaces and public addresses. A virtual network cannot be moved
+          while resources in other resource groups use its subnets, so machines that must
+          keep their network usually get a new one in the destination and are rebuilt or
+          reattached.
+      - id: b
+        label: Move the two virtual machines on their own and reattach everything afterwards
+        correct: false
+        rep: -8
+        consequence: >
+          The move validation fails immediately, listing seven dependent resources, and the
+          window is wasted.
+        explain: >
+          Resource Manager validates the whole dependency set before it moves anything.
+          A virtual machine cannot leave its disks and network interfaces behind.
+      - id: c
+        label: Change the subscription on each machine in the portal, which is a supported operation
+        correct: false
+        rep: -6
+        consequence: >
+          There is no such setting, and half an hour goes into looking for it.
+        explain: >
+          Moving between subscriptions is a resource move operation on the resource group or
+          the resource, with its own validation. Subscription is not a property you edit.
+      - id: d
+        label: Rebuild the machines in the new subscription from the template and delete the originals
+        correct: false
+        rep: -5
+        consequence: >
+          It works, over two evenings, and the partner feed's allow-listed public address
+          changes without notice.
+        explain: >
+          Rebuilding is often the pragmatic answer, especially when networking has to change.
+          It is not free: identities, addresses and anything allow-listed by a partner move
+          with it, and this option skips planning for that.
+  - id: c
+    type: troubleshoot
+    title: INC-4688
+    speaker: Meridian NOC
+    objectives: [AZ104-3.2.3]
+    intro: >
+      The move ran at 22:00 and failed at 22:04 with a validation error. Nothing
+      moved, which is at least the behavior everyone was promised.
+
+
+      The change window closes at midnight and Dana is still awake.
+    ticket:
+      ref: INC-4688
+      opened: "22:06"
+      reporter: Meridian NOC
+      summary: Resource group move to the non-production subscription failed validation.
+      severity: sev3
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what was in the resource group at the time
+        speaker: Marek Sobczak
+        reveals: >
+          "The two machines, their disks, their interfaces, one public address, and a
+          recovery services vault item, because somebody enabled backup on them last
+          month."
+      - id: b
+        action: Ask what the destination subscription looks like
+        speaker: Meridian IT
+        reveals: >
+          The non-production subscription has the compute and network resource providers
+          registered. Nothing else is in the destination resource group.
+    commands:
+      - id: a
+        label: Read the move validation result
+        cmd: az resource invoke-action --action validateMoveResources --ids "/subscriptions/.../resourceGroups/rg-finance-report" --request-body "{\"resources\":[],\"targetResourceGroup\":\"/subscriptions/.../resourceGroups/rg-finance-report\"}"
+        output: |
+          {
+            "error": {
+              "code": "ResourceMoveValidationFailed",
+              "message": "Resource '/subscriptions/.../vaults/rsv-meridian/backupFabrics/.../protectedItems/vm-report01'
+              is protected by Azure Backup. Disable protection before moving the virtual machine."
+            }
+          }
+        time_cost: 1
+      - id: b
+        label: Check what is protecting the machines
+        cmd: az backup item list --vault-name rsv-meridian -g rg-ops --query "[?contains(name,'report')].{name:name,policy:properties.policyName}" -o table
+        output: |
+          Name          Policy
+          ------------  ----------------
+          vm-report01   DailyPolicy-7d
+          vm-report02   DailyPolicy-7d
+        time_cost: 1
+      - id: c
+        label: Check the resource providers in the destination subscription
+        cmd: az provider list --query "[?namespace=='Microsoft.Compute'||namespace=='Microsoft.RecoveryServices'].{ns:namespace,state:registrationState}" -o table
+        output: |
+          Ns                          State
+          --------------------------  ------------
+          Microsoft.Compute           Registered
+          Microsoft.RecoveryServices  NotRegistered
+        time_cost: 1
+      - id: d
+        label: Check for locks on either resource group
+        cmd: az lock list --resource-group rg-finance-report -o table
+        output: |
+          (no results)
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Stop protection on the two machines keeping the backup data, move them, and
+          re-enable backup in the destination after registering the provider
+        correct: true
+        rep: 9
+        consequence: >
+          The move completes at 23:20 and backup is configured again in the destination the
+          next morning.
+        explain: >
+          A virtual machine protected by a recovery services vault cannot be moved while
+          protection is active, because the vault holds a reference to it. Stopping protection
+          while retaining the recovery points keeps the history and releases the machine. The
+          destination subscription also needs the resource providers registered for the
+          resource types it is about to receive.
+      - id: b
+        label: Move the recovery services vault along with the machines
+        correct: false
+        rep: -7
+        consequence: >
+          Vault move has its own restrictions and the window closes with nothing moved.
+        explain: >
+          Recovery services vaults have significant limitations on moving while they contain
+          protected items. The vault stays where it is; the machines leave protection first.
+      - id: c
+        label: Delete the backup items so the machines are free to move
+        correct: false
+        rep: -10
+        consequence: >
+          The seven days of recovery points for two finance machines are gone, on the night
+          before month end.
+        explain: >
+          Stopping protection with retained data does exactly what is needed. Deleting the
+          backup data destroys the recovery points for no benefit.
+      - id: d
+        label: Register Microsoft.RecoveryServices in the destination and retry the move
+        correct: false
+        rep: -6
+        consequence: >
+          The provider registers and the move fails again with the same protected item error.
+        explain: >
+          Provider registration is genuinely required for the destination, and it does not
+          release the vault's hold on the machines. Both things have to be true.

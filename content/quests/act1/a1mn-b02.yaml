@@ -1,0 +1,224 @@
+id: a1mn-b02
+chapter: act1-monitoring
+title: The Tabletop Rehearsal, Exam Hard
+summary: The region is really gone this time, and the decisions have consequences that last past the weekend.
+variant: bonus
+bonus_of: a1mn-q06
+estimated_minutes: 12
+objectives:
+  - AZ104-5.2.5
+  - AZ104-5.2.6
+  - AZ104-5.2.4
+brief: >
+  Everything rehearsed works. What the rehearsal did not cover is what happens
+  after you have failed over.
+debrief: >
+  Failover is the easy half. Reprotecting and coming home is where the plan gets
+  tested.
+encounters:
+  - id: a
+    type: troubleshoot
+    title: INC-4901
+    speaker: Dana Ong
+    objectives: [AZ104-5.2.6]
+    intro: >
+      Southeast Asia has been unavailable for seventy minutes with no estimate.
+      The depots cannot dispatch. The board's four-hour objective started at
+      09:10 and it is now 10:20.
+
+
+      The recovery plan is written and rehearsed. Dana is asking you to make the
+      call, and you have four time units before she makes it herself.
+    ticket:
+      ref: INC-4901
+      opened: "09:10"
+      reporter: Dana Ong
+      summary: Regional outage. Transport application unavailable. Failover decision required.
+      severity: sev1
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what the latest recovery points look like
+        speaker: Marek Sobczak
+        reveals: >
+          "Crash consistent points from 09:04 for all four machines, and an
+          application-consistent point from 08:30. Six minutes of shipment records
+          against thirty-six."
+      - id: b
+        action: Ask what the database is doing
+        speaker: Meridian NOC
+        reveals: >
+          "The database has an active geo-replica in East Asia and it is up to date to
+          within seconds. It is the machines that are stuck."
+    commands:
+      - id: a
+        label: Check replication health for the protected items
+        cmd: az site-recovery protected-item list --vault-name rsv-meridian -g rg-ops --query "[].{name:name,health:properties.replicationHealth,rpo:properties.providerSpecificDetails.lastRpoCalculatedTime}" -o table
+        output: |
+          Name         Health    Rpo
+          -----------  --------  ------------------------
+          vm-tms01     Normal    2026-08-24T09:04:11Z
+          vm-tms02     Normal    2026-08-24T09:04:09Z
+          vm-dc01      Normal    2026-08-24T09:03:58Z
+          vm-scan01    Normal    2026-08-24T09:04:20Z
+        time_cost: 1
+      - id: b
+        label: Confirm the source region really is unreachable
+        cmd: az vm get-instance-view -n vm-tms01 -g rg-app --query "instanceView.statuses[].displayStatus" -o tsv
+        output: |
+          (ServiceUnavailable) The request failed because the region is currently unavailable.
+        time_cost: 1
+      - id: c
+        label: Check the recovery plan is ready to run
+        cmd: az site-recovery recovery-plan show --vault-name rsv-meridian -g rg-ops -n rp-transport --query "{groups:length(properties.groups),lastRun:properties.lastPlannedFailoverTime}" -o json
+        output: |
+          {
+            "groups": 3,
+            "lastRun": "2026-08-11T06:40:00Z"
+          }
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Run an unplanned failover of the recovery plan using the latest crash-consistent
+          points, and commit once the application is verified
+        correct: true
+        rep: 10
+        consequence: >
+          The depots are dispatching from East Asia at 11:05, inside the objective, having lost
+          six minutes of records that the depots re-key from paper.
+        explain: >
+          Unplanned failover is the path when the source region is gone: it does not try to
+          shut down the source and accepts the data loss implied by the last recovery point.
+          Choosing the latest point over the older application-consistent one is a judgment
+          about six minutes of loss against thirty-six, and for shipment records that is the
+          right trade. Commit finalizes the failover.
+        diagram:
+          - {op: set_status, node: vm-tms01-dr, status: healthy}
+          - {op: set_status, node: vnet-hub-ea, status: healthy}
+      - id: b
+        label: Run a planned failover so no data is lost
+        correct: false
+        rep: -9
+        consequence: >
+          The planned failover cannot proceed, because it needs to shut down machines in a
+          region that is not answering, and twenty minutes of the objective are gone.
+        explain: >
+          Planned failover requires the source to be reachable so it can be shut down cleanly.
+          It is for announced migrations, not for a region that has already gone.
+      - id: c
+        label: Fail over using the 08:30 application-consistent point to be safe
+        correct: false
+        rep: -6
+        consequence: >
+          Thirty-six minutes of shipment records are lost instead of six, and the depots re-key
+          six times as much.
+        explain: >
+          Application-consistent points are preferable where the workload requires them, such
+          as a database with in-flight transactions. Here the database is replicating
+          separately and the machines are stateless enough that the newer point wins.
+      - id: d
+        label: Wait for the region, since the objective allows until 13:10
+        correct: false
+        rep: -7
+        consequence: >
+          The region returns at 15:40, which is two and a half hours past the commitment the
+          board was given.
+        explain: >
+          With no estimate from the provider, waiting spends the objective on hope. The
+          rehearsed plan exists so this decision can be made at seventy minutes rather than at
+          three hours.
+  - id: b
+    type: design
+    title: Coming home
+    speaker: Marek Sobczak
+    objectives: [AZ104-5.2.5]
+    intro: >
+      Southeast Asia came back on Sunday afternoon. Meridian has been running in
+      East Asia since Friday, and the transport application has three days of
+      shipment records that only exist there.
+
+
+      "There is a button called failback," says Marek, "and it does not do what
+      people think it does."
+    prompt: How do you get back to Southeast Asia?
+    options:
+      - id: a
+        label: >
+          Reprotect the machines from East Asia back to Southeast Asia, let the reverse
+          replication complete, then run a planned failover during a window
+        correct: true
+        rep: 8
+        consequence: >
+          Reverse replication runs overnight and the move home happens on Tuesday at 21:00 with
+          no data loss and eleven minutes of downtime.
+        explain: >
+          After a committed failover the machines in the target region are the source of truth
+          and nothing is replicating. Reprotect establishes replication in the reverse
+          direction, and only once it is healthy can a planned failover move the workload back
+          cleanly.
+      - id: b
+        label: Fail over again from Southeast Asia, since the original machines are still there
+        correct: false
+        rep: -10
+        consequence: >
+          The original machines hold Friday morning's state, and three days of shipment records
+          are lost.
+        explain: >
+          The machines left behind are frozen at the moment of failover. Treating them as
+          current discards everything that happened in the recovery region.
+      - id: c
+        label: Rebuild in Southeast Asia from the templates and copy the data across
+        correct: false
+        rep: -6
+        consequence: >
+          It takes a week of evenings and the data copy is a hand-written script.
+        explain: >
+          Reprotect exists so this is a supported, replicated move rather than a migration
+          project. Rebuilding is what you do when replication is not available.
+      - id: d
+        label: Stay in East Asia permanently and make it the primary region
+        correct: false
+        rep: -5
+        consequence: >
+          The database's primary, the storage accounts and the network hub are all still in
+          Southeast Asia, so half the estate is now cross-region.
+        explain: >
+          It is a legitimate strategic option and a much larger decision than an incident
+          response. Everything else in the estate would have to move with it.
+  - id: c
+    type: knowledge
+    title: What a commit does
+    speaker: Marek Sobczak
+    objectives: [AZ104-5.2.4]
+    intro: >
+      "One more," says Marek. "After an unplanned failover, the portal offers
+      commit, and it is not obvious what it means. What are you agreeing to?"
+    question: What does committing a failover do?
+    options:
+      - id: a
+        label: >
+          It finalizes the chosen recovery point and discards the others, so you can no longer
+          switch to a different point
+        correct: true
+        rep: 6
+        explain: >
+          Before commit you can change your mind and fail over to a different recovery point.
+          Commit finalizes the choice, cleans up the other points and is the prerequisite for
+          reprotecting in the reverse direction.
+      - id: b
+        label: It deletes the source machines in the failed region
+        correct: false
+        rep: -5
+        consequence: A commit is delayed for days out of fear of destroying the source, blocking reprotection.
+        explain: >
+          Commit does not touch the source region. Cleaning up the original machines is a
+          separate decision, usually taken after failback.
+      - id: c
+        label: It starts replication back to the source region automatically
+        correct: false
+        rep: -5
+        consequence: Nobody reprotects, nothing replicates, and the estate sits in the recovery region unprotected.
+        explain: >
+          Reprotect is a separate, explicit step. After a commit the workload is running with
+          no replication until you ask for it.

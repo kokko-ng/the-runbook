@@ -1,0 +1,258 @@
+id: a1id-q05
+chapter: act1-identity
+title: The Resource Group That Was Not There
+summary: Somebody deleted rg-reporting on a Friday, and nobody can say who or why.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ104-1.3.1
+  - AZ104-1.3.2
+  - AZ104-1.3.3
+  - AZ104-1.3.4
+brief: >
+  A resource group vanished over the weekend. There is no soft delete for a
+  resource group, so this is now a conversation about guard rails.
+debrief: >
+  Locks on what must not vanish, a policy that stops untagged resources being
+  created, and an owner tag on everything so the next question has an answer.
+encounters:
+  - id: a
+    type: troubleshoot
+    title: INC-4460
+    speaker: Marek Sobczak
+    objectives: [AZ104-1.3.4]
+    intro: >
+      Monday, 08:10. The finance reporting job did not run over the weekend
+      because the storage account it writes to is gone. So is everything else in
+      rg-reporting.
+
+
+      "Twelve resources," says Marek. "A storage account, a small database, some
+      automation. All in one group, all gone. Nobody has admitted to anything
+      yet, which in my experience means nobody has read their email."
+    ticket:
+      ref: INC-4460
+      opened: "08:10"
+      reporter: Marek Sobczak
+      summary: rg-reporting and its twelve resources no longer exist.
+      severity: sev2
+    time_budget: 5
+    investigate:
+      - id: a
+        action: Ask who had access to that resource group
+        speaker: Wei Lin Tan
+        reveals: >
+          "After your access review, three people: you, Marek, and the finance systems
+          contractor who was given Contributor on rg-reporting for the quarter-end work."
+      - id: b
+        action: Ask whether anything is recoverable
+        speaker: Marek Sobczak
+        reveals: >
+          "The database was in a server that is also gone, so no point-in-time restore.
+          The storage account is past its purge window for account-level recovery. There
+          is a backup vault, but rg-reporting was never added to it."
+      - id: c
+        action: Ask finance what they need first
+        speaker: Priya Raghunathan
+        reveals: >
+          "The month-end pack. It reads from the reporting database, which is rebuilt
+          nightly from the transport system. If you rebuild the database, the data comes
+          back on tonight's run."
+    commands:
+      - id: a
+        label: Look for the deletion in the activity log
+        cmd: az monitor activity-log list --offset 72h --query "[?operationName.value=='Microsoft.Resources/subscriptions/resourcegroups/delete'].{who:caller,at:eventTimestamp,status:status.value}" -o table
+        output: |
+          Who                                       At                        Status
+          ----------------------------------------  ------------------------  ---------
+          c.fernandez@contractor.example            2026-08-22T17:41:09Z      Succeeded
+        time_cost: 1
+      - id: b
+        label: Check whether the group can simply be restored
+        cmd: az group show -n rg-reporting
+        output: |
+          (ResourceGroupNotFound) Resource group 'rg-reporting' could not be found.
+        note: There is no undelete for a resource group. What is gone depends entirely on each resource type.
+        time_cost: 1
+      - id: c
+        label: Check what the contractor could do
+        cmd: az role assignment list --assignee c.fernandez@contractor.example --all -o table
+        output: |
+          Principal                        Role         Scope
+          -------------------------------  -----------  ----------------------------------------------
+          c.fernandez@contractor.example   Contributor  /subscriptions/.../resourceGroups/rg-reporting
+        time_cost: 1
+      - id: d
+        label: Check whether any lock was in place
+        cmd: az lock list --query "[].{name:name,level:level,scope:id}" -o table
+        output: |
+          Name                Level          Scope
+          ------------------  -------------  --------------------------------------------
+          protect-rg-data     CanNotDelete   /subscriptions/.../resourceGroups/rg-data
+        time_cost: 1
+      - id: e
+        label: Check the backup vault for anything from that group
+        cmd: az backup item list --vault-name rsv-meridian -g rg-ops -o table
+        output: |
+          Name              Type                 LastBackupStatus
+          ----------------  -------------------  ------------------
+          vm-tms01          Microsoft.Compute    Completed
+        time_cost: 2
+    fixes:
+      - id: a
+        label: >
+          Rebuild rg-reporting from the deployment template, let tonight's job repopulate
+          the database, and put a CanNotDelete lock on the rebuilt group
+        correct: true
+        rep: 9
+        consequence: >
+          The group is back before lunch, the month-end pack runs that night, and the lock
+          means the next contractor cannot repeat it.
+        explain: >
+          Deleting a resource group deletes everything in it and there is no undo at the
+          group level. Recovery is per resource type, and here the data is reproducible
+          from the nightly rebuild. The durable fix is the lock: CanNotDelete stops
+          deletion even for an Owner until the lock itself is removed.
+        diagram:
+          - {op: add_node, node: rg-ops}
+          - {op: add_node, node: lock-data}
+      - id: b
+        label: Open a support case to have the resource group restored
+        correct: false
+        rep: -7
+        consequence: >
+          Two days pass waiting for an answer that was always going to be no, and month-end
+          slips.
+        explain: >
+          There is no platform-level restore for a deleted resource group. Some individual
+          resource types have their own recovery windows, and those are what a case can
+          help with, not the group.
+      - id: c
+        label: Remove the contractor's access and report the incident, then decide about rebuilding
+        correct: false
+        rep: -6
+        consequence: >
+          Access is tidy and finance still has nothing to report with on Tuesday morning.
+        explain: >
+          Revoking access is right and it is not a recovery. Service first, then the access
+          question, then the guard rail so it cannot happen again.
+      - id: d
+        label: Restore the storage account from its soft delete window and rebuild the rest
+        correct: false
+        rep: -5
+        consequence: >
+          The restore fails because the account itself is gone, not just its blobs, and the
+          window for account recovery has passed.
+        explain: >
+          Blob soft delete protects blobs inside an account. Recovering a deleted storage
+          account is a different, time-limited operation, and Marek said that window has
+          closed.
+  - id: b
+    type: design
+    title: Guard rails, not memos
+    speaker: Dana Ong
+    objectives: [AZ104-1.3.2]
+    intro: >
+      "I do not want a memo about being careful," says Dana. "I want the platform
+      to say no. Production data groups must not be deletable by accident. The
+      developers still need to deploy and delete their own test resources in
+      rg-app all day long."
+    prompt: What do you put in place?
+    options:
+      - id: a
+        label: A CanNotDelete lock on rg-data and rg-reporting, and nothing on rg-app
+        correct: true
+        rep: 7
+        consequence: >
+          Developers notice nothing. The next attempt to delete rg-data fails with a
+          message naming the lock.
+        explain: >
+          CanNotDelete allows reading and modifying but blocks deletion, and it applies to
+          everyone including Owners until the lock is removed. Applying it only where
+          deletion is genuinely unacceptable keeps it credible.
+      - id: b
+        label: A ReadOnly lock on every production resource group
+        correct: false
+        rep: -8
+        consequence: >
+          Backups start failing, the transport application cannot write its own
+          configuration, and the lock is removed within a day and never reapplied.
+        explain: >
+          ReadOnly blocks every write operation, which breaks far more than deletion:
+          scaling, backup configuration, even some read operations that are implemented as
+          POST. It is a strong tool for a frozen environment and the wrong default.
+      - id: c
+        label: Remove Contributor from everyone and grant it per change request
+        correct: false
+        rep: -7
+        consequence: >
+          The change queue triples, deployments slow to a crawl, and someone is eventually
+          given Owner permanently to make it stop.
+        explain: >
+          Locks exist so that access does not have to be this narrow. Process that fights
+          daily work gets routed around.
+  - id: c
+    type: design
+    title: Whose is this
+    speaker: Priya Raghunathan
+    objectives: [AZ104-1.3.3, AZ104-1.3.1]
+    intro: >
+      Priya has the invoice and a specific complaint.
+
+
+      "Forty-one per cent of last month's spend is on resources I cannot attribute
+      to a department. I am not asking you to cut anything yet. I am asking to know
+      whose it is before I have that conversation."
+
+
+      Meridian has agreed on three tags: costcenter, owner, and environment.
+      About half the estate carries them.
+    prompt: How do you get to full coverage?
+    options:
+      - id: a
+        label: >
+          Tag the existing resources, then assign a policy that denies creation of resources
+          without a costcenter tag
+        correct: true
+        rep: 8
+        consequence: >
+          The next invoice attributes ninety-six per cent of spend, and the gap is two
+          resources that predate the policy and get fixed the same week.
+        explain: >
+          Azure Policy evaluates resources at creation and on update, and a deny effect
+          stops untagged resources being created at all. Backfilling the existing estate
+          first means the policy does not immediately block work that was already
+          compliant in spirit.
+        diagram:
+          - {op: add_node, node: policy-tags}
+      - id: b
+        label: Send the resource owners a spreadsheet and ask them to tag their own resources
+        correct: false
+        rep: -6
+        consequence: >
+          Coverage reaches seventy per cent, then drifts back down as new resources appear
+          untagged.
+        explain: >
+          Tagging by request does not hold, because nothing stops the next untagged
+          resource. Policy is what makes the state stick.
+      - id: c
+        label: Assign a policy with a modify effect that adds a costcenter tag of "unknown"
+        correct: false
+        rep: -7
+        consequence: >
+          Every resource is tagged and the invoice now shows forty-one per cent under a
+          department called unknown.
+        explain: >
+          It satisfies the letter of the requirement and answers none of Priya's question.
+          A modify effect is genuinely useful for inheriting a real value from the resource
+          group, which is a different and better use of it.
+      - id: d
+        label: Split each department into its own subscription so the invoice separates itself
+        correct: false
+        rep: -8
+        consequence: >
+          Six weeks of migration work for a reporting problem, and the shared hub still has
+          to live somewhere.
+        explain: >
+          Subscription design is a real lever for billing separation, and it is a much
+          larger change than the problem needs. Tags plus a policy get there this week.

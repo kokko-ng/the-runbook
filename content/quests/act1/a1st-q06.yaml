@@ -1,0 +1,260 @@
+id: a1st-q06
+chapter: act1-storage
+title: East Asia Wants a Copy
+summary: The claims team in Hong Kong reads scans across the region link, and the customer contract now says the data must not be reachable from the internet.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ104-2.2.3
+  - AZ104-2.1.1
+brief: >
+  Two requirements arrive in the same week and pull in different directions: put
+  a copy nearer the readers, and close the account to everything else.
+debrief: >
+  A one-way replication that keeps the Hong Kong team local, and a firewall that
+  says no to everything nobody named.
+encounters:
+  - id: a
+    type: design
+    title: A copy where the readers are
+    speaker: Dana Ong
+    objectives: [AZ104-2.2.3]
+    intro: >
+      "The Hong Kong claims team opens about six hundred scans a day," says Dana,
+      "and every one of them comes out of Southeast Asia. They wait a second and a
+      half per image and they have started complaining in writing."
+
+
+      They only read. Writes all happen at the depots in the south. The account is
+      geo-redundant already, but the secondary is not readable and the team needs
+      the last two years, not everything.
+    prompt: What do you put in place?
+    options:
+      - id: a
+        label: >
+          Object replication from the scans container to a container in a new East Asia
+          account, with a rule that copies blobs from the last two years onwards
+        correct: true
+        rep: 8
+        consequence: >
+          Hong Kong reads locally within a day of the initial copy, and new scans appear
+          there within minutes of being written.
+        explain: >
+          Object replication asynchronously copies block blobs from a source container to a
+          destination container in another account, in another region if you like, with
+          rules by prefix and creation time. Versioning and change feed must be on at the
+          source, which they already are. The destination is readable and writable
+          independently, which is what makes it useful for a local reader.
+        diagram:
+          - {op: add_node, node: st-pod-dr}
+          - {op: add_edge, edge: e-objrepl-pod}
+      - id: b
+        label: Switch the account to read-access geo-redundant storage and point Hong Kong at the secondary endpoint
+        correct: false
+        rep: -6
+        consequence: >
+          It works, and the claims application has to be taught a second endpoint name, and
+          reads may be behind by minutes with no way to tell how far.
+        explain: >
+          Read access to the geo-redundant secondary is a real option and it is read-only,
+          eventually consistent, and covers the whole account rather than a chosen subset.
+          Object replication gives a normal account you control at the far end.
+      - id: c
+        label: Copy the last two years to an East Asia account with AzCopy, on a nightly schedule
+        correct: false
+        rep: -7
+        consequence: >
+          Yesterday's scans are always missing, which is the set the claims team most often
+          needs.
+        explain: >
+          A nightly copy is a replication system you now maintain, with a built-in day of
+          lag. Object replication is continuous and is part of the service.
+      - id: d
+        label: Put a content delivery network in front of the storage account
+        correct: false
+        rep: -8
+        consequence: >
+          Proof-of-delivery images are cached at edge nodes around the world, which is the
+          opposite of what the customer contract is about to require.
+        explain: >
+          Caching customer documents at public edge locations is a poor fit for data with a
+          contractual locality requirement, and a cache does not help data that is read once.
+  - id: b
+    type: design
+    title: Closing the front door
+    speaker: Wei Lin Tan
+    objectives: [AZ104-2.1.1]
+    intro: >
+      "The renewed contract with our two largest customers says their documents
+      are not reachable from the public internet," says Wei Lin. "Today the
+      account accepts a request from anywhere with a valid credential."
+
+
+      Who needs in: the intake service in vnet-app, the depot scanners in
+      vnet-depot, the claims team in Jurong over the VPN, and object replication
+      to East Asia. Marek also needs to run AzCopy from his laptop occasionally.
+    prompt: How do you configure the account's networking?
+    options:
+      - id: a
+        label: >
+          Set the firewall to deny by default, allow the two virtual networks by service
+          endpoint, allow trusted Microsoft services, and add the office range as an exception
+        correct: true
+        rep: 8
+        consequence: >
+          The audit item closes, replication carries on, and Marek's laptop still works from
+          the office.
+        explain: >
+          The storage firewall's default action of deny is what closes the account. Virtual
+          network rules let named subnets through over service endpoints, an IP rule covers
+          a known office range, and the trusted Microsoft services exception is what keeps
+          platform features such as replication working when everything else is refused.
+        diagram:
+          - {op: set_detail, node: st-pod, detail: "Firewall deny by default, two vnets allowed"}
+      - id: b
+        label: Deny by default and allow only the two virtual networks
+        correct: false
+        rep: -7
+        consequence: >
+          Object replication starts failing overnight and Marek cannot run AzCopy from
+          anywhere.
+        explain: >
+          A default deny without the trusted services exception blocks platform features that
+          reach the account from outside your virtual networks, and it leaves no path for
+          legitimate administrative access.
+      - id: c
+        label: Leave the firewall open and rely on private endpoints for the internal traffic
+        correct: false
+        rep: -8
+        consequence: >
+          Internal traffic goes private and the account still answers a request from a
+          coffee shop with a valid signature.
+        explain: >
+          Private endpoints change how internal clients reach the account; they do not close
+          the public endpoint. Disabling public network access, or a firewall that denies by
+          default, is what does that.
+      - id: d
+        label: Allow the public IP ranges of the depots and Jurong, and deny everything else
+        correct: false
+        rep: -6
+        consequence: >
+          A depot's internet provider changes its address in October and eleven sites drop
+          out at once.
+        explain: >
+          Address-based allow lists drift, and traffic from inside Azure often leaves from
+          addresses you do not control. Virtual network rules are stable because they name
+          the subnet, not the address.
+  - id: c
+    type: troubleshoot
+    title: INC-4561
+    speaker: Marek Sobczak
+    objectives: [AZ104-2.1.1, AZ104-2.2.3]
+    intro: >
+      The firewall went on at 15:00. By 15:30 the East Asia container has stopped
+      receiving new blobs, and the replication status on the source shows a
+      failure count climbing.
+
+
+      Everything else is fine: the intake service writes, the depots upload, the
+      claims team reads.
+    ticket:
+      ref: INC-4561
+      opened: "15:30"
+      reporter: Marek Sobczak
+      summary: Object replication to East Asia stopped after the storage firewall was enabled.
+      severity: sev3
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask exactly what was applied at 15:00
+        speaker: Meridian IT
+        reveals: >
+          CHG-2280 set the default action to Deny on both accounts and added virtual
+          network rules for snet-app and snet-depot. No exception was ticked.
+      - id: b
+        action: Ask which direction is failing
+        speaker: Marek Sobczak
+        reveals: >
+          "Source says failed. Destination has nothing new since 15:04. So the copy is
+          not arriving, rather than arriving and being rejected."
+    commands:
+      - id: a
+        label: Check the network rules on the destination account
+        cmd: az storage account show -n stmeridianpoddr -g rg-data --query "networkRuleSet.{default:defaultAction,bypass:bypass,vnets:virtualNetworkRules[].id}" -o json
+        output: |
+          {
+            "bypass": "None",
+            "default": "Deny",
+            "vnets": []
+          }
+        time_cost: 1
+      - id: b
+        label: Check the source account for comparison
+        cmd: az storage account show -n stmeridianpod -g rg-data --query "networkRuleSet.{default:defaultAction,bypass:bypass}" -o json
+        output: |
+          {
+            "bypass": "AzureServices",
+            "default": "Deny"
+          }
+        time_cost: 1
+      - id: c
+        label: Look at the replication policy status
+        cmd: az storage account or-policy show -n stmeridianpod -g rg-data --policy-id "d4f2..." --query "rules[0].{src:sourceContainer,dst:destinationContainer,filters:filters}" -o json
+        output: |
+          {
+            "dst": "pod-scans",
+            "filters": { "minCreationTime": "2024-08-01T00:00:00Z", "prefixMatch": [] },
+            "src": "pod-scans"
+          }
+        time_cost: 1
+      - id: d
+        label: Check the destination container still exists
+        cmd: az storage container show -c pod-scans --account-name stmeridianpoddr --auth-mode login --query "name" -o tsv
+        output: |
+          pod-scans
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Add the trusted Microsoft services exception to the destination account's firewall
+        correct: true
+        rep: 9
+        consequence: >
+          Replication catches up within twenty minutes and the failure count stops climbing.
+        explain: >
+          Object replication is performed by the storage service itself, not from one of your
+          subnets, so a destination account that denies by default with no bypass refuses it.
+          The source account had the exception set and the destination did not, which is why
+          only one direction broke.
+        diagram:
+          - {op: set_status, node: st-pod-dr, status: healthy}
+      - id: b
+        label: Add a virtual network rule for snet-app to the destination account
+        correct: false
+        rep: -7
+        consequence: >
+          Nothing changes, because the replication traffic does not come from that subnet.
+        explain: >
+          Virtual network rules admit traffic from your subnets. The replication service
+          reaches the destination from Azure's own infrastructure, which is what the trusted
+          services exception covers.
+      - id: c
+        label: Set the destination account's default action back to Allow
+        correct: false
+        rep: -8
+        consequence: >
+          Replication resumes and the East Asia copy of the same customer documents is now
+          open to the internet, which is the requirement you were closing.
+        explain: >
+          Opening the destination defeats the control. The exception exists so that platform
+          features work with the firewall on.
+      - id: d
+        label: Recreate the replication policy with the destination as the source
+        correct: false
+        rep: -9
+        consequence: >
+          The direction of replication reverses and East Asia's stale copy starts overwriting
+          the primary.
+        explain: >
+          Object replication is one-way by design, from source container to destination.
+          Reversing it points the copy the wrong way and risks the live data.

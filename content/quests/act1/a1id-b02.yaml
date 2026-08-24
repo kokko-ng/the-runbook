@@ -1,0 +1,177 @@
+id: a1id-b02
+chapter: act1-identity
+title: The Resource Group That Was Not There, Exam Hard
+summary: Policy that has to change behavior without breaking a deployment already in flight.
+variant: bonus
+bonus_of: a1id-q05
+estimated_minutes: 12
+objectives:
+  - AZ104-1.3.1
+  - AZ104-1.3.2
+  - AZ104-1.3.3
+brief: >
+  Policy effects look interchangeable until the day one of them stops a release.
+debrief: >
+  Audit to learn, deny to enforce, modify to fix, and an exemption when the
+  business says so in writing.
+encounters:
+  - id: a
+    type: design
+    title: The effect you choose first
+    speaker: Wei Lin Tan
+    objectives: [AZ104-1.3.1]
+    intro: >
+      The tagging requirement is agreed. What is not agreed is how hard to land
+      it.
+
+
+      "Two hundred and sixty existing resources," says Wei Lin, "of which about
+      ninety have no costcenter tag. There is a release on Thursday that deploys
+      about thirty resources from a template nobody has time to edit this week."
+
+
+      Priya wants attribution on the next invoice. Dana wants Thursday to happen.
+    prompt: What do you assign, and when?
+    options:
+      - id: a
+        label: >
+          Assign the policy with an audit effect now, fix the ninety and the template, then
+          switch the effect to deny
+        correct: true
+        rep: 8
+        consequence: >
+          Thursday ships. The compliance view names the ninety, they are fixed over two
+          weeks, and the deny goes on with nothing left to break.
+        explain: >
+          Audit evaluates and reports without blocking, which turns policy into a worklist
+          before it becomes a wall. Once the estate and the templates are compliant, moving
+          the same definition to deny costs nothing and holds the line.
+      - id: b
+        label: Assign the policy with a deny effect now, because the requirement is agreed
+        correct: false
+        rep: -7
+        consequence: >
+          Thursday's release fails at resource nineteen of thirty, half deployed, at 21:40.
+        explain: >
+          Deny blocks creation and update outright, including from templates already in
+          flight. It is the right end state and the wrong opening move when you know
+          non-compliant deployments are queued.
+      - id: c
+        label: Assign the policy with a modify effect that copies the tag from the resource group
+        correct: false
+        rep: -5
+        consequence: >
+          Thirty resources inherit rg-app's costcenter, which is the platform team's, and
+          the invoice attributes the release to the wrong department.
+        explain: >
+          Modify with tag inheritance is an excellent pattern when the resource group's tag
+          is the right answer. Here it silently produces a wrong answer, which is worse for
+          Priya than a missing one.
+      - id: d
+        label: Assign the policy with a deny effect and an exemption for rg-app until Friday
+        correct: false
+        rep: -6
+        consequence: >
+          The exemption is still there in November, because nothing expires that nobody
+          diaries.
+        explain: >
+          Exemptions are for cases the business has genuinely accepted, with an expiry and a
+          reason. Using one to work around a rollout you control turns the exception into
+          the norm.
+  - id: b
+    type: design
+    title: The lock that stopped a backup
+    speaker: Marek Sobczak
+    objectives: [AZ104-1.3.2]
+    intro: >
+      A ReadOnly lock went on rg-data during the panic after rg-reporting
+      disappeared. Two days later the backup job starts failing, the storage
+      lifecycle rule stops moving blobs to cool, and somebody cannot rotate a key.
+
+
+      "I know what did it," says Marek. "I want to know what you would put back
+      instead, and I want the reason, not the answer."
+    prompt: What replaces the ReadOnly lock?
+    options:
+      - id: a
+        label: >
+          A CanNotDelete lock on the resource group, because deletion was the risk and writes
+          were never the problem
+        correct: true
+        rep: 7
+        consequence: >
+          Backups resume on the next run, the lifecycle rule catches up overnight, and
+          deletion is still refused.
+        explain: >
+          ReadOnly blocks every write in its scope, which includes operations that services
+          perform on your behalf: backup configuration, lifecycle management, key rotation,
+          and some read paths implemented as POST. CanNotDelete addresses the actual risk
+          and leaves normal operation alone.
+      - id: b
+        label: Keep ReadOnly and exclude the backup service principal from it
+        correct: false
+        rep: -8
+        consequence: >
+          There is no way to exclude a principal from a lock, and an hour goes into finding
+          that out.
+        explain: >
+          Locks are not access assignments and have no principal list. They apply to every
+          identity, which is exactly what makes them a guard rail rather than a permission.
+      - id: c
+        label: Remove the lock and rely on the access review to keep deletion out of reach
+        correct: false
+        rep: -6
+        consequence: >
+          Six months later a contractor with Contributor deletes something in rg-data, which
+          is the film you have already seen.
+        explain: >
+          Access control and locks answer different questions. Contributor legitimately
+          includes delete, so the lock is what stops the accident.
+  - id: c
+    type: design
+    title: Where the tag comes from
+    speaker: Priya Raghunathan
+    objectives: [AZ104-1.3.3]
+    intro: >
+      Attribution is at ninety-six per cent and Priya wants the last four.
+
+
+      "Every resource in rg-depot-johor belongs to the Johor cost center. Every
+      one. I do not want to type it on each resource, and I do not want it wrong
+      when somebody deploys at eleven at night."
+    prompt: How do you cover the remainder?
+    options:
+      - id: a
+        label: >
+          A policy with a modify effect that inherits the costcenter tag from the resource
+          group, with a remediation task for what already exists
+        correct: true
+        rep: 8
+        consequence: >
+          The remediation task tags the existing resources in about a minute, and everything
+          deployed afterwards arrives tagged whatever the deployer remembered.
+        explain: >
+          Modify changes the resource as it is created or updated, and tag inheritance from
+          the resource group is its most common use. Existing resources are not changed
+          retroactively by the assignment alone, which is what the remediation task is for.
+        diagram:
+          - {op: set_detail, node: policy-tags, detail: "Deny untagged, inherit from the resource group"}
+      - id: b
+        label: A policy with an append effect that adds the tag
+        correct: false
+        rep: -5
+        consequence: >
+          It works for creation, and an update that omits the tag can remove it again.
+        explain: >
+          Append adds fields during create and update, and it is the older pattern for tags.
+          Modify is the effect built for tag operations, supports remediation of existing
+          resources, and handles updates more predictably.
+      - id: c
+        label: A deny policy requiring the tag on every resource in that group
+        correct: false
+        rep: -6
+        consequence: >
+          Deployments at eleven at night start failing, which is when the depot deploys.
+        explain: >
+          Deny makes the human responsible for something the platform already knows. If the
+          right value can be derived, derive it.

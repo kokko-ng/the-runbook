@@ -1,0 +1,255 @@
+id: a1st-q04
+chapter: act1-storage
+title: Nine Cents a Gigabyte
+summary: Seven years of scans at hot prices, and the CFO has done the multiplication.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ104-2.3.3
+  - AZ104-2.3.6
+  - AZ104-2.3.7
+brief: >
+  The scans are safe, they are attributed, and they are all sitting in the most
+  expensive tier there is. Nobody reads a scan from 2019.
+debrief: >
+  A lifecycle rule that moves the old ones down, versioning on so an overwrite is
+  survivable, and a bill that flattens out instead of climbing.
+encounters:
+  - id: a
+    type: design
+    title: What gets read, and when
+    speaker: Priya Raghunathan
+    objectives: [AZ104-2.3.3]
+    intro: >
+      Priya has the access statistics, because you sent them to her.
+
+
+      "Ninety-four per cent of reads are of scans from the last thirty days.
+      Claims occasionally pull something from the last year. Beyond a year it is
+      three or four requests a month, usually a legal request, and those people
+      wait days for other things anyway."
+
+
+      The account is general-purpose v2. Everything is in hot.
+    prompt: What tiering do you propose?
+    options:
+      - id: a
+        label: >
+          Hot for the first thirty days, cool to ninety, cold to a year, then archive for the
+          rest of the retention
+        correct: true
+        rep: 8
+        consequence: >
+          The projected seven-year storage cost falls by about seventy per cent, and the
+          claims team notices nothing.
+        explain: >
+          Access tiers trade storage price against access price and minimum retention. Hot
+          suits data read often, cool and cold progressively cheaper to store and dearer to
+          read, and archive is offline with a rehydration delay measured in hours, which
+          matches a legal request that already takes days.
+        diagram:
+          - {op: add_node, node: lifecycle-pod}
+      - id: b
+        label: Move everything to cool immediately, since almost nothing is read
+        correct: false
+        rep: -6
+        consequence: >
+          Read costs on the last thirty days go up more than the storage saving, and there
+          is an early deletion charge on anything rewritten.
+        explain: >
+          Ninety-four per cent of reads are in the first thirty days, and cool charges more
+          per read. Cool also has a thirty-day minimum retention, so data deleted or moved
+          sooner is billed as if it had stayed.
+      - id: c
+        label: Move everything older than thirty days straight to archive
+        correct: false
+        rep: -7
+        consequence: >
+          The claims team's occasional look at a six-month-old scan turns into a rehydration
+          request and an angry email.
+        explain: >
+          Archive is offline. Any read needs rehydration to an online tier, which takes hours
+          in standard priority. The step from cool through cold to archive is what keeps the
+          occasional read tolerable.
+      - id: d
+        label: Keep everything hot and buy a reservation for the storage capacity
+        correct: false
+        rep: -5
+        consequence: >
+          The discount is real and applies to the most expensive tier for data nobody reads.
+        explain: >
+          Capacity reservations do reduce the price of storage you know you will use. They
+          are worth having on top of correct tiering, not instead of it.
+  - id: b
+    type: design
+    title: The rule that does it
+    speaker: Marek Sobczak
+    objectives: [AZ104-2.3.6]
+    intro: >
+      "Agreed shape," says Marek. "Now the mechanism. Eleven thousand blobs a day,
+      indefinitely. I do not want a runbook that tiers them, and I do not want a
+      function app somebody has to maintain."
+    prompt: How do you implement the tiering?
+    options:
+      - id: a
+        label: >
+          A lifecycle management policy on the account, with rules by prefix and days since
+          last modification
+        correct: true
+        rep: 8
+        consequence: >
+          The policy is four lines of JSON and runs itself once a day. The first run moves
+          nine hundred thousand blobs and costs nothing to operate.
+        explain: >
+          Lifecycle management is built into the storage account: rules match blobs by prefix
+          or index tag and act on age since creation, last modification, or last access,
+          moving them between tiers or deleting them. It runs daily, on the platform's
+          schedule, with no code.
+        diagram:
+          - {op: set_detail, node: lifecycle-pod, detail: "Hot 30d, cool 90d, cold 365d, then archive"}
+      - id: b
+        label: A scheduled runbook that lists blobs and sets their tier
+        correct: false
+        rep: -7
+        consequence: >
+          It works for a year, then times out on a container with four million blobs and
+          nobody notices for two months.
+        explain: >
+          You are rebuilding a platform feature that already exists, and paying for the
+          listing operations. Lifecycle management is the answer this exact problem was built
+          for.
+      - id: c
+        label: Set the tier on each blob at upload time from the intake service
+        correct: false
+        rep: -6
+        consequence: >
+          New blobs are tiered correctly and nothing ever moves down, because a blob's age
+          changes after it is written.
+        explain: >
+          Upload-time tiering cannot express a rule about age. It is useful for putting a
+          blob straight into cool when you know it will not be read, and it does not replace
+          a lifecycle policy.
+      - id: d
+        label: Change the account's default access tier to cool and let blobs inherit it
+        correct: false
+        rep: -5
+        consequence: >
+          Every new scan lands in cool, and the ninety-four per cent of reads that happen in
+          the first month get more expensive.
+        explain: >
+          The default tier applies to blobs that do not set one, including brand new ones.
+          It is a blunt instrument compared with a rule that knows how old a blob is.
+  - id: c
+    type: troubleshoot
+    title: INC-4529
+    speaker: Meridian NOC
+    objectives: [AZ104-2.3.7]
+    intro: >
+      A fault in the intake service uploaded the same scan identifier for every
+      delivery on Tuesday afternoon, overwriting each one with the next. Four
+      hundred and six scans are now four hundred and six copies of a pallet of
+      instant noodles bound for Ipoh.
+
+
+      The bug is fixed. The scans are gone, and the drivers cannot re-scan a
+      delivery that has already happened.
+    ticket:
+      ref: INC-4529
+      opened: "10:02"
+      reporter: Meridian NOC
+      summary: Intake bug overwrote 406 proof-of-delivery scans with the same image.
+      severity: sev1
+    time_budget: 5
+    investigate:
+      - id: a
+        action: Ask what protection the container has
+        speaker: Marek Sobczak
+        reveals: >
+          "Blob soft delete is on, fourteen days. Versioning I turned on last month when
+          we set up the lifecycle rules, because the documentation recommended it."
+      - id: b
+        action: Ask whether the originals ever existed in Azure
+        speaker: Meridian IT
+        reveals: >
+          Intake logs show 406 successful PUT operations before the faulty ones, each
+          with a distinct content length. The originals were written.
+    commands:
+      - id: a
+        label: Check versioning and soft delete on the account
+        cmd: az storage account blob-service-properties show -n stmeridianpod -g rg-data --query "{versioning:isVersioningEnabled,softDelete:deleteRetentionPolicy}" -o json
+        output: |
+          {
+            "softDelete": { "days": 14, "enabled": true },
+            "versioning": true
+          }
+        time_cost: 1
+      - id: b
+        label: List the versions of one affected blob
+        cmd: az storage blob list -c pod-scans --account-name stmeridianpod --include v --prefix "2026/08/24/POD-88214" -o table
+        output: |
+          Name                            VersionId                       IsCurrentVersion    Length
+          ------------------------------  ------------------------------  ------------------  --------
+          2026/08/24/POD-88214.jpg        2026-08-24T06:12:41.7Z          False               412331
+          2026/08/24/POD-88214.jpg        2026-08-24T09:41:02.1Z          True                287004
+        time_cost: 1
+      - id: c
+        label: Check whether the deleted-blob list has anything
+        cmd: az storage blob list -c pod-scans --account-name stmeridianpod --include d --prefix "2026/08/24/" --query "[?deleted]" -o table
+        output: |
+          (no results)
+        note: Nothing was deleted. Each blob was overwritten, which is a different event.
+        time_cost: 1
+      - id: d
+        label: Check whether the container has a legal hold or immutability policy
+        cmd: az storage container immutability-policy show -c pod-scans --account-name stmeridianpod -g rg-data
+        output: |
+          (ImmutabilityPolicyNotFound) No immutability policy found on this container.
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Promote the previous version of each affected blob back to current, using the
+          version identifiers from before the fault window
+        correct: true
+        rep: 10
+        consequence: >
+          All 406 originals are back within the hour. Priya hears about it as a note in the
+          weekly report rather than as a customer complaint.
+        explain: >
+          Versioning keeps the previous state of a blob every time it is overwritten or
+          deleted, and any version can be promoted back to current. Blob soft delete would
+          have covered a deletion; this was an overwrite, which is exactly the case
+          versioning exists for.
+        diagram:
+          - {op: set_detail, node: st-pod, detail: "Versioning on, 14 day soft delete"}
+      - id: b
+        label: Restore the blobs from soft delete
+        correct: false
+        rep: -7
+        consequence: >
+          The deleted blob list is empty and half an hour is spent confirming it twice.
+        explain: >
+          Soft delete retains blobs that were deleted. When versioning is enabled an
+          overwrite creates a version rather than a soft-deleted blob, and the recovery path
+          is the version list.
+      - id: c
+        label: Restore the container from the account's geo-redundant secondary
+        correct: false
+        rep: -9
+        consequence: >
+          A failover is initiated for four hundred blobs, and the secondary is behind
+          anyway, so newer scans are lost as well.
+        explain: >
+          Geo-redundancy is regional disaster protection, not undo. Failing over for a
+          data-level mistake loses everything written after the last replication and cannot
+          be reversed cleanly.
+      - id: d
+        label: Ask the depots to re-scan the affected deliveries
+        correct: false
+        rep: -8
+        consequence: >
+          The deliveries were completed on Tuesday. There is nothing left to scan, and the
+          customer contract requires the original.
+        explain: >
+          The recovery point exists in the account already. Asking the business to redo work
+          the platform has kept a copy of is the expensive way to find that out.

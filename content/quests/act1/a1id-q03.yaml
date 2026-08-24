@@ -1,0 +1,245 @@
+id: a1id-q03
+chapter: act1-identity
+title: The Joiner Problem
+summary: Fourteen seasonal drivers start on Monday and HR sent the list as a spreadsheet on Friday afternoon.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ104-1.1.1
+  - AZ104-1.1.2
+  - AZ104-1.1.3
+brief: >
+  Peak season means the depots hire on short contracts. The identity work that
+  goes with that has been done by hand every year, and this year it is your hand.
+debrief: >
+  Membership is a rule now rather than a spreadsheet, and the licenses follow the
+  group instead of the person who remembered.
+encounters:
+  - id: a
+    type: design
+    title: Fourteen at once
+    speaker: Dana Ong
+    objectives: [AZ104-1.1.1, AZ104-1.1.2]
+    intro: >
+      "Fourteen seasonal drivers, three depots, all finishing in February," says
+      Dana. "They need accounts, they need to be in the depot access group for
+      their site, and in February they need to be gone. HR will send another
+      batch in three weeks."
+
+
+      Every account carries a department attribute set from the HR export, and the
+      depot access groups already exist. Last year this was done one account at a
+      time in the portal, and two people were still active in April.
+    prompt: How do you handle joiners this year?
+    options:
+      - id: a
+        label: >
+          Bulk create the users from the HR export, set the department attribute on each,
+          and make the depot access groups dynamic on that attribute
+        correct: true
+        rep: 8
+        consequence: >
+          The three-week batch lands with no ticket at all, and February's leavers drop out
+          of the groups the moment HR clears their department.
+        explain: >
+          Bulk create handles the volume, and dynamic membership makes the group a rule
+          rather than a list: membership follows the user attributes, so joiners and leavers
+          are handled by the same rule with no manual step. Dynamic groups need Microsoft
+          Entra ID P1 licensing, which Meridian already has.
+        diagram:
+          - {op: add_node, node: grp-depot-admins}
+      - id: b
+        label: Create the fourteen accounts by hand and add each one to the right group
+        correct: false
+        rep: -6
+        consequence: >
+          It takes an afternoon, the next batch takes another afternoon, and in April two
+          accounts are still in a group nobody audits.
+        explain: >
+          It works and it does not scale, and every manual step is a chance to forget the
+          removal. The failure mode is exactly the one Dana described from last year.
+      - id: c
+        label: Create one shared account per depot for the seasonal drivers to share
+        correct: false
+        rep: -12
+        consequence: >
+          Wei Lin escalates it as a finding the same week: no attribution, no way to remove
+          one person's access, and a password four people know.
+        explain: >
+          Shared accounts destroy the audit trail and cannot be revoked per person. They
+          are the single fastest way to fail a certification audit.
+      - id: d
+        label: >
+          Bulk create the users and add them to the depot groups as assigned members, to
+          be removed in February
+        correct: false
+        rep: -5
+        consequence: >
+          February arrives during the worst week of the year and the removals slip, which is
+          how last year went.
+        explain: >
+          Bulk creation is right and static membership puts the leaver problem back on a
+          human. If the attribute is already there, let the rule do the work.
+  - id: b
+    type: design
+    title: What the account looks like
+    speaker: Wei Lin Tan
+    objectives: [AZ104-1.1.2]
+    intro: >
+      Wei Lin has one requirement for the seasonal accounts, and she is very
+      clear about it.
+
+
+      "When one of these drivers finishes, I want their access gone the same day
+      and their record kept for the audit trail. Not deleted, not reusable. And I
+      want to be able to tell a seasonal account from a permanent one by looking
+      at it."
+    prompt: How do you handle a driver finishing?
+    options:
+      - id: a
+        label: >
+          Block sign-in on the account, keep it for the retention period, and set the
+          employee type and department attributes so the account is identifiable
+        correct: true
+        rep: 7
+        consequence: >
+          The first February leaver is handled in one step and the record survives the audit
+          in March.
+        explain: >
+          Blocking sign-in stops access immediately while preserving the object, its group
+          memberships and the sign-in history that an audit asks about. Attributes such as
+          employee type and department are what dynamic groups and reporting key off.
+      - id: b
+        label: Delete the account on the last day
+        correct: false
+        rep: -6
+        consequence: >
+          The audit asks who accessed the depot share in January and the answer is a
+          deleted object identifier.
+        explain: >
+          Deletion removes the object and, after the recycle bin window, the trail with it.
+          Blocking sign-in achieves the access requirement without losing the record.
+      - id: c
+        label: Reset the password to something nobody knows and leave the account enabled
+        correct: false
+        rep: -9
+        consequence: >
+          The account keeps its group memberships, keeps its tokens for a while, and shows
+          up as active in the next access review.
+        explain: >
+          An enabled account is an access path. Existing refresh tokens can survive a
+          password change for some time, and the account still counts as active everywhere
+          it is reported.
+  - id: c
+    type: troubleshoot
+    title: INC-4425
+    speaker: Meridian NOC
+    objectives: [AZ104-1.1.3]
+    intro: >
+      Two of the new drivers cannot open the depot planning app. It signs them in
+      and then tells them they do not have a license for this product.
+
+
+      The other twelve are fine. All fourteen were created by the same bulk
+      import, and all fourteen are in sg-depot-drivers.
+    ticket:
+      ref: INC-4425
+      opened: "08:15"
+      reporter: Meridian NOC
+      summary: Two of fourteen new users see a licensing error in the planning app.
+      severity: sev3
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask how licenses are normally assigned here
+        speaker: Marek Sobczak
+        reveals: >
+          "Group-based licensing on sg-depot-drivers. You put someone in the group and
+          the license lands on them within a few minutes. It has been that way for years."
+      - id: b
+        action: Ask what the two affected accounts have in common
+        speaker: Meridian IT
+        reveals: >
+          Both were created last, at the end of the import. Both show a usage location
+          field that is empty; the other twelve show SG.
+    commands:
+      - id: a
+        label: Check the group's licensing state
+        cmd: az rest --method get --url "https://graph.microsoft.com/v1.0/groups/sg-depot-drivers?$select=assignedLicenses,id"
+        output: |
+          {
+            "id": "8f1c...",
+            "assignedLicenses": [ { "skuId": "f8a1db68-be16-40ed-86d5-cb42ce701560" } ]
+          }
+        time_cost: 1
+      - id: b
+        label: Look at one of the failing users
+        cmd: az ad user show --id ravi.kumar@meridianlogistics.com --query "{upn:userPrincipalName,usage:usageLocation,enabled:accountEnabled}" -o table
+        output: |
+          Upn                                   Usage    Enabled
+          ------------------------------------  -------  ---------
+          ravi.kumar@meridianlogistics.com               True
+        time_cost: 1
+      - id: c
+        label: Look at one of the working users for comparison
+        cmd: az ad user show --id nurul.hasan@meridianlogistics.com --query "{upn:userPrincipalName,usage:usageLocation,enabled:accountEnabled}" -o table
+        output: |
+          Upn                                    Usage    Enabled
+          -------------------------------------  -------  ---------
+          nurul.hasan@meridianlogistics.com      SG       True
+        time_cost: 1
+      - id: d
+        label: Check whether the tenant has run out of licenses
+        cmd: az rest --method get --url "https://graph.microsoft.com/v1.0/subscribedSkus?$select=skuPartNumber,prepaidUnits,consumedUnits"
+        output: |
+          {
+            "value": [
+              { "skuPartNumber": "AAD_PREMIUM", "prepaidUnits": { "enabled": 120 }, "consumedUnits": 94 }
+            ]
+          }
+        time_cost: 1
+    fixes:
+      - id: a
+        label: Set the usage location on the two accounts and let group licensing reapply
+        correct: true
+        rep: 8
+        consequence: >
+          Both licenses land within a couple of minutes and the drivers are in the app
+          before the first delivery run.
+        explain: >
+          A license cannot be assigned to a user with no usage location, because licensing
+          is subject to per-country service availability. Group-based licensing reports this
+          as an error on the individual user rather than failing the whole group, which is
+          why twelve worked and two did not.
+        diagram:
+          - {op: add_node, node: entra-licenses}
+      - id: b
+        label: Assign the license directly to the two users instead of through the group
+        correct: false
+        rep: -7
+        consequence: >
+          The direct assignment fails with the same error, and now there are two
+          exceptions to explain in the next review.
+        explain: >
+          Direct assignment hits exactly the same usage location requirement. It also
+          creates a second way licenses reach users, which is how tenants end up
+          double-assigned and over-licensed.
+      - id: c
+        label: Buy more licenses, since the tenant may be at its limit
+        correct: false
+        rep: -8
+        consequence: >
+          Priya sees the purchase and asks, reasonably, why 94 of 120 licenses was not
+          enough.
+        explain: >
+          The subscribed SKUs output showed 94 of 120 consumed. Buying capacity that is
+          already there is the expensive way to not fix something.
+      - id: d
+        label: Remove and re-add the two users to the group to force a re-evaluation
+        correct: false
+        rep: -5
+        consequence: >
+          The licensing error comes back within a minute, unchanged.
+        explain: >
+          Reprocessing does not change the outcome while the blocking condition is still
+          there. The error text named the reason.

@@ -1,0 +1,229 @@
+id: a1id-q02
+chapter: act1-identity
+title: Who Can Do What
+summary: A depot lead has been given access twice and still cannot start a virtual machine.
+variant: core
+estimated_minutes: 13
+objectives:
+  - AZ104-1.2.3
+  - AZ104-1.2.2
+brief: >
+  Reading an access assignment is a skill. Reading three of them, inherited from
+  three different scopes, is the job.
+debrief: >
+  The rule you will use for the rest of your career: roles add up, scope decides
+  where, and a deny beats everything.
+encounters:
+  - id: a
+    type: troubleshoot
+    title: INC-4418
+    speaker: Hendrik Salim
+    objectives: [AZ104-1.2.3]
+    intro: >
+      "You gave me access on Tuesday," says Hendrik, "and Marek gave me access on
+      Wednesday, and I still cannot start vm-scan01 when the depot calls at
+      six in the morning. It says I do not have permission to perform the action."
+
+
+      He can see the virtual machine in the portal. He can read its configuration.
+      The start button is grayed out with a tooltip he has photographed and sent
+      you, slightly out of focus.
+    ticket:
+      ref: INC-4418
+      opened: "06:20"
+      reporter: Hendrik Salim
+      summary: Depot lead can see vm-scan01 but cannot start it.
+      severity: sev3
+    time_budget: 5
+    investigate:
+      - id: a
+        action: Ask what you actually assigned on Tuesday
+        speaker: Marek Sobczak
+        reveals: >
+          "You gave sg-depot-leads the Reader role on the subscription. I gave Hendrik
+          Virtual Machine Contributor, and I am fairly sure I did it on rg-depot."
+      - id: b
+        action: Ask Hendrik which resource group the machine is in
+        speaker: Hendrik Salim
+        reveals: >
+          "It says rg-app in the portal, if that is the line under the name. I thought
+          the scanners lived in the depot group."
+      - id: c
+        action: Check whether anything moved recently
+        speaker: Meridian IT
+        reveals: >
+          CHG-2251, last Friday: "Move vm-scan01 to rg-app to sit with the intake
+          service." Approved and completed. Role assignments were not mentioned.
+    commands:
+      - id: a
+        label: List every assignment Hendrik has, inherited and through groups
+        cmd: az role assignment list --assignee hendrik.salim@meridianlogistics.com --all --include-inherited --include-groups -o table
+        output: |
+          Principal                    Role                        Scope
+          ---------------------------  --------------------------  ------------------------------------------
+          sg-depot-leads               Reader                      /subscriptions/...
+          hendrik.salim@meridianlo...  Virtual Machine Contributor /subscriptions/.../resourceGroups/rg-depot
+        time_cost: 1
+      - id: b
+        label: Ask where the virtual machine lives now
+        cmd: az vm show -n vm-scan01 -g rg-app --query "{rg:resourceGroup,id:id}" -o table
+        output: |
+          Rg      Id
+          ------  -------------------------------------------------------------
+          rg-app  /subscriptions/.../resourceGroups/rg-app/providers/Microsoft.Compute/virtualMachines/vm-scan01
+        time_cost: 1
+      - id: c
+        label: Check what Hendrik can do on the machine itself
+        cmd: az role assignment list --assignee hendrik.salim@meridianlogistics.com --scope /subscriptions/00000000/resourceGroups/rg-app/providers/Microsoft.Compute/virtualMachines/vm-scan01 --include-inherited -o table
+        output: |
+          Principal        Role     Scope
+          ---------------  -------  --------------------
+          sg-depot-leads   Reader   /subscriptions/...
+        note: Only the inherited Reader applies here. The VM Contributor assignment is on a different resource group.
+        time_cost: 1
+      - id: d
+        label: Check for a deny assignment on the resource group
+        cmd: az role assignment list --scope /subscriptions/00000000/resourceGroups/rg-app --query "[?contains(roleDefinitionName,'Deny')]" -o table
+        output: |
+          (no results)
+        time_cost: 1
+      - id: e
+        label: Check the virtual machine is in a state that can be started
+        cmd: az vm get-instance-view -n vm-scan01 -g rg-app --query "instanceView.statuses[].displayStatus" -o tsv
+        output: |
+          Provisioning succeeded
+          VM deallocated
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Assign Virtual Machine Contributor to sg-depot-leads on rg-app, and remove the
+          stale assignment on rg-depot
+        correct: true
+        rep: 9
+        consequence: >
+          Hendrik starts the machine from his phone at 06:31 the next morning and does not
+          call anybody.
+        explain: >
+          Role assignments attach to a scope, not to a resource. When the machine moved to
+          rg-app it left the scope where Hendrik's assignment lived, and only the
+          subscription-level Reader still applied, which is why he could see it and not
+          touch it. Assigning to the group rather than the person means the next depot lead
+          inherits it.
+        diagram:
+          - {op: add_node, node: grp-depot-admins}
+      - id: b
+        label: Assign Owner to Hendrik on vm-scan01 directly
+        correct: false
+        rep: -8
+        consequence: >
+          It works, and there is now a personal Owner assignment on a production virtual
+          machine that nobody will ever remember to remove.
+        explain: >
+          It over-grants and it is attached to one person and one resource. Groups and the
+          narrowest role that does the job are what keep an access review readable.
+      - id: c
+        label: Move vm-scan01 back to rg-depot
+        correct: false
+        rep: -7
+        consequence: >
+          The intake service loses track of the machine it was moved to sit beside, and the
+          change board asks why last Friday's approved change was reversed overnight.
+        explain: >
+          Reversing a deliberate change to make a role assignment fit is backwards. Access
+          follows the estate, not the other way around.
+      - id: d
+        label: Add Hendrik to the group that has Reader, since he is missing group membership
+        correct: false
+        rep: -6
+        consequence: >
+          Nothing changes, because he was already inheriting Reader through that group.
+        explain: >
+          The command output already showed the Reader coming through sg-depot-leads.
+          Reader is what he has and it is not the permission he is missing.
+  - id: b
+    type: design
+    title: Reading the room
+    speaker: Wei Lin Tan
+    objectives: [AZ104-1.2.3]
+    intro: >
+      Wei Lin forwards an export from the audit firm with a question on it.
+
+
+      A service principal has Contributor at the mg-workload management group. It
+      also has Reader on sub-meridian-prod. And there is a deny assignment on
+      rg-data, inherited from a managed application, that covers delete actions.
+
+
+      "Their question is whether this identity can delete a storage account in
+      rg-data. I would like to answer it correctly the first time."
+    prompt: What is the answer?
+    options:
+      - id: a
+        label: No. The deny assignment on rg-data wins over the inherited Contributor.
+        correct: true
+        rep: 7
+        consequence: >
+          Wei Lin sends the one-line answer with the scope written out, and the auditors
+          move on.
+        explain: >
+          Azure adds up every role assignment that applies at or above a scope, so
+          Contributor at the management group does reach rg-data. Deny assignments are
+          evaluated afterwards and take precedence over every role assignment, whatever the
+          scope.
+      - id: b
+        label: Yes. Contributor at the management group is inherited everywhere below it.
+        correct: false
+        rep: -7
+        consequence: >
+          The audit report records an incorrect answer from Meridian, which is a worse
+          finding than the one it was about.
+        explain: >
+          The inheritance half is right and the conclusion is not. A deny assignment is
+          checked after roles are combined and overrides them.
+      - id: c
+        label: No. The Reader assignment on the subscription overrides the Contributor.
+        correct: false
+        rep: -8
+        consequence: >
+          The next design assumes a narrower role can cancel a broader one, and access
+          reviews stop meaning anything.
+        explain: >
+          Role assignments are additive, never subtractive. Holding Reader as well as
+          Contributor gives the union of both, which is Contributor.
+  - id: c
+    type: knowledge
+    title: Marek's rule of three
+    speaker: Marek Sobczak
+    objectives: [AZ104-1.2.2]
+    intro: >
+      "Three scopes," says Marek. "Management group, subscription, resource group,
+      resource. Fine, four. Somebody has Reader at the subscription and Contributor
+      on one resource group inside it. What do they have?"
+    question: What is the effective access?
+    options:
+      - id: a
+        label: >
+          Contributor on that resource group, Reader everywhere else in the subscription
+        correct: true
+        rep: 4
+        explain: >
+          Assignments accumulate down the hierarchy and combine as a union at each scope.
+          The narrower assignment does not replace the broader one; it adds to it where it
+          applies.
+      - id: b
+        label: Contributor across the whole subscription, since the higher role wins
+        correct: false
+        rep: -5
+        consequence: You size a change's blast radius wrongly and find out during the change.
+        explain: >
+          Inheritance runs downwards, not upwards. An assignment on a resource group has no
+          effect anywhere else.
+      - id: c
+        label: Reader everywhere, since the subscription assignment is evaluated last
+        correct: false
+        rep: -5
+        consequence: Somebody is told they cannot do work they can in fact do, and does it anyway.
+        explain: >
+          There is no last-write-wins in role assignments. Only deny assignments override,
+          and there is no deny assignment here.

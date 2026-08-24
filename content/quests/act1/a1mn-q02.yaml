@@ -1,0 +1,257 @@
+id: a1mn-q02
+chapter: act1-monitoring
+title: Where Do the Logs Go
+summary: An auditor asks for six months of sign-in and storage access logs, and Meridian has nine days of some of them.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ104-5.1.2
+  - AZ104-5.1.3
+brief: >
+  Logs are not kept unless somebody decides to keep them, decides where, and
+  decides for how long. Nobody has done any of that yet.
+debrief: >
+  One workspace, diagnostic settings that name what matters, and a query you can
+  hand to an auditor without a conversation about tooling.
+encounters:
+  - id: a
+    type: design
+    title: Turning the tap on
+    speaker: Wei Lin Tan
+    objectives: [AZ104-5.1.2]
+    intro: >
+      "The audit asks for six months of storage account access, key vault access,
+      and the activity log," says Wei Lin. "What we have is whatever the portal
+      shows by default, which I am told is a few days."
+
+
+      There is one Log Analytics workspace, created for a proof of concept, with a
+      thirty-day retention and nothing sending to it.
+    prompt: What do you configure?
+    options:
+      - id: a
+        label: >
+          Diagnostic settings on the storage account and key vault sending the relevant log
+          categories to the workspace, with retention set to cover the audit period
+        correct: true
+        rep: 8
+        consequence: >
+          Logs start arriving within minutes, and in six months the audit question is a query
+          rather than an apology.
+        explain: >
+          Platform logs are not collected until a diagnostic setting says where to send them.
+          Each resource type offers categories, and a setting can send to a workspace, a
+          storage account, an event hub or a partner destination. Retention is set on the
+          workspace or table, and for an audit requirement it has to be at least the period
+          being audited.
+        diagram:
+          - {op: add_node, node: law-meridian}
+          - {op: add_edge, edge: e-law-st}
+      - id: b
+        label: Increase the workspace retention to two years and wait for the logs to arrive
+        correct: false
+        rep: -7
+        consequence: >
+          Retention is longer, the workspace is still empty, and the cost of the change is
+          real.
+        explain: >
+          Retention decides how long data is kept once it is there. Nothing sends to the
+          workspace until a diagnostic setting exists.
+      - id: c
+        label: Export the activity log to a storage account and read it from there when asked
+        correct: false
+        rep: -5
+        consequence: >
+          Six months later the auditor gets ten thousand JSON blobs and asks for it in a
+          readable form.
+        explain: >
+          Archiving to storage is cheap and appropriate for long retention of data nobody
+          queries often. It gives up the query experience, which for an audit trail people ask
+          questions of is most of the value.
+      - id: d
+        label: Install the monitoring agent on every virtual machine
+        correct: false
+        rep: -6
+        consequence: >
+          Guest logs start flowing and none of the three sources the auditor named are
+          covered.
+        explain: >
+          Agents collect from inside a machine. Storage, key vault and the activity log are
+          platform sources, collected with diagnostic settings and not with an agent.
+  - id: b
+    type: design
+    title: What to keep, and for how long
+    speaker: Priya Raghunathan
+    objectives: [AZ104-5.1.2]
+    intro: >
+      "I have seen what a logging bill looks like at a previous employer," says
+      Priya. "Before you send everything everywhere, tell me what we are keeping
+      and why."
+
+
+      The audit needs six months. The NOC investigates incidents up to about two
+      weeks old. Storage read operations are by far the highest volume category
+      and are not part of what the auditor asked for.
+    prompt: What do you propose?
+    options:
+      - id: a
+        label: >
+          Send the audit categories to the workspace with an interactive period for
+          investigation and long-term retention beyond it, and leave high-volume read
+          operations out
+        correct: true
+        rep: 8
+        consequence: >
+          The projected logging cost lands close to the NOC's incident budget, and Priya asks
+          only one follow-up question.
+        explain: >
+          Log Analytics separates an interactive retention period, where data is queryable at
+          full speed, from cheaper long-term retention for the tail. Choosing categories is
+          the other lever: high-volume telemetry nobody has asked for is where logging bills
+          come from.
+      - id: b
+        label: Send every category from every resource, and keep it all for two years
+        correct: false
+        rep: -7
+        consequence: >
+          The first full month of ingestion costs more than the virtual machines being logged.
+        explain: >
+          Ingestion is charged by volume. Storage transaction logs on a busy account can
+          dwarf everything else and answer no question anybody is asking.
+      - id: c
+        label: Keep thirty days in the workspace and archive everything to a storage account
+        correct: false
+        rep: -6
+        consequence: >
+          Month four of the audit period is in a storage account and takes two days to make
+          searchable.
+        explain: >
+          Storage archive is a reasonable second tier, and long-term retention inside the
+          workspace keeps the data searchable with the same queries. Reach for storage export
+          when the requirement is genuinely cold.
+      - id: d
+        label: Keep seven days, since the NOC only investigates recent incidents
+        correct: false
+        rep: -9
+        consequence: >
+          The audit requirement fails on the first sample, which is the thing that started
+          this.
+        explain: >
+          Two requirements are in play and the longer one governs. Seven days serves the NOC
+          and ignores the auditor.
+  - id: c
+    type: troubleshoot
+    title: INC-4802
+    speaker: Wei Lin Tan
+    objectives: [AZ104-5.1.3]
+    intro: >
+      The auditor has a specific question: which identities read from the
+      pod-scans container between the fourteenth and the twenty-first, and from
+      which addresses.
+
+
+      The data is in the workspace. Wei Lin has opened the query editor and would
+      like it to be someone else's problem.
+    ticket:
+      ref: INC-4802
+      opened: "11:00"
+      reporter: Wei Lin Tan
+      summary: Audit request for blob read access by identity and source address over one week.
+      severity: sev4
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask which table the storage logs land in
+        speaker: Marek Sobczak
+        reveals: >
+          "StorageBlobLogs, if the diagnostic setting used resource-specific tables.
+          AzureDiagnostics if it used the legacy mode. Check before you write anything."
+      - id: b
+        action: Ask what the auditor wants in the answer
+        speaker: Wei Lin Tan
+        reveals: >
+          "Identity, source address, how many reads, and the day. She has asked for a
+          table, not a chart."
+    commands:
+      - id: a
+        label: Check which tables have data
+        cmd: "kql: search * | where TimeGenerated > ago(7d) | summarize count() by Type"
+        output: |
+          Type                  count_
+          --------------------  --------
+          StorageBlobLogs       4183221
+          AzureActivity         912
+          KeyVaultAuditLogs     4410
+        time_cost: 1
+      - id: b
+        label: Look at the shape of one row
+        cmd: "kql: StorageBlobLogs | take 1 | project OperationName, CallerIpAddress, AuthenticationType, RequesterObjectId, Uri"
+        output: |
+          OperationName  CallerIpAddress  AuthenticationType  RequesterObjectId  Uri
+          -------------  ---------------  ------------------  -----------------  -----------------------
+          GetBlob        20.195.74.12     OAuth               8f1c-...           .../pod-scans/2026/...
+        time_cost: 1
+      - id: c
+        label: Write the query the auditor asked for
+        cmd: >-
+          kql: StorageBlobLogs | where TimeGenerated between (datetime(2026-08-14) .. datetime(2026-08-21))
+          | where OperationName == "GetBlob" and Uri contains "/pod-scans/"
+          | summarize Reads=count() by RequesterObjectId, CallerIpAddress, bin(TimeGenerated, 1d)
+          | order by TimeGenerated asc
+        output: |
+          RequesterObjectId  CallerIpAddress  TimeGenerated         Reads
+          -----------------  ---------------  --------------------  -------
+          8f1c-...           10.20.1.11       2026-08-14T00:00:00Z  18422
+          2b90-...           203.0.113.44     2026-08-15T00:00:00Z  61
+        time_cost: 1
+      - id: d
+        label: Check whether the whole period is present
+        cmd: "kql: StorageBlobLogs | summarize Earliest=min(TimeGenerated), Latest=max(TimeGenerated)"
+        output: |
+          Earliest              Latest
+          --------------------  --------------------
+          2026-08-02T09:14:00Z  2026-08-24T10:58:00Z
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Give the auditor the summarized table, and note that collection began on 2 August so
+          earlier periods are not covered
+        correct: true
+        rep: 9
+        consequence: >
+          The auditor accepts the table and records the collection start date as a finding
+          with a remediation date rather than a failure.
+        explain: >
+          The query answers the question: filter the table and time range, filter to the
+          operation and container, then summarize by the fields asked for. Being explicit
+          about when collection started is the difference between a gap and a
+          misrepresentation.
+      - id: b
+        label: Send the raw StorageBlobLogs rows for the period as a CSV export
+        correct: false
+        rep: -6
+        consequence: >
+          Four million rows arrive in the auditor's inbox and the request comes back rephrased.
+        explain: >
+          Summarize before you export. The auditor asked for reads by identity and address,
+          which is four columns, not four million rows.
+      - id: c
+        label: Report that the data is not available, since collection started on 2 August
+        correct: false
+        rep: -7
+        consequence: >
+          A partial answer that existed was withheld, and the finding is harsher for it.
+        explain: >
+          Give what exists and say plainly where it starts. Auditors are used to gaps and are
+          much less used to being told nothing.
+      - id: d
+        label: Query AzureDiagnostics instead, which holds everything in one table
+        correct: false
+        rep: -5
+        consequence: >
+          The table is empty, because the diagnostic setting uses resource-specific tables.
+        explain: >
+          AzureDiagnostics is the legacy destination where many resource types share one
+          table. Resource-specific tables such as StorageBlobLogs are the current default and
+          are easier to query and cheaper to keep.

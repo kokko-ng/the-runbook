@@ -1,0 +1,260 @@
+id: a1cm-q02
+chapter: act1-compute
+title: Bicep, Because Nobody Can Read the Other One
+summary: Twelve hundred lines of JSON, one change a fortnight, and a new starter who has to work in it.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ104-3.1.3
+  - AZ104-3.1.4
+  - AZ104-3.1.5
+brief: >
+  The templates work. Nobody enjoys them. Converting them is a small project with
+  a real payoff and one classic trap.
+debrief: >
+  The estate deploys from Bicep now, and the resources that were clicked into
+  existence have been exported so they can join it.
+encounters:
+  - id: a
+    type: design
+    title: Getting from here to there
+    speaker: Dana Ong
+    objectives: [AZ104-3.1.5]
+    intro: >
+      "You want to rewrite the templates," says Dana, in the tone of somebody who
+      has heard that sentence before. "Convince me it is not three weeks of
+      retyping."
+
+
+      There are four templates in the repository. There is also the depot
+      environment, which was built in the portal by hand two years ago and is
+      described nowhere.
+    prompt: How do you approach it?
+    options:
+      - id: a
+        label: >
+          Decompile the four JSON templates to Bicep, then export the depot resource group as
+          a template and decompile that too as a starting point
+        correct: true
+        rep: 8
+        consequence: >
+          Four files convert in a minute. The depot export needs a day of cleaning up, which
+          is a day well spent given nothing described it before.
+        explain: >
+          The Bicep tooling decompiles an existing ARM template to Bicep, and Azure can export
+          a resource group's current state as a template. Neither output is publishable as it
+          stands, and both are far better starting points than a blank file.
+      - id: b
+        label: Rewrite all four templates in Bicep by hand, and leave the depot environment alone
+        correct: false
+        rep: -6
+        consequence: >
+          Two weeks of retyping, one transcription error in a subnet prefix, and the depot is
+          still undocumented.
+        explain: >
+          Decompilation gets you most of the way in seconds. Hand conversion is where subtle
+          differences creep in, and the undescribed environment is the part that most needs
+          attention.
+      - id: c
+        label: Export the whole subscription as a template and use that as the new source
+        correct: false
+        rep: -7
+        consequence: >
+          The export is enormous, includes resources managed by other teams, and contains
+          generated names nobody wants to inherit.
+        explain: >
+          Export captures current state including things you do not own and identifiers you
+          would not have chosen. Export the scope you intend to manage, and clean it.
+      - id: d
+        label: Keep the JSON templates and add comments so the new starter can follow them
+        correct: false
+        rep: -5
+        consequence: >
+          JSON templates do not support comments in the way people expect, and the next
+          reviewer removes them.
+        explain: >
+          Readability is the actual problem being solved. Bicep exists because expressions
+          like the ones in those templates are genuinely hard to read.
+  - id: b
+    type: design
+    title: What the decompiler leaves behind
+    speaker: Marek Sobczak
+    objectives: [AZ104-3.1.3]
+    intro: >
+      The decompiled file works, and it looks like a machine wrote it.
+
+
+      param location string = resourceGroup().location
+      param vmSize string = 'Standard_D2s_v5'
+      resource vm_tms01 'Microsoft.Compute/virtualMachines@2024-07-01' = {
+        name: 'vm-tms01'
+        location: location
+        properties: { hardwareProfile: { vmSize: vmSize } }
+        dependsOn: [ resourceId('Microsoft.Network/networkInterfaces', 'vm-tms01-nic') ]
+      }
+
+
+      "Two things in there are worth changing before anyone else reads it," says
+      Marek.
+    prompt: What do you clean up?
+    options:
+      - id: a
+        label: >
+          Replace the resourceId expression in dependsOn with a symbolic reference to the
+          network interface resource, and let Bicep infer the dependency
+        correct: true
+        rep: 8
+        consequence: >
+          The dependsOn line disappears entirely, and the file gets shorter every time you do
+          this.
+        explain: >
+          Bicep infers dependencies when one resource refers to another symbolically, so an
+          explicit dependsOn with a resourceId string is decompiler residue. Removing it also
+          removes a name that can silently go stale.
+      - id: b
+        label: Replace the location parameter with the hard-coded region, so deployments are predictable
+        correct: false
+        rep: -6
+        consequence: >
+          The template can no longer be used for the East Asia landing zone without editing
+          it.
+        explain: >
+          Defaulting location to the resource group's location is idiomatic and keeps the
+          file reusable. Hard-coding a region is the thing to remove, not to add.
+      - id: c
+        label: Move every property into variables at the top of the file
+        correct: false
+        rep: -5
+        consequence: >
+          The file becomes a lookup table and the reader has to hold twenty names in their
+          head.
+        explain: >
+          Variables help when a value is computed or repeated. Wholesale indirection makes a
+          template harder to read, which is the problem you set out to fix.
+      - id: d
+        label: Split each resource into its own module immediately
+        correct: false
+        rep: -5
+        consequence: >
+          Four files become twenty, and the new starter now has to understand modules before
+          they can change a virtual machine size.
+        explain: >
+          Modules are valuable when a pattern repeats or a boundary is real. Applying them
+          before either is true adds indirection for its own sake.
+  - id: c
+    type: troubleshoot
+    title: INC-4638
+    speaker: Meridian NOC
+    objectives: [AZ104-3.1.4]
+    intro: >
+      The first Bicep deployment into the non-production subscription fails after
+      ninety seconds. The pipeline log has the deployment name and an error code
+      that is not in anybody's notes.
+
+
+      The same file deploys fine from Marek's laptop into his own sandbox
+      resource group.
+    ticket:
+      ref: INC-4638
+      opened: "10:14"
+      reporter: Meridian NOC
+      summary: Bicep deployment fails in the non-production subscription. Works from a laptop.
+      severity: sev3
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what differs between the two places it was run
+        speaker: Marek Sobczak
+        reveals: >
+          "My sandbox is in the production subscription, where I am Owner. The pipeline
+          runs as a service principal in the non-production subscription, and that one
+          got its role assignments last week."
+      - id: b
+        action: Ask what the pipeline command looks like
+        speaker: Meridian IT
+        reveals: >
+          az deployment group create -g rg-app-nonprod --template-file main.bicep
+          --parameters @nonprod.bicepparam
+    commands:
+      - id: a
+        label: Read the deployment error
+        cmd: az deployment group show -g rg-app-nonprod -n main --query "properties.error" -o json
+        output: |
+          {
+            "code": "DeploymentFailed",
+            "details": [
+              {
+                "code": "AuthorizationFailed",
+                "message": "The client 'sp-pipeline' does not have authorization to perform action
+                'Microsoft.Network/virtualNetworks/subnets/join/action' over scope
+                '/subscriptions/.../resourceGroups/rg-hub/providers/Microsoft.Network/virtualNetworks/vnet-hub/subnets/snet-shared'."
+              }
+            ]
+          }
+        time_cost: 1
+      - id: b
+        label: Check what the pipeline identity can do
+        cmd: az role assignment list --assignee sp-pipeline --all -o table
+        output: |
+          Principal     Role         Scope
+          ------------  -----------  -----------------------------------------------------
+          sp-pipeline   Contributor  /subscriptions/.../resourceGroups/rg-app-nonprod
+        time_cost: 1
+      - id: c
+        label: Check which subnet the template asks for
+        cmd: az bicep build --file main.bicep --stdout --query "resources[?type=='Microsoft.Network/networkInterfaces'].properties.ipConfigurations[0].properties.subnet.id" -o tsv
+        output: |
+          /subscriptions/.../resourceGroups/rg-hub/providers/Microsoft.Network/virtualNetworks/vnet-hub/subnets/snet-shared
+        note: The non-production parameter file was copied from production and still points at the hub subnet.
+        time_cost: 1
+      - id: d
+        label: Confirm the Bicep file itself compiles
+        cmd: az bicep build --file main.bicep --stdout --query "$schema" -o tsv
+        output: |
+          https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Point the non-production parameter file at the non-production subnet, which the
+          pipeline identity already has rights over
+        correct: true
+        rep: 9
+        consequence: >
+          The deployment completes in two minutes and the parameter files stop being copies
+          of each other.
+        explain: >
+          Attaching a network interface to a subnet requires the join action on that subnet,
+          so a deployment reaches outside its resource group whenever it references shared
+          networking. The parameter file was the fault: it was pointing non-production at
+          production's hub.
+      - id: b
+        label: Grant the pipeline identity Contributor on rg-hub
+        correct: false
+        rep: -8
+        consequence: >
+          The deployment succeeds and a non-production pipeline can now write to the hub
+          every other environment depends on.
+        explain: >
+          It makes the error go away by making the mistake legal. The pipeline was asking for
+          the wrong subnet, and widening its access hides that permanently.
+      - id: c
+        label: Run the deployment from Marek's account until the permissions are sorted out
+        correct: false
+        rep: -7
+        consequence: >
+          Non-production is deployed by hand for three weeks and drifts from what the
+          pipeline would produce.
+        explain: >
+          Deploying as a human because the service principal cannot is how pipelines quietly
+          stop being the source of truth.
+      - id: d
+        label: Add a Network Contributor role assignment on the subnet for the pipeline identity
+        correct: false
+        rep: -6
+        consequence: >
+          The wrong subnet is now writable by the non-production pipeline, and the parameter
+          file is still wrong.
+        explain: >
+          Granting join on a specific subnet is exactly the right pattern when a workload
+          legitimately needs a shared subnet. Here it does not: it needs its own.

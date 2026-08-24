@@ -1,0 +1,293 @@
+id: a1id-q01
+chapter: act1-identity
+title: Owner, Everywhere
+summary: Your predecessor left, and eleven people have Owner on the production subscription.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ104-1.2.1
+  - AZ104-1.2.2
+brief: >
+  First morning. Your laptop is not set up, but the access review is due before
+  the auditor arrives and somebody has to be the one who reads it.
+debrief: >
+  Nine Owner assignments gone, nobody locked out, and an access review that fits
+  on one page. Dana calls it a good first week.
+encounters:
+  - id: a
+    type: design
+    title: The access review
+    speaker: Dana Ong
+    objectives: [AZ104-1.2.1, AZ104-1.2.2]
+    intro: >
+      Dana puts the export on the desk. Eleven Owner assignments on
+      sub-meridian-prod: two platform admins, four application developers, the
+      Jurong facilities manager, two people who left last year, a service
+      principal named "temp-migration", and you.
+
+
+      "The auditor's first question will be who can delete production. Right now
+      the answer is eleven people and a script. Fix it, and do not break the
+      deployment the developers are running on Thursday."
+
+
+      The developers deploy into rg-app and rg-data. They have never touched the
+      hub.
+    prompt: What do you take to the change board?
+    options:
+      - id: a
+        label: >
+          Two Owners on the subscription, Contributor for the developers on rg-app and
+          rg-data only, and remove the leavers and the unused service principal
+        correct: true
+        rep: 8
+        consequence: >
+          Thursday's deployment runs without a call. The auditor asks the question and
+          Dana answers it from one screen.
+        explain: >
+          Least privilege is about scope as much as role. Contributor at the resource
+          group covers everything a developer does day to day without touching the hub or
+          the subscription, and two Owners is enough to run the subscription without being
+          a queue of one.
+        diagram:
+          - {op: set_detail, node: sub-prod, detail: "Two Owners, everything else scoped"}
+      - id: b
+        label: Downgrade all eleven to Contributor on the subscription
+        correct: false
+        rep: -8
+        consequence: >
+          The auditor asks who can delete production and the answer is still eleven people,
+          because Contributor deletes things perfectly well.
+        explain: >
+          Contributor can create, change and delete every resource in its scope. It cannot
+          grant access, which is the only thing it gives up compared to Owner. Narrowing
+          the role without narrowing the scope moves almost nothing.
+      - id: c
+        label: Leave the assignments and add a policy that blocks resource deletion
+        correct: false
+        rep: -9
+        consequence: >
+          Two developers cannot redeploy their own test resources on Thursday, and eleven
+          people still hold Owner.
+        explain: >
+          Policy governs what resources may look like, not who may act. It is the wrong
+          control for an access finding, and blocking deletion outright breaks the normal
+          work of the people who legitimately need it.
+      - id: d
+        label: Remove every assignment and hand access out again as people ask
+        correct: false
+        rep: -10
+        consequence: >
+          Thursday's deployment fails at 02:00, the developers cannot see why, and you
+          spend the night granting roles one at a time.
+        explain: >
+          Access reviews are not achieved by breaking everything and waiting for the
+          screaming. Work out who needs what, at which scope, and change it once.
+  - id: b
+    type: design
+    title: The auditor wants a look
+    speaker: Wei Lin Tan
+    objectives: [AZ104-1.2.1, AZ104-1.2.2]
+    intro: >
+      "The external audit firm needs to see the production estate for three
+      weeks. Configuration only. They must not be able to change anything, read
+      any storage account contents, or see the non-production subscription."
+
+
+      They are getting guest accounts in the tenant. You are deciding what those
+      accounts can do once they are in.
+    prompt: What do you assign them?
+    options:
+      - id: a
+        label: Reader on sub-meridian-prod
+        correct: true
+        rep: 7
+        consequence: >
+          The firm gets what it needs on the Monday, and the assignment is easy to remove
+          on the Friday three weeks later.
+        explain: >
+          Reader grants view access to resources and their configuration at its scope and
+          nothing else. Scoped to the production subscription it excludes non-production
+          entirely, and it does not grant access to data inside a storage account, which
+          needs a separate data-plane role.
+      - id: b
+        label: Reader on mg-meridian, the management group above both subscriptions
+        correct: false
+        rep: -7
+        consequence: >
+          The auditors send screenshots of the non-production environment and ask why the
+          naming is different there.
+        explain: >
+          Assignments at a management group are inherited by every subscription beneath it.
+          The requirement named one subscription, so the assignment belongs on that
+          subscription.
+      - id: c
+        label: Storage Blob Data Reader and Reader on sub-meridian-prod
+        correct: false
+        rep: -8
+        consequence: >
+          Wei Lin sees the data-plane role in the change and asks, at length, who approved
+          giving an outside firm access to proof-of-delivery scans.
+        explain: >
+          Reader covers the configuration view the auditors asked for. Storage Blob Data
+          Reader adds access to the contents of every blob in scope, which is customer data
+          the requirement specifically excluded.
+      - id: d
+        label: Contributor on sub-meridian-prod, with a resource lock to stop changes
+        correct: false
+        rep: -9
+        consequence: >
+          A CanNotDelete lock does not stop an update, and the audit firm's tooling starts
+          tagging resources it has "inventoried".
+        explain: >
+          Contributor is write access, and locks are a guard rail rather than a permission
+          boundary. Do not grant more than is needed and then try to fence it in.
+  - id: c
+    type: troubleshoot
+    title: INC-4402
+    speaker: Dana Ong
+    objectives: [AZ104-1.2.1]
+    intro: >
+      Dana is trying to hand the new developer access to rg-app herself, because
+      you are in a meeting and she is trying to be helpful.
+
+
+      "It will not let me. The Add role assignment button is there, I fill it in,
+      and it fails at the end with something about authorization. I am Contributor
+      on that resource group, which I would have thought was enough."
+    ticket:
+      ref: INC-4402
+      opened: "11:05"
+      reporter: Dana Ong
+      summary: Manager with Contributor cannot assign a role on rg-app.
+      severity: sev4
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask Dana exactly what the error says
+        speaker: Dana Ong
+        reveals: >
+          "The client has permission to perform action Microsoft.Authorization/
+          roleAssignments/write, but only over a scope it does not have. Which
+          sounds like it is disagreeing with itself."
+      - id: b
+        action: Ask Marek whether this has come up before
+        speaker: Marek Sobczak
+        reveals: >
+          "Every time somebody new tries to grant access. Contributor does everything
+          except hand out permissions. That is the entire difference from Owner."
+    commands:
+      - id: a
+        label: List what Dana actually has
+        cmd: az role assignment list --assignee dana.ong@meridianlogistics.com --all -o table
+        output: |
+          Principal                            Role         Scope
+          -----------------------------------  -----------  -------------------------------------
+          dana.ong@meridianlogistics.com       Contributor  /subscriptions/.../resourceGroups/rg-app
+          dana.ong@meridianlogistics.com       Reader       /subscriptions/...
+        time_cost: 1
+      - id: b
+        label: Check what the Contributor role can do about role assignments
+        cmd: az role definition list --name Contributor --query "[0].permissions[0].notActions" -o tsv
+        output: |
+          Microsoft.Authorization/*/Delete
+          Microsoft.Authorization/*/Write
+          Microsoft.Authorization/elevateAccess/Action
+          Microsoft.Blueprint/blueprintAssignments/write
+          Microsoft.Blueprint/blueprintAssignments/delete
+        note: NotActions subtract from Actions. Contributor is explicitly denied writing role assignments.
+        time_cost: 1
+      - id: c
+        label: Check whether anything is denying the action outright
+        cmd: az role assignment list --assignee dana.ong@meridianlogistics.com --include-inherited --include-groups -o table
+        output: |
+          Principal                            Role         Scope
+          -----------------------------------  -----------  -------------------------------------
+          dana.ong@meridianlogistics.com       Contributor  /subscriptions/.../resourceGroups/rg-app
+          dana.ong@meridianlogistics.com       Reader       /subscriptions/...
+        time_cost: 1
+      - id: d
+        label: Check the subscription for deny assignments
+        cmd: az role assignment list --scope /subscriptions/00000000-0000-0000-0000-000000000000 --query "[?contains(roleDefinitionName,'Deny')]" -o table
+        output: |
+          (no results)
+        time_cost: 1
+    fixes:
+      - id: a
+        label: Assign Dana User Access Administrator on rg-app
+        correct: true
+        rep: 8
+        consequence: >
+          Dana grants the developer access herself two minutes later and stops needing you
+          for it, which was the actual goal.
+        explain: >
+          Contributor carries Microsoft.Authorization/*/Write in its NotActions, so it can
+          do everything except grant access. User Access Administrator is the built-in role
+          that adds exactly that, and scoped to the resource group it does not let her
+          change anything above it.
+      - id: b
+        label: Assign Dana Owner on rg-app
+        correct: false
+        rep: -6
+        consequence: >
+          It works, and the access review you finished this morning now has a new Owner
+          assignment on it.
+        explain: >
+          Owner is Contributor plus User Access Administrator. Granting it here hands over
+          more than the requirement and undoes the work of narrowing access.
+      - id: c
+        label: Add Dana to the group that already has Contributor, at subscription scope
+        correct: false
+        rep: -7
+        consequence: >
+          She still cannot assign roles, and now she has write access to the hub as well.
+        explain: >
+          The problem is the role, not the scope. Contributor cannot write role assignments
+          anywhere, so widening the scope changes nothing except the blast radius.
+      - id: d
+        label: Tell Dana to raise a ticket each time, since granting access is your job
+        correct: false
+        rep: -5
+        consequence: >
+          The queue grows by three tickets a week and Dana stops reading the access review
+          entirely.
+        explain: >
+          There is a built-in role for delegating exactly this, scoped exactly where you
+          want it. Making yourself the bottleneck is a choice, and it is usually the wrong
+          one.
+  - id: d
+    type: knowledge
+    title: The difference that matters
+    speaker: Marek Sobczak
+    objectives: [AZ104-1.2.1]
+    intro: >
+      "One question and then I want coffee," says Marek. "Somebody asks you in an
+      interview what the difference is between Owner and Contributor. Do not say
+      'Owner is more'."
+    question: What can Owner do that Contributor cannot?
+    options:
+      - id: a
+        label: Grant access to others, by writing role assignments at its scope
+        correct: true
+        rep: 4
+        explain: >
+          Owner is full access including Microsoft.Authorization/*/Write. Contributor has
+          the same management-plane access with authorization writes removed, which is why
+          User Access Administrator exists to fill the gap on its own.
+      - id: b
+        label: Delete resources, which Contributor is not permitted to do
+        correct: false
+        rep: -5
+        consequence: You reassure someone that Contributor is safe, and a resource group disappears that afternoon.
+        explain: >
+          Contributor can delete anything in its scope. Removing that is what resource
+          locks and policy are for, not the role.
+      - id: c
+        label: Read data inside storage accounts and key vaults
+        correct: false
+        rep: -5
+        consequence: An access design goes out assuming the wrong boundary between management and data.
+        explain: >
+          Neither role grants data-plane access by itself. Reading blob contents needs a
+          data role such as Storage Blob Data Reader; key vault contents follow their own
+          access model.

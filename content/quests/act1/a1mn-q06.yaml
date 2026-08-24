@@ -1,0 +1,253 @@
+id: a1mn-q06
+chapter: act1-monitoring
+title: The Tabletop Rehearsal
+summary: The board asks what happens if Southeast Asia goes away for a day, and this time the answer has to be demonstrated.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ104-5.2.5
+  - AZ104-5.2.6
+brief: >
+  Backups cover losing data. This is about losing a region, which is a different
+  question with a different product behind it.
+debrief: >
+  Replication running, a recovery plan with an order in it, and a test failover
+  that proved the number rather than asserting it.
+encounters:
+  - id: a
+    type: design
+    title: Replicate what
+    speaker: Dana Ong
+    objectives: [AZ104-5.2.5]
+    intro: >
+      "The board wants to know we can run from East Asia," says Dana. "Not
+      everything. The transport application and the machines it needs, so the
+      depots can keep dispatching."
+
+
+      That is vm-tms01 and vm-tms02, the domain controller replica, and the
+      scanner intake host. The database already replicates. The blob scans already
+      replicate. Recovery time objective is four hours.
+    prompt: What do you set up?
+    options:
+      - id: a
+        label: >
+          Azure Site Recovery replication for the four machines to East Asia, with a recovery
+          plan that starts the domain controller first
+        correct: true
+        rep: 8
+        consequence: >
+          Replication reaches a healthy state in six hours and the recovery plan is written
+          down in the order things actually have to start.
+        explain: >
+          Site Recovery replicates virtual machines continuously to another region and can
+          bring them up there on demand. A recovery plan groups machines and orders them, which
+          matters when one of them is a domain controller and the others need it. Data services
+          that already replicate stay out of it.
+        diagram:
+          - {op: add_node, node: asr-tms}
+          - {op: add_node, node: vm-tms01-dr}
+          - {op: add_edge, edge: e-asr-tms}
+      - id: b
+        label: Nightly backups copied to a vault in East Asia, restored there if needed
+        correct: false
+        rep: -7
+        consequence: >
+          The tabletop shows a restore of four machines taking most of a day, against a
+          four-hour objective.
+        explain: >
+          Cross-region restore from a vault is a legitimate recovery path and it is slow: full
+          machine restores over a region boundary. Site Recovery keeps a replica warm, which is
+          what a four-hour objective needs.
+      - id: c
+        label: Build standby machines in East Asia and keep them patched and switched off
+        correct: false
+        rep: -6
+        consequence: >
+          Two of the four drift out of sync within a quarter and nobody notices until the
+          rehearsal.
+        explain: >
+          Cold standbys are an old pattern that depends on somebody maintaining two of
+          everything by hand. Replication removes the drift.
+      - id: d
+        label: Replicate every machine in the subscription, so nothing is missed
+        correct: false
+        rep: -5
+        consequence: >
+          The bill covers replication for eleven machines that the board never asked to keep
+          running, including two test servers.
+        explain: >
+          Scope disaster recovery to what the business said has to survive. Everything else is
+          rebuilt from templates and backups when there is time.
+  - id: b
+    type: design
+    title: Rehearsing without breaking anything
+    speaker: Wei Lin Tan
+    objectives: [AZ104-5.2.6]
+    intro: >
+      "I will not sign the continuity plan on the basis that it should work," says
+      Wei Lin. "I want a rehearsal, and I want production untouched while it
+      happens."
+    prompt: How do you rehearse?
+    options:
+      - id: a
+        label: >
+          A test failover into an isolated network in East Asia, validated, then cleaned up
+        correct: true
+        rep: 8
+        consequence: >
+          The rehearsal runs on a Tuesday afternoon, takes fifty-five minutes to a working
+          login, and does not touch production at all.
+        explain: >
+          Test failover brings the replicated machines up in a network you nominate, without
+          affecting the source machines or stopping replication. Choosing an isolated network
+          keeps the test from colliding with production addresses and identities. Cleaning up
+          afterwards removes the test machines and keeps the replication going.
+      - id: b
+        label: A planned failover to East Asia after hours, then a failback the next morning
+        correct: false
+        rep: -8
+        consequence: >
+          Production genuinely moves region on a Tuesday night, and the failback takes until
+          Thursday.
+        explain: >
+          Planned failover is a real move with no data loss, used for things like an announced
+          regional migration. It is not a rehearsal, because production goes with it.
+      - id: c
+        label: An unplanned failover, since that is what a real event would be
+        correct: false
+        rep: -10
+        consequence: >
+          The rehearsal becomes the outage it was meant to prepare for, with data loss to
+          match.
+        explain: >
+          Unplanned failover is the emergency path, used when the source region is gone and
+          some data loss is accepted. Nobody rehearses with it.
+      - id: d
+        label: Review the recovery plan in a meeting and confirm each step is documented
+        correct: false
+        rep: -6
+        consequence: >
+          The document is excellent, and the first real failover discovers that one machine
+          never replicated at all.
+        explain: >
+          Paper rehearsals catch process gaps and cannot catch technical ones. Test failover
+          is cheap enough that there is no reason to skip it.
+  - id: c
+    type: troubleshoot
+    title: INC-4863
+    speaker: Marek Sobczak
+    objectives: [AZ104-5.2.6, AZ104-5.2.5]
+    intro: >
+      The test failover ran. Three machines came up. vm-scan01 failed the failover
+      with a message about the target network, and the recovery plan stopped at
+      that step.
+
+
+      Replication for vm-scan01 shows as healthy, and its last recovery point is
+      four minutes old.
+    ticket:
+      ref: INC-4863
+      opened: "14:52"
+      reporter: Marek Sobczak
+      summary: One machine fails test failover with a network configuration error.
+      severity: sev3
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what is different about that machine
+        speaker: Marek Sobczak
+        reveals: >
+          "It is the only one in vnet-depot. The other three are in vnet-app, and the test
+          network I nominated is a copy of vnet-app in East Asia."
+      - id: b
+        action: Ask whether replication itself is healthy
+        speaker: Meridian NOC
+        reveals: >
+          "Healthy, four-minute recovery point, no errors in the replication view. It is
+          only the failover that failed."
+    commands:
+      - id: a
+        label: Read the failover job error
+        cmd: az site-recovery job show --vault-name rsv-meridian -g rg-ops -n "TestFailover_vm-scan01" --query "{state:state,error:errors[0].serviceErrorDetails.message}" -o json
+        output: |
+          {
+            "error": "The target network configuration for the protected item is not valid.
+            No subnet was specified for network interface nic-scan01 in the selected network.",
+            "state": "Failed"
+          }
+        time_cost: 1
+      - id: b
+        label: Check the machine's replication network mapping
+        cmd: az site-recovery protected-item show --vault-name rsv-meridian -g rg-ops -n vm-scan01 --query "properties.providerSpecificDetails.vmNics[0].{source:sourceNicArmId,target:targetSubnetName}" -o json
+        output: |
+          {
+            "source": "/subscriptions/.../networkInterfaces/nic-scan01",
+            "targetSubnetName": null
+          }
+        time_cost: 1
+      - id: c
+        label: Check what networks exist in the target region
+        cmd: az network vnet list -g rg-dr-eastasia --query "[].{name:name,subnets:subnets[].name}" -o json
+        output: |
+          [
+            { "name": "vnet-app-dr", "subnets": ["snet-app", "snet-db"] }
+          ]
+        note: There is no depot network in the target region at all.
+        time_cost: 1
+      - id: d
+        label: Check the recovery point for the machine
+        cmd: az site-recovery recovery-point list --vault-name rsv-meridian -g rg-ops --protected-item vm-scan01 --query "[0].{time:properties.recoveryPointTime,type:properties.recoveryPointType}" -o json
+        output: |
+          {
+            "time": "2026-08-24T14:48:00Z",
+            "type": "CrashConsistent"
+          }
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Create the depot network in the target region, map it in the replication settings,
+          and re-run the test failover for that machine
+        correct: true
+        rep: 9
+        consequence: >
+          The re-run brings vm-scan01 up in twelve minutes, and the recovery plan completes
+          end to end for the first time.
+        explain: >
+          Replication copies the machine; it does not create the network it lands in. Each
+          replicated interface needs a target network and subnet mapped, and a machine in a
+          network with no counterpart in the target region has nowhere to go. This is exactly
+          the class of gap a test failover exists to find.
+        diagram:
+          - {op: set_status, node: vnet-hub-ea, status: healthy}
+      - id: b
+        label: Map vm-scan01 to the application subnet in the target region
+        correct: false
+        rep: -6
+        consequence: >
+          The machine comes up on the wrong network with an address that collides with the
+          intake host, and the depot routing is wrong on failover.
+        explain: >
+          It would complete the failover and produce an environment that does not resemble
+          production. The rehearsal is meant to prove the real shape works.
+      - id: c
+        label: Remove vm-scan01 from the recovery plan so the rehearsal completes
+        correct: false
+        rep: -9
+        consequence: >
+          The plan passes, and the machine that receives depot scanner uploads is not part of
+          the disaster recovery story.
+        explain: >
+          Adjusting the test until it passes is the failure mode this whole exercise exists to
+          avoid.
+      - id: d
+        label: Re-enable replication for the machine from scratch
+        correct: false
+        rep: -7
+        consequence: >
+          The initial replication runs for six hours and the network mapping is still missing
+          at the end of it.
+        explain: >
+          Replication was healthy. Rebuilding it does not create a target network, and it
+          costs a full initial copy.

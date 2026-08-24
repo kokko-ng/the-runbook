@@ -1,0 +1,265 @@
+id: a1cm-q07
+chapter: act1-compute
+title: The Label Service Wants a Container
+summary: A developer has a Dockerfile, a deadline, and an opinion about virtual machines.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ104-3.3.1
+  - AZ104-3.3.2
+  - AZ104-3.3.3
+  - AZ104-3.3.4
+brief: >
+  Two container workloads arrive in the same sprint: a nightly batch job and a
+  small always-on API. They do not want the same thing.
+debrief: >
+  One registry, one job that runs and stops, and one API that scales to zero
+  overnight and back up when the depots wake.
+encounters:
+  - id: a
+    type: design
+    title: Somewhere to keep the image
+    speaker: Marek Sobczak
+    objectives: [AZ104-3.3.1]
+    intro: >
+      "Before anything runs," says Marek, "the image has to live somewhere that is
+      not a laptop and not a public registry. Two images, built by the pipeline
+      every few days, pulled by whatever ends up running them."
+
+
+      Wei Lin has one requirement: images must not be pullable anonymously, and
+      whatever pulls them must not use a password stored in a pipeline variable.
+    prompt: What do you set up?
+    options:
+      - id: a
+        label: >
+          An Azure Container Registry, with the pipeline and the runtimes authenticating with
+          managed identities and the AcrPull role
+        correct: true
+        rep: 8
+        consequence: >
+          The first image is pushed on Wednesday, and no credential for it exists anywhere.
+        explain: >
+          A container registry is the private home for images, and role-based access lets a
+          pipeline push with AcrPush and a runtime pull with AcrPull using a managed identity.
+          Admin user accounts on the registry exist for convenience and are the thing to leave
+          disabled.
+        diagram:
+          - {op: add_node, node: acr-meridian}
+      - id: b
+        label: A container registry with the admin user enabled, and the credentials in the pipeline
+        correct: false
+        rep: -7
+        consequence: >
+          Two months later the same credentials are in three pipelines and one developer's
+          shell history.
+        explain: >
+          The registry admin account is a single shared credential with full access. It is
+          there for quick starts, and every use of it is a credential to rotate later.
+      - id: c
+        label: A public registry repository, since the images contain no secrets
+        correct: false
+        rep: -8
+        consequence: >
+          Wei Lin finds Meridian's label templates and internal host names in a public image
+          layer.
+        explain: >
+          Images almost always carry more context than intended: configuration, paths,
+          internal names. The requirement was explicit anyway.
+      - id: d
+        label: A storage account holding exported image tar files
+        correct: false
+        rep: -6
+        consequence: >
+          Every runtime now needs a step to download and load an image before it can start.
+        explain: >
+          A registry is the protocol every container runtime already speaks. Storage is not a
+          registry, and rebuilding the pull path by hand is work with no payoff.
+  - id: b
+    type: design
+    title: Two workloads, two runtimes
+    speaker: Dana Ong
+    objectives: [AZ104-3.3.2, AZ104-3.3.3]
+    intro: >
+      "The label generator runs at 23:00, takes about eleven minutes, and stops,"
+      says Dana. "The tracking API answers a few requests a second during the day
+      and almost nothing overnight, and it needs to keep answering when we deploy
+      a new version."
+
+
+      Nobody at Meridian has run Kubernetes and nobody wants to be the first.
+    prompt: Where do you run them?
+    options:
+      - id: a
+        label: >
+          Azure Container Instances for the nightly job, and Azure Container Apps for the
+          tracking API
+        correct: true
+        rep: 9
+        consequence: >
+          The job runs at 23:00 and bills eleven minutes. The API deploys with a revision
+          swap and no downtime.
+        explain: >
+          Container Instances give a single container that starts, runs and stops, billed per
+          second, which is what a scheduled batch job wants. Container Apps is the managed
+          serverless platform for long-running services: revisions, ingress, scale to zero
+          and scale out on requests, without operating a cluster.
+        diagram:
+          - {op: add_node, node: aci-labelgen}
+          - {op: add_node, node: aca-trackapi}
+          - {op: add_edge, edge: e-aci-acr}
+          - {op: add_edge, edge: e-aca-acr}
+      - id: b
+        label: Both on Azure Container Instances, one restarted on a schedule and one always on
+        correct: false
+        rep: -6
+        consequence: >
+          The API has no scaling, no revisions and no ingress, and every deploy is a brief
+          outage.
+        explain: >
+          Container Instances have no built-in scaling or traffic management. They are a
+          single container per group, which suits the batch job and leaves the API without the
+          things it needs.
+      - id: c
+        label: Both on a small Kubernetes cluster, so there is one platform to learn
+        correct: false
+        rep: -7
+        consequence: >
+          Meridian acquires a cluster to upgrade, node pools to size, and an eleven-minute
+          nightly job.
+        explain: >
+          Kubernetes is the right answer at a certain scale and complexity, and it comes with
+          an operational burden. Two containers with these shapes do not need it.
+      - id: d
+        label: Both as App Service containers on the existing plan
+        correct: false
+        rep: -5
+        consequence: >
+          The nightly job holds an instance of the plan for eleven minutes and the plan is
+          paid for all day regardless.
+        explain: >
+          App Service runs containers perfectly well for web workloads. A batch job that runs
+          once a night is a poor fit for a plan you pay for continuously.
+  - id: c
+    type: troubleshoot
+    title: INC-4718
+    speaker: Meridian NOC
+    objectives: [AZ104-3.3.4]
+    intro: >
+      The tracking API went live on Monday. On Wednesday morning, between 06:40
+      and 07:10, about one request in six fails with a gateway error. Outside that
+      window everything is fine.
+
+
+      The depots start their shift at 06:45.
+    ticket:
+      ref: INC-4718
+      opened: "07:15"
+      reporter: Meridian NOC
+      summary: Tracking API returns intermittent 502 errors during the morning ramp.
+      severity: sev2
+    time_budget: 5
+    investigate:
+      - id: a
+        action: Ask what the API does at start-up
+        speaker: Marek Sobczak
+        reveals: >
+          "It loads a route table into memory. Takes about twenty seconds before it can
+          answer anything, and it does not report ready until it has."
+      - id: b
+        action: Ask what the traffic actually looks like
+        speaker: Joana Reyes
+        reveals: >
+          "Nothing overnight, then about forty requests a second within two minutes of
+          06:45. It is the sharpest ramp we have anywhere."
+    commands:
+      - id: a
+        label: Check the container app's scale settings
+        cmd: az containerapp show -n aca-trackapi -g rg-app --query "properties.template.scale" -o json
+        output: |
+          {
+            "maxReplicas": 10,
+            "minReplicas": 0,
+            "rules": [
+              { "http": { "metadata": { "concurrentRequests": "20" } }, "name": "http-rule" }
+            ]
+          }
+        time_cost: 1
+      - id: b
+        label: Check the container's resource allocation
+        cmd: az containerapp show -n aca-trackapi -g rg-app --query "properties.template.containers[0].resources" -o json
+        output: |
+          {
+            "cpu": 0.25,
+            "memory": "0.5Gi"
+          }
+        time_cost: 1
+      - id: c
+        label: Look at the replica count over the morning
+        cmd: az monitor metrics list --resource aca-trackapi -g rg-app --resource-type Microsoft.App/containerApps --metric Replicas --interval PT5M --query "value[0].timeseries[0].data[-6:]" -o table
+        output: |
+          Average    TimeStamp
+          ---------  -------------------
+          0.0        2026-08-24T06:35:00Z
+          1.2        2026-08-24T06:45:00Z
+          3.4        2026-08-24T06:50:00Z
+          5.0        2026-08-24T06:55:00Z
+          5.0        2026-08-24T07:00:00Z
+          5.0        2026-08-24T07:05:00Z
+        time_cost: 1
+      - id: d
+        label: Check the container app's own logs for start-up errors
+        cmd: az containerapp logs show -n aca-trackapi -g rg-app --tail 5
+        output: |
+          route table loaded in 21.4s
+          listening on :8080
+          route table loaded in 22.9s
+          listening on :8080
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Set the minimum replica count to two so instances are warm before the shift starts,
+          and keep the scale rule for the rest of the ramp
+        correct: true
+        rep: 9
+        consequence: >
+          Thursday's ramp is clean. The two idle replicas cost a few dollars a month and
+          nobody sees a gateway error again.
+        explain: >
+          Scaling to zero saves money and costs a cold start, and a twenty-second start-up
+          against a two-minute ramp is exactly when that matters. A minimum replica count
+          keeps enough capacity warm to absorb the first burst while the scale rule handles
+          the rest.
+        diagram:
+          - {op: set_detail, node: aca-trackapi, detail: "Minimum two replicas"}
+      - id: b
+        label: Raise the maximum replica count to twenty
+        correct: false
+        rep: -6
+        consequence: >
+          The same one in six failures happen, and now more replicas are cold starting at
+          once.
+        explain: >
+          The metric showed it settling at five of a possible ten, so the ceiling was never
+          reached. Adding headroom above an unused limit changes nothing.
+      - id: c
+        label: Increase the container to one processor core and two gibibytes of memory
+        correct: false
+        rep: -5
+        consequence: >
+          Start-up drops to eighteen seconds, the cost per replica triples, and the first
+          requests still arrive before anything is ready.
+        explain: >
+          More resources per replica helps a slow container and does not remove a cold start
+          from zero. Warm capacity is what does.
+      - id: d
+        label: Move the API to Azure Container Instances so it is always running
+        correct: false
+        rep: -7
+        consequence: >
+          It is always warm, never scales, and every deploy takes the API offline for a
+          minute.
+        explain: >
+          It solves the cold start by giving up scaling and revisions. The platform already
+          supports keeping instances warm.

@@ -1,0 +1,248 @@
+id: a1cm-q01
+chapter: act1-compute
+title: Reading Somebody Else's Template
+summary: The transport application is deployed from a template nobody has opened since the consultant left.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ104-3.1.1
+  - AZ104-3.1.2
+brief: >
+  Before you can change how something is deployed, you have to be able to read
+  what it currently says. That is today.
+debrief: >
+  One parameter, one output, and a template that no longer hard-codes a size
+  somebody chose in 2023.
+encounters:
+  - id: a
+    type: design
+    title: What this template does
+    speaker: Marek Sobczak
+    objectives: [AZ104-3.1.1]
+    intro: >
+      Marek puts a fragment on the screen. It is the part of tms-vm.json that
+      everyone skips.
+
+
+      "parameters": { "vmSize": { "type": "string", "defaultValue": "Standard_D2s_v5",
+      "allowedValues": ["Standard_D2s_v5", "Standard_D4s_v5"] } },
+      "variables": { "nicName": "[concat(parameters('vmName'), '-nic')]" },
+      "resources": [ { "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2024-07-01", "dependsOn": ["[resourceId('Microsoft.Network/networkInterfaces',
+      variables('nicName'))]"] } ]
+
+
+      "Tell me what happens if I deploy this with no parameter file at all."
+    prompt: What does a deployment with no parameters do?
+    options:
+      - id: a
+        label: >
+          It deploys a Standard_D2s_v5 and fails, because vmName has no default and must be
+          supplied
+        correct: true
+        rep: 7
+        consequence: >
+          Marek grunts. "Right. Which is why the pipeline has a parameter file and why
+          nobody can remember what is in it."
+        explain: >
+          Parameters with a defaultValue are optional; those without one are required and
+          deployment fails at validation if they are missing. allowedValues constrains what
+          may be passed, and variables are evaluated at deployment time from expressions
+          such as concat and resourceId.
+      - id: b
+        label: It deploys successfully with every default, since defaults exist for all parameters
+        correct: false
+        rep: -6
+        consequence: >
+          You promise a colleague they can deploy it with one command, and they cannot.
+        explain: >
+          Only vmSize has a default in this fragment. vmName is referenced by the nicName
+          variable and has no default, so it is required.
+      - id: c
+        label: It fails, because dependsOn refers to a resource that is not in the template
+        correct: false
+        rep: -7
+        consequence: >
+          Twenty minutes are spent looking for a missing resource that is defined further
+          down the file.
+        explain: >
+          dependsOn names a resource by its resource identifier and only orders the
+          deployment. Whether the network interface is defined in this template or already
+          exists is a separate question from what dependsOn does.
+      - id: d
+        label: It deploys a Standard_D4s_v5, because allowedValues takes the last entry
+        correct: false
+        rep: -6
+        consequence: >
+          A test deployment comes back double the expected size and the invoice reflects it.
+        explain: >
+          allowedValues restricts what can be supplied; it never selects a value. The default
+          is whatever defaultValue says.
+  - id: b
+    type: design
+    title: The size that is not allowed
+    speaker: Dana Ong
+    objectives: [AZ104-3.1.2]
+    intro: >
+      "The transport application needs more memory for peak season," says Dana.
+      "Marek says a Standard_E4s_v5 is the right shape. The pipeline rejects it
+      before it even reaches Azure."
+
+
+      The template is the one you read this morning. The pipeline passes vmSize
+      from a parameter file that now says Standard_E4s_v5.
+    prompt: What do you change?
+    options:
+      - id: a
+        label: Add Standard_E4s_v5 to the allowedValues array in the template
+        correct: true
+        rep: 7
+        consequence: >
+          The next pipeline run deploys the larger size, and the list still stops somebody
+          picking a size nobody has costed.
+        explain: >
+          allowedValues is validated by Resource Manager before anything is created, which is
+          why the failure happens without reaching the platform. Extending the list is the
+          intended way to permit a new value while keeping the guard rail.
+      - id: b
+        label: Remove the allowedValues array so any size can be passed
+        correct: false
+        rep: -6
+        consequence: >
+          Someone deploys a Standard_M128ms into non-production in November and Priya finds
+          it in December.
+        explain: >
+          It unblocks the change and removes the control that made the template safe to hand
+          to other people. Keep the list and maintain it.
+      - id: c
+        label: Change the defaultValue to Standard_E4s_v5 and stop passing the parameter
+        correct: false
+        rep: -7
+        consequence: >
+          Validation still fails, because the parameter file is still supplying a value that
+          is not permitted.
+        explain: >
+          A default does not widen allowedValues, and a default that is not in the list is
+          itself invalid. The constraint is the thing that has to change.
+      - id: d
+        label: Resize the virtual machine in the portal and leave the template alone
+        correct: false
+        rep: -8
+        consequence: >
+          The next pipeline run puts it back to Standard_D2s_v5 during the busiest fortnight
+          of the year.
+        explain: >
+          If a resource is deployed from a template, the template is the source of truth.
+          Changing the resource by hand creates drift that the next deployment silently
+          reverses.
+  - id: c
+    type: troubleshoot
+    title: INC-4620
+    speaker: Meridian NOC
+    objectives: [AZ104-3.1.2, AZ104-3.1.1]
+    intro: >
+      The size change was merged. The pipeline now fails at deployment, after
+      validation, with a conflict about the operating system disk.
+
+
+      Nothing else in the template changed, and the same template deployed cleanly
+      into the non-production subscription an hour ago.
+    ticket:
+      ref: INC-4620
+      opened: "16:40"
+      reporter: Meridian NOC
+      summary: Template deployment fails in production with a disk conflict after a size change.
+      severity: sev3
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what is different about non-production
+        speaker: Marek Sobczak
+        reveals: >
+          "Non-production is empty every morning. Production has the existing virtual
+          machine and its existing disks, which have names the template also wants to use."
+      - id: b
+        action: Ask what mode the pipeline deploys in
+        speaker: Meridian IT
+        reveals: >
+          The pipeline runs az deployment group create with no mode argument, which means
+          incremental.
+    commands:
+      - id: a
+        label: Read the failure from the deployment history
+        cmd: az deployment group show -g rg-app -n tms-vm --query "properties.error.details[0].message" -o tsv
+        output: |
+          Changing property 'osDisk.createOption' is not allowed. Existing disk
+          'vm-tms01-osdisk' cannot be re-created by this deployment.
+        time_cost: 1
+      - id: b
+        label: Look at what the template asks for
+        cmd: az deployment group validate -g rg-app --template-file tms-vm.json --parameters @prod.parameters.json --query "properties.validatedResources[].id" -o tsv
+        output: |
+          /subscriptions/.../resourceGroups/rg-app/providers/Microsoft.Compute/virtualMachines/vm-tms01
+          /subscriptions/.../resourceGroups/rg-app/providers/Microsoft.Network/networkInterfaces/vm-tms01-nic
+        time_cost: 1
+      - id: c
+        label: Ask what a deployment would actually change
+        cmd: az deployment group what-if -g rg-app --template-file tms-vm.json --parameters @prod.parameters.json
+        output: |
+          Resource changes: 1 to modify.
+
+          ~ Microsoft.Compute/virtualMachines/vm-tms01
+            ~ properties.hardwareProfile.vmSize:  "Standard_D2s_v5" => "Standard_E4s_v5"
+            ~ properties.storageProfile.osDisk.createOption: "FromImage" => "FromImage"
+        time_cost: 1
+      - id: d
+        label: Check the current state of the machine
+        cmd: az vm show -n vm-tms01 -g rg-app --query "{size:hardwareProfile.vmSize,osDisk:storageProfile.osDisk.name}" -o table
+        output: |
+          Size              OsDisk
+          ----------------  ----------------
+          Standard_D2s_v5   vm-tms01-osdisk
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Change the template's operating system disk to createOption Attach for the existing
+          disk, or resize through the template with the disk properties left as they are
+        correct: true
+        rep: 9
+        consequence: >
+          The redeployment changes only the size, the machine restarts once, and the pipeline
+          is green.
+        explain: >
+          Incremental mode leaves resources alone that are not in the template, and it still
+          sends the full definition of the resources that are. A createOption of FromImage on
+          an existing machine asks the platform to build the operating system disk again,
+          which it refuses. What-if is the tool that shows this before the deployment does.
+      - id: b
+        label: Switch the deployment to complete mode so the resource is replaced cleanly
+        correct: false
+        rep: -12
+        consequence: >
+          Complete mode deletes every resource in the resource group that is not in the
+          template, which in rg-app is most of them.
+        explain: >
+          Complete mode is a deletion tool. In a shared resource group it removes anything
+          the template does not describe, which is how people lose databases to a
+          deployment.
+      - id: c
+        label: Delete the existing virtual machine so the template can create it fresh
+        correct: false
+        rep: -10
+        consequence: >
+          The transport application is down for forty minutes and the data disk has to be
+          reattached by hand.
+        explain: >
+          Deleting production to make a deployment idempotent is the wrong direction. The
+          template should describe the machine as it is meant to exist.
+      - id: d
+        label: Resize the machine in the portal and revert the template change
+        correct: false
+        rep: -7
+        consequence: >
+          Peak season is survived and the drift is still there in January when the next
+          deployment runs.
+        explain: >
+          It restores service and abandons the source of truth. If the template cannot
+          express the change, fix the template.

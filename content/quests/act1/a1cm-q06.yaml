@@ -1,0 +1,247 @@
+id: a1cm-q06
+chapter: act1-compute
+title: Peak Season Scaling
+summary: Intake needs four machines in November and one in February, and nobody wants to remember which month it is.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ104-3.2.7
+brief: >
+  The intake service is stateless, which is the only reason this conversation is
+  possible at all.
+debrief: >
+  A scale set that adds instances when the queue grows and takes them away when
+  it does not, and an upgrade policy chosen on purpose.
+encounters:
+  - id: a
+    type: design
+    title: Four machines or one scale set
+    speaker: Marek Sobczak
+    objectives: [AZ104-3.2.7]
+    intro: >
+      "Intake handles scanner uploads," says Marek. "Stateless, behind the public
+      load balancer, writes straight to storage. In November we want four of them.
+      In February one is plenty, and last February we were still paying for four
+      because nobody switched them off."
+    prompt: How do you build it?
+    options:
+      - id: a
+        label: >
+          A virtual machine scale set in flexible orchestration across zones, with autoscale
+          rules on the queue depth
+        correct: true
+        rep: 8
+        consequence: >
+          November scales to four without a change record, and February settles at one on its
+          own.
+        explain: >
+          A scale set manages a group of identical machines as one resource, with autoscale
+          rules that add and remove instances on a metric or a schedule. Flexible orchestration
+          is the current default and gives you scale set management with the control of
+          individual machines, and zone spread comes with it.
+        diagram:
+          - {op: add_node, node: vmss-intake}
+          - {op: add_edge, edge: e-lb-vmss}
+      - id: b
+        label: Four virtual machines behind the load balancer, with two switched off outside peak
+        correct: false
+        rep: -6
+        consequence: >
+          Somebody has to remember, and last February proved that somebody does not.
+        explain: >
+          A deallocated machine still costs for its disks and still has to be patched when it
+          comes back. Manual scaling is a runbook that depends on a person's calendar.
+      - id: c
+        label: One larger virtual machine, sized for November, all year round
+        correct: false
+        rep: -7
+        consequence: >
+          The February bill is unchanged from November and a single host failure takes intake
+          down completely.
+        explain: >
+          Scaling up handles load and gives no redundancy and no way down. For a stateless
+          service that varies by season, scaling out is the shape.
+      - id: d
+        label: A scale set with a fixed instance count of four and a manual change to scale down
+        correct: false
+        rep: -5
+        consequence: >
+          The scale set works and the February problem is exactly as it was.
+        explain: >
+          The scale set is right; the autoscale rules are the half that solves the stated
+          problem. Fixed capacity in a scale set is a reasonable starting point and not the
+          end state.
+  - id: b
+    type: design
+    title: What triggers a scale out
+    speaker: Dana Ong
+    objectives: [AZ104-3.2.7]
+    intro: >
+      "Autoscale on what?" asks Dana. "Marek says processor. The depot manager
+      says drivers wait when uploads queue. I would rather scale on the thing the
+      drivers feel."
+
+
+      The intake instances read from a storage queue. During the morning rush the
+      queue grows to several thousand messages while processor sits around fifty
+      per cent.
+    prompt: What rule do you configure?
+    options:
+      - id: a
+        label: >
+          Scale out on queue length per instance, scale in on the same metric with a lower
+          threshold and a cool-down
+        correct: true
+        rep: 8
+        consequence: >
+          The set adds an instance eleven minutes into the morning rush and removes it at
+          ten, without anybody watching.
+        explain: >
+          Scale on the metric that represents the work waiting, not the symptom. Queue length
+          per instance is the standard signal for a queue worker. Different thresholds for out
+          and in, plus a cool-down, are what stop the set oscillating.
+      - id: b
+        label: Scale out when processor exceeds seventy per cent, scale in below thirty
+        correct: false
+        rep: -6
+        consequence: >
+          The queue reaches four thousand messages with processor at fifty-two per cent and
+          nothing scales.
+        explain: >
+          Processor is a fine signal for compute-bound work. This service spends its time
+          waiting on storage, so the queue grows long before the processor does.
+      - id: c
+        label: A schedule that runs four instances from October to January and one otherwise
+        correct: false
+        rep: -5
+        consequence: >
+          A one-off promotion in April floods the queue and nothing responds until somebody
+          notices.
+        explain: >
+          Scheduled rules are useful and they are predictions. Combined with a metric rule
+          they are excellent; on their own they only handle the season you predicted.
+      - id: d
+        label: Scale out on queue length, and scale in manually so capacity is never removed by surprise
+        correct: false
+        rep: -6
+        consequence: >
+          February arrives with four instances again, which is where this started.
+        explain: >
+          Automatic scale-in with a conservative threshold and cool-down is what makes the
+          saving real. Manual scale-in is the same calendar problem in new clothes.
+  - id: c
+    type: troubleshoot
+    title: INC-4701
+    speaker: Meridian NOC
+    objectives: [AZ104-3.2.7]
+    intro: >
+      A new intake image was published on Tuesday with a fix for a scanner
+      firmware quirk. On Thursday the depots report that some uploads still hit
+      the old behavior and some do not, apparently at random.
+
+
+      The scale set is running five instances. The model was updated on Tuesday.
+    ticket:
+      ref: INC-4701
+      opened: "09:30"
+      reporter: Meridian NOC
+      summary: Scale set instances behave inconsistently after an image update.
+      severity: sev3
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what was changed on Tuesday
+        speaker: Marek Sobczak
+        reveals: >
+          "I updated the image reference on the scale set model. The portal said it was
+          saved and I moved on."
+      - id: b
+        action: Ask which instances are misbehaving
+        speaker: Joana Reyes
+        reveals: >
+          "Three of the five, consistently. The two that came up during Wednesday's scale
+          out are fine."
+    commands:
+      - id: a
+        label: Check the scale set's upgrade policy
+        cmd: az vmss show -n vmss-intake -g rg-app --query "{policy:upgradePolicy.mode,image:virtualMachineProfile.storageProfile.imageReference.version}" -o json
+        output: |
+          {
+            "image": "2026.08.18",
+            "policy": "Manual"
+          }
+        time_cost: 1
+      - id: b
+        label: Check what each instance is running
+        cmd: az vmss list-instances -n vmss-intake -g rg-app --query "[].{id:instanceId,latest:latestModelApplied}" -o table
+        output: |
+          Id    Latest
+          ----  --------
+          1     False
+          2     False
+          4     False
+          7     True
+          8     True
+        time_cost: 1
+      - id: c
+        label: Check for failed instances
+        cmd: az vmss get-instance-view -n vmss-intake -g rg-app --query "statuses[].displayStatus" -o tsv
+        output: |
+          Provisioning succeeded
+        time_cost: 1
+      - id: d
+        label: Check the load balancer health
+        cmd: az monitor metrics list --resource vmss-intake -g rg-app --resource-type Microsoft.Compute/virtualMachineScaleSets --metric "Percentage CPU" --interval PT15M --query "value[0].timeseries[0].data[-1]" -o json
+        output: |
+          {
+            "average": 41.2,
+            "timeStamp": "2026-08-24T09:15:00Z"
+          }
+        time_cost: 2
+    fixes:
+      - id: a
+        label: >
+          Upgrade the three instances to the latest model, and set the upgrade policy to
+          rolling so future model changes roll out on their own
+        correct: true
+        rep: 9
+        consequence: >
+          The three instances are replaced in batches over twenty minutes with the load
+          balancer keeping intake up throughout.
+        explain: >
+          With a manual upgrade policy, changing the scale set model affects new instances
+          only; existing ones keep running the old model until they are explicitly upgraded.
+          The latestModelApplied field is what tells you. A rolling policy upgrades instances
+          in batches with health checks between them.
+        diagram:
+          - {op: set_status, node: vmss-intake, status: healthy}
+      - id: b
+        label: Scale the set to zero and back to five so every instance is new
+        correct: false
+        rep: -9
+        consequence: >
+          Intake is completely down for the several minutes it takes to provision five
+          instances during the morning rush.
+        explain: >
+          It reaches the right end state by taking the service away first. Upgrading in place,
+          or a rolling policy, keeps capacity while it happens.
+      - id: c
+        label: Set the upgrade policy to automatic so instances always match the model
+        correct: false
+        rep: -6
+        consequence: >
+          The three instances are replaced at once with no health gate, and a bad image would
+          take the whole set out.
+        explain: >
+          Automatic upgrades apply the model without batching or health checks. Rolling is
+          the option that gives the same outcome with a safety net.
+      - id: d
+        label: Reimage the three instances
+        correct: false
+        rep: -5
+        consequence: >
+          They come back on the same old model, because reimage reapplies the model the
+          instance already has.
+        explain: >
+          Reimage resets an instance to its current model, which is useful for a corrupted
+          guest. Upgrade is the operation that moves an instance to the latest model.

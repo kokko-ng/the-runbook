@@ -1,0 +1,215 @@
+id: a1cm-b01
+chapter: act1-compute
+title: Peak Season Scaling, Exam Hard
+summary: The scale set works. It also removes the instance that is halfway through a batch, twice a day.
+variant: bonus
+bonus_of: a1cm-q06
+estimated_minutes: 11
+objectives:
+  - AZ104-3.2.7
+  - AZ104-3.2.4
+brief: >
+  Autoscale is easy to turn on and easy to get subtly wrong. Every option here is
+  something that appears in a real configuration.
+debrief: >
+  Scale in has to be as deliberate as scale out, and the instance doing work is
+  not always the one with the highest processor.
+encounters:
+  - id: a
+    type: troubleshoot
+    title: INC-4760
+    speaker: Joana Reyes
+    objectives: [AZ104-3.2.7]
+    intro: >
+      "Twice a day, a batch of scanner uploads is lost," says Joana. "Not failed.
+      Lost. The message is taken off the queue and never processed, and it always
+      happens within a minute of the set scaling in."
+
+
+      The scale set has autoscale on queue length, out at ten messages per
+      instance, in at five, with a one-minute cool-down.
+
+
+      Four time units. The next scale-in event is in about twenty minutes.
+    ticket:
+      ref: INC-4760
+      opened: "11:20"
+      reporter: Joana Reyes
+      summary: Uploads disappear from the queue around scale-in events.
+      severity: sev2
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask how the worker handles shutdown
+        speaker: Marek Sobczak
+        reveals: >
+          "It takes a message, processes it for up to forty seconds, then deletes it. If
+          the process dies in the middle, the message becomes visible again after its
+          timeout. Which is five minutes."
+      - id: b
+        action: Ask what the queue looks like after an event
+        speaker: Meridian NOC
+        reveals: >
+          "Message count dips, then recovers a few minutes later. So they do come back.
+          The application that reads them has already reported the upload as failed by
+          then."
+    commands:
+      - id: a
+        label: Check the autoscale profile
+        cmd: az monitor autoscale show -n autoscale-intake -g rg-app --query "profiles[0].rules[].{metric:metricTrigger.metricName,dir:scaleAction.direction,cooldown:scaleAction.cooldown}" -o table
+        output: |
+          Metric                  Dir        Cooldown
+          ----------------------  ---------  ----------
+          ApproximateMessageCount  Increase   PT1M
+          ApproximateMessageCount  Decrease   PT1M
+        time_cost: 1
+      - id: b
+        label: Check whether instances are being removed abruptly
+        cmd: az monitor activity-log list --offset 6h --query "[?contains(operationName.value,'virtualMachineScaleSets/delete')].{at:eventTimestamp,status:status.value}" -o table
+        output: |
+          At                        Status
+          ------------------------  ---------
+          2026-08-24T09:41:12Z      Succeeded
+          2026-08-24T11:02:44Z      Succeeded
+        time_cost: 1
+      - id: c
+        label: Check for a termination notification setting on the set
+        cmd: az vmss show -n vmss-intake -g rg-app --query "virtualMachineProfile.scheduledEventsProfile" -o json
+        output: |
+          null
+        note: Scheduled events are not enabled, so instances get no warning before they are removed.
+        time_cost: 1
+      - id: d
+        label: Check how long a worker takes to finish a message
+        cmd: az monitor metrics list --resource vmss-intake -g rg-app --resource-type Microsoft.Compute/virtualMachineScaleSets --metric "Percentage CPU" --interval PT1M --query "value[0].timeseries[0].data[-2:]" -o table
+        output: |
+          Average    TimeStamp
+          ---------  -------------------
+          38.4       2026-08-24T11:18:00Z
+          41.9       2026-08-24T11:19:00Z
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Enable terminate notifications on the scale set and have the worker finish or release
+          its message when it receives one
+        correct: true
+        rep: 10
+        consequence: >
+          The next scale-in gives each instance its notice, workers release their messages,
+          and nothing is reported as failed.
+        explain: >
+          Scale-in removes instances without waiting for whatever they were doing. Terminate
+          notifications give the instance a defined window to shut down cleanly, which is how
+          a queue worker finishes or releases its current message. The message was never lost;
+          it was invisible for five minutes, which the caller experienced as a failure.
+      - id: b
+        label: Raise the scale-in threshold so the set scales in less often
+        correct: false
+        rep: -7
+        consequence: >
+          It happens once a day instead of twice, which is a smaller version of the same
+          incident.
+        explain: >
+          Tuning frequency reduces exposure without addressing the cause. The instance still
+          dies mid-message whenever it does happen.
+      - id: c
+        label: Reduce the queue message visibility timeout from five minutes to thirty seconds
+        correct: false
+        rep: -8
+        consequence: >
+          Messages become visible again while a healthy worker is still processing them, and
+          uploads start being processed twice.
+        explain: >
+          The visibility timeout has to be longer than the worst-case processing time, or
+          messages are handed out twice. Shortening it trades a rare loss for a routine
+          duplicate.
+      - id: d
+        label: Disable scale-in entirely and remove instances manually
+        correct: false
+        rep: -6
+        consequence: >
+          February arrives with the set at its peak size, which is the problem the scale set
+          was introduced to solve.
+        explain: >
+          It is a real option for workloads that cannot tolerate interruption and it gives up
+          the saving. Terminate notifications keep both.
+  - id: b
+    type: design
+    title: Uniform or flexible
+    speaker: Marek Sobczak
+    objectives: [AZ104-3.2.7, AZ104-3.2.4]
+    intro: >
+      A second scale set is being planned for the reporting workers. These are not
+      identical: two of them need a larger size with more memory for the month-end
+      run, and the team wants to be able to attach a data disk to one of them for
+      a migration.
+    prompt: Which orchestration mode do you choose?
+    options:
+      - id: a
+        label: >
+          Flexible orchestration, which manages the instances as individual virtual machines
+        correct: true
+        rep: 7
+        explain: >
+          Flexible orchestration is the current default and treats each instance as a standard
+          virtual machine, so instances can differ, can be managed individually, and support
+          the full virtual machine feature set. Uniform orchestration is the older model built
+          for large numbers of identical instances from one model.
+      - id: b
+        label: Uniform orchestration, because scale sets are for identical instances
+        correct: false
+        rep: -6
+        consequence: >
+          The migration disk cannot be attached to one instance, and the workaround becomes a
+          separate machine outside the set.
+        explain: >
+          Uniform is exactly that: every instance comes from one model. It scales to very
+          large counts efficiently and gives up per-instance flexibility.
+      - id: c
+        label: Neither. Use individual virtual machines and an availability set.
+        correct: false
+        rep: -5
+        consequence: >
+          Month end needs two more workers and somebody deploys them by hand at 23:00.
+        explain: >
+          That is the shape flexible orchestration exists to replace: availability set style
+          placement with scale set management on top.
+  - id: c
+    type: knowledge
+    title: What resizing costs you
+    speaker: Marek Sobczak
+    objectives: [AZ104-3.2.4]
+    intro: >
+      "Somebody asks you to move a production machine from a D-series to an
+      E-series size, in the same region, same family generation. What do you tell
+      them it costs in downtime, and what would make it worse?"
+    question: What happens when you change a virtual machine's size?
+    options:
+      - id: a
+        label: >
+          A restart, and if the target size is not available on the current host cluster the
+          machine must be deallocated first
+        correct: true
+        rep: 6
+        explain: >
+          Resizing restarts the machine. If the requested size is supported by the hardware
+          cluster the machine is already on, that is all it takes; if it is not, the machine
+          has to be deallocated and started again, which also releases any dynamic public IP
+          address and the contents of the temporary disk.
+      - id: b
+        label: Nothing. Resizing is a live operation with no interruption.
+        correct: false
+        rep: -5
+        consequence: A resize is scheduled during business hours and the application goes down for three minutes.
+        explain: >
+          There is no in-place live resize for a virtual machine. Plan a restart, and plan for
+          a deallocation if the size family changes.
+      - id: c
+        label: The machine is rebuilt from its image, so anything on the temporary disk is lost
+        correct: false
+        rep: -5
+        consequence: A rebuild is expected and a change window is booked that is four times longer than needed.
+        explain: >
+          The managed disks are kept and the operating system is not reinstalled. The
+          temporary disk is lost on deallocation, which is a smaller and more specific claim.

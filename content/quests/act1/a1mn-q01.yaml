@@ -1,0 +1,246 @@
+id: a1mn-q01
+chapter: act1-monitoring
+title: Nobody Read the Alert
+summary: The alert that would have caught last week's outage fired eleven times, into a mailbox nobody owns.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ104-5.1.1
+  - AZ104-5.1.4
+brief: >
+  Meridian has alerts. What it does not have is anyone who believes them, because
+  most of them are noise and the important ones go to a shared inbox.
+debrief: >
+  Fewer rules, aimed at what users feel, going to a place with a person behind it,
+  and quiet during maintenance.
+encounters:
+  - id: a
+    type: design
+    title: Reading the graph
+    speaker: Marek Sobczak
+    objectives: [AZ104-5.1.1]
+    intro: >
+      Marek has the metric chart for vm-tms01 from the outage on screen.
+
+
+      Processor sat at ninety-eight per cent for four minutes at 06:40 and again
+      at 07:05. Available memory did not move. Disk queue depth climbed from near
+      zero to forty and stayed there. Network out fell to almost nothing at 06:41.
+
+
+      "Somebody is going to ask you what this says. Not what to do about it. What
+      it says."
+    prompt: What is the metric telling you?
+    options:
+      - id: a
+        label: >
+          The machine was blocked on disk, and the processor spikes and the traffic collapse
+          are consequences of that
+        correct: true
+        rep: 8
+        consequence: >
+          Marek nods and pulls up the disk metrics next, which is the conversation you wanted
+          to be having.
+        explain: >
+          A high disk queue with flat memory and collapsing outbound traffic is the signature
+          of storage becoming the bottleneck: work queues up, threads block, and the machine
+          serves less while looking busy. Processor at ninety-eight per cent is a symptom
+          here, not the cause.
+      - id: b
+        label: The machine was processor bound and needs a larger size
+        correct: false
+        rep: -6
+        consequence: >
+          A resize is scheduled, the machine gets bigger, and the next morning rush looks
+          exactly the same.
+        explain: >
+          Processor is the number people reach for first. Read it alongside the others: with
+          the disk queue at forty, more processor has nothing to do.
+      - id: c
+        label: A network problem, because outbound traffic dropped at the same moment
+        correct: false
+        rep: -6
+        consequence: >
+          Two hours go into packet captures on a network that was working perfectly.
+        explain: >
+          Outbound traffic fell because the application stopped producing responses. Traffic
+          is an output of application health as often as it is a cause.
+      - id: d
+        label: A memory leak, since the processor spike repeats on a cycle
+        correct: false
+        rep: -7
+        consequence: >
+          The application team is asked to look for a leak that the memory metric already
+          rules out.
+        explain: >
+          Available memory did not move. A leak shows up there first, and repeating spikes are
+          just as likely to be a workload pattern.
+  - id: b
+    type: design
+    title: Where the alert goes
+    speaker: Dana Ong
+    objectives: [AZ104-5.1.4]
+    intro: >
+      "There are forty-one alert rules," says Dana. "Thirty of them email
+      it-alerts, which is a distribution list that goes to four people who all
+      assume one of the others reads it. Last week's outage fired eleven alerts
+      and nobody acted for fifty minutes."
+
+
+      Meridian's on-call rotation is the Cebu NOC overnight and the platform team
+      during the day.
+    prompt: How do you rebuild the alerting?
+    options:
+      - id: a
+        label: >
+          Define action groups for the NOC and the platform team, point the rules that matter
+          at them, and delete the rules nobody acts on
+        correct: true
+        rep: 8
+        consequence: >
+          Eleven rules survive. The next real incident pages Cebu in ninety seconds and they
+          acknowledge it.
+        explain: >
+          An action group is the reusable answer to who gets told and how: email, SMS, push,
+          voice, webhook or an automation action. Rules reference the group, so changing the
+          rotation is one edit. Deleting rules nobody acts on is the other half, because an
+          alert that is always ignored trains people to ignore alerts.
+        diagram:
+          - {op: add_node, node: ag-oncall}
+          - {op: add_node, node: alert-tms-cpu}
+          - {op: add_edge, edge: e-alert-ag}
+      - id: b
+        label: Point all forty-one rules at a new action group that emails the NOC
+        correct: false
+        rep: -7
+        consequence: >
+          The NOC receives thirty low-value emails a night and starts filtering them, which is
+          where the last inbox ended up.
+        explain: >
+          Routing is half the fix. Volume is the other half: an alert has to be worth waking
+          somebody for, or the routing does not matter.
+      - id: c
+        label: Keep the rules and add a daily digest of everything that fired
+        correct: false
+        rep: -8
+        consequence: >
+          The digest confirms the next outage the following morning.
+        explain: >
+          A digest is a report, not an alert. Anything that needs action within minutes cannot
+          be delivered daily.
+      - id: d
+        label: Replace the alerts with a dashboard the NOC watches
+        correct: false
+        rep: -7
+        consequence: >
+          At 03:00 the dashboard is on a screen in an empty room.
+        explain: >
+          Dashboards are for investigating and for shared situational awareness. Something has
+          to reach out to a person when a threshold is crossed.
+  - id: c
+    type: troubleshoot
+    title: INC-4780
+    speaker: Joana Reyes
+    objectives: [AZ104-5.1.4]
+    intro: >
+      Patching runs on the first Sunday of the month between 01:00 and 04:00.
+      Every machine restarts, and every restart fires a heartbeat alert and a
+      processor alert.
+
+
+      "Forty-two pages between one and four in the morning," says Joana. "My
+      overnight shift acknowledged all of them because that is the rule, and now
+      they do not trust the page."
+    ticket:
+      ref: INC-4780
+      opened: "04:10"
+      reporter: Joana Reyes
+      summary: Patching window generates 42 pages. Genuine alerts are being lost in the noise.
+      severity: sev3
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what the patching window actually does
+        speaker: Marek Sobczak
+        reveals: >
+          "Update management patches and reboots in waves, first Sunday, 01:00 to 04:00.
+          Same three hours every month, and it is in the change calendar."
+      - id: b
+        action: Ask whether the alerts are wrong
+        speaker: Joana Reyes
+        reveals: >
+          "They are all technically correct. The machine did stop responding. It is
+          supposed to."
+    commands:
+      - id: a
+        label: Look at what fired during the window
+        cmd: az monitor metrics alert list -g rg-ops --query "[?enabled].{name:name,severity:severity,scopes:scopes[0]}" -o table
+        output: |
+          Name                     Severity    Scopes
+          -----------------------  ----------  ---------------------------------
+          vm-heartbeat-missing     1           /subscriptions/.../rg-app
+          vm-cpu-high              2           /subscriptions/.../rg-app
+          vm-disk-queue            2           /subscriptions/.../rg-app
+        time_cost: 1
+      - id: b
+        label: Check for any suppression already in place
+        cmd: az monitor alert-processing-rule list -g rg-ops -o table
+        output: |
+          (no results)
+        time_cost: 1
+      - id: c
+        label: Check how the rules are scoped
+        cmd: az monitor metrics alert show -n vm-heartbeat-missing -g rg-ops --query "{scopes:scopes,window:windowSize,freq:evaluationFrequency}" -o json
+        output: |
+          {
+            "freq": "PT1M",
+            "scopes": ["/subscriptions/.../resourceGroups/rg-app"],
+            "window": "PT5M"
+          }
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Create an alert processing rule that suppresses notifications for rg-app during a
+          recurring maintenance window
+        correct: true
+        rep: 9
+        consequence: >
+          The next patching Sunday produces no pages, and the one genuine alert at 05:20 gets
+          answered in two minutes.
+        explain: >
+          Alert processing rules act on alerts after they fire, and can suppress notifications
+          for a scope on a schedule, including a recurring one. The alerts still appear in the
+          portal for the record; nobody is woken for them.
+        diagram:
+          - {op: add_node, node: alert-processing}
+      - id: b
+        label: Disable the alert rules before patching and enable them afterwards
+        correct: false
+        rep: -6
+        consequence: >
+          One month somebody forgets to re-enable them and nothing is monitored for eleven
+          days.
+        explain: >
+          It achieves the same silence by hand every month, with a failure mode that leaves
+          production unmonitored. A processing rule is declarative and repeats itself.
+      - id: c
+        label: Raise the heartbeat alert's window to fifteen minutes so restarts do not trigger it
+        correct: false
+        rep: -7
+        consequence: >
+          Patching gets quieter, and a genuine machine failure now takes fifteen minutes to
+          page anybody.
+        explain: >
+          Detuning a rule to survive a known window damages it for the rest of the month.
+          Suppress the window, keep the sensitivity.
+      - id: d
+        label: Move patching to a time when the NOC is not on shift
+        correct: false
+        rep: -8
+        consequence: >
+          The pages arrive during business hours instead, and now the platform team is
+          ignoring them.
+        explain: >
+          The alerts are not a scheduling problem. Something has to know that this noise is
+          expected.
