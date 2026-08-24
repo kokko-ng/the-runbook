@@ -1,0 +1,164 @@
+id: a2in-q08
+chapter: act2-infrastructure
+title: Moving the Data
+summary: Four databases and fourteen terabytes of documents, over a link that was sized for email.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ305-4.3.4
+  - AZ305-4.3.5
+brief: >
+  Data migration is where migration plans meet physics. The answers depend on
+  size, on the acceptable outage and on what the link can carry.
+debrief: >
+  Databases moved with minimal downtime, documents moved by whatever gets them
+  there before the deadline.
+encounters:
+  - id: a
+    type: design
+    title: Four databases, four windows
+    speaker: Marek Sobczak
+    objectives: [AZ305-4.3.4]
+    intro: >
+      "The ERP databases are 240 gigabytes with a six-hour window," says Marek.
+      "The warehouse system's database is 40 gigabytes and can be down for a
+      weekend. There is also a MySQL database behind the driver app, 12 gigabytes,
+      that the vendor says must not be down for more than an hour."
+    prompt: How do you move them?
+    options:
+      - id: a
+        label: >
+          Online migration with the Database Migration Service for the ERP and the driver app,
+          and a simple backup and restore for the warehouse database
+        correct: true
+        rep: 9
+        consequence: >
+          The two tight windows are met with continuous replication, and the weekend one is
+          done with a restore and no extra machinery.
+        explain: >
+          Match the method to the window. Online migration replicates changes after an initial
+          seed, so the outage is the cutover; offline is simpler and needs a window long enough
+          for the whole copy. Using the simplest method that fits each window is the point.
+        diagram:
+          - {op: set_detail, node: dms-migration, detail: "Online for ERP and driver app"}
+      - id: b
+        label: Online migration for all three, since it minimizes downtime everywhere
+        correct: false
+        rep: -5
+        consequence: >
+          The warehouse database migration is set up with replication for a weekend window that
+          needed none.
+        explain: >
+          Online migration has real setup cost and prerequisites. Where the window is generous,
+          the simpler method is less to go wrong.
+      - id: c
+        label: Backup and restore for all three, scheduled into the largest available window
+        correct: false
+        rep: -8
+        consequence: >
+          The driver app is down for four hours against a one-hour commitment from its vendor.
+        explain: >
+          The copy for a 240 gigabyte database does not fit in six hours over this link, and the
+          driver app's window is shorter still.
+      - id: d
+        label: Export each database to files, copy them, and import at the destination
+        correct: false
+        rep: -7
+        consequence: >
+          Export and import together take longer than the copy, and the ERP schema needs
+          adjustments the tooling would have handled.
+        explain: >
+          File-based export is a fallback for unusual sources. For supported engines the
+          migration service handles schema, data and validation with less manual work.
+  - id: b
+    type: design
+    title: Fourteen terabytes over a thin link
+    speaker: Grace Mendoza
+    objectives: [AZ305-4.3.5]
+    intro: >
+      "Fourteen terabytes of manifests, and the Port Klang link manages about
+      eighty megabits when nothing else is using it," says Grace. "That is
+      somewhere north of two weeks of continuous transfer, and the site still has
+      to work during the day."
+    prompt: How do you move the documents?
+    options:
+      - id: a
+        label: >
+          An offline transfer appliance for the bulk, with a final incremental copy over the
+          link at cutover
+        correct: true
+        rep: 9
+        consequence: >
+          The bulk arrives on disk in ten days, and the incremental catch-up runs in two hours
+          on the cutover weekend.
+        explain: >
+          When the data set divided by the available bandwidth exceeds the schedule, physical
+          transfer is the answer: an appliance is shipped, loaded, returned and imported. The
+          final delta still travels over the link, which is what keeps the cutover short.
+        diagram:
+          - {op: set_detail, node: st-manifests, detail: "Seeded offline, delta over the link"}
+      - id: b
+        label: AzCopy over the link, throttled to run overnight and at weekends
+        correct: false
+        rep: -6
+        consequence: >
+          At the available off-hours bandwidth the copy takes about six weeks, which misses the
+          site closure date.
+        explain: >
+          Throttled transfer is the right approach for a few terabytes with time available. Here
+          the arithmetic does not fit the schedule.
+      - id: c
+        label: Azure File Sync from the file server, tiering the files to the cloud
+        correct: false
+        rep: -5
+        consequence: >
+          The initial upload still has to cross the same link, and the destination is a file
+          share rather than the blob storage the target design specified.
+        explain: >
+          File Sync is excellent for keeping a share available while its data moves to Azure, and
+          it does not change how many bits have to travel. It also lands the data in Files.
+      - id: d
+        label: Compress the documents and transfer the archive over the link
+        correct: false
+        rep: -7
+        consequence: >
+          Scanned PDF files compress by a few per cent, and the transfer still takes weeks.
+        explain: >
+          Compression helps where the data is compressible. Already-compressed images are the
+          case where it does not.
+  - id: c
+    type: knowledge
+    title: The arithmetic nobody does
+    speaker: Grace Mendoza
+    objectives: [AZ305-4.3.5]
+    intro: >
+      "This is the calculation that decides half of all data migration questions,"
+      says Grace. "Fourteen terabytes, eighty megabits per second, and you may
+      assume perfect efficiency. Roughly how long?"
+    question: Roughly how long does fourteen terabytes take over eighty megabits per second?
+    options:
+      - id: a
+        label: About sixteen days of continuous transfer
+        correct: true
+        rep: 6
+        explain: >
+          Eighty megabits per second is ten megabytes per second, or about 864 gigabytes a day
+          at perfect efficiency. Fourteen terabytes is therefore around sixteen days flat out,
+          and considerably longer sharing the link with a working site. That number is what
+          decides between the network and a physical appliance.
+      - id: b
+        label: About two days
+        correct: false
+        rep: -5
+        consequence: A schedule is built on a transfer estimate that is off by an order of magnitude.
+        explain: >
+          That would need roughly eight times the bandwidth. Convert bits to bytes and divide;
+          the answer usually surprises people in the same direction.
+      - id: c
+        label: About four months
+        correct: false
+        rep: -5
+        consequence: A physical transfer is proposed for a data set the link could have carried, at unnecessary cost and handling.
+        explain: >
+          That is an overestimate by about a factor of eight. Getting the order of magnitude
+          right is what the decision hinges on.

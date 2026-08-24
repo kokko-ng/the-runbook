@@ -1,0 +1,183 @@
+id: a2in-q01
+chapter: act2-infrastructure
+title: What Should Run Where
+summary: Eleven workloads from two companies, and a review board that wants a reason for every placement.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ305-4.1.1
+  - AZ305-4.1.2
+brief: >
+  The compute chapter of the target architecture. Every choice here is defensible
+  in isolation, which is why the requirements matter.
+debrief: >
+  A compute decision framework the team can apply themselves, and a virtual
+  machine design for the workload that genuinely needs one.
+encounters:
+  - id: a
+    type: design
+    title: The question before the answer
+    speaker: Grace Mendoza
+    objectives: [AZ305-4.1.1]
+    intro: >
+      "Eleven workloads," says Grace. "Somebody is going to ask why dispatch is on
+      Kubernetes and the label generator is a container instance and the ERP is on
+      virtual machines. I want the reasoning written down once, so the twelfth
+      workload places itself."
+    prompt: What drives the compute choice?
+    options:
+      - id: a
+        label: >
+          Operating system and runtime constraints first, then operational model, scale shape
+          and how much platform the team can run
+        correct: true
+        rep: 9
+        consequence: >
+          The framework fits on a page, and the next workload is placed by the team without a
+          review.
+        explain: >
+          Compute selection starts with hard constraints: what the application requires of the
+          host, and whether it can be containerized or rewritten at all. Then the operational
+          question, of how much of the stack the organization wants to own, then the scale
+          shape, which decides between always-on and event-driven. Cost falls out of those
+          rather than leading them.
+      - id: b
+        label: Cost per hour for each option, compared at the expected load
+        correct: false
+        rep: -6
+        consequence: >
+          The cheapest compute is chosen for an application that cannot run on it, and the
+          rewrite costs more than a decade of the difference.
+        explain: >
+          Price comparisons between compute options are only meaningful once the options are
+          all viable. Constraints come first.
+      - id: c
+        label: A preference for platform services, falling back to infrastructure when they do not fit
+        correct: false
+        rep: -5
+        consequence: >
+          The default is right about eight times out of eleven, and the three exceptions are
+          argued from scratch every time.
+        explain: >
+          Preferring managed services is a sound default and is not a framework. It does not
+          say what to do when several managed options fit, which is most of the interesting
+          cases.
+      - id: d
+        label: Whatever each application team is already comfortable operating
+        correct: false
+        rep: -7
+        consequence: >
+          Meridian ends up running four compute platforms because four teams each had a
+          preference.
+        explain: >
+          Team familiarity is a real input and it is not the driver. Standardizing on fewer
+          platforms is worth something in itself.
+  - id: b
+    type: design
+    title: The workload that needs a machine
+    speaker: Marek Sobczak
+    objectives: [AZ305-4.1.2]
+    intro: >
+      "The Straits ERP application tier needs Windows, a specific .NET Framework
+      version, an installer that writes to the registry and a license dongle
+      emulator," says Marek. "The vendor is gone. It is four servers today and the
+      load is flat."
+    prompt: How do you run it in Azure?
+    options:
+      - id: a
+        label: >
+          A virtual machine scale set in flexible orchestration, from a managed image, across
+          zones, with the application installed by the image rather than at boot
+        correct: true
+        rep: 8
+        consequence: >
+          Four instances become a scale set that can be patched by replacing instances rather
+          than by patching in place.
+        explain: >
+          When an application cannot be containerized or rewritten, infrastructure as a service
+          is the answer, and building it as a scale set from an image gives zone spread,
+          repeatable instances and a path to immutable updates without changing the application.
+        diagram:
+          - {op: set_detail, node: vmss-legacy, detail: "Flexible orchestration, three zones"}
+      - id: b
+        label: Four individual virtual machines, matching the current design
+        correct: false
+        rep: -6
+        consequence: >
+          Four machines drift apart over two years, and patching is done by hand on each.
+        explain: >
+          Lifting the current shape is the fastest migration and carries forward the
+          operational cost. Where a set of identical machines is the reality, model it as a set.
+      - id: c
+        label: Containerize it on Windows containers to fit the platform standard
+        correct: false
+        rep: -8
+        consequence: >
+          The installer, the registry writes and the dongle emulator each fail in a container in
+          a different way, with no vendor to ask.
+        explain: >
+          Containerization needs an owner for the application. A vendor-abandoned application
+          with hardware-key emulation is the textbook case for leaving it on a machine.
+      - id: d
+        label: App Service on Windows, since it runs .NET Framework applications
+        correct: false
+        rep: -7
+        consequence: >
+          The application fails on first deploy because it needs an installer and machine-level
+          state that App Service does not provide.
+        explain: >
+          App Service runs .NET Framework web applications well. It does not run installers,
+          registry-dependent components or device emulation.
+  - id: c
+    type: design
+    title: Sizing without guessing
+    speaker: Priya Raghunathan
+    objectives: [AZ305-4.1.2, AZ305-4.1.1]
+    intro: >
+      "You have asked for four instances of a size I have not seen before," says
+      Priya. "The last time somebody sized a migration here, they doubled
+      everything on-premises and we paid for it for two years."
+    prompt: How do you justify the size?
+    options:
+      - id: a
+        label: >
+          Size from the assessment's measured utilization with headroom, commit to a review at
+          ninety days, and use reservations only after that
+        correct: true
+        rep: 8
+        consequence: >
+          The ninety-day review drops two instances a size, and the reservation is bought
+          against the shape that is actually running.
+        explain: >
+          Migration assessments collect real processor, memory and disk data, which is a better
+          basis than the specification of hardware bought five years ago. Reviewing after the
+          workload has settled, then committing, is what avoids paying for a guess for three
+          years.
+      - id: b
+        label: Match the on-premises hardware specification, to remove risk from the cutover
+        correct: false
+        rep: -7
+        consequence: >
+          Four machines run at eleven per cent utilization for two years, which is the outcome
+          Priya described.
+        explain: >
+          Physical servers are typically bought oversized for a five-year life. Copying that
+          into a cloud where capacity is elastic keeps the cost and removes the reason for it.
+      - id: c
+        label: Start small and scale up when users complain
+        correct: false
+        rep: -6
+        consequence: >
+          The complaint arrives during the first month-end run, from finance, to Priya.
+        explain: >
+          Starting under the measured peak means the first busy period is an incident. Right-size
+          from data and review, rather than discovering it in production.
+      - id: d
+        label: Buy three-year reservations immediately for the discount
+        correct: false
+        rep: -8
+        consequence: >
+          The size changes at ninety days and the reservation no longer matches what is running.
+        explain: >
+          Reservations reward a known steady state. Committing before the workload has settled
+          is how organizations end up with capacity they cannot use.

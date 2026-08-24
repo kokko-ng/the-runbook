@@ -1,0 +1,167 @@
+id: a2id-b01
+chapter: act2-identity
+title: Who Approves the Approver, Exam Hard
+summary: Conditional Access, eligible roles and one account that must never be locked out.
+variant: bonus
+bonus_of: a2id-q02
+estimated_minutes: 11
+objectives:
+  - AZ305-1.2.1
+  - AZ305-1.2.3
+  - AZ305-1.3.3
+brief: >
+  The access design is agreed. The exam version asks what happens at the edges of
+  it, which is where identity designs actually fail.
+debrief: >
+  Policy that fails safe, exclusions that are deliberate, and a way back in when
+  the policy is the thing that is broken.
+encounters:
+  - id: a
+    type: design
+    title: The policy that locks everyone out
+    speaker: Wei Lin Tan
+    objectives: [AZ305-1.2.1]
+    intro: >
+      The proposed Conditional Access baseline: require multi-factor for all
+      users, require compliant devices for administrative roles, and block legacy
+      authentication protocols.
+
+
+      "Two questions from the review," says Wei Lin. "What happens if the policy
+      itself is misconfigured at two in the morning, and what happens to the
+      service accounts that still use basic authentication against Exchange?"
+    prompt: What do you add to the design?
+    options:
+      - id: a
+        label: >
+          Two cloud-only break-glass accounts excluded from all policies, monitored with
+          alerts, and a plan to move the service accounts off legacy authentication before the
+          block goes on
+        correct: true
+        rep: 9
+        consequence: >
+          The block ships in report-only first, the two service accounts are migrated, and the
+          emergency accounts are tested quarterly.
+        explain: >
+          Every Conditional Access design needs emergency access accounts that no policy can
+          lock out, with alerting on their use so exclusion does not mean unwatched. Legacy
+          authentication cannot satisfy multi-factor, so blocking it requires knowing what
+          still uses it, which report-only mode and the sign-in logs will tell you.
+      - id: b
+        label: Exclude service accounts from the legacy authentication block permanently
+        correct: false
+        rep: -8
+        consequence: >
+          Two accounts with passwords and no second factor remain the easiest way into the
+          tenant, indefinitely.
+        explain: >
+          A permanent exclusion for legacy authentication is the hole attackers look for.
+          Where an application genuinely cannot be moved, the exclusion should be scoped,
+          time-boxed and compensated.
+      - id: c
+        label: Apply the policies to administrators only until confidence is built
+        correct: false
+        rep: -6
+        consequence: >
+          The accounts with the most access are protected and the four hundred that get
+          phished are not.
+        explain: >
+          Administrators are the highest-value targets and the initial compromise usually
+          arrives through an ordinary user. Report-only mode is the way to build confidence
+          without narrowing the scope.
+      - id: d
+        label: Rely on security defaults instead of custom policies
+        correct: false
+        rep: -5
+        consequence: >
+          Security defaults cannot be tuned, and the device compliance requirement cannot be
+          expressed at all.
+        explain: >
+          Security defaults are an excellent baseline for organizations with no custom
+          policies. They are all or nothing, and this design has requirements they do not
+          express.
+  - id: b
+    type: design
+    title: Eligible for what
+    speaker: Grace Mendoza
+    objectives: [AZ305-1.2.3, AZ305-1.3.3]
+    intro: >
+      "Two kinds of privilege in the design," says Grace. "Entra roles, such as
+      Global Administrator and User Administrator. And Azure resource roles, such
+      as Owner on the transport landing zone."
+
+
+      "Somebody will ask you in the review whether Privileged Identity Management
+      covers both, and what the difference is in practice."
+    prompt: What do you tell them?
+    options:
+      - id: a
+        label: >
+          It covers both, with separate settings, and group ownership can be governed the same
+          way through privileged access groups
+        correct: true
+        rep: 8
+        explain: >
+          Privileged Identity Management manages eligibility, activation, approval and review
+          for Microsoft Entra roles and for Azure resource roles, configured separately because
+          their scopes and settings differ. Privileged access groups extend the same model to
+          membership and ownership of a group, which is how you make a group that grants access
+          just-in-time.
+      - id: b
+        label: It covers Entra roles only; Azure resource roles need a separate approach
+        correct: false
+        rep: -6
+        consequence: >
+          The design proposes a custom approval workflow for Azure roles that the platform
+          already provides.
+        explain: >
+          Azure resource roles have been in scope for years, with their own activation
+          settings, approvers and expiry per scope.
+      - id: c
+        label: It covers both and applies the same settings to each automatically
+        correct: false
+        rep: -5
+        consequence: >
+          Production Owner ends up with the same eight-hour activation as a read-only Entra
+          role, because nobody configured them separately.
+        explain: >
+          Settings are per role and per scope. Uniformity is something you choose, not
+          something you inherit.
+  - id: c
+    type: knowledge
+    title: The review nobody runs
+    speaker: Grace Mendoza
+    objectives: [AZ305-1.3.3]
+    intro: >
+      "Last one," says Grace. "Access reviews can be assigned to the users
+      themselves, to a manager, or to a named reviewer. For thirty-one guests from
+      a company we do not manage, who reviews?"
+    question: Who should review guest access here?
+    options:
+      - id: a
+        label: >
+          The Meridian sponsor who requested the access, with users who do not respond removed
+          by default
+        correct: true
+        rep: 6
+        explain: >
+          Guests rarely have a manager in your tenant, and self-review by an external user is
+          weak evidence. The internal sponsor knows whether the access is still needed, and a
+          default of removing access when nobody responds is what makes the review work when
+          people are busy.
+      - id: b
+        label: The guests themselves, since they know whether they still need it
+        correct: false
+        rep: -5
+        consequence: Everyone attests that they still need everything, which is the answer self-review usually produces.
+        explain: >
+          Self-attestation is available and is the weakest option. It suits low-risk access
+          where the alternative is no review at all.
+      - id: c
+        label: The platform team, who own the resources being accessed
+        correct: false
+        rep: -5
+        consequence: Four hundred decisions land on three people who have no idea what any of the guests do.
+        explain: >
+          Resource owners can review and rarely have the context. The person who asked for the
+          access usually does.

@@ -1,0 +1,235 @@
+id: a2dt-q02
+chapter: act2-data
+title: Peak Season for Freight
+summary: The dispatch database is fine for ten months of the year, and unusable for the other two.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ305-2.1.3
+  - AZ305-2.1.4
+brief: >
+  Scale and protection for the transport database, decided in the same review
+  because the answers interact.
+debrief: >
+  Read load moved off the primary, a tier that can grow without a migration, and
+  protection that covers deletion as well as disaster.
+encounters:
+  - id: a
+    type: design
+    title: Where the load actually is
+    speaker: Grace Mendoza
+    objectives: [AZ305-2.1.3]
+    intro: >
+      "During peak, the dispatch database sits at ninety per cent," says Grace.
+      "Marek's numbers say seventy per cent of the queries are the tracking
+      portal and the analytics extracts. Both are read-only, both tolerate data a
+      few seconds old."
+
+
+      The database is a single Azure SQL Database on the General Purpose tier,
+      about 400 gibibytes and growing.
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          Move to Hyperscale and serve the read-only traffic from named replicas
+        correct: true
+        rep: 9
+        consequence: >
+          The primary drops to about forty per cent at peak, and the analytics extract stops
+          being a reason anyone is paged.
+        explain: >
+          Hyperscale separates compute from storage, scales beyond the standard size limits,
+          and supports named replicas that serve read-only traffic on their own compute. That
+          removes seventy per cent of the load from the primary without changing the
+          application beyond a connection string.
+        diagram:
+          - {op: set_detail, node: sqldb-transport, detail: "Hyperscale with read replicas"}
+      - id: b
+        label: Scale up the General Purpose tier to more virtual cores for the peak months
+        correct: false
+        rep: -6
+        consequence: >
+          Peak is survived at twice the cost, and the read traffic still competes with
+          dispatch writes.
+        explain: >
+          Scaling up is simple and correct when everything genuinely needs the primary.
+          Where most of the load is read-only, separating it is both cheaper and better.
+      - id: c
+        label: Add an elastic pool so the database can borrow capacity from others
+        correct: false
+        rep: -7
+        consequence: >
+          The pool's other databases slow down during peak, which is when they are also busy.
+        explain: >
+          Elastic pools share a budget between databases with complementary peaks. Meridian's
+          databases all peak in the same fortnight.
+      - id: d
+        label: Cache the tracking portal's queries in Redis and leave the database as it is
+        correct: false
+        rep: -5
+        consequence: >
+          Portal reads drop and the analytics extracts, which are the heavier half, still hit
+          the primary.
+        explain: >
+          Caching is a strong answer for repeated reads and is worth doing. It does not help
+          large analytical scans, and the two together are the seventy per cent.
+  - id: b
+    type: design
+    title: Protecting the data itself
+    speaker: Wei Lin Tan
+    objectives: [AZ305-2.1.4]
+    intro: >
+      "Three requirements from the customer contracts," says Wei Lin. "Data at
+      rest encrypted with keys we control. Nobody in the platform team able to read
+      shipment values in the customer columns. And a way to recover from somebody
+      deleting a month of rows, which is not the same as a region failing."
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          Transparent data encryption with a customer-managed key, Always Encrypted for the
+          sensitive columns, and long-term retention with point-in-time restore
+        correct: true
+        rep: 9
+        consequence: >
+          The questionnaire is answered in three lines, and the platform team can operate the
+          database without being able to read what is in it.
+        explain: >
+          Transparent data encryption protects data at rest and a customer-managed key puts
+          custody in your vault. Always Encrypted keeps chosen columns encrypted in the engine
+          itself, so administrators cannot read them. Point-in-time restore covers deletion;
+          long-term retention covers the seven-year contractual requirement.
+        diagram:
+          - {op: set_detail, node: sqldb-transport, detail: "Customer-managed keys and long-term retention"}
+      - id: b
+        label: Transparent data encryption with the service-managed key, plus geo-redundant backups
+        correct: false
+        rep: -6
+        consequence: >
+          Two of the three requirements are unmet, and the questionnaire comes back with them
+          circled.
+        explain: >
+          Service-managed keys do not give the customer key control they asked for, and
+          nothing in that option stops an administrator reading the sensitive columns.
+      - id: c
+        label: Dynamic data masking on the sensitive columns and a customer-managed key
+        correct: false
+        rep: -7
+        consequence: >
+          An administrator with the right permission removes the mask, or queries around it,
+          and reads everything.
+        explain: >
+          Dynamic data masking hides values in query results for unprivileged users and is a
+          presentation control rather than a cryptographic one. Always Encrypted is what keeps
+          the data unreadable to the database itself.
+      - id: d
+        label: Rely on geo-redundant backups and the thirty-five day restore window
+        correct: false
+        rep: -8
+        consequence: >
+          A deletion discovered in month three has nothing to restore from, and the encryption
+          requirements are untouched.
+        explain: >
+          Backups cover deletion within their window and say nothing about key custody or
+          administrator access. Three requirements need three answers.
+  - id: c
+    type: troubleshoot
+    title: DRV-1122
+    speaker: Marek Sobczak
+    objectives: [AZ305-2.1.3]
+    intro: >
+      The Hyperscale proof of concept is up with one named replica. The tracking
+      portal points at the replica and is fast. The analytics extract points at
+      the replica and fails part way through with a message about a transaction
+      not being permitted.
+
+
+      Grace wants the cause named before the design goes to the review board.
+    ticket:
+      ref: DRV-1122
+      opened: "10:30"
+      reporter: Marek Sobczak
+      summary: Analytics extract fails against the read-only replica. Portal queries succeed.
+      severity: sev3
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what the extract does
+        speaker: Marek Sobczak
+        reveals: >
+          "Reads about nine million rows, then writes a watermark row into a control table
+          in the same database so the next run knows where it got to."
+      - id: b
+        action: Ask what the portal does differently
+        speaker: Grace Mendoza
+        reveals: >
+          "Pure reads. No writes anywhere in the request path, which is why it works."
+    commands:
+      - id: a
+        label: Read the failure message from the extract log
+        cmd: "kql: AppTraces | where Message contains 'extract' | top 1 by TimeGenerated desc | project Message"
+        output: |
+          Failed to update dbo.ExtractWatermark: Failed to update database "transport" because
+          the database is read-only.
+        time_cost: 1
+      - id: b
+        label: Check what the connection string asks for
+        cmd: az sql db show --name transport --server sql-meridian-tms -g rg-data --query "{tier:sku.name,readScale:readScale}" -o json
+        output: |
+          {
+            "readScale": "Enabled",
+            "tier": "HS_Gen5_4"
+          }
+        time_cost: 1
+      - id: c
+        label: Confirm which endpoint the extract connects to
+        cmd: az sql db replica list-links --name transport --server sql-meridian-tms -g rg-data -o table
+        output: |
+          Name              Role       PartnerServer
+          ----------------  ---------  -------------------------
+          transport-nr01    Secondary  sql-meridian-tms-replica
+        note: The extract's connection string sets ApplicationIntent to ReadOnly.
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Point the extract's read phase at the replica and its watermark write at the primary,
+          using two connections
+        correct: true
+        rep: 9
+        consequence: >
+          The extract reads nine million rows off the replica and writes twelve bytes to the
+          primary, which is the shape everyone wanted.
+        explain: >
+          A read-only replica accepts no writes at all, including a single control row. Splitting
+          the connection is the standard pattern: heavy reads against the replica, the small
+          write against the primary. The alternative is moving the watermark out of the database.
+      - id: b
+        label: Move the extract back to the primary
+        correct: false
+        rep: -7
+        consequence: >
+          Nine million rows are read from the primary again, which is the load the design was
+          removing.
+        explain: >
+          It restores the failure the architecture was addressing. The write is twelve bytes;
+          the read is the problem.
+      - id: c
+        label: Make the replica writable
+        correct: false
+        rep: -9
+        consequence: >
+          There is no such setting, and an hour is spent confirming that.
+        explain: >
+          Read-only replicas are read-only by design; that is what makes them consistent and
+          cheap to serve. Nothing turns one into a second primary.
+      - id: d
+        label: Remove ApplicationIntent from the connection string so it uses the primary automatically
+        correct: false
+        rep: -6
+        consequence: >
+          Every query in the extract goes to the primary, including the nine million rows.
+        explain: >
+          ApplicationIntent is what routes a connection to a replica. Removing it sends
+          everything to the primary, which is the opposite of the intent.

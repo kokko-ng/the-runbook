@@ -1,0 +1,163 @@
+id: a2dt-b02
+chapter: act2-data
+title: Ten Thousand Trailers, Exam Hard
+summary: The document store is agreed, and every remaining decision about it changes the invoice.
+variant: bonus
+bonus_of: a2dt-q03
+estimated_minutes: 11
+objectives:
+  - AZ305-2.2.1
+  - AZ305-2.2.3
+brief: >
+  Consistency, throughput and partitioning, which are the three things people
+  choose badly and then blame the service for.
+debrief: >
+  A consistency level chosen against a requirement, throughput chosen against a
+  pattern, and a partition key chosen against the query.
+encounters:
+  - id: a
+    type: design
+    title: How consistent does it have to be
+    speaker: Grace Mendoza
+    objectives: [AZ305-2.2.1]
+    intro: >
+      "Telemetry is written in Southeast Asia and read in Southeast Asia and East
+      Asia," says Grace. "The dispatch screen must never show an older position
+      after showing a newer one, and it can tolerate being a few seconds behind
+      reality. Nobody needs the absolute latest value across regions."
+    prompt: Which consistency level do you recommend?
+    options:
+      - id: a
+        label: Session consistency, the default
+        correct: true
+        rep: 8
+        consequence: >
+          Reads within a session never go backwards, latency stays low and the throughput
+          charge stays where it was budgeted.
+        explain: >
+          Session consistency guarantees monotonic reads and read-your-writes within a client
+          session, which is exactly the requirement not to show an older position after a newer
+          one. Stronger levels cost more request units and add latency across regions for
+          guarantees nobody asked for.
+      - id: b
+        label: Strong consistency, so every reader sees the latest write
+        correct: false
+        rep: -7
+        consequence: >
+          Read latency across regions rises and the request unit consumption for reads roughly
+          doubles.
+        explain: >
+          Strong consistency is limited in multi-region configurations and costs both latency
+          and request units. It is the right choice when a stale read is genuinely unacceptable,
+          which the requirement explicitly says it is not.
+      - id: c
+        label: Eventual consistency, since a few seconds of lag is acceptable
+        correct: false
+        rep: -6
+        consequence: >
+          The dispatch screen occasionally shows a trailer jumping backwards along its route,
+          which is the one thing the requirement forbids.
+        explain: >
+          Eventual consistency makes no ordering guarantee, so a reader can see an older value
+          after a newer one. Session consistency gives the lag tolerance without the reordering.
+      - id: d
+        label: Bounded staleness with a five-second window
+        correct: false
+        rep: -5
+        consequence: >
+          It satisfies the requirement at a higher cost than session consistency, for no stated
+          benefit.
+        explain: >
+          Bounded staleness is a good fit when there is a defined tolerance across all clients,
+          not just within a session. Here session consistency already meets the requirement.
+  - id: b
+    type: design
+    title: Paying for throughput
+    speaker: Priya Raghunathan
+    objectives: [AZ305-2.2.3]
+    intro: >
+      "Ten thousand trailers writing every thirty seconds is steady," says Priya.
+      "The analytics read once a month is not. And the sensor team want a small
+      container for device registrations that is queried perhaps a hundred times a
+      day."
+    prompt: How do you configure throughput?
+    options:
+      - id: a
+        label: >
+          Provisioned throughput with autoscale on the telemetry container, and serverless for
+          the device registrations
+        correct: true
+        rep: 8
+        consequence: >
+          Telemetry costs a predictable base with headroom for peaks, and the registrations
+          container costs almost nothing.
+        explain: >
+          Steady, high-volume workloads suit provisioned throughput, with autoscale absorbing
+          peaks up to ten times the baseline. Small, spiky or intermittent workloads suit
+          serverless, which charges per request with no floor. Choosing per container is the
+          point.
+      - id: b
+        label: Serverless for both, so nothing is paid for when idle
+        correct: false
+        rep: -7
+        consequence: >
+          The telemetry container hits the serverless throughput ceiling during the evening
+          peak and requests start being throttled.
+        explain: >
+          Serverless has per-container limits and no reserved capacity. A sustained
+          high-throughput workload is exactly what it is not for.
+      - id: c
+        label: Manual provisioned throughput on both, sized for the peak
+        correct: false
+        rep: -6
+        consequence: >
+          The registrations container is provisioned with a minimum nobody uses, all year.
+        explain: >
+          Manual provisioning suits predictable steady load and pays a floor whether or not it
+          is used. For a hundred requests a day that floor is the entire cost.
+      - id: d
+        label: Autoscale on both containers, with a high maximum
+        correct: false
+        rep: -5
+        consequence: >
+          The registrations container still pays ten per cent of its maximum as a floor, for a
+          workload measured in hundreds of requests.
+        explain: >
+          Autoscale bills a minimum proportional to the maximum. For genuinely tiny workloads
+          serverless is cheaper, which is why the choice is per container.
+  - id: c
+    type: knowledge
+    title: The key you cannot change
+    speaker: Grace Mendoza
+    objectives: [AZ305-2.2.1]
+    intro: >
+      "Say why the partition key matters more than anything else in this design,"
+      says Grace, "and what it costs to get it wrong."
+    question: What makes the partition key decision so consequential?
+    options:
+      - id: a
+        label: >
+          It cannot be changed on an existing container, and it determines whether reads and
+          writes distribute or concentrate
+        correct: true
+        rep: 6
+        explain: >
+          The partition key fixes how data and throughput are distributed. A poor choice
+          produces hot partitions that throttle while the rest of the container idles, and
+          changing it means creating a new container and migrating the data.
+      - id: b
+        label: It can be changed later, but only while the container is empty
+        correct: false
+        rep: -5
+        consequence: A design defers the decision, planning to revisit it after the pilot has loaded data.
+        explain: >
+          Effectively the same constraint stated more loosely: once data exists, the change is a
+          migration. Deciding it up front is the practice worth having.
+      - id: c
+        label: It controls which region a document is written to
+        correct: false
+        rep: -6
+        consequence: A multi-region design is built on a mechanism that does not exist.
+        explain: >
+          Region placement is controlled by the account's region configuration and write mode.
+          The partition key distributes data within a container.

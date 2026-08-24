@@ -1,0 +1,202 @@
+id: a2id-q04
+chapter: act2-identity
+title: The Landing Zone Diagram
+summary: Two subscriptions today, fourteen expected within the year, and one chance to decide what sits above them.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ305-1.3.1
+  - AZ305-1.3.2
+brief: >
+  Every governance decision Meridian makes for the next five years hangs off a
+  hierarchy that takes an afternoon to design and years to change.
+debrief: >
+  A hierarchy with a reason for every level, tags that answer questions people
+  actually ask, and compliance measured continuously rather than annually.
+encounters:
+  - id: a
+    type: design
+    title: What goes above the subscriptions
+    speaker: Grace Mendoza
+    objectives: [AZ305-1.3.1]
+    intro: >
+      "Fourteen subscriptions by next December," says Grace. "Connectivity,
+      identity, management, the transport landing zone, analytics, the Straits
+      workloads, a sandbox for the data team, and more after that."
+
+
+      "Policy has to differ between platform services and workloads. Sandboxes
+      must be exempt from some of it. And the security team wants one place to see
+      compliance for everything that is not a sandbox."
+    prompt: What hierarchy do you recommend?
+    options:
+      - id: a
+        label: >
+          A top-level Meridian group with platform, landing zones and sandbox beneath it, and
+          subscriptions placed by purpose
+        correct: true
+        rep: 9
+        consequence: >
+          The initiative is assigned once at landing zones. The data team's sandbox is exempt
+          by being somewhere else, not by an exception.
+        explain: >
+          This is the shape the cloud adoption framework recommends and it exists because
+          policy inheritance is the point of management groups. Platform services and workloads
+          need different rules, sandboxes need looser ones, and a single group under the tenant
+          root keeps the root free for the rare tenant-wide assignment.
+        diagram:
+          - {op: add_node, node: mg-platform2}
+          - {op: add_node, node: mg-landingzones}
+          - {op: add_node, node: mg-sandbox}
+          - {op: add_edge, edge: e2-mg-platform}
+          - {op: add_edge, edge: e2-mg-lz}
+          - {op: add_edge, edge: e2-mg-sandbox}
+      - id: b
+        label: A management group per department, mirroring the organization chart
+        correct: false
+        rep: -8
+        consequence: >
+          Finance is reorganized in March and the hierarchy has to be rebuilt around a shape
+          that has already changed again.
+        explain: >
+          Organization charts change far more often than platforms do. Management groups should
+          reflect how workloads are governed, not who currently reports to whom.
+      - id: c
+        label: One management group holding every subscription, with policy assigned per subscription
+        correct: false
+        rep: -7
+        consequence: >
+          Fourteen subscriptions accumulate fourteen slightly different sets of assignments
+          within a year.
+        explain: >
+          That is the flat structure the hierarchy exists to replace. Inheritance is what keeps
+          governance consistent as the estate grows.
+      - id: d
+        label: A management group per region, since data residency is the main constraint
+        correct: false
+        rep: -6
+        consequence: >
+          A workload that spans two regions has no natural home, which is most of them.
+        explain: >
+          Residency is enforced with policy on allowed locations, which can be assigned
+          anywhere in the hierarchy. Regions are a poor axis for a structure that has to hold
+          whole workloads.
+  - id: b
+    type: design
+    title: Tags that answer a question
+    speaker: Priya Raghunathan
+    objectives: [AZ305-1.3.1]
+    intro: >
+      "The tag list I inherited has nine tags," says Priya. "Four of them are
+      spelled two ways. Nobody can tell me what the difference is between owner
+      and contact, and I still cannot answer the only question I ask, which is
+      which part of the business a cost belongs to."
+    prompt: What tagging strategy do you recommend?
+    options:
+      - id: a
+        label: >
+          A small mandatory set enforced by policy, inherited from the resource group, with
+          optional tags left to teams
+        correct: true
+        rep: 8
+        consequence: >
+          Four mandatory tags, applied by inheritance, and the cost report finally splits by
+          business unit without anyone typing anything.
+        explain: >
+          Tag strategies fail by being too large. A short mandatory set that maps to the
+          questions the business asks, enforced with a deny or modify policy and inherited from
+          the resource group, is what stays accurate. Optional tags can exist without being
+          governed.
+        diagram:
+          - {op: add_node, node: tag-strategy}
+      - id: b
+        label: Standardize the nine existing tags and make all of them mandatory
+        correct: false
+        rep: -6
+        consequence: >
+          Deployments start failing on a tag nobody can define, and an exemption process grows
+          around it.
+        explain: >
+          Making everything mandatory guarantees that some of it is filled in with noise. Each
+          mandatory tag needs a question it answers.
+      - id: c
+        label: Drop tags and rely on the subscription and resource group names for attribution
+        correct: false
+        rep: -7
+        consequence: >
+          Shared platform subscriptions carry costs for six business units and cannot be split.
+        explain: >
+          Subscription boundaries are a coarse and useful attribution axis, and shared services
+          are exactly where they stop working. Tags are what resolve inside a shared scope.
+      - id: d
+        label: Apply tags with a modify policy only, without any mandatory ones
+        correct: false
+        rep: -5
+        consequence: >
+          Resources deployed outside a tagged resource group inherit nothing and appear
+          untagged.
+        explain: >
+          Inheritance covers most cases and needs a floor underneath it. A mandatory tag with
+          a deny effect is what catches the resources that inherit from nothing.
+  - id: c
+    type: design
+    title: Compliance that is not a spreadsheet
+    speaker: Wei Lin Tan
+    objectives: [AZ305-1.3.2]
+    intro: >
+      "The customer contracts reference ISO 27001, and Singapore's data protection
+      obligations apply to everything," says Wei Lin. "Today I answer questionnaires
+      by asking six people and writing down what they say."
+
+
+      Fourteen subscriptions are coming. She would like the answer to be a screen.
+    prompt: What do you recommend for compliance?
+    options:
+      - id: a
+        label: >
+          Defender for Cloud with the relevant regulatory compliance standards assigned at the
+          top management group, plus a policy initiative for Meridian's own rules
+        correct: true
+        rep: 9
+        consequence: >
+          The first compliance view shows sixty-one per cent, which is a number nobody had
+          before, and a list of what to fix in priority order.
+        explain: >
+          Defender for Cloud continuously assesses resources against built-in regulatory
+          standards and shows a compliance score with the failing controls. Meridian's own
+          rules go in a custom policy initiative assigned at the same scope, so both are
+          inherited by every subscription that appears later.
+        diagram:
+          - {op: add_node, node: defender-cloud}
+          - {op: add_node, node: policy-initiative}
+          - {op: add_edge, edge: e2-policy-mg}
+      - id: b
+        label: An annual audit by an external firm, with findings tracked in a register
+        correct: false
+        rep: -7
+        consequence: >
+          The estate is compliant on the day of the audit and drifts for the following
+          eleven months.
+        explain: >
+          External audit is a requirement and a point-in-time check. Continuous assessment is
+          what keeps the state true between audits.
+      - id: c
+        label: A monthly export of resource configuration into a spreadsheet for review
+        correct: false
+        rep: -8
+        consequence: >
+          The spreadsheet takes a day to produce and is out of date before the review meeting
+          finishes.
+        explain: >
+          This is the manual process being replaced, with an extra step. Assessment against a
+          standard is a platform capability.
+      - id: d
+        label: Policy with deny effects for every control in the standard
+        correct: false
+        rep: -6
+        consequence: >
+          Deployments start failing against controls that are guidance rather than technical
+          rules, and teams route around the platform.
+        explain: >
+          Some controls are preventable and many are detective or procedural. Assess everything,
+          deny the subset that is genuinely a technical rule, and audit the rest.

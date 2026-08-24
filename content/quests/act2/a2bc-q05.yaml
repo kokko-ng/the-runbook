@@ -1,0 +1,170 @@
+id: a2bc-q05
+chapter: act2-continuity
+title: The Straits Estate
+summary: Two physical servers, a virtual machine scale set and a plan that has to work while a migration is half done.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ305-3.1.2
+brief: >
+  Compute recovery for a hybrid estate in the middle of a migration, which is the
+  least tidy and most common situation an architect gets asked about.
+debrief: >
+  One protection story for what is in Azure, one for what is not yet, and a
+  rehearsal date in the calendar.
+encounters:
+  - id: a
+    type: design
+    title: What protects the machines in Azure
+    speaker: Grace Mendoza
+    objectives: [AZ305-3.1.2]
+    intro: >
+      "In Azure we have the ERP scale set, four virtual machines that run
+      integrations, and the Kubernetes cluster," says Grace. "The cluster is
+      rebuilt from the pipeline, so leave it out. The other two need an answer that
+      is not a screenshot of the portal."
+    prompt: What do you recommend for the virtual machines and the scale set?
+    options:
+      - id: a
+        label: >
+          Azure Backup with an enhanced policy for the virtual machines and the scale set, and
+          Site Recovery replication for the ERP set only
+        correct: true
+        rep: 9
+        consequence: >
+          Every machine has recovery points, and the one workload with a tight recovery time
+          also has a warm copy in East Asia.
+        explain: >
+          Backup covers data loss and accidental damage for compute, and the enhanced policy
+          supports multiple backups a day. Site Recovery covers losing a region by keeping a
+          replica, which costs more and is worth it only where the recovery time objective
+          demands it.
+        diagram:
+          - {op: add_node, node: vmss-legacy}
+          - {op: add_edge, edge: e2-rsv-vmss}
+          - {op: add_edge, edge: e2-asr-vmss}
+      - id: b
+        label: Site Recovery replication for everything, since it also protects against failure
+        correct: false
+        rep: -7
+        consequence: >
+          Replication runs for eleven machines and nothing can be restored to a point in time
+          after a bad patch.
+        explain: >
+          Site Recovery gives recent recovery points for a regional event. It is not a backup:
+          for restoring a machine to last Tuesday, or recovering a single file, Backup is the
+          tool.
+      - id: c
+        label: Backup only, with a documented rebuild in East Asia if the region is lost
+        correct: false
+        rep: -6
+        consequence: >
+          The ERP rebuild takes six hours in rehearsal, against an objective of two.
+        explain: >
+          Backup plus rebuild meets a generous recovery time objective at low cost. For the one
+          workload with a tight objective, it does not.
+      - id: d
+        label: Rely on the scale set spanning zones, which already survives a failure
+        correct: false
+        rep: -9
+        consequence: >
+          A corrupted deployment propagates to every instance and there is nothing to restore.
+        explain: >
+          Zone spread protects against infrastructure failure. It does nothing about data loss,
+          corruption or deletion, which is what backups are for.
+  - id: b
+    type: design
+    title: What protects the machines that are not
+    speaker: Marek Sobczak
+    objectives: [AZ305-3.1.2]
+    intro: >
+      "Port Klang still has the two warehouse servers, and Jurong has the domain
+      controller and the print server until the depots finish moving," says Marek.
+      "Both sites are being decommissioned within eighteen months, so I do not want
+      to build anything permanent."
+    prompt: What do you recommend for the remaining on-premises compute?
+    options:
+      - id: a
+        label: >
+          Azure Backup with the Microsoft Azure Recovery Services agent or the backup server,
+          protecting to a vault in Azure, and retire it with the sites
+        correct: true
+        rep: 8
+        consequence: >
+          Protection is running within a week, costs almost nothing while the sites shrink, and
+          disappears with them.
+        explain: >
+          Azure Backup protects on-premises files, folders, system state and whole workloads to
+          a vault, with no hardware to buy and no contract to end. For an estate with a known
+          end date, that is the right shape.
+        diagram:
+          - {op: add_node, node: arc-servers}
+          - {op: add_edge, edge: e2-sf-arc}
+      - id: b
+        label: Buy a backup appliance for each site
+        correct: false
+        rep: -8
+        consequence: >
+          Two appliances are bought and depreciated over five years for sites that close in
+          eighteen months.
+        explain: >
+          Capital purchases for infrastructure with a known end date are hard to defend. The
+          cloud vault has no residual value problem.
+      - id: c
+        label: Replicate both sites to Azure with Site Recovery and treat that as the backup
+        correct: false
+        rep: -6
+        consequence: >
+          A file deleted three weeks ago cannot be recovered, because replication is not a
+          catalog of points in time.
+        explain: >
+          Site Recovery is the right tool for standing the servers up in Azure after a site
+          loss, and it is worth having here. It is not a substitute for backup.
+      - id: d
+        label: Copy the important folders to a storage account with a scheduled script
+        correct: false
+        rep: -7
+        consequence: >
+          System state is not covered, restores are manual, and nobody can say what the script
+          missed.
+        explain: >
+          File copying is not backup: no application consistency, no system state, no retention
+          policy and no tested restore.
+  - id: c
+    type: knowledge
+    title: The difference people blur
+    speaker: Grace Mendoza
+    objectives: [AZ305-3.1.2]
+    intro: >
+      "You will be asked this in every design review for the rest of your career,"
+      says Grace. "Backup and disaster recovery. Both protect things. What is the
+      distinction that actually matters?"
+    question: What separates backup from disaster recovery?
+    options:
+      - id: a
+        label: >
+          Backup restores data to a point in time; disaster recovery restores service in another
+          location
+        correct: true
+        rep: 6
+        explain: >
+          Backup answers data loss and corruption with a catalog of recovery points, and its
+          recovery time is however long a restore takes. Disaster recovery answers the loss of a
+          location by having somewhere else to run, usually with a much tighter recovery time
+          and a much shorter history.
+      - id: b
+        label: Backup is for data, disaster recovery is for infrastructure
+        correct: false
+        rep: -5
+        consequence: A design assumes replication covers a deleted table because the table is infrastructure-adjacent.
+        explain: >
+          Both cover both. The distinction is what question each answers: how far back can you
+          go, against how quickly can you run somewhere else.
+      - id: c
+        label: Backup is cheaper, so it is what you use unless the budget allows more
+        correct: false
+        rep: -6
+        consequence: A workload with a one-hour objective is protected by backups because they were affordable.
+        explain: >
+          Cost is a consequence, not the distinction. A backup cannot meet a one-hour objective
+          for a large system however much you spend on it.

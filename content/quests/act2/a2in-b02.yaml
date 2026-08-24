@@ -1,0 +1,240 @@
+id: a2in-b02
+chapter: act2-infrastructure
+title: The Network Under All of It, Exam Hard
+summary: Three security controls, one packet, and a review board that wants to know which one sees it first.
+variant: bonus
+bonus_of: a2in-q09
+estimated_minutes: 12
+objectives:
+  - AZ305-4.4.1
+  - AZ305-4.4.3
+  - AZ305-4.4.4
+brief: >
+  The network questions that separate people who have drawn the diagram from
+  people who have debugged it.
+debrief: >
+  Each control at the layer it belongs to, name resolution that works in both
+  directions, and routing that is understood rather than hoped for.
+encounters:
+  - id: a
+    type: design
+    title: Three controls, one request
+    speaker: Wei Lin Tan
+    objectives: [AZ305-4.4.4]
+    intro: >
+      A customer request arrives at the tracking portal from the internet. In the
+      design it passes the global edge with its web application firewall, the
+      regional gateway, the hub firewall and a network security group on the
+      subnet.
+
+
+      "Somebody will ask which of those is redundant," says Wei Lin. "I would
+      rather you answered than me."
+    prompt: What is each control for?
+    options:
+      - id: a
+        label: >
+          The web application firewall inspects HTTP payloads, the network firewall controls
+          traffic between networks, and the security group is the subnet-level allow list
+        correct: true
+        rep: 9
+        explain: >
+          They operate at different layers on different questions. A web application firewall
+          understands requests and blocks injection or malicious payloads. A network firewall
+          filters and inspects traffic crossing between networks, including outbound. A network
+          security group is a stateful allow list on a subnet or interface. Removing any one
+          leaves a class of traffic unexamined.
+      - id: b
+        label: The network firewall makes the security groups redundant, since it sees everything
+        correct: false
+        rep: -7
+        consequence: >
+          Security groups are removed, and traffic between two workloads in the same spoke never
+          passes the firewall at all.
+        explain: >
+          The firewall only sees traffic routed through it. Same-subnet and intra-spoke traffic
+          is exactly what security groups govern.
+      - id: c
+        label: The web application firewall makes the network firewall redundant for inbound traffic
+        correct: false
+        rep: -6
+        consequence: >
+          Non-HTTP inbound paths and all outbound traffic lose their inspection point.
+        explain: >
+          A web application firewall only understands HTTP. The network firewall covers other
+          protocols and, more importantly, outbound traffic, which is where exfiltration goes.
+      - id: d
+        label: All three are needed at every layer for every workload
+        correct: false
+        rep: -5
+        consequence: >
+          Internal service-to-service traffic is routed through a firewall for no benefit, and
+          throughput becomes a design constraint.
+        explain: >
+          Layered defense is right, and where each layer applies is a judgment about trust
+          boundaries. Applying everything everywhere is expensive and slows the traffic that
+          never leaves the estate.
+  - id: b
+    type: design
+    title: Which name resolves where
+    speaker: Marek Sobczak
+    objectives: [AZ305-4.4.1]
+    intro: >
+      "Private endpoints everywhere means private DNS zones," says Marek. "Azure
+      workloads must resolve them to private addresses. So must the ERP in Port
+      Klang, over the circuit. And Azure workloads still have to resolve
+      straitsfreight.local."
+    prompt: What DNS design do you recommend?
+    options:
+      - id: a
+        label: >
+          Private DNS zones linked to the hub, a DNS resolver in the hub with inbound and
+          outbound endpoints, and conditional forwarding both ways
+        correct: true
+        rep: 9
+        consequence: >
+          On-premises clients resolve private endpoints through the resolver, and Azure workloads
+          resolve the local domain through the forwarding rule.
+        explain: >
+          Private DNS zones only answer queries from linked virtual networks. A DNS private
+          resolver gives an inbound endpoint that on-premises servers can forward to, and an
+          outbound endpoint with rules for forwarding on-premises domains the other way. That is
+          the supported replacement for running forwarder virtual machines.
+      - id: b
+        label: Point every virtual network at the on-premises DNS servers
+        correct: false
+        rep: -7
+        consequence: >
+          Azure workloads cannot resolve private endpoints, because the on-premises servers have
+          no view of the private zones.
+        explain: >
+          Private zone records live in Azure. Sending all Azure queries on-premises removes the
+          resolution that private endpoints depend on unless the on-premises servers forward back.
+      - id: c
+        label: Host DNS forwarder virtual machines in the hub, as the pattern used to require
+        correct: false
+        rep: -5
+        consequence: >
+          Two more machines to patch, size and make highly available, for a capability the
+          platform now provides.
+        explain: >
+          Forwarder virtual machines were the standard pattern before the private resolver
+          existed and still work. They are infrastructure you now own.
+      - id: d
+        label: Use host file entries on the servers that need private endpoint names
+        correct: false
+        rep: -9
+        consequence: >
+          A private endpoint address changes during a rebuild and eleven servers keep using the
+          old one.
+        explain: >
+          Host files are unmaintainable at any scale and silently wrong when addresses change.
+  - id: c
+    type: troubleshoot
+    title: DRV-1181
+    speaker: Grace Mendoza
+    objectives: [AZ305-4.4.3, AZ305-4.4.4]
+    intro: >
+      The proof of concept works except for one path. The analytics workload in
+      the East Asia spoke cannot reach the data lake's private endpoint in
+      Southeast Asia. Name resolution returns the correct private address, the
+      security groups allow it, and the firewall shows no denied traffic.
+    ticket:
+      ref: DRV-1181
+      opened: "09:50"
+      reporter: Grace Mendoza
+      summary: Cross-region spoke cannot reach a private endpoint. No denies logged anywhere.
+      severity: sev3
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what the traffic is supposed to do
+        speaker: Marek Sobczak
+        reveals: >
+          "It should leave the East Asia spoke, cross to the Southeast Asia hub and reach the
+          private endpoint subnet there."
+      - id: b
+        action: Ask what changed when the second hub was added
+        speaker: Grace Mendoza
+        reveals: >
+          "We added the East Asia hub and connected it. Nobody revisited the route tables in
+          the spokes, which were written when there was one hub."
+    commands:
+      - id: a
+        label: Look at the effective routes on the analytics subnet
+        cmd: az network nic show-effective-route-table --name nic-analytics01 -g rg-lz-analytics -o table
+        output: |
+          Source    State     AddressPrefix     NextHopType          NextHopIp
+          --------  --------  ----------------  -------------------  ----------
+          Default   Active    10.60.0.0/16      VnetLocal
+          User      Active    0.0.0.0/0         VirtualAppliance     10.50.1.4
+          Default   Invalid   10.40.0.0/16      VNetPeering
+        note: The 0.0.0.0/0 route sends everything to the East Asia firewall, including traffic for the other region.
+        time_cost: 1
+      - id: b
+        label: Check what the East Asia firewall does with it
+        cmd: "kql: AZFWNetworkRule | where DestinationIp startswith '10.40' | summarize count() by Action"
+        output: |
+          Action    count_
+          --------  --------
+          Allow     412
+        time_cost: 1
+      - id: c
+        label: Check whether the private endpoint accepts traffic from that address space
+        cmd: az network private-endpoint-connection list --name pe-datalake -g rg-data --type Microsoft.Storage/storageAccounts --query "[].{state:properties.privateLinkServiceConnectionState.status}" -o table
+        output: |
+          State
+          ----------
+          Approved
+        time_cost: 1
+      - id: d
+        label: Check whether the two hubs are connected to each other
+        cmd: az network vhub connection list --vhub-name hub-eastasia -g rg-connectivity -o table
+        output: |
+          Name                RemoteVirtualNetwork
+          ------------------  ----------------------
+          conn-lz-analytics   vnet-lz-analytics
+        note: The East Asia hub has no connection to the Southeast Asia hub.
+        time_cost: 1
+    fixes:
+      - id: a
+        label: Connect the two hubs so traffic can transit between regions
+        correct: true
+        rep: 10
+        consequence: >
+          The path completes in both directions, and the design note gains a line about
+          inter-hub connectivity being explicit.
+        explain: >
+          Hubs are not connected to each other by default, and a spoke connected to one hub has
+          no path to the other region's spokes until they are. The firewall logged an allow
+          because it permitted the traffic and then had nowhere to send it. Effective routes and
+          hub connections are the two places to look when a cross-region path fails silently.
+      - id: b
+        label: Add a user-defined route in the analytics subnet for the Southeast Asia address space
+        correct: false
+        rep: -7
+        consequence: >
+          The route points at a next hop that still has no path to the other region.
+        explain: >
+          A route selects a next hop; it does not create connectivity behind that hop. The
+          missing piece is between the hubs.
+      - id: c
+        label: Peer the analytics spoke directly to the Southeast Asia hub
+        correct: false
+        rep: -6
+        consequence: >
+          It works and the spoke now has two hub relationships with overlapping routes, which
+          nobody will remember in a year.
+        explain: >
+          Spokes belong to one hub in this topology. Cross-region traffic is a hub-to-hub
+          concern, which keeps the spoke configuration uniform.
+      - id: d
+        label: Give the analytics workload access over the public endpoint instead
+        correct: false
+        rep: -9
+        consequence: >
+          The traffic leaves the private network and the storage firewall refuses it, which is
+          how it was designed.
+        explain: >
+          Routing around the private path defeats the control the design is built on, and the
+          firewall on the account will refuse it anyway.

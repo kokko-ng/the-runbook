@@ -1,0 +1,148 @@
+id: a2bc-b01
+chapter: act2-continuity
+title: The Numbers on the Slide, Exam Hard
+summary: The objectives are agreed. The review board wants to know what breaks them.
+variant: bonus
+bonus_of: a2bc-q01
+estimated_minutes: 11
+objectives:
+  - AZ305-3.1.1
+  - AZ305-3.1.2
+brief: >
+  Continuity designs fail on dependencies, not on the workload everyone was
+  looking at.
+debrief: >
+  Recovery is ordered, dependencies are named, and the objective belongs to the
+  slowest link rather than the fastest.
+encounters:
+  - id: a
+    type: design
+    title: The dependency nobody listed
+    speaker: Grace Mendoza
+    objectives: [AZ305-3.1.1]
+    intro: >
+      Dispatch is designed for one hour. It depends on the database, which fails
+      over in a minute, and on Entra ID, which is a global service.
+
+
+      It also depends on the licensing service that runs on a virtual machine in
+      the hub, on private DNS zones linked to the hub network, and on a key vault
+      in Southeast Asia that holds the certificate its ingress uses.
+    prompt: What does the design have to add?
+    options:
+      - id: a
+        label: >
+          Recovery for each dependency, in an order, with the objective measured end to end
+        correct: true
+        rep: 9
+        consequence: >
+          The rehearsal reveals that the certificate is the long pole, and it is fixed before
+          anyone needs it.
+        explain: >
+          A recovery objective belongs to a service, and a service is only recovered when
+          everything it needs is. Dependencies with their own recovery time have to be recovered
+          first, which is what a recovery plan with ordered groups expresses.
+      - id: b
+        label: Note the dependencies in the design document as assumptions
+        correct: false
+        rep: -7
+        consequence: >
+          The real failover stops at the ingress certificate, which nobody has a copy of in the
+          second region.
+        explain: >
+            An assumption in a document is a thing nobody has tested. Dependencies belong in the
+            plan with an owner and a step.
+      - id: c
+        label: Replicate the hub as well, so everything is available in the second region
+        correct: false
+        rep: -5
+        consequence: >
+          The cost roughly doubles and the ordering problem remains, because a replicated hub
+          still has to come up before the workload.
+        explain: >
+          Replicating more can be the right answer for shared platform services, and it does
+          not remove the need for an order. Sequence is the point.
+      - id: d
+        label: Set the dispatch objective to four hours to allow for the dependencies
+        correct: false
+        rep: -8
+        consequence: >
+          The business requirement is quietly changed to fit the design, and nobody tells the
+          business.
+        explain: >
+          Adjusting the number to match what the design achieves is the failure mode this whole
+          exercise exists to prevent.
+  - id: b
+    type: design
+    title: The region pair question
+    speaker: Marek Sobczak
+    objectives: [AZ305-3.1.2]
+    intro: >
+      "Someone will ask why East Asia rather than Australia East," says Marek.
+      "Give the reasons that matter and be honest about which ones are habit."
+    prompt: What decides the secondary region?
+    options:
+      - id: a
+        label: >
+          Latency, data residency, service availability in that region, and the paired region's
+          platform behavior
+        correct: true
+        rep: 8
+        explain: >
+          The secondary must be able to run the workload: the services used have to exist there,
+          residency requirements must permit it, and replication latency has to fit the recovery
+          point objective. Paired regions matter for some platform behaviors such as sequential
+          platform updates and geo-redundant storage replication targets.
+      - id: b
+        label: The paired region must always be used, because failover only works between pairs
+        correct: false
+        rep: -6
+        consequence: A design excludes a region that would have met residency and latency requirements better.
+        explain: >
+          Pairing governs specific platform behaviors, notably the destination for geo-redundant
+          storage. Most services can replicate to any region you choose.
+      - id: c
+        label: The cheapest region with the same services, since it is idle most of the time
+        correct: false
+        rep: -7
+        consequence: A secondary is chosen four thousand kilometers away and the replication lag exceeds the recovery point objective.
+        explain: >
+          Price is a real input and it is the last one. Latency and residency decide whether a
+          region is eligible at all.
+  - id: c
+    type: knowledge
+    title: What the objective is measured from
+    speaker: Grace Mendoza
+    objectives: [AZ305-3.1.1]
+    intro: >
+      "The board will ask when the clock starts on a one-hour recovery time
+      objective," says Grace. "Get this right, because it changes what we have to
+      build."
+    question: When does the recovery time clock start and stop?
+    options:
+      - id: a
+        label: >
+          It starts at the moment of failure and stops when the service is usable again,
+          including detection and the decision to fail over
+        correct: true
+        rep: 6
+        explain: >
+          The objective covers the whole outage as the business experiences it: the time to
+          detect, the time to decide, and the time to recover. That is why monitoring and a
+          pre-agreed decision authority are part of a continuity design, not an afterthought.
+      - id: b
+        label: It starts when the failover is initiated and stops when it completes
+        correct: false
+        rep: -6
+        consequence: A design meets its number on paper while the business experiences three hours of downtime.
+        explain: >
+          Measuring only the technical failover ignores the forty minutes spent deciding, which
+          is often the largest part.
+      - id: c
+        label: It starts when the incident is declared by the on-call engineer
+        correct: false
+        rep: -5
+        consequence: The declaration is delayed during a real incident, and the reported number looks better than the outage was.
+        explain: >
+          Anything that lets the clock start later makes the measurement flatter and the
+          business no better off.

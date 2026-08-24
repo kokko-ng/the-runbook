@@ -1,0 +1,198 @@
+id: a2id-q02
+chapter: act2-identity
+title: Who Approves the Approver
+summary: Thirty-one guests, eleven Meridian admins and one auditor who wants to know how access is granted and taken away.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ305-1.2.3
+  - AZ305-1.3.3
+brief: >
+  Access that is granted permanently and reviewed never is the finding that
+  follows every acquisition. This one is being designed before it happens.
+debrief: >
+  Roles that are requested and expire, access packages that guests apply for, and
+  reviews that run whether anyone remembers or not.
+encounters:
+  - id: a
+    type: design
+    title: Standing access to production
+    speaker: Wei Lin Tan
+    objectives: [AZ305-1.2.3]
+    intro: >
+      "Eleven people hold Contributor on the transport landing zone permanently,"
+      says Wei Lin. "They need it perhaps four times a month each, usually during
+      an incident. The auditor's question is not whether they are trustworthy. It
+      is what an attacker gets when one of their laptops is compromised at two in
+      the morning."
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          Make the Azure roles eligible rather than active, activated on request with
+          justification, approval for production and a time limit
+        correct: true
+        rep: 9
+        consequence: >
+          Standing Contributor drops from eleven to zero. The first incident activation takes
+          forty seconds and the auditor asks for the activation report instead.
+        explain: >
+          Privileged Identity Management makes a role assignment eligible: the person holds
+          nothing until they activate it, with justification, optional approval and an
+          expiry. A compromised session outside an activation window carries no privilege, and
+          every activation is recorded.
+        diagram:
+          - {op: add_node, node: entra-pim}
+          - {op: add_edge, edge: e2-pim-entra}
+      - id: b
+        label: Keep the assignments and require multi-factor for every write operation
+        correct: false
+        rep: -6
+        consequence: >
+          A session hijacked after a successful multi-factor prompt still holds Contributor
+          all night.
+        explain: >
+          Strong authentication reduces the chance of compromise and does nothing about the
+          standing privilege once a session exists. The two controls solve different halves.
+      - id: c
+        label: Reduce the eleven to three permanent Contributors and remove the rest
+        correct: false
+        rep: -5
+        consequence: >
+          Incident response now waits for one of three people, and those three hold standing
+          access permanently.
+        explain: >
+          Fewer standing administrators is genuinely better and it trades availability for
+          it. Eligible assignments give both: everyone who needs it can get it, nobody has it
+          by default.
+      - id: d
+        label: Move the eleven to a break-glass account they share during incidents
+        correct: false
+        rep: -11
+        consequence: >
+          The activity log shows one account doing everything, and the auditor cannot tell who
+          did what.
+        explain: >
+          Shared administrative accounts destroy attribution. Break-glass accounts exist for
+          the case where the identity platform itself is unavailable, and are two accounts,
+          heavily monitored, not a working practice.
+  - id: b
+    type: design
+    title: Access for people who do not work here
+    speaker: Grace Mendoza
+    objectives: [AZ305-1.3.3]
+    intro: >
+      "Thirty-one Straits guests today," says Grace. "It will be sixty by
+      November, across four applications, and Straits will not tell us promptly
+      when somebody leaves. Meridian's own contractors have the same shape."
+
+
+      "I do not want a design where somebody at Meridian is expected to remember."
+    prompt: How do you handle guest access over time?
+    options:
+      - id: a
+        label: >
+          Entitlement management access packages with an expiry and a sponsor approval, plus
+          recurring access reviews for the guest population
+        correct: true
+        rep: 9
+        consequence: >
+          Guests request the package they need, a Meridian sponsor approves it, and access
+          expires in ninety days unless someone actively renews it.
+        explain: >
+          Entitlement management packages up the groups, applications and roles a role needs,
+          with a request and approval workflow, an expiry and a scoped set of who may request.
+          Access reviews then re-attest what remains. Together they turn a memory problem into
+          a scheduled one.
+        diagram:
+          - {op: add_node, node: entra-idgov}
+          - {op: add_edge, edge: e2-idgov-entra}
+      - id: b
+        label: A quarterly manual review of guest accounts by the platform team
+        correct: false
+        rep: -6
+        consequence: >
+          The first review takes a day and finds nine leavers. The second is postponed twice
+          and then forgotten.
+        explain: >
+          Manual reviews compete with everything else. Access reviews automate the same
+          exercise with reminders, defaults and an audit record.
+      - id: c
+        label: Expire every guest account automatically after ninety days
+        correct: false
+        rep: -7
+        consequence: >
+          Thirty-one planners lose access mid-quarter with no renewal path, during peak
+          season.
+        explain: >
+          Expiry without a request and approval path is an outage generator. The package
+          provides the renewal route that makes expiry safe.
+      - id: d
+        label: Ask Straits to notify Meridian within one working day of any leaver
+        correct: false
+        rep: -8
+        consequence: >
+          The notification process works for two months and then a planner leaves during a
+          reorganization and nobody tells anyone.
+        explain: >
+          A process that depends on another company's diligence is a control you cannot
+          evidence. Design for the notification not arriving.
+  - id: c
+    type: design
+    title: What the application uses
+    speaker: Marek Sobczak
+    objectives: [AZ305-1.2.3]
+    intro: >
+      "While we are on access," says Marek. "The dispatch service reads the
+      shipment database and the manifest storage account. Today it uses a
+      connection string with a password and a storage account key, both in the
+      pipeline."
+    prompt: What do you recommend for the service's own access?
+    options:
+      - id: a
+        label: >
+          A managed identity for the service, with database and storage data-plane roles
+          assigned to it
+        correct: true
+        rep: 8
+        consequence: >
+          Two secrets leave the pipeline. Nothing needs rotating, because there is nothing to
+          rotate.
+        explain: >
+          A managed identity is an identity Azure creates and rotates for a resource, with no
+          credential in your code or pipeline. Assign it the data-plane roles it needs and the
+          access is auditable per resource and revocable in one place.
+        diagram:
+          - {op: add_node, node: mi-workloads}
+      - id: b
+        label: Move both credentials into Key Vault and read them at start-up
+        correct: false
+        rep: -5
+        consequence: >
+          The credentials are better protected and still exist, still expire, and still have
+          to be rotated on a schedule somebody owns.
+        explain: >
+          Key Vault is the right home for secrets that must exist, such as a third-party API
+          key. Where the platform supports an identity instead, having no secret is stronger
+          than having a well-stored one.
+      - id: c
+        label: A service principal with a client secret, rotated every ninety days by automation
+        correct: false
+        rep: -6
+        consequence: >
+          The rotation automation is one more thing that can fail at three in the morning, and
+          eventually does.
+        explain: >
+          Service principals with secrets are the pattern managed identities replace for
+          workloads running in Azure. They remain necessary outside Azure, where a managed
+          identity is not available.
+      - id: d
+        label: A shared access signature for storage and Entra authentication for the database
+        correct: false
+        rep: -5
+        consequence: >
+          Two different credential models for one service, one of which expires on a date
+          nobody has diarized.
+        explain: >
+          Mixing models doubles what has to be understood and maintained. One identity for
+          both resources is simpler and stronger.

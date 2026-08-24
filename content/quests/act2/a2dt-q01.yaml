@@ -1,0 +1,194 @@
+id: a2dt-q01
+chapter: act2-data
+title: The ERP Database Has to Land Somewhere
+summary: SQL Server 2016, cross-database queries, four SQL Agent jobs and a linked server nobody documented.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ305-2.1.1
+  - AZ305-2.1.2
+brief: >
+  Straits ERP is moving to Azure. The application cannot change, which narrows
+  the options in a way the exam likes to test.
+debrief: >
+  A destination chosen from the constraints rather than from the brochure, and a
+  tier sized from the metrics that already exist.
+encounters:
+  - id: a
+    type: design
+    title: What can host this
+    speaker: Grace Mendoza
+    objectives: [AZ305-2.1.1]
+    intro: >
+      Grace lists what the assessment found. Four databases on one instance, with
+      cross-database joins between them. Four SQL Agent jobs. A linked server to
+      an old reporting box. Service Broker in use for the dispatch queue. Common
+      language runtime assemblies for a routing calculation.
+
+
+      "The application vendor is out of business," she says. "Nothing in that list
+      is negotiable."
+    prompt: Where does this database go?
+    options:
+      - id: a
+        label: Azure SQL Managed Instance
+        correct: true
+        rep: 9
+        consequence: >
+          The migration assessment comes back with two minor warnings instead of forty
+          blockers, and the vendor's absence stops being the deciding factor.
+        explain: >
+          Managed Instance exists for exactly this list: near-complete engine compatibility
+          including cross-database queries, SQL Agent, Service Broker, common language runtime
+          and linked servers, with a managed platform underneath. Azure SQL Database is a
+          single-database service and does not support most of that list.
+        diagram:
+          - {op: add_node, node: sqlmi-erp}
+          - {op: add_edge, edge: e2-sf-erp-mi}
+      - id: b
+        label: Azure SQL Database, with the databases in an elastic pool
+        correct: false
+        rep: -8
+        consequence: >
+          The migration assessment lists cross-database queries, Agent jobs and Service Broker
+          as blockers, and the project stalls for a month.
+        explain: >
+          Elastic pools share compute between databases; they do not make databases able to
+          query each other. SQL Database has no SQL Agent and no Service Broker, and the
+          application cannot be changed to work without them.
+      - id: c
+        label: SQL Server on an Azure virtual machine
+        correct: false
+        rep: -5
+        consequence: >
+          It works, and Meridian owns patching, backup, high availability and licensing for a
+          database it wanted to stop operating.
+        explain: >
+          Infrastructure as a service is the compatibility answer of last resort and is right
+          when something needs operating system access or an unsupported feature. Managed
+          Instance gives the compatibility with far less operational burden.
+      - id: d
+        label: Azure Database for PostgreSQL, after converting the schema
+        correct: false
+        rep: -11
+        consequence: >
+          A conversion project starts for an application whose vendor no longer exists and
+          whose stored procedures nobody understands.
+        explain: >
+          Engine migration is a serious undertaking that needs an owner for the application.
+          There is none.
+  - id: b
+    type: design
+    title: Which tier, and how big
+    speaker: Priya Raghunathan
+    objectives: [AZ305-2.1.2]
+    intro: >
+      The assessment metrics: peak 6 processor cores in use, 240 gibibytes of data
+      growing at about 4 a month, 900 input and output operations a second at
+      month end, and a requirement that a restore reach any point in the last
+      thirty-five days.
+
+
+      "The number I sign is annual," says Priya. "Tell me what drives it."
+    prompt: What tier and size do you recommend?
+    options:
+      - id: a
+        label: >
+          General Purpose, eight virtual cores, 512 gibibytes of storage, with a reserved
+          capacity commitment once the size settles
+        correct: true
+        rep: 8
+        consequence: >
+          The instance runs at about sixty per cent of its cores at month end, and the
+          reservation is signed in the second quarter once the shape is proven.
+        explain: >
+          General Purpose suits most workloads: remote storage with good throughput and
+          built-in high availability. Business Critical adds local solid-state storage, higher
+          input and output rates and a readable replica, at roughly double the price. Size the
+          cores from the measured peak with headroom, and commit only once the shape is known.
+      - id: b
+        label: Business Critical, eight virtual cores, for the performance headroom
+        correct: false
+        rep: -6
+        consequence: >
+          The bill roughly doubles for a workload whose peak is nine hundred operations a
+          second.
+        explain: >
+          Business Critical earns its price when latency or read scale-out genuinely need it.
+          Nothing in these metrics does.
+      - id: c
+        label: General Purpose, four virtual cores, and scale up when it becomes a problem
+        correct: false
+        rep: -7
+        consequence: >
+          Month end saturates the instance, and scaling a managed instance is not instant.
+        explain: >
+          Sizing below the measured peak guarantees the first month end is an incident.
+          Scaling exists and takes time, so start above the peak rather than below it.
+      - id: d
+        label: Business Critical with a readable secondary, to serve the reporting queries
+        correct: false
+        rep: -5
+        consequence: >
+          Reporting moves off the primary and the annual cost is signed for a benefit nobody
+          measured.
+        explain: >
+          The readable secondary is a real reason to choose Business Critical, when reporting
+          load is hurting the primary. That case has not been made here yet.
+  - id: c
+    type: design
+    title: The cutover
+    speaker: Marek Sobczak
+    objectives: [AZ305-2.1.1]
+    intro: >
+      "Two hundred and forty gigabytes over a link that manages about eighty
+      megabits on a good day," says Marek. "Straits runs six days a week. The
+      dispatch window they can give us is Sunday, six hours."
+    prompt: How do you move the data?
+    options:
+      - id: a
+        label: >
+          Azure Database Migration Service in online mode, seeding ahead of time and cutting
+          over inside the Sunday window
+        correct: true
+        rep: 9
+        consequence: >
+          The seed runs for four days in the background, and Sunday's cutover takes fifty
+          minutes including validation.
+        explain: >
+          Online migration performs an initial seed and then keeps replicating changes, so the
+          outage is the final catch-up and the cutover rather than the whole copy. That is what
+          makes a six-hour window enough for a data set that takes days to move.
+        diagram:
+          - {op: add_node, node: dms-migration}
+          - {op: add_edge, edge: e2-dms-mi}
+      - id: b
+        label: Back up to a storage account and restore into the managed instance on Sunday
+        correct: false
+        rep: -7
+        consequence: >
+          The upload alone takes most of the window, and the restore has not started when the
+          window closes.
+        explain: >
+          Native backup and restore is a clean approach for smaller databases or longer
+          windows. Here the copy does not fit in the window, which is what online migration
+          solves.
+      - id: c
+        label: Ship the backup on physical media to the region
+        correct: false
+        rep: -6
+        consequence: >
+          The data is a week old on arrival and has to be caught up by hand.
+        explain: >
+          Physical transfer suits very large data sets over poor links, and it moves a static
+          copy. A live database still needs a catch-up mechanism.
+      - id: d
+        label: Set up transactional replication from the source to the managed instance
+        correct: false
+        rep: -5
+        consequence: >
+          It works for the tables that have primary keys, and three of them do not.
+        explain: >
+          Replication is a valid migration technique with real constraints, including primary
+          key requirements and schema limitations. The migration service handles the general
+          case with less bespoke work.

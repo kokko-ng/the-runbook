@@ -1,0 +1,154 @@
+id: a2dt-b01
+chapter: act2-data
+title: The ERP Database, Exam Hard
+summary: The managed instance is agreed. Now the questions that decide whether it survives contact with month end.
+variant: bonus
+bonus_of: a2dt-q01
+estimated_minutes: 11
+objectives:
+  - AZ305-2.1.1
+  - AZ305-2.1.2
+  - AZ305-2.1.3
+brief: >
+  Three follow-up questions from the review board, each of which has a defensible
+  wrong answer.
+debrief: >
+  Tiers, licensing and scale limits are the detail that turns a diagram into a
+  number Priya can sign.
+encounters:
+  - id: a
+    type: design
+    title: The license Meridian already owns
+    speaker: Priya Raghunathan
+    objectives: [AZ305-2.1.2]
+    intro: >
+      "Straits own SQL Server licenses with Software Assurance," says Priya. "The
+      quote you gave me assumes we are paying for the database engine again. Is
+      that right?"
+    prompt: What do you tell her?
+    options:
+      - id: a
+        label: >
+          Azure Hybrid Benefit applies the existing licenses to the managed instance and
+          removes the engine cost from the price
+        correct: true
+        rep: 8
+        consequence: >
+          The annual figure falls by about forty per cent and Priya asks why it was not in the
+          first version.
+        explain: >
+          Azure Hybrid Benefit lets eligible SQL Server licenses with Software Assurance cover
+          the engine cost of a managed instance or database, leaving compute and storage. On an
+          acquisition where the licenses already exist, it is one of the largest single
+          reductions available.
+      - id: b
+        label: The licenses cannot transfer, because the platform includes its own licensing
+        correct: false
+        rep: -7
+        consequence: >
+          Meridian pays twice for an engine it already owns, for three years.
+        explain: >
+          The pay-as-you-go price includes the license, and the hybrid benefit is exactly the
+          mechanism for not paying for it twice.
+      - id: c
+        label: The licenses can be applied, but only to SQL Server running on a virtual machine
+        correct: false
+        rep: -6
+        consequence: >
+          The design is pushed towards infrastructure as a service for a licensing reason that
+          does not exist.
+        explain: >
+          The benefit applies to managed instance and to Azure SQL Database in the virtual core
+          model, as well as to virtual machines.
+  - id: b
+    type: design
+    title: The month that does not fit
+    speaker: Marek Sobczak
+    objectives: [AZ305-2.1.3]
+    intro: >
+      "Month end runs a reconciliation across all four databases for about six
+      hours," says Marek. "During those six hours the instance is at ninety-five
+      per cent and everything else queues. The other twenty-eight days it sits at
+      forty."
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          Scale the instance up for the reconciliation window and back down afterwards,
+          scripted as part of the job
+        correct: true
+        rep: 8
+        consequence: >
+          The window shortens to two hours at twice the cores for a quarter of a day, which
+          costs less than running larger all month.
+        explain: >
+          Managed instance virtual cores can be changed, with the change taking effect after a
+          period of preparation and a brief failover. For a predictable, scheduled peak, scaling
+          around the window is cheaper than provisioning for it permanently.
+      - id: b
+        label: Provision the instance for the month-end peak permanently
+        correct: false
+        rep: -6
+        consequence: >
+          Twenty-eight days a month are paid for at the peak size, at forty per cent
+          utilization.
+        explain: >
+          Sizing for the peak is the simple answer and is right when the peak is unpredictable.
+          A scheduled six-hour window is the definition of predictable.
+      - id: c
+        label: Move the reconciliation to a read replica
+        correct: false
+        rep: -7
+        consequence: >
+          The reconciliation writes its results back, and the read-only replica refuses.
+        explain: >
+          Read scale-out serves read-only workloads, and the reconciliation writes. It is also
+          a Business Critical feature, which this instance is not.
+      - id: d
+        label: Split the four databases across two managed instances
+        correct: false
+        rep: -8
+        consequence: >
+          The cross-database joins that decided the destination in the first place stop
+          working.
+        explain: >
+          Cross-database queries are why this is a managed instance. Splitting the databases
+          across instances removes the capability the migration depended on.
+  - id: c
+    type: knowledge
+    title: The tier question
+    speaker: Grace Mendoza
+    objectives: [AZ305-2.1.2, AZ305-2.1.1]
+    intro: >
+      "The board will ask what General Purpose gives up compared with Business
+      Critical," says Grace. "Two sentences, no hedging."
+    question: What is the main difference between the two managed instance tiers?
+    options:
+      - id: a
+        label: >
+          General Purpose uses remote storage with a single compute node; Business Critical uses
+          local solid-state storage with replicas, one of which is readable
+        correct: true
+        rep: 6
+        explain: >
+          General Purpose separates compute from remote premium storage, which keeps it cheaper
+          and gives higher storage latency. Business Critical runs an availability group of
+          replicas on local solid-state storage, which gives lower latency, faster failover and
+          a free readable secondary, at roughly double the price.
+      - id: b
+        label: Business Critical has a higher storage limit; the performance is the same
+        correct: false
+        rep: -5
+        consequence: A tier is chosen on capacity alone and the latency-sensitive workload lands on remote storage.
+        explain: >
+          General Purpose actually offers larger maximum storage per instance. The difference
+          that matters is latency, failover behavior and the readable replica.
+      - id: c
+        label: General Purpose has no high availability at all
+        correct: false
+        rep: -6
+        consequence: A design proposes Business Critical to obtain availability the cheaper tier already provides.
+        explain: >
+          Both tiers are highly available. General Purpose achieves it by reattaching remote
+          storage to a new compute node, which is slower than a failover between local replicas
+          but not absent.

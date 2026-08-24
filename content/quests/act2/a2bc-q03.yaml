@@ -1,0 +1,242 @@
+id: a2bc-q03
+chapter: act2-continuity
+title: The Database Cannot Stop
+summary: Fifteen minutes of acceptable data loss for dispatch, and the database is the part that decides whether that is true.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ305-3.2.2
+  - AZ305-3.1.3
+brief: >
+  Compute can be rebuilt from a pipeline. The database is the piece that has to
+  be somewhere else already.
+debrief: >
+  A failover group with a listener the application does not have to think about,
+  and a backup story that covers the failures replication does not.
+encounters:
+  - id: a
+    type: design
+    title: Getting the data to the other region
+    speaker: Grace Mendoza
+    objectives: [AZ305-3.2.2]
+    intro: >
+      The dispatch database is Azure SQL Database, Hyperscale, in Southeast Asia.
+      The recovery objectives are fifteen minutes of data and one hour to run.
+
+
+      "The application has one connection string," says Grace. "I would prefer it
+      stayed that way after a failover."
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          A failover group to East Asia with automatic failover, and the application using the
+          group's read-write listener
+        correct: true
+        rep: 9
+        consequence: >
+          A test failover moves the listener in under a minute, and the application reconnects
+          without a configuration change.
+        explain: >
+          Active geo-replication keeps a readable secondary continuously updated. A failover
+          group adds a listener endpoint that follows the primary and an automatic failover
+          policy, so the application connects to a name that stays correct. Replication is
+          asynchronous, so the data loss window is measured in seconds, well inside fifteen
+          minutes.
+        diagram:
+          - {op: add_node, node: sql-failover-group}
+          - {op: add_edge, edge: e2-sql-fog}
+      - id: b
+        label: Geo-redundant backups, restored into East Asia if the region is lost
+        correct: false
+        rep: -8
+        consequence: >
+          The geo-restore of a Hyperscale database takes well over an hour, against a one-hour
+          objective.
+        explain: >
+          Geo-restore is the cheapest option and its recovery time depends on database size.
+          It suits workloads with a day to recover, not an hour.
+      - id: c
+        label: Active geo-replication without a failover group, with the application aware of both endpoints
+        correct: false
+        rep: -5
+        consequence: >
+          Failover works and every application that connects has to implement the switch,
+          including two that nobody owns.
+        explain: >
+          Geo-replication alone gives the replica and leaves endpoint management to you. The
+          failover group exists to handle the listener and the policy.
+      - id: d
+        label: A second database in East Asia kept current by the nightly data pipeline
+        correct: false
+        rep: -10
+        consequence: >
+          The recovery point is up to twenty-four hours old against a fifteen-minute
+          requirement.
+        explain: >
+          Batch copying is not replication. The gap between the last run and the failure is the
+          data loss, and here that is orders of magnitude too large.
+  - id: b
+    type: design
+    title: What replication does not protect
+    speaker: Wei Lin Tan
+    objectives: [AZ305-3.1.3]
+    intro: >
+      "The failover group answers the region question," says Wei Lin. "It does not
+      answer mine, which is what happens when somebody runs a delete without a
+      where clause at four in the afternoon and it replicates perfectly to East
+      Asia in under a second."
+    prompt: What covers that?
+    options:
+      - id: a
+        label: >
+          Point-in-time restore within the retention window, plus long-term retention for the
+          seven-year contractual requirement
+        correct: true
+        rep: 9
+        consequence: >
+          A restore to 15:58 into a new database on the same server takes eleven minutes in the
+          rehearsal.
+        explain: >
+          Replication faithfully copies mistakes. Point-in-time restore reconstructs the
+          database to any second in the retention window from full, differential and log
+          backups, which is the control for data-level accidents. Long-term retention keeps
+          weekly, monthly and yearly copies for the contractual period.
+        diagram:
+          - {op: set_detail, node: sqldb-transport, detail: "PITR 35 days, LTR 7 years"}
+      - id: b
+        label: Failing over to the secondary, which will not have the delete yet
+        correct: false
+        rep: -9
+        consequence: >
+          The secondary has the delete, because replication is measured in seconds.
+        explain: >
+          Asynchronous replication is not a delay you can hide behind. It is designed to be as
+          close to current as possible.
+      - id: c
+        label: Weekly exports of the database to a storage account
+        correct: false
+        rep: -7
+        consequence: >
+          The most recent copy is six days old, and the restore is a full import rather than a
+          point in time.
+        explain: >
+          Exports are useful for moving a copy elsewhere and are a coarse recovery point.
+          Point-in-time restore is built in and far more precise.
+      - id: d
+        label: Enabling the database's ledger feature so changes cannot be reversed
+        correct: false
+        rep: -6
+        consequence: >
+          The deletion is now provably recorded and the rows are still gone.
+        explain: >
+          Ledger provides tamper evidence, which answers a different question. It proves what
+          happened; it does not put the data back.
+  - id: c
+    type: troubleshoot
+    title: DRV-1140
+    speaker: Marek Sobczak
+    objectives: [AZ305-3.2.2]
+    intro: >
+      The failover group rehearsal ran. The database failed over in forty seconds
+      and the application reconnected. Two things did not work: a reporting job
+      could not connect at all, and the dispatch service could write but not read
+      one lookup table.
+
+
+      Grace wants both explained before the design is signed off.
+    ticket:
+      ref: DRV-1140
+      opened: "15:20"
+      reporter: Marek Sobczak
+      summary: Two consumers fail after a rehearsed database failover.
+      severity: sev3
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask how each consumer connects
+        speaker: Marek Sobczak
+        reveals: >
+          "Dispatch uses the failover group listener. The reporting job has the original
+          server name in its connection string, from before the group existed."
+      - id: b
+        action: Ask what the lookup table is
+        speaker: Grace Mendoza
+        reveals: >
+          "It is in a second database on the same server, which was never added to the
+          failover group. Dispatch queries it with a cross-database reference."
+    commands:
+      - id: a
+        label: Check what is in the failover group
+        cmd: az sql failover-group show -n fog-transport -g rg-data -s sql-meridian-tms --query "{databases:databases,listener:readWriteEndpoint.failoverPolicy}" -o json
+        output: |
+          {
+            "databases": ["/subscriptions/.../databases/transport"],
+            "listener": "Automatic"
+          }
+        time_cost: 1
+      - id: b
+        label: Check where each database is now
+        cmd: az sql db list -s sql-meridian-tms -g rg-data --query "[].{name:name,status:status}" -o table
+        output: |
+          Name        Status
+          ----------  ---------
+          transport   Offline
+          lookup      Online
+        note: The transport database has moved to the secondary server. The lookup database has not.
+        time_cost: 1
+      - id: c
+        label: Check the reporting job's connection target
+        cmd: "kql: AppTraces | where Message contains 'reporting' | top 1 by TimeGenerated desc | project Message"
+        output: |
+          Login failed. Cannot open server 'sql-meridian-tms' requested by the login.
+          The database 'transport' is not available on this server.
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Add the lookup database to the failover group and move the reporting job to the
+          listener endpoint
+        correct: true
+        rep: 9
+        consequence: >
+          The second rehearsal moves both databases together and every consumer reconnects
+          without intervention.
+        explain: >
+          A failover group covers the databases you put in it, and databases that must fail over
+          together have to be in the same group. Consumers must use the group's listener rather
+          than a server name, or they keep pointing at whichever server was primary when they
+          were configured.
+        diagram:
+          - {op: set_detail, node: sql-failover-group, detail: "Both databases, listener endpoints"}
+      - id: b
+        label: Fail the transport database back so both are on the same server again
+        correct: false
+        rep: -7
+        consequence: >
+          The rehearsal ends without proving anything, and the same two failures wait for the
+          real event.
+        explain: >
+          Undoing the rehearsal is what the rehearsal was for. Both findings are exactly what a
+          test is supposed to surface.
+      - id: c
+        label: Copy the lookup table into the transport database
+        correct: false
+        rep: -5
+        consequence: >
+          The reporting job still fails, and two copies of a reference table now have to be kept
+          in step.
+        explain: >
+          Consolidating removes the cross-database dependency and is a real option worth
+          considering on its merits. It does not address the reporting job's hard-coded server
+          name, which is half the incident.
+      - id: d
+        label: Set the failover policy to manual so failovers only happen when someone decides
+        correct: false
+        rep: -8
+        consequence: >
+          The recovery time objective now includes waiting for a human at three in the morning.
+        explain: >
+          Manual failover is a legitimate choice when the application cannot tolerate an
+          automatic switch. Choosing it to avoid fixing two connection strings trades an hour
+          of recovery time for ten minutes of work.

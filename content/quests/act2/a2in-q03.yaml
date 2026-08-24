@@ -1,0 +1,189 @@
+id: a2in-q03
+chapter: act2-infrastructure
+title: Ten Million Route Calculations
+summary: The overnight routing run takes six hours on one machine, and the depots want it finished by four in the morning.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ305-4.1.5
+  - AZ305-4.2.4
+brief: >
+  Embarrassingly parallel work on a schedule, and a read pattern that is asking
+  for a cache.
+debrief: >
+  A pool that exists only while the work does, and a cache in front of the lookup
+  that was carrying the load.
+encounters:
+  - id: a
+    type: design
+    title: Six hours on one machine
+    speaker: Marek Sobczak
+    objectives: [AZ305-4.1.5]
+    intro: >
+      "Ten million route calculations, one per shipment leg," says Marek. "Each
+      one is independent, takes about two milliseconds, and reads a distance
+      matrix. It runs at 22:00 on one large virtual machine and finishes around
+      04:00, which used to be fine."
+
+
+      Peak season doubles the volume. The machine is idle for the other eighteen
+      hours.
+    prompt: How do you run it?
+    options:
+      - id: a
+        label: >
+          Azure Batch with a pool that scales from zero for the run and back afterwards, work
+          split into tasks
+        correct: true
+        rep: 9
+        consequence: >
+          The run finishes in forty minutes on twenty nodes, and the pool costs nothing between
+          runs.
+        explain: >
+          Batch is the managed service for large-scale parallel work: it schedules tasks across
+          a pool that can autoscale from zero, handles retries and node failures, and bills only
+          while nodes exist. Independent units of work with no shared state are exactly what it
+          is for.
+        diagram:
+          - {op: add_node, node: batch-routing}
+          - {op: add_edge, edge: e2-batch-lake}
+      - id: b
+        label: A larger virtual machine, running the same job with more threads
+        correct: false
+        rep: -6
+        consequence: >
+          The run gets to about three hours and the machine is idle for twenty-one, at twice the
+          price.
+        explain: >
+          Scaling up a single machine is bounded by its size, and it does not remove the idle
+          hours. The work is parallel across machines, so scale out.
+      - id: c
+        label: A function app fanned out across ten million invocations
+        correct: false
+        rep: -7
+        consequence: >
+          The orchestration overhead per two-millisecond calculation dominates, and the bill for
+          ten million executions exceeds the machine it replaced.
+        explain: >
+          Serverless fan-out suits event-driven work at moderate volume. Ten million tiny units
+          with a shared data set is a batch scheduling problem, and Batch groups them into tasks
+          rather than invocations.
+      - id: d
+        label: A Kubernetes job on the dispatch cluster overnight
+        correct: false
+        rep: -5
+        consequence: >
+          The cluster is sized for the nightly peak of a workload that has nothing to do with
+          dispatch.
+        explain: >
+          Running batch jobs on an existing cluster is viable and couples the cluster's capacity
+          to an unrelated schedule. Batch keeps them independent.
+  - id: b
+    type: design
+    title: The matrix everything reads
+    speaker: Grace Mendoza
+    objectives: [AZ305-4.2.4]
+    intro: >
+      "Every one of those ten million calculations reads the distance matrix," says
+      Grace. "So does the dispatch screen, about four hundred times a second during
+      the day. It is two hundred megabytes, it changes when a depot moves, which is
+      twice a year, and it currently lives in the transport database."
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          Azure Cache for Redis in front of the matrix, loaded at start-up and invalidated when
+          it changes
+        correct: true
+        rep: 8
+        consequence: >
+          Database reads for the matrix fall to almost nothing, and the dispatch screen's
+          lookups drop below a millisecond.
+        explain: >
+          Caching suits data that is read constantly, changes rarely and is expensive to fetch.
+          Two hundred megabytes read four hundred times a second and updated twice a year is the
+          canonical case, and the invalidation strategy is trivial because the change is a known
+          event.
+        diagram:
+          - {op: add_node, node: redis-sessions}
+          - {op: add_edge, edge: e2-aks-redis}
+      - id: b
+        label: Read replicas on the database to absorb the matrix reads
+        correct: false
+        rep: -6
+        consequence: >
+          The replicas serve the same query millions of times, at database prices and database
+          latency.
+        explain: >
+          Replicas help spread varied read load. Serving one small, static data set from a
+          relational engine is work a cache does at a fraction of the cost and latency.
+      - id: c
+        label: Load the matrix into each process at start-up and keep it in memory
+        correct: false
+        rep: -5
+        consequence: >
+          Twenty batch nodes and eleven dispatch pods each hold their own copy, and a depot move
+          requires restarting all of them.
+        explain: >
+          In-process caching is fast and simple and it multiplies memory and makes invalidation
+          a deployment. It is a reasonable choice at small scale; here a shared cache is
+          cleaner.
+      - id: d
+        label: Materialize the matrix into a static file in blob storage and read it from there
+        correct: false
+        rep: -6
+        consequence: >
+          Every lookup becomes an HTTP request with tens of milliseconds of latency, which the
+          dispatch screen feels immediately.
+        explain: >
+          Blob storage is durable and cheap and is not a low-latency lookup store for hundreds
+          of reads a second.
+  - id: c
+    type: design
+    title: When the cache is not there
+    speaker: Wei Lin Tan
+    objectives: [AZ305-4.2.4]
+    intro: >
+      "You are putting a cache in the path of the dispatch screen," says Wei Lin.
+      "What happens at three in the morning when the cache is patched, or full, or
+      simply not answering?"
+    prompt: How does the design handle a cache failure?
+    options:
+      - id: a
+        label: >
+          Fall back to the database on a cache miss or error, with a short timeout and a
+          circuit breaker
+        correct: true
+        rep: 8
+        explain: >
+          A cache should be an optimization, not a dependency. Falling back to the source on
+          miss or failure keeps the service correct, and a short timeout with a circuit breaker
+          stops a slow cache being worse than no cache. The database has to be able to carry the
+          load for the fallback window.
+      - id: b
+        label: Fail the request, since a cache miss means the data is unavailable
+        correct: false
+        rep: -8
+        consequence: >
+          A cache maintenance window becomes a dispatch outage.
+        explain: >
+          That makes the cache a hard dependency, which is the opposite of why it was
+          introduced.
+      - id: c
+        label: Use a premium cache with zone redundancy, so it does not fail
+        correct: false
+        rep: -5
+        consequence: >
+          Availability improves and the first genuine outage still takes dispatch with it.
+        explain: >
+          Redundancy reduces the frequency and does not remove the case. Design the fallback as
+          well.
+      - id: d
+        label: Keep a second cache in another region and fail over to it
+        correct: false
+        rep: -6
+        consequence: >
+          A second cache is operated and paid for, and the failover path is untested.
+        explain: >
+          Two caches is more machinery for a component whose source of truth is a database
+          sitting right there.

@@ -1,0 +1,195 @@
+id: a2dt-q03
+chapter: act2-data
+title: Ten Thousand Trailers
+summary: Telemetry from every trailer, every thirty seconds, and fourteen terabytes of scanned manifests from Straits.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ305-2.2.1
+  - AZ305-2.2.2
+brief: >
+  Two data sets arrive in the same month and neither belongs in a relational
+  database.
+debrief: >
+  A store shaped like the query for telemetry, and a store shaped like the object
+  for documents.
+encounters:
+  - id: a
+    type: design
+    title: Where the trailer telemetry goes
+    speaker: Grace Mendoza
+    objectives: [AZ305-2.2.1]
+    intro: >
+      "Ten thousand trailers, a reading every thirty seconds," says Grace. "Each
+      reading is a small document: position, temperature, door state, and whatever
+      the newer sensor generation adds next year, which will not match the older
+      one."
+
+
+      "The dispatch screen asks for the last known state of one trailer,
+      constantly, and wants it back in single-digit milliseconds. Analytics reads
+      the whole month once a month."
+    prompt: Where does the telemetry land?
+    options:
+      - id: a
+        label: >
+          Azure Cosmos DB partitioned by trailer, with a time-to-live, and older data landing
+          in the data lake for analytics
+        correct: true
+        rep: 9
+        consequence: >
+          The dispatch screen reads a single document by partition key in about four
+          milliseconds, and the lake holds the history for the monthly run.
+        explain: >
+          Cosmos DB is built for high-volume semi-structured documents with predictable
+          low-latency point reads, and a schema that varies between sensor generations is
+          exactly what a document store absorbs. Partitioning by trailer matches the query.
+          Analytics does not belong on the same store, which is what the lake and the analytical
+          store are for.
+        diagram:
+          - {op: add_node, node: cosmos-telemetry}
+          - {op: add_node, node: eventhub-telemetry}
+          - {op: add_edge, edge: e2-eh-telemetry}
+      - id: b
+        label: Azure SQL Database with a table for readings, indexed on trailer and timestamp
+        correct: false
+        rep: -7
+        consequence: >
+          Twenty-eight million rows a day arrive in a relational table, and the schema change
+          for the new sensor generation becomes a project.
+        explain: >
+          A relational engine can do this and pays for it in write amplification, index
+          maintenance and schema rigidity. The requirement has a varying shape and a very high
+          write rate, which is the document database case.
+      - id: c
+        label: Append the readings to blob storage as JSON files, one per trailer per day
+        correct: false
+        rep: -6
+        consequence: >
+          The dispatch screen has to read and parse a growing file to find the last reading,
+          and the latency requirement is missed by two orders of magnitude.
+        explain: >
+          Blob storage is excellent for the analytical copy and is not a low-latency point
+          lookup store. The read pattern decides this.
+      - id: d
+        label: Azure Cache for Redis as the primary store, with periodic snapshots to storage
+        correct: false
+        rep: -8
+        consequence: >
+          A cache eviction during peak loses the last known state of several hundred trailers.
+        explain: >
+          Redis is the right shape for the read and the wrong shape for the system of record.
+          It is a cache in front of a durable store, not the store.
+  - id: b
+    type: design
+    title: Fourteen terabytes of paper
+    speaker: Marek Sobczak
+    objectives: [AZ305-2.2.2]
+    intro: >
+      "Straits scanned every manifest since 2011," says Marek. "Fourteen terabytes
+      of PDF files, average two hundred kilobytes. Almost nothing is read.
+      Occasionally legal ask for one and want it the same day."
+
+
+      Straits keep them on a file server with a folder structure that encodes the
+      depot and the date.
+    prompt: Where do the manifests go?
+    options:
+      - id: a
+        label: >
+          Blob storage with a lifecycle policy tiering by age, and the folder structure kept as
+          the blob prefix
+        correct: true
+        rep: 8
+        consequence: >
+          The copy runs for six days over the link, the oldest data lands in archive, and legal
+          requests are answered from an index rather than a share.
+        explain: >
+          Unstructured documents nobody reads are the case blob storage was built for, with
+          lifecycle rules doing the tiering. Keeping the existing path as the prefix preserves
+          the only index anybody has, and prefixes are how blob storage is queried.
+        diagram:
+          - {op: add_node, node: st-manifests}
+          - {op: add_edge, edge: e2-sf-files}
+      - id: b
+        label: An Azure Files share, so the existing folder structure and access method are unchanged
+        correct: false
+        rep: -6
+        consequence: >
+          Fourteen terabytes are held at file share prices for documents that are read four
+          times a month.
+        explain: >
+          Files is right when something must mount a share. Nothing here mounts anything once
+          the application is retired, and blob tiering is dramatically cheaper at this volume.
+      - id: c
+        label: Azure NetApp Files, for performance on the legal retrieval
+        correct: false
+        rep: -9
+        consequence: >
+          The most expensive storage in the portfolio is bought for the least demanding
+          workload in the estate.
+        explain: >
+          NetApp Files exists for latency-sensitive enterprise file workloads. Four retrievals
+          a month is the opposite requirement.
+      - id: d
+        label: Store the documents as binary columns in the managed instance beside the ERP data
+        correct: false
+        rep: -8
+        consequence: >
+          The database grows by fourteen terabytes, and every backup and restore now carries
+          the manifests with it.
+        explain: >
+          Large binary objects in a relational database inflate backups, restores and licensing
+          cost. Keep the document in blob storage and the reference in the database.
+  - id: c
+    type: design
+    title: What the sensor team asks for next
+    speaker: Grace Mendoza
+    objectives: [AZ305-2.2.1]
+    intro: >
+      "The sensor team want to know whether they can query telemetry by
+      geographic area," says Grace. "Show me every trailer within twenty
+      kilometers of Ipoh in the last hour. Once a minute, from the control room."
+    prompt: How do you answer that?
+    options:
+      - id: a
+        label: >
+          Keep Cosmos DB for the per-trailer reads and serve the geographic query from a
+          purpose-built index or the analytical store
+        correct: true
+        rep: 8
+        explain: >
+          A partition key optimizes one access pattern. A query across all partitions by
+          location is a cross-partition scan, which is expensive and slow in a document store.
+          Serving a second access pattern from a second structure, whether a search index, a
+          geospatial index or the analytical store, is the normal answer.
+      - id: b
+        label: Change the partition key to a geographic cell so the query is efficient
+        correct: false
+        rep: -7
+        consequence: >
+          The dispatch screen's per-trailer read becomes a cross-partition query, which is the
+          workload that actually runs constantly.
+        explain: >
+          A container has one partition key. Optimizing it for the once-a-minute query at the
+          expense of the constant one is the wrong trade.
+      - id: c
+        label: Run the geographic query as a cross-partition query once a minute
+        correct: false
+        rep: -6
+        consequence: >
+          The request unit consumption from one query a minute exceeds the entire dispatch
+          workload.
+        explain: >
+          Cross-partition scans across ten thousand partitions are charged accordingly. It
+          works and the cost is the reason nobody does it.
+      - id: d
+        label: Move the whole telemetry store to a relational database with spatial types
+        correct: false
+        rep: -8
+        consequence: >
+          The write rate that motivated the document store comes back, in exchange for one
+          query.
+        explain: >
+          Redesigning the primary store around a secondary access pattern is how systems end
+          up serving neither well.

@@ -1,0 +1,240 @@
+id: a2in-q05
+chapter: act2-infrastructure
+title: One Front Door for the APIs
+summary: Nine APIs, three consumers who are not Meridian, and every team about to invent their own authentication.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ305-4.2.3
+  - AZ305-4.4.5
+brief: >
+  API integration and traffic routing, decided together because the same request
+  passes through both.
+debrief: >
+  A gateway that owns the contract with consumers, and a routing layer that knows
+  which region is healthy.
+encounters:
+  - id: a
+    type: design
+    title: Nine APIs, three audiences
+    speaker: Grace Mendoza
+    objectives: [AZ305-4.2.3]
+    intro: >
+      "Nine internal APIs," says Grace. "Three of them are also used by Northgate,
+      Sriwijaya and the customs broker. Each team has invented its own key
+      handling, two of them log request bodies, and nobody can tell a partner what
+      their rate limit is because there is not one."
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          API Management in front of the externally consumed APIs, owning authentication, rate
+          limits, versioning and the developer portal
+        correct: true
+        rep: 9
+        consequence: >
+          Partners get one base address, documented limits and keys that can be revoked without
+          a deployment.
+        explain: >
+          A gateway is where cross-cutting API concerns belong: authentication and authorization,
+          throttling, quotas, versioning, transformation and a portal partners can self-serve
+          from. Applying it to the externally consumed subset keeps the internal calls simple.
+        diagram:
+          - {op: add_node, node: apim-gateway}
+          - {op: add_edge, edge: e2-apim-aks}
+          - {op: add_edge, edge: e2-apim-func}
+      - id: b
+        label: A shared library each team imports for keys and rate limiting
+        correct: false
+        rep: -6
+        consequence: >
+          Three services are two versions behind the library, and the rate limit is enforced per
+          instance rather than per consumer.
+        explain: >
+          Library-based policy depends on every team upgrading, and it cannot enforce a limit
+          across instances. Cross-cutting concerns belong in front of the services.
+      - id: c
+        label: API Management in front of all nine, internal and external
+        correct: false
+        rep: -5
+        consequence: >
+          Internal service-to-service calls take an extra hop through a gateway that adds
+          nothing to them.
+        explain: >
+          Fronting everything is defensible for consistency and adds latency and a dependency to
+          calls that have no external consumer. Start with the boundary that has one.
+      - id: d
+        label: An Application Gateway with routing rules per API
+        correct: false
+        rep: -7
+        consequence: >
+          Routing works and partners still have nine different authentication schemes and no
+          documentation.
+        explain: >
+          Application Gateway routes and inspects at layer seven. It does not manage API keys,
+          products, quotas or a developer portal, which is most of the requirement here.
+  - id: b
+    type: design
+    title: Getting the request to the right region
+    speaker: Marek Sobczak
+    objectives: [AZ305-4.4.5]
+    intro: >
+      "The tracking portal and the partner APIs will run in Southeast Asia
+      normally and East Asia during a failover," says Marek. "Traffic arrives from
+      the public internet. We want the web application firewall in the path, and we
+      want failover in seconds rather than in whatever a resolver has cached."
+    prompt: What routing layer do you recommend?
+    options:
+      - id: a
+        label: >
+          Azure Front Door with the web application firewall, origins in both regions and health
+          probes deciding
+        correct: true
+        rep: 9
+        consequence: >
+          A regional failure moves traffic in about thirty seconds without a DNS change, and the
+          firewall runs at the edge.
+        explain: >
+          Front Door terminates at the edge, applies the web application firewall there, and
+          routes to the healthiest origin based on its own probes, so failover does not wait for
+          DNS caching. That combination is what the requirement describes.
+        diagram:
+          - {op: add_edge, edge: e2-fd-appgw}
+          - {op: add_node, node: appgw-waf}
+          - {op: add_edge, edge: e2-appgw-aks}
+      - id: b
+        label: Traffic Manager with endpoints in both regions
+        correct: false
+        rep: -6
+        consequence: >
+          Failover works and clients with cached DNS answers keep trying the dead region for
+          minutes.
+        explain: >
+          Traffic Manager routes by DNS, so its failover speed is bounded by time to live and
+          resolver behavior, and it cannot host a web application firewall because it never sees
+          the request.
+      - id: c
+        label: An Application Gateway in each region with a public address each
+        correct: false
+        rep: -7
+        consequence: >
+          Partners have to be told two addresses and decide for themselves which one is up.
+        explain: >
+          Application Gateway is a regional service. Something global has to sit in front of the
+          two to make failover the platform's problem rather than the client's.
+      - id: d
+        label: A cross-region load balancer in front of the regional gateways
+        correct: false
+        rep: -5
+        consequence: >
+          Traffic distributes across regions at layer four, with no web application firewall and
+          no caching of static content.
+        explain: >
+          The cross-region load balancer is a real option for global layer four traffic. For
+          HTTP with a firewall requirement, Front Door is the layer seven answer.
+  - id: c
+    type: troubleshoot
+    title: DRV-1160
+    speaker: Joana Reyes
+    objectives: [AZ305-4.4.5, AZ305-4.2.3]
+    intro: >
+      The proof of concept is up. Requests through Front Door reach the portal.
+      Partner API calls through the gateway fail with a 403 from the origin, but
+      only when they come through Front Door; going straight to the origin works.
+    ticket:
+      ref: DRV-1160
+      opened: "11:40"
+      reporter: Joana Reyes
+      summary: Partner API calls fail with 403 when routed through the global front end.
+      severity: sev3
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what the origin is checking
+        speaker: Marek Sobczak
+        reveals: >
+          "The gateway validates the host header against the API's configured host name, and
+          it is seeing the Front Door host name instead."
+      - id: b
+        action: Ask what changed in the request path
+        speaker: Grace Mendoza
+        reveals: >
+          "Nothing at the origin. The only difference is that Front Door is now terminating
+          the connection and forwarding it."
+    commands:
+      - id: a
+        label: Check what the origin receives
+        cmd: "kql: ApiManagementGatewayLogs | top 1 by TimeGenerated desc | project Host=tostring(parse_url(Url).Host), ResponseCode"
+        output: |
+          Host                                    ResponseCode
+          --------------------------------------  --------------
+          meridian-fd-a1b2.azurefd.net            403
+        time_cost: 1
+      - id: b
+        label: Check the Front Door origin configuration
+        cmd: az afd origin show -g rg-edge --profile-name fd-meridian --origin-group-name og-api --origin-name api-sea --query "{host:hostName,originHostHeader:originHostHeader}" -o json
+        output: |
+          {
+            "host": "apim-meridian.azure-api.net",
+            "originHostHeader": null
+          }
+        time_cost: 1
+      - id: c
+        label: Confirm the origin works when called directly
+        cmd: >-
+          curl -sS -o /dev/null -w "%{http_code}" -H "Ocp-Apim-Subscription-Key: REDACTED"
+          https://apim-meridian.azure-api.net/shipments/v1/ping
+        output: |
+          200 OK
+          {"status":"ok","region":"southeastasia"}
+        time_cost: 1
+      - id: d
+        label: Check whether the firewall is blocking anything
+        cmd: "kql: AzureDiagnostics | where Category == 'FrontdoorWebApplicationFirewallLog' | summarize count() by action_s"
+        output: |
+          action_s    count_
+          ----------  --------
+          Allowed     1841
+        time_cost: 1
+    fixes:
+      - id: a
+        label: Set the origin host header to the gateway's own host name
+        correct: true
+        rep: 9
+        consequence: >
+          The next call returns 200, and the design note records that the origin validates the
+          host header.
+        explain: >
+          Front Door forwards its own host name by default, and any origin that validates the
+          host header rejects it. Setting the origin host header explicitly is the supported
+          fix, and it is worth knowing before an origin is chosen rather than after.
+      - id: b
+        label: Disable host header validation on the gateway
+        correct: false
+        rep: -7
+        consequence: >
+          The 403 goes away and the origin now accepts requests for any host name, including
+          direct calls that bypass Front Door.
+        explain: >
+          Host validation is part of what stops an origin being addressed directly. Removing it
+          to fix a header is the wrong direction; restricting the origin to Front Door traffic
+          is the right one.
+      - id: c
+        label: Add the Front Door host name to the gateway's accepted host names
+        correct: false
+        rep: -5
+        consequence: >
+          It works, and every API in the gateway now answers to an edge host name that will
+          change if the profile is rebuilt.
+        explain: >
+          Accepting the edge host name is a workaround that couples the origin's configuration to
+          a generated name. Setting the origin host header keeps the origin unaware of the edge.
+      - id: d
+        label: Route partner traffic around Front Door directly to the gateway
+        correct: false
+        rep: -8
+        consequence: >
+          Partner traffic loses the web application firewall and the regional failover that
+          justified the design.
+        explain: >
+          Removing the component to avoid configuring it gives up everything it was added for.

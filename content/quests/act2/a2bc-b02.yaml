@@ -1,0 +1,141 @@
+id: a2bc-b02
+chapter: act2-continuity
+title: The Database Cannot Stop, Exam Hard
+summary: Availability inside a region and availability across regions are different products, and the review board knows it.
+variant: bonus
+bonus_of: a2bc-q03
+estimated_minutes: 11
+objectives:
+  - AZ305-3.2.1
+  - AZ305-3.2.2
+brief: >
+  Every option here is a real availability feature. Only one answers the sentence
+  as written.
+debrief: >
+  Zone redundancy for a data center, replication for a region, and a clear head
+  about which failure each one covers.
+encounters:
+  - id: a
+    type: design
+    title: Inside the region
+    speaker: Wei Lin Tan
+    objectives: [AZ305-3.2.2]
+    intro: >
+      "The failover group covers losing Southeast Asia," says Wei Lin. "What
+      covers losing one data center inside Southeast Asia, which is a much more
+      likely event, without failing over to another country?"
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: Zone-redundant configuration for the database, keeping the failover group for regional loss
+        correct: true
+        rep: 8
+        consequence: >
+          A zone event is absorbed without a regional failover and without a data loss window.
+        explain: >
+          Zone redundancy places replicas across availability zones inside the region, so losing
+          a data center is handled transparently with no failover decision and no data loss. The
+          geo-replication relationship remains for the regional case. They are complementary,
+          not alternatives.
+      - id: b
+        label: Rely on the failover group, which will promote the secondary if anything fails
+        correct: false
+        rep: -7
+        consequence: >
+          A single zone event moves the primary to another country, taking every dependent
+          service's latency with it.
+        explain: >
+          Regional failover for a zone-level failure is a large response to a small event, and
+          it comes with a data loss window and a return journey.
+      - id: c
+        label: Add a second read replica in the same region
+        correct: false
+        rep: -6
+        consequence: >
+          The replica happens to be in the same zone as the primary, and both go together.
+        explain: >
+          A replica without zone placement guarantees nothing about where it sits. Zone
+          redundancy is the property being asked for.
+      - id: d
+        label: Increase the backup frequency so recovery from a zone failure is quicker
+        correct: false
+        rep: -8
+        consequence: >
+          A zone failure now requires a restore, which takes longer than the objective by an
+          order of magnitude.
+        explain: >
+          Backups do not provide availability. Redundant replicas do.
+  - id: b
+    type: design
+    title: The read replica that is not a standby
+    speaker: Grace Mendoza
+    objectives: [AZ305-3.2.1]
+    intro: >
+      A junior engineer's design proposes serving the tracking portal from the
+      geo-replicated secondary in East Asia to reduce load on the primary, and
+      counting that as the disaster recovery plan as well.
+    prompt: What is wrong with it?
+    options:
+      - id: a
+        label: >
+          Nothing is wrong with reading from it, but the portal's latency and the failover
+          behavior both need designing rather than assuming
+        correct: true
+        rep: 8
+        explain: >
+          Reading from a geo-secondary is supported and is a real way to offload reads. The
+          design has to account for cross-region read latency for users near the primary, for
+          the replica becoming the primary during a failover, and for what happens to those
+          reads while the failover is in progress.
+      - id: b
+        label: A geo-secondary cannot be read at all
+        correct: false
+        rep: -6
+        consequence: A capability the design could have used is ruled out on a false constraint.
+        explain: >
+          Active geo-replication secondaries are readable. That is one of the reasons to choose
+          it over geo-restore.
+      - id: c
+        label: Reading from the secondary breaks replication
+        correct: false
+        rep: -6
+        consequence: A supported pattern is rejected in a review with a reason that will be checked.
+        explain: >
+          Read workloads on a secondary do not interfere with replication. They consume its
+          compute, which is a sizing consideration.
+  - id: c
+    type: knowledge
+    title: Two words that are not synonyms
+    speaker: Grace Mendoza
+    objectives: [AZ305-3.2.1]
+    intro: >
+      "Last one," says Grace. "Somebody says a workload is highly available, so it
+      does not need disaster recovery. What is the shortest correct answer?"
+    question: Why does high availability not replace disaster recovery?
+    options:
+      - id: a
+        label: >
+          High availability handles component failure inside a scope; disaster recovery handles
+          the loss of that scope
+        correct: true
+        rep: 6
+        explain: >
+          Redundant instances across zones keep a service running when a node or a data center
+          fails. Nothing inside the region survives the region being unavailable, or a mistake
+          that replicates instantly to every replica.
+      - id: b
+        label: High availability protects compute and disaster recovery protects data
+        correct: false
+        rep: -5
+        consequence: A design assumes replicated compute plus local backups covers a regional event.
+        explain: >
+          Both cover both. The distinction is the scope of the failure, not the type of
+          resource.
+      - id: c
+        label: They are the same thing at different price points
+        correct: false
+        rep: -6
+        consequence: A single mechanism is bought, and the failure it does not cover is the one that happens.
+        explain: >
+          They answer different failures and are usually both required. Spending more on one
+          does not turn it into the other.
