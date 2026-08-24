@@ -1,0 +1,176 @@
+id: a1st-b01
+chapter: act1-storage
+title: The Key in the Config File, Exam Hard
+summary: Same partner, same container, and every plausible way to hand out access is on the table.
+variant: bonus
+bonus_of: a1st-q02
+estimated_minutes: 11
+objectives:
+  - AZ104-2.1.2
+  - AZ104-2.1.3
+  - AZ104-2.1.4
+brief: >
+  Four kinds of shared access signature, two account keys, and one requirement
+  that rules out most of them.
+debrief: >
+  If you can answer which signature type to use and how to revoke it, you can
+  answer most of what this exam asks about storage security.
+encounters:
+  - id: a
+    type: design
+    title: Which signature
+    speaker: Wei Lin Tan
+    objectives: [AZ104-2.1.2]
+    intro: >
+      A second partner integration is being built, this time by Meridian's own
+      developers. Their service runs on a virtual machine in vnet-app with a
+      managed identity, and it needs to hand short-lived upload links to a mobile
+      app used by drivers.
+
+
+      "I do not want another credential signed with the account key," says Wei
+      Lin. "And I want to be able to see who issued a link if one is abused."
+    prompt: What kind of shared access signature do you use?
+    options:
+      - id: a
+        label: >
+          A user delegation signature, signed with a key obtained from Microsoft Entra using
+          the service's managed identity
+        correct: true
+        rep: 9
+        consequence: >
+          The links carry the identity that issued them, expire in fifteen minutes, and
+          nothing on the virtual machine holds an account key.
+        explain: >
+          A user delegation signature is signed with a key that Entra issues to a security
+          principal rather than with the storage account key. It carries the issuing identity
+          in the diagnostic logs, is limited to blob storage, and can be revoked by revoking
+          the delegation key.
+      - id: b
+        label: An account signature scoped to the blob service with write permission
+        correct: false
+        rep: -7
+        consequence: >
+          The account key is back in the deployment, and the signature covers every container
+          in the account.
+        explain: >
+          An account signature is signed with an account key and can span services and
+          containers. It is the widest of the options and puts the key back in the
+          application.
+      - id: c
+        label: A service signature tied to a stored access policy on the container
+        correct: false
+        rep: -5
+        consequence: >
+          It works and every link is attributed to the storage account rather than to the
+          service that issued it.
+        explain: >
+          This is the right answer when the caller is an outside party with no identity in
+          your tenant, which is why the earlier partner got one. Here there is a managed
+          identity available, and the delegation signature is stronger.
+      - id: d
+        label: A service signature with a fifteen-minute expiry and no policy
+        correct: false
+        rep: -6
+        consequence: >
+          Short lifetimes limit the damage and nothing identifies which service issued a
+          given link.
+        explain: >
+          Short expiry is good practice on top of the right signature type, not a substitute
+          for it. This is still signed with the account key.
+  - id: b
+    type: design
+    title: Revoking in a hurry
+    speaker: Marek Sobczak
+    objectives: [AZ104-2.1.3, AZ104-2.1.4]
+    intro: >
+      It is 22:40. A partner reports that a laptop holding one of Meridian's
+      upload credentials has been stolen. You do not yet know which credential.
+
+
+      In circulation: Northgate's service signature under a stored access policy,
+      Sriwijaya's ad hoc service signature with four months to run, and the
+      internal service's user delegation signatures.
+    prompt: What do you do first?
+    options:
+      - id: a
+        label: >
+          Delete the stored access policy, then decide about the rest once you know which
+          partner it was
+        correct: true
+        rep: 8
+        consequence: >
+          Northgate's uploads stop immediately, which is a phone call in the morning rather
+          than a breach.
+        explain: >
+          Deleting or changing a stored access policy invalidates every signature issued
+          under it, immediately and without touching anything else. It is the only revocation
+          in this list that is both instant and narrow, which is exactly why the policy was
+          worth creating.
+      - id: b
+        label: Rotate both account keys straight away
+        correct: false
+        rep: -6
+        consequence: >
+          Every signature dies at once, including Sriwijaya's and several internal jobs, and
+          the night turns into a different incident.
+        explain: >
+          It is effective and indiscriminate. Rotating keys is the answer when the account
+          key itself is exposed, or when an ad hoc signature must be killed and there is no
+          policy behind it.
+      - id: c
+        label: Revoke the delegation key with the Entra revoke operation
+        correct: false
+        rep: -7
+        consequence: >
+          The internal service loses the ability to issue links and the partner credential is
+          still valid.
+        explain: >
+          Revoking user delegation keys kills the signatures your own service issues. The
+          partner credentials are signed with account keys and are unaffected.
+      - id: d
+        label: Set the account's shared access signature policy to a one-hour maximum expiry
+        correct: false
+        rep: -8
+        consequence: >
+          The policy applies to newly issued signatures and the stolen one keeps working
+          until its own expiry.
+        explain: >
+          An expiry policy constrains what can be issued from now on. It does nothing to
+          credentials already in the wild, which is the situation at 22:40.
+  - id: c
+    type: knowledge
+    title: What a signature cannot do
+    speaker: Marek Sobczak
+    objectives: [AZ104-2.1.2]
+    intro: >
+      "One more, then go home," says Marek. "Somebody hands you a service
+      signature for a container with read and list permissions, and the account
+      firewall denies by default with one virtual network allowed. The signature
+      holder is on a hotel network. What happens?"
+    question: What is the result of the request?
+    options:
+      - id: a
+        label: It is refused, because the firewall is evaluated before the signature
+        correct: true
+        rep: 6
+        explain: >
+          Network rules are checked first and a valid credential does not bypass them. A
+          shared access signature answers what a caller may do; the firewall answers where a
+          caller may come from, and both have to permit the request.
+      - id: b
+        label: It succeeds, because a valid signature is an explicit grant of access
+        correct: false
+        rep: -6
+        consequence: You design a partner integration that fails on the day the firewall goes on.
+        explain: >
+          Authorization and network access are separate gates. This is the most common
+          surprise when a storage firewall is enabled in front of existing integrations.
+      - id: c
+        label: It succeeds for list and fails for read, since list is a service-level operation
+        correct: false
+        rep: -5
+        consequence: An intermittent-looking failure gets diagnosed as a permission problem for an afternoon.
+        explain: >
+          Both are container operations and both are refused by the network rule. There is no
+          split behavior here.

@@ -1,0 +1,220 @@
+id: a1id-b01
+chapter: act1-identity
+title: Owner, Everywhere, Exam Hard
+summary: The same access review, with a custom role, an inherited deny, and a service principal that should not exist.
+variant: bonus
+bonus_of: a1id-q01
+estimated_minutes: 12
+objectives:
+  - AZ104-1.2.1
+  - AZ104-1.2.2
+  - AZ104-1.2.3
+brief: >
+  Every option here is something a competent administrator has actually done.
+  Only one of them is right for the requirement as written.
+debrief: >
+  Scope, role, deny, in that order. Everything else is detail.
+encounters:
+  - id: a
+    type: design
+    title: The role that does not exist yet
+    speaker: Wei Lin Tan
+    objectives: [AZ104-1.2.1, AZ104-1.2.2]
+    intro: >
+      "The Cebu desk needs to restart virtual machines at three in the morning
+      without waking anyone. Restart only. Not resize, not delete, not create,
+      not read a disk. There are eleven machines across two resource groups, and
+      the list changes."
+
+
+      You check the built-in roles. Virtual Machine Contributor manages virtual
+      machines fully. Reader sees and does nothing. There is nothing between them
+      that stops at restart.
+    prompt: What do you do?
+    options:
+      - id: a
+        label: >
+          Create a custom role with the restart action and read access, and assign it to the
+          NOC group at both resource groups
+        correct: true
+        rep: 8
+        consequence: >
+          The NOC restarts a hung scanner host at 03:12 the following Tuesday and nobody's
+          phone rings.
+        explain: >
+          When no built-in role matches the requirement, a custom role definition with
+          exactly the actions needed, such as the virtual machine restart action plus the
+          reads required to find the machine, is the correct tool. Assign it to a group at
+          the narrowest scope that covers the machines.
+      - id: b
+        label: Assign Virtual Machine Contributor to the NOC group at both resource groups
+        correct: false
+        rep: -7
+        consequence: >
+          Six weeks later a night shift resizes a machine to clear a memory alert and the
+          transport application is down until morning.
+        explain: >
+          Virtual Machine Contributor can create, resize, delete and manage the machines it
+          covers. It is the closest built-in role and it is far wider than restart only,
+          which is the requirement that was written down.
+      - id: c
+        label: Assign Reader to the NOC group and give them a runbook that restarts machines
+        correct: false
+        rep: -6
+        consequence: >
+          The automation account's identity now holds the permission, and anyone who can
+          start the runbook can restart anything it covers.
+        explain: >
+          It moves the permission to the automation identity rather than removing the need
+          for it. That is a legitimate pattern when you want an approval or logging step in
+          the middle, and it is not simpler or tighter here.
+      - id: d
+        label: Assign Contributor at the subscription and rely on the activity log to catch misuse
+        correct: false
+        rep: -12
+        consequence: >
+          The access review you just finished is undone in a single change, and the auditor
+          notices before the log does.
+        explain: >
+          Detective controls do not replace preventive ones, and this grants the NOC write
+          access to the entire estate to solve an eleven-machine restart problem.
+  - id: b
+    type: troubleshoot
+    title: INC-4471
+    speaker: Marek Sobczak
+    objectives: [AZ104-1.2.3]
+    intro: >
+      The custom role is assigned. The NOC still cannot restart one machine out of
+      eleven, and it is the one in rg-data.
+
+
+      Marek has looked at it for ten minutes, which is his limit before he hands
+      something over. "It is not the role. The role is identical on both groups. I
+      have checked twice."
+
+
+      You have three time units, because it is 03:20 and the machine is down.
+    ticket:
+      ref: INC-4471
+      opened: "03:20"
+      reporter: Marek Sobczak
+      summary: NOC can restart ten of eleven machines. The eleventh refuses with an authorization error.
+      severity: sev2
+    time_budget: 3
+    investigate:
+      - id: a
+        action: Ask what is different about rg-data
+        speaker: Wei Lin Tan
+        reveals: >
+          "rg-data is where the managed application from the archiving vendor is deployed.
+          That was installed in June and it brought its own resource group settings."
+      - id: b
+        action: Ask what the error says exactly
+        speaker: Marek Sobczak
+        reveals: >
+          "The client has permission, but the request is disallowed by a deny assignment.
+          Which is not an error I see very often."
+    commands:
+      - id: a
+        label: List deny assignments on the resource group
+        cmd: az rest --method get --url "https://management.azure.com/subscriptions/00000000/resourceGroups/rg-data/providers/Microsoft.Authorization/denyAssignments?api-version=2022-04-01"
+        output: |
+          {
+            "value": [
+              {
+                "name": "Deny assignment from managed application",
+                "properties": {
+                  "permissions": [ { "actions": ["Microsoft.Compute/virtualMachines/*"] } ],
+                  "excludePrincipals": [ { "id": "vendor-app-identity" } ]
+                }
+              }
+            ]
+          }
+        time_cost: 1
+      - id: b
+        label: Confirm the role assignment is really there
+        cmd: az role assignment list --assignee sg-noc-cebu --scope /subscriptions/00000000/resourceGroups/rg-data -o table
+        output: |
+          Principal     Role                 Scope
+          ------------  -------------------  ----------------------------------------
+          sg-noc-cebu   NOC Restart Only     /subscriptions/.../resourceGroups/rg-data
+        time_cost: 1
+      - id: c
+        label: Check the machine is actually running
+        cmd: az vm get-instance-view -n vm-archive01 -g rg-data --query "instanceView.statuses[].displayStatus" -o tsv
+        output: |
+          Provisioning succeeded
+          VM running
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Move vm-archive01 out of the managed application's resource group, or ask the
+          vendor to add the NOC group to the deny assignment's exclusions
+        correct: true
+        rep: 10
+        consequence: >
+          The vendor adds the exclusion in the morning. Tonight, Marek restarts it himself
+          with the account that is already excluded.
+        explain: >
+          Deny assignments are created by the platform, most often by managed applications
+          and blueprints, and they beat every role assignment. You cannot out-grant one:
+          either the principal is in its exclusions or the resource is outside its scope.
+      - id: b
+        label: Add the Owner role to the NOC group on rg-data
+        correct: false
+        rep: -9
+        consequence: >
+          It changes nothing, and there is now an Owner assignment on the data group at
+          three in the morning with no change record.
+        explain: >
+          A deny assignment overrides every role, including Owner. Escalating the role in
+          response to a deny is the reflex worth unlearning.
+      - id: c
+        label: Recreate the custom role with the wildcard compute action instead of restart
+        correct: false
+        rep: -8
+        consequence: >
+          The role is wider, the restart still fails, and the access review is worse.
+        explain: >
+          The deny assignment covers the wildcard compute action, so a broader role runs
+          into the same wall. The permission was never the problem.
+  - id: c
+    type: knowledge
+    title: The order of evaluation
+    speaker: Marek Sobczak
+    objectives: [AZ104-1.2.3]
+    intro: >
+      "Say it back to me," says Marek, "so you have it at three in the morning
+      when it matters. Somebody has a role assignment, a deny assignment, and a
+      resource lock all pointing at the same resource."
+    question: In what order does Azure decide whether the action goes through?
+    options:
+      - id: a
+        label: >
+          Roles are combined first, then deny assignments override them, and a lock can still
+          refuse the operation on top of both
+        correct: true
+        rep: 6
+        explain: >
+          Authorization combines every applicable role assignment, then applies deny
+          assignments, which win. Resource locks are checked separately as part of the
+          request: a CanNotDelete lock refuses a delete even from an Owner with no deny
+          assignment anywhere.
+      - id: b
+        label: The lock is checked first, then deny assignments, then roles
+        correct: false
+        rep: -5
+        consequence: You explain an authorization failure in the wrong order and look for the fault in the wrong place.
+        explain: >
+          Order matters less than the outcome, and the outcome is that a deny beats a role
+          and a lock refuses regardless of either. Reading a failure means checking all
+          three, not just the one you assigned.
+      - id: c
+        label: Locks apply only to Contributors; Owners bypass them
+        correct: false
+        rep: -6
+        consequence: An Owner tries to delete a locked resource group, fails, and removes the lock in frustration.
+        explain: >
+          Locks apply to everyone. The way past a lock is to remove the lock, which is a
+          deliberate and auditable act rather than a side effect of holding a role.

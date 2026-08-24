@@ -1,0 +1,208 @@
+id: a1st-b02
+chapter: act1-storage
+title: East Asia Wants a Copy, Exam Hard
+summary: The region is down, the secondary is behind, and somebody senior is asking about the failover button.
+variant: bonus
+bonus_of: a1st-q06
+estimated_minutes: 11
+objectives:
+  - AZ104-2.2.2
+  - AZ104-2.2.3
+  - AZ104-2.1.1
+brief: >
+  Redundancy questions are easy until the day you have to use it. This is that
+  day, with the clock running.
+debrief: >
+  Failover is a decision about accepting data loss, and it is not reversible in
+  the way people assume.
+encounters:
+  - id: a
+    type: troubleshoot
+    title: INC-4600
+    speaker: Meridian NOC
+    objectives: [AZ104-2.2.2]
+    intro: >
+      Southeast Asia has been degraded for fifty minutes. Storage in the region is
+      returning intermittent errors and Microsoft's status page says engineers are
+      engaged with no estimate.
+
+
+      Scans cannot be written. Depot drivers are queuing uploads on their
+      handhelds, which hold about six hours' worth. Dana is on a call with Priya
+      and both of them have heard the phrase customer-initiated failover.
+    ticket:
+      ref: INC-4600
+      opened: "13:05"
+      reporter: Meridian NOC
+      summary: Regional storage degradation. Writes to stmeridianpod failing intermittently.
+      severity: sev1
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what the handhelds do when they cannot upload
+        speaker: Hendrik Salim
+        reveals: >
+          "They queue. About six hours of scans, then they start refusing new deliveries,
+          which is the part that stops trucks."
+      - id: b
+        action: Ask what the account's replication status looks like
+        speaker: Marek Sobczak
+        reveals: >
+          "Last sync time is eleven minutes before the incident started. So the secondary
+          is missing at least eleven minutes of scans, probably more."
+    commands:
+      - id: a
+        label: Check the account's redundancy and last sync time
+        cmd: az storage account show -n stmeridianpod -g rg-data --query "{sku:sku.name,status:statusOfPrimary,secondary:statusOfSecondary,lastSync:geoReplicationStats.lastSyncTime}" -o json
+        output: |
+          {
+            "lastSync": "2026-08-24T12:54:11Z",
+            "secondary": "available",
+            "sku": "Standard_GRS",
+            "status": "unavailable"
+          }
+        time_cost: 1
+      - id: b
+        label: Check whether the East Asia replica account is healthy
+        cmd: az storage account show -n stmeridianpoddr -g rg-data --query "{status:statusOfPrimary,sku:sku.name}" -o json
+        output: |
+          {
+            "sku": "Standard_LRS",
+            "status": "available"
+          }
+        time_cost: 1
+      - id: c
+        label: Check whether writes are failing everywhere or only sometimes
+        cmd: az storage blob upload --account-name stmeridianpod -c pod-scans -n probe.txt --data "probe" --auth-mode login
+        output: |
+          (ServiceUnavailable) The server is busy. Please retry the request.
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Point the intake service at the East Asia replica account for new writes, and leave
+          the geo-redundant account alone
+        correct: true
+        rep: 10
+        consequence: >
+          The handhelds drain into East Asia within the hour. When the primary region
+          recovers, the two sets of scans are reconciled by prefix and nothing is lost.
+        explain: >
+          The replica account created for object replication is an ordinary account in a
+          healthy region, and it can take writes. Customer-initiated failover of the
+          geo-redundant account would discard everything written after the last sync time,
+          which is at least eleven minutes of scans, and the account comes back as locally
+          redundant afterwards.
+      - id: b
+        label: Initiate customer-initiated failover of stmeridianpod to the secondary region
+        correct: false
+        rep: -11
+        consequence: >
+          Eleven minutes of scans are gone permanently, the account returns as locally
+          redundant, and re-establishing geo-redundancy takes a full recopy.
+        explain: >
+          Failover promotes the secondary as it stands. Anything not yet replicated is lost,
+          the operation cannot be undone, and the account is locally redundant until you
+          reconfigure and re-replicate it.
+      - id: c
+        label: Wait for the region to recover, since the handhelds hold six hours
+        correct: false
+        rep: -6
+        consequence: >
+          The incident runs past six hours, depots start refusing deliveries, and the
+          decision gets made under much more pressure.
+        explain: >
+          Waiting is a legitimate option when there is headroom and no alternative, and here
+          there is a healthy account in another region already holding a copy. Using it costs
+          nothing and buys the whole afternoon.
+      - id: d
+        label: Change the account to read-access geo-redundant so the secondary can be used
+        correct: false
+        rep: -9
+        consequence: >
+          The change cannot complete while the primary is unavailable, and read access would
+          not have allowed writes anyway.
+        explain: >
+          Read access to the secondary is exactly that: read only. It never accepts writes,
+          and the queued scans are writes.
+  - id: b
+    type: design
+    title: After the region comes back
+    speaker: Dana Ong
+    objectives: [AZ104-2.2.3, AZ104-2.1.1]
+    intro: >
+      The region recovered at 18:20. Six hours of scans are in the East Asia
+      account, everything older is in the primary, and Dana wants one place to
+      look tomorrow morning.
+    prompt: How do you reconcile it?
+    options:
+      - id: a
+        label: >
+          Copy the East Asia blobs written during the incident back to the primary with
+          AzCopy, then let object replication resume as normal
+        correct: true
+        rep: 8
+        consequence: >
+          The primary is complete by 21:00 and the replication backlog clears overnight.
+        explain: >
+          Object replication is one-way from the primary, so blobs written directly to the
+          destination will never travel back on their own. A one-off server-side copy of the
+          incident window is the reconciliation, after which the normal flow resumes.
+      - id: b
+        label: Reverse the replication policy so East Asia becomes the source
+        correct: false
+        rep: -8
+        consequence: >
+          Two years of primary scans start being overwritten by a container that only holds
+          six hours of them.
+        explain: >
+          Reversing the policy makes the smaller, newer container authoritative. Replication
+          is a copy relationship, not a merge.
+      - id: c
+        label: Leave the incident scans in East Asia and teach the claims application both accounts
+        correct: false
+        rep: -6
+        consequence: >
+          Every future query has two places to look, and the six-hour window becomes a piece
+          of tribal knowledge.
+        explain: >
+          It works and it leaves a permanent seam in the data for a one-off event. Copy it
+          back while everyone still remembers why.
+  - id: c
+    type: knowledge
+    title: Four letters that matter
+    speaker: Marek Sobczak
+    objectives: [AZ104-2.2.2]
+    intro: >
+      "Before you write the incident review," says Marek. "A customer asks whether
+      their scans survive an entire availability zone failing, and whether they
+      survive the region failing. Locally redundant, zone-redundant, geo-redundant,
+      geo-zone-redundant. Which one answers yes to both?"
+    question: Which redundancy option survives both a zone failure and a regional failure?
+    options:
+      - id: a
+        label: Geo-zone-redundant storage, which spreads the primary copies across zones and replicates to a second region
+        correct: true
+        rep: 6
+        explain: >
+          Locally redundant keeps three copies in one data center. Zone-redundant spreads
+          them across three availability zones in one region. Geo-redundant keeps three
+          local copies plus a replicated copy in the paired region. Geo-zone-redundant does
+          both: zone spread in the primary and a copy in the secondary region.
+      - id: b
+        label: Geo-redundant storage, since the copies in the primary region are already spread out
+        correct: false
+        rep: -5
+        consequence: A customer questionnaire is answered too optimistically and has to be corrected later.
+        explain: >
+          Geo-redundant storage keeps its three primary copies inside a single data center.
+          Zone spread in the primary region is what the zone variant adds.
+      - id: c
+        label: Zone-redundant storage, because zones are in different physical locations
+        correct: false
+        rep: -5
+        consequence: A continuity plan is signed off believing a regional event is covered when it is not.
+        explain: >
+          Availability zones are separate locations inside one region and share a regional
+          fate for events that affect the region as a whole. Surviving that needs a copy
+          somewhere else.

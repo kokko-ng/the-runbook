@@ -1,0 +1,251 @@
+id: a1id-q06
+chapter: act1-identity
+title: Priya Reads the Invoice
+summary: The CFO has questions about a bill that grew nineteen per cent in a quarter, and she has brought a printout.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ104-1.3.5
+  - AZ104-1.3.6
+  - AZ104-1.3.7
+brief: >
+  Cost is a governance problem before it is a technical one. You are about to
+  find out how much of it is structure.
+debrief: >
+  A management group hierarchy that policy can hang off, a budget that warns
+  before the invoice does, and one non-production subscription that is finally
+  separate.
+encounters:
+  - id: a
+    type: design
+    title: One subscription for everything
+    speaker: Priya Raghunathan
+    objectives: [AZ104-1.3.5]
+    intro: >
+      Priya has printed the invoice, which she says makes it easier to argue with.
+
+
+      "Everything is in one subscription. Production, the test environment the
+      developers keep rebuilding, and whatever the data team is doing with those
+      large virtual machines. I cannot tell which is which, I cannot cap one
+      without capping all of them, and the developers can spend production's
+      quota by accident."
+
+
+      Meridian has one Azure agreement, and creating subscriptions under it is
+      not a problem.
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          A separate non-production subscription for development and test, with production
+          left as it is
+        correct: true
+        rep: 8
+        consequence: >
+          The next invoice arrives with two lines, and Priya asks about only one of them.
+        explain: >
+          A subscription is a billing boundary, a scale boundary and a blast radius. Splitting
+          non-production out gives finance a line to look at, lets policy differ between the
+          two, and stops a test deployment consuming production's quota for a virtual machine
+          family.
+        diagram:
+          - {op: add_node, node: sub-nonprod}
+      - id: b
+        label: Keep one subscription and separate the environments with resource groups and tags
+        correct: false
+        rep: -6
+        consequence: >
+          The invoice becomes readable and the developers still hit the same quota ceiling
+          as production during a rebuild.
+        explain: >
+          Tags fix reporting only. Quotas, some policy scopes and several service limits are
+          per subscription, so environments that must not affect each other belong in
+          separate subscriptions.
+      - id: c
+        label: A subscription per depot, so each site is billed for what it uses
+        correct: false
+        rep: -8
+        consequence: >
+          Twenty-two subscriptions, twenty-two sets of role assignments, and the shared hub
+          still has nowhere natural to live.
+        explain: >
+          Subscription sprawl has a real management cost, and depots share the same
+          infrastructure anyway. Chargeback by site is a tagging question, not a
+          subscription question.
+      - id: d
+        label: Move the data team's virtual machines to a separate Azure account entirely
+        correct: false
+        rep: -7
+        consequence: >
+          The data team ends up outside every policy, every role assignment and every
+          monitoring rule Meridian has.
+        explain: >
+          A separate billing account puts the workload outside your tenant's governance.
+          Separation inside the same tenant is what management groups and subscriptions are
+          for.
+  - id: b
+    type: design
+    title: Somewhere to hang the rules
+    speaker: Wei Lin Tan
+    objectives: [AZ104-1.3.7]
+    intro: >
+      "If we are getting a second subscription," says Wei Lin, "I want the
+      allowed-regions policy and the tagging policy to apply to both, and to any
+      third one that appears without anybody telling me."
+
+
+      Today both policies are assigned directly to the production subscription.
+      There will be a third subscription eventually, for the acquisition everyone
+      is pretending is a secret.
+    prompt: How do you arrange it?
+    options:
+      - id: a
+        label: >
+          A management group above both subscriptions, with the policies assigned there and
+          removed from the subscription
+        correct: true
+        rep: 8
+        consequence: >
+          The non-production subscription inherits both policies the moment it is moved into
+          the group, without anyone assigning anything.
+        explain: >
+          Management groups sit above subscriptions and policy and role assignments made on
+          them are inherited by everything underneath. Assigning once at the right level is
+          what stops the third subscription arriving ungoverned.
+        diagram:
+          - {op: add_node, node: mg-meridian}
+          - {op: add_node, node: mg-workload}
+          - {op: add_edge, edge: e-mg-workload}
+          - {op: add_edge, edge: e-mg-sub-prod}
+          - {op: add_edge, edge: e-mg-sub-nonprod}
+      - id: b
+        label: Assign the same two policies to each subscription separately
+        correct: false
+        rep: -6
+        consequence: >
+          The acquisition's subscription appears in October with neither policy on it, and
+          nobody notices for a month.
+        explain: >
+          It works today and relies on somebody remembering next time. Inheritance from a
+          management group is the difference between a rule and a habit.
+      - id: c
+        label: Put the policies on the tenant root group so they apply to absolutely everything
+        correct: false
+        rep: -7
+        consequence: >
+          A sandbox subscription used for training suddenly cannot deploy anywhere except
+          Southeast Asia, and the only people who can change it are tenant administrators.
+        explain: >
+          The root management group covers every subscription in the tenant including ones
+          that should be exempt, and assignments there need elevated access to manage.
+          Build a level below it for the estate you actually govern.
+      - id: d
+        label: Use a policy initiative on the production subscription and copy it when needed
+        correct: false
+        rep: -5
+        consequence: >
+          Two copies drift apart within a quarter and nobody can say which is authoritative.
+        explain: >
+          Grouping policies into an initiative is a good idea on its own. The scope question
+          is separate, and copying an assignment is the thing management groups exist to
+          avoid.
+  - id: c
+    type: design
+    title: Before the invoice, not after
+    speaker: Priya Raghunathan
+    objectives: [AZ104-1.3.6]
+    intro: >
+      "Nineteen per cent," says Priya. "I found out on the tenth of the following
+      month. I want to know while it is happening, and I want the platform's own
+      opinion on what we are wasting."
+
+
+      Production runs about forty thousand dollars a month. Non-production, once
+      split out, will be nearer six.
+    prompt: What do you set up?
+    options:
+      - id: a
+        label: >
+          A budget on each subscription with alerts at eighty and one hundred per cent of
+          forecast, and a monthly review of Azure Advisor cost recommendations
+        correct: true
+        rep: 8
+        consequence: >
+          The first alert fires eleven days into a month when a test scale set is left
+          running, and it costs about four hundred dollars instead of six thousand.
+        explain: >
+          Budgets in Cost Management are alerting, not enforcement: they watch actual and
+          forecast spend against a threshold and notify at the percentages you choose.
+          Advisor's cost recommendations are the platform's own view of idle and underused
+          resources, which is the other half of the question.
+        diagram:
+          - {op: add_node, node: budget-prod}
+      - id: b
+        label: A budget on the production subscription that stops deployments when it is exceeded
+        correct: false
+        rep: -7
+        consequence: >
+          The expectation is set with the CFO that spend cannot exceed the number, and the
+          first time it does, nobody believes the tooling again.
+        explain: >
+          An Azure budget does not stop anything by itself. It raises alerts, and automation
+          can act on those, but a budget is not a spending cap and promising otherwise is
+          worse than not having one.
+      - id: c
+        label: A monthly export of the cost data into the finance system for analysis
+        correct: false
+        rep: -5
+        consequence: >
+          Finance gets better reports on the tenth of the following month, which is exactly
+          when they got them before.
+        explain: >
+          Exports are useful for chargeback and they do not change when you find out.
+          Priya's complaint was about timing.
+      - id: d
+        label: Reservations and savings plans for the production virtual machines
+        correct: false
+        rep: -6
+        consequence: >
+          A three-year commitment is signed for a fleet that is about to be resized during
+          the migration.
+        explain: >
+          Commitment discounts are a real saving and they come after you understand the
+          workload, not before. Committing to the current shape of an estate you are still
+          changing is how organizations end up paying for capacity they no longer use.
+  - id: d
+    type: knowledge
+    title: What a budget actually does
+    speaker: Marek Sobczak
+    objectives: [AZ104-1.3.6]
+    intro: >
+      "Priya will ask you this in six months and you had better not hedge," says
+      Marek. "The budget alert fires at one hundred per cent. What happens next?"
+    question: What does Azure do when spending passes a budget threshold?
+    options:
+      - id: a
+        label: >
+          It sends the alert to the action group and nothing else. Stopping anything is
+          something you have to build.
+        correct: true
+        rep: 4
+        explain: >
+          Budgets are an alerting construct in Cost Management. They can trigger an action
+          group, which can call automation that shuts resources down, but the budget itself
+          never blocks a deployment or stops a running resource.
+      - id: b
+        label: New resource deployments in the scope are blocked until the next billing period
+        correct: false
+        rep: -5
+        consequence: You tell the CFO spending is capped, and it is not.
+        explain: >
+          Nothing is blocked. Quotas and policy limit what can be deployed; budgets only
+          watch and report.
+      - id: c
+        label: Resources are stopped automatically to bring spending back under the threshold
+        correct: false
+        rep: -6
+        consequence: A production outage is expected from a budget alert, and the reverse assumption is worse.
+        explain: >
+          Azure will not stop your workloads to save you money. Automation you write can, and
+          then the behavior is yours to design and to test.

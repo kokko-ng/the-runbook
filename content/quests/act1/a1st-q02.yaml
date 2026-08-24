@@ -1,0 +1,246 @@
+id: a1st-q02
+chapter: act1-storage
+title: The Key in the Config File
+summary: A partner has the storage account key. It is in a text file on their server, and it has been there for two years.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ104-2.1.4
+  - AZ104-2.1.2
+  - AZ104-2.1.3
+brief: >
+  Northgate uploads customs paperwork straight into Meridian's storage. The way
+  they authenticate is about to become a finding.
+debrief: >
+  A stored access policy you can revoke without rotating a key, and a key rotation
+  that finally happened.
+encounters:
+  - id: a
+    type: design
+    title: What the partner is holding
+    speaker: Wei Lin Tan
+    objectives: [AZ104-2.1.4, AZ104-2.1.2]
+    intro: >
+      Wei Lin found it during the partner review.
+
+
+      "Northgate has key1 for stmeridianedi. The whole account key, in a
+      configuration file, on a server we do not manage. It gives them full control
+      of every container in that account, forever, and we cannot revoke it without
+      breaking everything else that uses the same key."
+
+
+      Northgate need to upload customs documents into one container, and nothing
+      else, indefinitely.
+    prompt: What do you move them to?
+    options:
+      - id: a
+        label: >
+          A service shared access signature for the one container, tied to a stored access
+          policy, with write and create permissions only
+        correct: true
+        rep: 8
+        consequence: >
+          Northgate swap the credential in an afternoon. Wei Lin closes the finding and asks
+          for the same treatment for Sriwijaya.
+        explain: >
+          A shared access signature grants scoped, time-limited access without handing over
+          the account key. Tying it to a stored access policy on the container is what makes
+          it revocable: change or delete the policy and every signature issued under it stops
+          working immediately.
+      - id: b
+        label: An ad hoc shared access signature for the container, valid for five years
+        correct: false
+        rep: -7
+        consequence: >
+          A year later a Northgate laptop is stolen and the only way to revoke the signature
+          is to rotate the account key, which breaks four other integrations.
+        explain: >
+          An ad hoc signature carries its own start and expiry and cannot be revoked
+          individually. The only way to invalidate one is to rotate the signing key, which
+          invalidates everything else signed with it too.
+      - id: c
+        label: Rotate key1, then give Northgate key2
+        correct: false
+        rep: -9
+        consequence: >
+          Nothing improves. The partner still holds full control of the account, just a
+          different string.
+        explain: >
+          Both account keys grant complete control of the account. Rotating one and handing
+          over the other is the same exposure with fresh characters in it.
+      - id: d
+        label: Create a Meridian user account for Northgate and give it Storage Blob Data Contributor
+        correct: false
+        rep: -6
+        consequence: >
+          Meridian now manages credentials for another firm's staff again, and the role
+          covers every container in the account.
+        explain: >
+          Microsoft Entra authorization is the strongest option for identities you control,
+          and here the caller is a partner system. Data Contributor at account scope is also
+          wider than the one container the requirement names.
+  - id: b
+    type: troubleshoot
+    title: INC-4488
+    speaker: Joana Reyes
+    objectives: [AZ104-2.1.2, AZ104-2.1.3]
+    intro: >
+      The new signature went to Northgate at 16:00. At 16:20 their uploads start
+      failing with a 403, and their integration lead is on the phone.
+
+
+      Sriwijaya, who are still on the old arrangement, are uploading normally.
+    ticket:
+      ref: INC-4488
+      opened: "16:20"
+      reporter: Joana Reyes
+      summary: Partner uploads fail with 403 after moving to a shared access signature.
+      severity: sev2
+    time_budget: 5
+    investigate:
+      - id: a
+        action: Ask Northgate what their client reports
+        speaker: Hendrik Salim
+        reveals: >
+          "Their log says AuthenticationFailed, and something about the signature not
+          being valid for the requested time. They are in Kuala Lumpur, so an hour behind
+          us."
+      - id: b
+        action: Ask what was used to generate the signature
+        speaker: Marek Sobczak
+        reveals: >
+          "You generated it in the portal at four o'clock local, with a start time of
+          now and an expiry in twelve months, and attached it to the policy."
+    commands:
+      - id: a
+        label: Look at the stored access policy on the container
+        cmd: az storage container policy list --container-name customs -n stmeridianedi --account-name stmeridianedi -o json
+        output: |
+          {
+            "northgate-upload": {
+              "expiry": "2027-08-24T08:00:00+00:00",
+              "permission": "cw",
+              "start": "2026-08-24T08:00:00+00:00"
+            }
+          }
+        time_cost: 1
+      - id: b
+        label: Decode the signature the partner was given
+        cmd: az storage blob url --container-name customs -n test.txt --account-name stmeridianedi --sas-token "sv=2024-11-04&si=northgate-upload&sr=c&st=2026-08-24T16:00:00Z&sig=..."
+        output: |
+          https://stmeridianedi.blob.core.windows.net/customs/test.txt?sv=2024-11-04&si=northgate-upload&sr=c&st=2026-08-24T16:00:00Z&sig=...
+        note: The signature carries its own start time of 16:00 UTC, which is midnight in Singapore.
+        time_cost: 1
+      - id: c
+        label: Check what the account allows
+        cmd: az storage account show -n stmeridianedi -g rg-data --query "{sasPolicy:sasPolicy,sharedKey:allowSharedKeyAccess,https:supportsHttpsTrafficOnly}" -o table
+        output: |
+          SasPolicy    SharedKey    Https
+          -----------  -----------  -------
+          None         True         True
+        time_cost: 1
+      - id: d
+        label: Try the same signature yourself
+        cmd: >-
+          curl -sS -X PUT -H "x-ms-blob-type: BlockBlob" --data-binary @test.txt
+          "https://stmeridianedi.blob.core.windows.net/customs/test.txt?sv=2024-11-04&si=northgate-upload&st=2026-08-24T16:00:00Z&sig=..."
+        output: |
+          <?xml version="1.0" encoding="utf-8"?>
+          <Error><Code>AuthenticationFailed</Code><Message>Signature not valid in the specified
+          time frame.</Message></Error>
+        time_cost: 2
+    fixes:
+      - id: a
+        label: >
+          Reissue the signature without a start time, or with one set several minutes in the
+          past
+        correct: true
+        rep: 9
+        consequence: >
+          Northgate's next upload succeeds at 16:41 and the integration lead stops calling.
+        explain: >
+          Shared access signature times are UTC. A start time taken from a local clock at
+          16:00 Singapore time becomes 08:00 UTC, but a start time recorded as 16:00 UTC is
+          eight hours in the future. Omitting the start time, or backdating it a few minutes
+          to allow for clock skew, avoids the whole class of problem.
+      - id: b
+        label: Delete the stored access policy and issue an ad hoc signature instead
+        correct: false
+        rep: -7
+        consequence: >
+          Uploads work and you have given away the revocation you designed this quest
+          around.
+        explain: >
+          The policy is not the fault. Removing it to work around a time field trades a
+          revocable credential for one that can only be killed by rotating the account key.
+      - id: c
+        label: Extend the policy's expiry by a year
+        correct: false
+        rep: -6
+        consequence: >
+          The 403 continues unchanged, because the expiry was never the problem.
+        explain: >
+          The error named the time frame, and the signature's own start time was the field
+          in the future. When a signature and a policy both carry times, the most restrictive
+          combination applies.
+      - id: d
+        label: Turn off shared key access on the account to force Entra authorization
+        correct: false
+        rep: -10
+        consequence: >
+          Every shared access signature signed with the account key stops working at once,
+          including Sriwijaya's, and a second incident starts.
+        explain: >
+          Disabling shared key access also disables signatures signed with account keys,
+          which is most of them. It is a good end state to work towards deliberately, not a
+          fix to apply during an incident.
+  - id: c
+    type: design
+    title: The key that has never been rotated
+    speaker: Marek Sobczak
+    objectives: [AZ104-2.1.4]
+    intro: >
+      "While we are here," says Marek. "key1 on that account has not changed since
+      the account was created. Northgate had it. Two internal services still use
+      it. There is a rotation reminder in the portal that has been red for a year."
+
+
+      The two internal services read their configuration from the key vault, which
+      holds a copy of key1.
+    prompt: How do you rotate it?
+    options:
+      - id: a
+        label: >
+          Move the services to key2, rotate key1, update the vault, then rotate key2 at the
+          next window
+        correct: true
+        rep: 8
+        consequence: >
+          No downtime, both keys are new within a fortnight, and the reminder goes green for
+          the first time.
+        explain: >
+          Two keys exist so rotation can be done without an outage: move consumers to the
+          second key, regenerate the first, then repeat in the other direction next time.
+          Doing it in that order means there is always one valid key in circulation.
+      - id: b
+        label: Rotate both keys at once, out of hours, and update everything afterwards
+        correct: false
+        rep: -7
+        consequence: >
+          Two services fail for the twenty minutes it takes to notice, and one of them is
+          the intake queue.
+        explain: >
+          Regenerating both keys invalidates every credential derived from them at the same
+          moment. The staged approach exists precisely to avoid that window.
+      - id: c
+        label: Leave key1 in place and dismiss the reminder, since the partner no longer has it
+        correct: false
+        rep: -8
+        consequence: >
+          The next audit finds a key that has never been rotated and a dismissed reminder,
+          which reads worse than either alone.
+        explain: >
+          A key that was shared with an outside party two years ago should be treated as
+          compromised. Rotation is cheap here because the platform gives you two keys and a
+          vault to publish them through.

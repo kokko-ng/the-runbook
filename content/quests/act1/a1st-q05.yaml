@@ -1,0 +1,228 @@
+id: a1st-q05
+chapter: act1-storage
+title: Restore the Wednesday Batch
+summary: A cleanup script did what it was told and removed a container that was still in use.
+variant: core
+estimated_minutes: 13
+objectives:
+  - AZ104-2.3.4
+  - AZ104-2.2.5
+brief: >
+  Someone wrote a tidy-up job for the EDI drop zone. It was correct about
+  everything except which container was stale.
+debrief: >
+  Container soft delete earned its place, and the archive move that follows is
+  done with a tool built for it instead of a browser tab.
+encounters:
+  - id: a
+    type: troubleshoot
+    title: INC-4544
+    speaker: Joana Reyes
+    objectives: [AZ104-2.3.4]
+    intro: >
+      "Customs paperwork is failing to load for every shipment after Wednesday,"
+      says Joana. "The EDI service says the container does not exist. Which is a
+      strange thing for it to say about a container that existed on Tuesday."
+
+
+      The overnight tidy-up job removes containers whose names match a pattern and
+      which have not been written to for thirty days. It ran at 02:00.
+    ticket:
+      ref: INC-4544
+      opened: "07:55"
+      reporter: Joana Reyes
+      summary: EDI service reports ContainerNotFound for customs documents.
+      severity: sev1
+    time_budget: 5
+    investigate:
+      - id: a
+        action: Ask what the tidy-up job actually matched
+        speaker: Marek Sobczak
+        reveals: >
+          "It matches anything starting with customs-. There is customs-archive, which
+          is genuinely stale, and customs-2026, which the EDI service writes to through a
+          shared access signature. The signature writes do not update the container's
+          last modified time the way the script expects."
+      - id: b
+        action: Ask what the storage account has enabled
+        speaker: Meridian IT
+        reveals: >
+          The account was created from the standard template: blob soft delete fourteen
+          days, container soft delete seven days, versioning on.
+    commands:
+      - id: a
+        label: List containers, including deleted ones
+        cmd: az storage container list --account-name stmeridianedi --include-deleted -o table
+        output: |
+          Name              Deleted    VersionId                             RemainingRetentionDays
+          ----------------  ---------  ------------------------------------  ------------------------
+          customs-archive   True       01DA4C1F2B3E4A50                      6
+          customs-2026      True       01DA4C1F2B3E4A61                      6
+          edi-inbound       False
+        time_cost: 1
+      - id: b
+        label: Check the container soft delete policy
+        cmd: az storage account blob-service-properties show -n stmeridianedi -g rg-data --query "containerDeleteRetentionPolicy" -o json
+        output: |
+          {
+            "days": 7,
+            "enabled": true
+          }
+        time_cost: 1
+      - id: c
+        label: Check whether the EDI service is failing for any other reason
+        cmd: az storage blob list -c edi-inbound --account-name stmeridianedi --num-results 3 -o table
+        output: |
+          Name                      Blob Type      Length    Last Modified
+          ------------------------  -------------  --------  -------------------------
+          NG-99120.edi              BlockBlob      8814      2026-08-24T01:12:04+00:00
+        time_cost: 1
+      - id: d
+        label: Look at the deletion in the activity log
+        cmd: az monitor activity-log list --offset 12h --query "[?contains(operationName.value,'containers/delete')].{who:caller,at:eventTimestamp}" -o table
+        output: |
+          Who                                  At
+          -----------------------------------  ------------------------
+          sp-storage-tidyup                    2026-08-24T02:03:51Z
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Restore customs-2026 from container soft delete, then fix the tidy-up job to use an
+          allow list instead of a prefix
+        correct: true
+        rep: 10
+        consequence: >
+          The container is back in under a minute with every blob in it, and the job is
+          changed the same day so it cannot take a live container again.
+        explain: >
+          Container soft delete keeps a deleted container and its contents for the retention
+          period, and an undelete restores it with the same name and the same blobs. The
+          restore is the incident; the allow list is the fix.
+        diagram:
+          - {op: set_status, node: st-edi, status: healthy}
+      - id: b
+        label: Re-create the container and ask the partners to resend Wednesday's documents
+        correct: false
+        rep: -9
+        consequence: >
+          Two partners can resend and one cannot, and re-creating the container blocks the
+          undelete that would have worked.
+        explain: >
+          Creating a container with the same name while a soft-deleted one exists prevents
+          restoring it. Always check the deleted list before re-creating anything.
+      - id: c
+        label: Restore the blobs individually from blob soft delete
+        correct: false
+        rep: -6
+        consequence: >
+          The blobs cannot be listed, because the container that holds them is not there.
+        explain: >
+          Blob soft delete operates inside a container. When the container itself is deleted
+          the container-level restore is the one that applies, and it brings the blobs with
+          it.
+      - id: d
+        label: Fail over the storage account to the secondary region to get the container back
+        correct: false
+        rep: -11
+        consequence: >
+          The failover loses everything written since the last replication, including this
+          morning's inbound files, and cannot be undone.
+        explain: >
+          Failover is for losing a region. Using it as an undo for a deletion is a much
+          larger, irreversible action than the problem needs, and the deletion would most
+          likely have replicated anyway.
+  - id: b
+    type: design
+    title: Moving what is left
+    speaker: Marek Sobczak
+    objectives: [AZ104-2.2.5]
+    intro: >
+      customs-archive really is stale: eight hundred thousand small documents,
+      about nine hundred gigabytes, that legal wants kept but nobody reads. They
+      are going to a separate archive account in the same region.
+
+
+      "Not the portal," says Marek. "I have watched somebody try to move nine
+      hundred gigabytes through a browser before."
+    prompt: How do you move it?
+    options:
+      - id: a
+        label: >
+          AzCopy with a server-to-server copy between the two accounts, using Microsoft Entra
+          credentials
+        correct: true
+        rep: 8
+        consequence: >
+          The copy runs at service speed with nothing streaming through your laptop, and
+          finishes overnight with a log you can attach to the change record.
+        explain: >
+          AzCopy is the tool for bulk data movement. A copy between two storage endpoints is
+          performed server side, so the data never travels through the machine running the
+          command, and it can authenticate with Entra credentials rather than an account key.
+      - id: b
+        label: Azure Storage Explorer, dragging the container from one account to the other
+        correct: false
+        rep: -5
+        consequence: >
+          It works, slowly, and stops when the laptop sleeps at eleven at night.
+        explain: >
+          Storage Explorer is genuinely useful for browsing, permissions and spot checks, and
+          it uses AzCopy underneath for transfers. For eight hundred thousand objects, drive
+          the tool that does the work directly and let it run somewhere that stays awake.
+      - id: c
+        label: A lifecycle policy that moves the blobs to the other account
+        correct: false
+        rep: -7
+        consequence: >
+          Half an hour goes into looking for a setting that does not exist.
+        explain: >
+          Lifecycle management moves blobs between tiers and deletes them inside one account.
+          It does not copy data to another account; object replication and AzCopy do that.
+      - id: d
+        label: A script that downloads each blob and uploads it to the new account
+        correct: false
+        rep: -6
+        consequence: >
+          Nine hundred gigabytes leave the region and come back, and the egress charge shows
+          up on the invoice Priya reads.
+        explain: >
+          Round-tripping through a client is slower and can incur egress charges. AzCopy's
+          server-to-server copy avoids both.
+  - id: c
+    type: knowledge
+    title: Which soft delete
+    speaker: Marek Sobczak
+    objectives: [AZ104-2.3.4]
+    intro: >
+      "Three settings with almost the same name," says Marek. "Somebody deletes a
+      single blob by accident, in a container that is otherwise fine. Which one
+      saves you?"
+    question: Which feature recovers a single deleted blob?
+    options:
+      - id: a
+        label: Blob soft delete, which retains deleted blobs for its retention period
+        correct: true
+        rep: 4
+        explain: >
+          Blob soft delete covers deleted blobs and blob snapshots. Container soft delete
+          covers a deleted container and everything in it. Share soft delete, on the file
+          service, covers a deleted file share. They are separate settings with separate
+          retention periods.
+      - id: b
+        label: Blob versioning, which keeps a version when a blob is deleted
+        correct: false
+        rep: -5
+        consequence: You rely on the wrong setting and find out during an incident which one you actually had on.
+        explain: >
+          Versioning does keep the previous state when a blob is overwritten or deleted, and
+          it is a good partner to soft delete. The feature named for recovering deleted blobs
+          is blob soft delete, and the exam is precise about which is which.
+      - id: c
+        label: Container soft delete, since the blob lives in a container
+        correct: false
+        rep: -5
+        consequence: A recovery plan is written against a setting that only triggers when the whole container goes.
+        explain: >
+          Container soft delete applies when the container itself is deleted. Deleting one
+          blob inside a live container never triggers it.

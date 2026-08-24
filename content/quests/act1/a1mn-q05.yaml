@@ -1,0 +1,240 @@
+id: a1mn-q05
+chapter: act1-monitoring
+title: Restore the Thing
+summary: The first real restore in Meridian's history, at 23:40, with the month-end close in the morning.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ104-5.2.4
+  - AZ104-5.2.7
+brief: >
+  A backup that has never been restored is a hypothesis. Tonight it gets tested,
+  and not by choice.
+debrief: >
+  A restore that worked, a report that would have shown the gap earlier, and an
+  alert so the next silent failure is not silent.
+encounters:
+  - id: a
+    type: troubleshoot
+    title: INC-4841
+    speaker: Marek Sobczak
+    objectives: [AZ104-5.2.4]
+    intro: >
+      A failed patch has left vm-report01 unbootable. The month-end close runs on
+      it at 06:00 and finance need the output by nine.
+
+
+      "It boots to recovery and stops," says Marek. "I have spent forty minutes on
+      it and I would rather restore than keep guessing. Your call on how."
+
+
+      The machine has a 128 gibibyte operating system disk and a 512 gibibyte data
+      disk holding the extract files.
+    ticket:
+      ref: INC-4841
+      opened: "23:40"
+      reporter: Marek Sobczak
+      summary: vm-report01 will not boot after patching. Month-end close due at 06:00.
+      severity: sev1
+    time_budget: 5
+    investigate:
+      - id: a
+        action: Ask what finance actually need by nine
+        speaker: Priya Raghunathan
+        reveals: >
+          "The close job and the extract files it reads. If the machine is back with
+          yesterday's data on it, the job regenerates today's."
+      - id: b
+        action: Ask what changed on the machine
+        speaker: Meridian IT
+        reveals: >
+          Update management applied eleven patches at 22:00, including a kernel update.
+          Two other machines took the same patches and are fine.
+    commands:
+      - id: a
+        label: List recovery points for the machine
+        cmd: az backup recoverypoint list --vault-name rsv-meridian -g rg-ops -c vm-report01 -i vm-report01 --query "[].{name:name,time:properties.recoveryPointTime,type:properties.recoveryPointType}" -o table
+        output: |
+          Name              Time                      Type
+          ----------------  ------------------------  -----------
+          8371926244771     2026-08-24T18:04:22Z      CrashConsistent
+          8371926244102     2026-08-23T18:03:51Z      AppConsistent
+        time_cost: 1
+      - id: b
+        label: Check what the last backup job did
+        cmd: az backup job list --vault-name rsv-meridian -g rg-ops --query "[?entityFriendlyName=='vm-report01'] | [0:2].{op:operation,status:status,at:startTime}" -o table
+        output: |
+          Op       Status              At
+          -------  ------------------  ------------------------
+          Backup   CompletedWithWarnings  2026-08-24T18:00:11Z
+          Backup   Completed              2026-08-23T18:00:09Z
+        note: The most recent point is crash consistent, which means the application was not quiesced.
+        time_cost: 1
+      - id: c
+        label: Check whether the disks themselves are readable
+        cmd: az disk show -n vm-report01-osdisk -g rg-app --query "{state:diskState,size:diskSizeGb}" -o json
+        output: |
+          {
+            "diskState": "Attached",
+            "size": 128
+          }
+        time_cost: 1
+      - id: d
+        label: Check how long a full machine restore usually takes here
+        cmd: az backup job list --vault-name rsv-meridian -g rg-ops --query "[?operation=='Restore'].{op:operation,at:startTime}" -o table
+        output: |
+          (no results)
+        note: No restore has ever been run in this vault, so nobody knows how long one takes.
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Restore the operating system disk only from the 23 August application-consistent
+          point, attach it to a new machine, and keep the existing data disk
+        correct: true
+        rep: 10
+        consequence: >
+          The machine is up at 01:20 with the data disk untouched, the close job runs at 06:00
+          and finance get their output at 07:10.
+        explain: >
+          Restoring disks rather than a whole machine is usually faster and gives more control:
+          here only the operating system disk is broken, and the data disk holds the extract
+          files that are more current than any backup. An application-consistent point is
+          preferred over a crash-consistent one when both exist.
+        diagram:
+          - {op: set_status, node: vm-tms01, status: healthy}
+      - id: b
+        label: Restore the full virtual machine from the most recent point, overwriting the existing one
+        correct: false
+        rep: -8
+        consequence: >
+          The restore takes ninety minutes, and the data disk comes back at yesterday evening's
+          state, losing today's extracts.
+        explain: >
+          A full restore replaces every disk with the state in the recovery point, including
+          data disks that were healthy. It is also the slowest option, which matters at
+          midnight with a six o'clock deadline.
+      - id: c
+        label: Restore the full machine from the 23 August point to a new name and repoint finance at it
+        correct: false
+        rep: -6
+        consequence: >
+          It works and takes longer, and the machine that comes back has a day-old data disk
+          that then has to be swapped anyway.
+        explain: >
+          Restoring to a new name avoids overwriting, and it still brings back disks you did
+          not need to replace. Disk-level restore is the precise tool.
+      - id: d
+        label: Rebuild the machine from the Bicep template and reattach the data disk
+        correct: false
+        rep: -7
+        consequence: >
+          The template describes the machine and not what was installed on it by hand since
+          2023, and the close job fails on a missing runtime at 06:10.
+        explain: >
+          Rebuilding is right when the machine is genuinely described as code. This one is not,
+          which is a separate problem to fix in daylight.
+  - id: b
+    type: design
+    title: The warning nobody saw
+    speaker: Dana Ong
+    objectives: [AZ104-5.2.7]
+    intro: >
+      In the review, one line stands out: the 24 August backup completed with
+      warnings, and the point it produced was crash consistent rather than
+      application consistent.
+
+
+      "That warning has been there for six days," says Dana. "How would anyone
+      have known?"
+    prompt: What do you put in place?
+    options:
+      - id: a
+        label: >
+          Backup reports on the vault, and an alert on backup job failures and warnings routed
+          to the platform action group
+        correct: true
+        rep: 8
+        consequence: >
+          Two more machines with the same warning surface the next morning, and both are fixed
+          before anyone needs them.
+        explain: >
+          Backup reports build on the vault's diagnostic data in a Log Analytics workspace and
+          answer the questions people ask afterwards: what is protected, what failed, how much
+          is stored. Job alerts are what turn a silent warning into a notification.
+        diagram:
+          - {op: set_detail, node: rsv-meridian, detail: "Reports and job alerts enabled"}
+      - id: b
+        label: A weekly check of the vault's jobs blade during the operations meeting
+        correct: false
+        rep: -6
+        consequence: >
+          The check happens twice and then stops, which is what happened to the last manual
+          check.
+        explain: >
+          Manual review is better than nothing and it competes with everything else on a
+          Monday. Alerting does not.
+      - id: c
+        label: An alert on the vault's storage consumption, which will drop if backups stop
+        correct: false
+        rep: -7
+        consequence: >
+          Storage keeps growing because backups are still running, just badly, and nothing
+          fires.
+        explain: >
+          It is an indirect signal for a failure mode that is directly observable. The job
+          status is the thing to alert on.
+      - id: d
+        label: Rely on the vault's built-in notifications, which are on by default
+        correct: false
+        rep: -5
+        consequence: >
+          Default notifications go to a classic alert configuration nobody has looked at, and
+          warnings are not included.
+        explain: >
+          Assuming a default exists and covers what you need is how six days of warnings go
+          unread. Configure it deliberately and confirm it fires.
+  - id: c
+    type: design
+    title: Proving it next time
+    speaker: Priya Raghunathan
+    objectives: [AZ104-5.2.4]
+    intro: >
+      "You restored something at one in the morning and it worked," says Priya.
+      "I would like the next board pack to say that we know it works, rather than
+      that we found out."
+    prompt: What do you commit to?
+    options:
+      - id: a
+        label: >
+          A quarterly restore test into an isolated resource group, with the time taken
+          recorded against the recovery time objective
+        correct: true
+        rep: 8
+        consequence: >
+          The first test takes seventy minutes, which is inside the four-hour objective, and
+          the number goes in the board pack.
+        explain: >
+          Restoring to an alternate location is non-disruptive and is the only way to know
+          both that the recovery points work and how long they take. Measuring against the
+          stated objective is what makes the answer meaningful.
+      - id: b
+        label: A monthly report showing every backup job completed successfully
+        correct: false
+        rep: -6
+        consequence: >
+          Every job is green for eight months and the first real restore fails on a missing
+          disk encryption key.
+        explain: >
+            A successful backup job proves data was written. It does not prove the data can be
+            turned back into a running system.
+      - id: c
+        label: A restore test in production during the next maintenance window
+        correct: false
+        rep: -7
+        consequence: >
+          The test overwrites a production machine and the maintenance window becomes an
+          incident.
+        explain: >
+          Restore to an alternate location. Testing recovery by replacing the live system is a
+          risk with no upside.

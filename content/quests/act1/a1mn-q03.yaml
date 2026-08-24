@@ -1,0 +1,256 @@
+id: a1mn-q03
+chapter: act1-monitoring
+title: The Depot That Drops Packets
+summary: Cebu says the Johor link is fine. Johor says it is not. Somebody has to produce a number.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ104-5.1.5
+  - AZ104-5.1.6
+brief: >
+  An argument between two teams that has been running for a fortnight, and which
+  ends the moment somebody measures it continuously.
+debrief: >
+  Insights for the things that have them, and a connection monitor that has been
+  running for a week the next time this argument starts.
+encounters:
+  - id: a
+    type: design
+    title: Look before you dig
+    speaker: Marek Sobczak
+    objectives: [AZ104-5.1.5]
+    intro: >
+      "Before you build anything," says Marek, "there are three views the platform
+      gives you for free once the data is flowing. Depot scanner uploads are slow,
+      the storage account is involved, and so is vm-scan01 and the network in
+      between."
+
+
+      Nobody has opened Insights for anything.
+    prompt: Where do you start?
+    options:
+      - id: a
+        label: >
+          Virtual machine insights for vm-scan01, storage insights for the account, and
+          network insights for the topology in between
+        correct: true
+        rep: 7
+        consequence: >
+          Storage insights shows availability at a hundred per cent and end-to-end latency
+          flat, which moves the argument to the network in ten minutes.
+        explain: >
+          Insights are curated workbooks over the metrics and logs a resource type already
+          emits: performance and dependency maps for virtual machines, availability, latency
+          and transaction breakdowns for storage, and topology plus connectivity for
+          networking. They are the fastest way to eliminate half the estate.
+      - id: b
+        label: A custom workbook querying the metrics tables directly
+        correct: false
+        rep: -5
+        consequence: >
+          Two hours are spent rebuilding a chart that was already on a blade.
+        explain: >
+          Custom workbooks are excellent when the question is specific to Meridian. Reaching
+          for one before looking at the curated view is work for its own sake.
+      - id: c
+        label: Enable the network performance monitor solution on the workspace
+        correct: false
+        rep: -6
+        consequence: >
+          The solution is retired and its replacement is the thing you were about to build
+          anyway.
+        explain: >
+          Network Watcher's connection monitor is the current tool for this, and the older
+          solutions have been folded into it.
+      - id: d
+        label: Ask the depot to run a speed test and send the result
+        correct: false
+        rep: -7
+        consequence: >
+          A screenshot of a speed test arrives showing a number that measures a path nobody
+          cares about.
+        explain: >
+          A one-off test from a browser measures a different route at a different moment. The
+          argument has been running for a fortnight because nobody is measuring the path that
+          matters, continuously.
+  - id: b
+    type: design
+    title: Measuring the thing itself
+    speaker: Dana Ong
+    objectives: [AZ104-5.1.6]
+    intro: >
+      "I need to be able to say, in the operations meeting, what the loss and
+      latency were between the Johor depot and the hub at nine o'clock last
+      Tuesday," says Dana. "Every Tuesday. Without anybody being awake for it."
+    prompt: What do you set up?
+    options:
+      - id: a
+        label: >
+          A connection monitor in Network Watcher with the depot machine as source and the hub
+          endpoint as destination, running continuously
+        correct: true
+        rep: 8
+        consequence: >
+          A week later the graph shows loss climbing every weekday at 08:50, which turns out
+          to be a backup job at the far end.
+        explain: >
+          Connection monitor runs continuous synthetic checks between sources and destinations
+          and records latency, loss and the hop-by-hop path. It stores results in the workspace
+          so they can be queried and alerted on, which is what turns an argument into a
+          measurement.
+        diagram:
+          - {op: add_node, node: netwatcher}
+          - {op: add_node, node: connmon-depot}
+          - {op: add_edge, edge: e-connmon-depot}
+      - id: b
+        label: A scheduled task on vm-scan01 that pings the hub and writes to a log file
+        correct: false
+        rep: -6
+        consequence: >
+          The log is on the machine that is having the problem, and nobody can correlate it
+          with anything.
+        explain: >
+          It measures something real and puts the data where it is least useful. Connection
+          monitor stores results centrally alongside everything else.
+      - id: c
+        label: An availability test on the storage endpoint from Azure's global locations
+        correct: false
+        rep: -7
+        consequence: >
+          The test reports a hundred per cent availability from six continents while the depot
+          continues to time out.
+        explain: >
+          Global availability tests measure a path Meridian does not use. The question is
+          specifically about the depot's link to the hub.
+      - id: d
+        label: Enable flow logs on the depot subnet and analyze them for retransmissions
+        correct: false
+        rep: -5
+        consequence: >
+          Flow logs record which flows were allowed and denied and say nothing about latency.
+        explain: >
+          Flow logs are valuable for security analysis and traffic accounting. They do not
+          measure loss or round-trip time, which is what was asked for.
+  - id: c
+    type: troubleshoot
+    title: INC-4820
+    speaker: Joana Reyes
+    objectives: [AZ104-5.1.6, AZ104-5.1.5]
+    intro: >
+      The connection monitor has been running for a week. This morning it went
+      red for eleven minutes at 08:52 and recovered on its own. The NOC wants to
+      know whether it was real, because nobody complained.
+    ticket:
+      ref: INC-4820
+      opened: "09:20"
+      reporter: Joana Reyes
+      summary: Connection monitor reported failure to the hub for eleven minutes. No user reports.
+      severity: sev4
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what else happened at 08:52
+        speaker: Marek Sobczak
+        reveals: >
+          "Nothing on our side. No deployments, no restarts, no change records. The depot
+          says the scanners were slow for a bit and then fine."
+      - id: b
+        action: Ask what the monitor actually checks
+        speaker: Meridian IT
+        reveals: >
+          TCP check from vm-scan01 to the hub print server on port 631, every thirty
+          seconds, with a failure threshold of two consecutive checks.
+    commands:
+      - id: a
+        label: Look at the connection monitor results for the window
+        cmd: >-
+          kql: NWConnectionMonitorTestResult | where TimeGenerated between (datetime(2026-08-24T08:45) .. datetime(2026-08-24T09:10))
+          | summarize avg(MinRoundTripTimeMs), avg(ChecksFailedPercent) by bin(TimeGenerated, 2m)
+        output: |
+          TimeGenerated         avg_MinRoundTripTimeMs   avg_ChecksFailedPercent
+          --------------------  -----------------------  -------------------------
+          2026-08-24T08:50:00Z  4.1                      0
+          2026-08-24T08:52:00Z  221.7                    64
+          2026-08-24T08:58:00Z  198.2                    58
+          2026-08-24T09:04:00Z  4.4                      0
+        time_cost: 1
+      - id: b
+        label: Look at the hop-by-hop path during the window
+        cmd: >-
+          kql: NWConnectionMonitorPathResult | where TimeGenerated between (datetime(2026-08-24T08:52) .. datetime(2026-08-24T09:04))
+          | project TimeGenerated, Hops, PathTestResult
+        output: |
+          TimeGenerated         Hops                                  PathTestResult
+          --------------------  ------------------------------------  ----------------
+          2026-08-24T08:53:00Z  ["10.30.1.14","10.10.1.4","10.10.1.20"]  Failed
+        note: The path runs through 10.10.1.4, which is the inspection appliance.
+        time_cost: 1
+      - id: c
+        label: Check the appliance's own metrics
+        cmd: az monitor metrics list --resource nva-hub -g rg-hub --resource-type Microsoft.Compute/virtualMachines --metric "Percentage CPU" --interval PT5M --query "value[0].timeseries[0].data[-5:]" -o table
+        output: |
+          Average    TimeStamp
+          ---------  -------------------
+          22.1       2026-08-24T08:45:00Z
+          98.7       2026-08-24T08:55:00Z
+          97.9       2026-08-24T09:00:00Z
+          24.0       2026-08-24T09:05:00Z
+        time_cost: 1
+      - id: d
+        label: Check whether the storage path was affected too
+        cmd: >-
+          kql: StorageBlobLogs | where TimeGenerated between (datetime(2026-08-24T08:50) .. datetime(2026-08-24T09:05))
+          | summarize avg(DurationMs) by bin(TimeGenerated, 5m)
+        output: |
+          TimeGenerated         avg_DurationMs
+          --------------------  ----------------
+          2026-08-24T08:50:00Z  38
+          2026-08-24T08:55:00Z  41
+          2026-08-24T09:00:00Z  39
+        time_cost: 2
+    fixes:
+      - id: a
+        label: >
+          Raise it with the appliance vendor with the processor graph and the path result, and
+          alert on the appliance's processor from now on
+        correct: true
+        rep: 9
+        consequence: >
+          The vendor identifies a signature update that pins a core, and the alert catches the
+          next occurrence in ninety seconds.
+        explain: >
+          The path result named the hop and the appliance's own metric explains it: the
+          inspection appliance saturated and the depot traffic that routes through it slowed.
+          Storage was unaffected because it does not take that path. Measuring the thing meant
+          the diagnosis took minutes.
+        diagram:
+          - {op: set_status, node: nva-hub, status: degraded}
+      - id: b
+        label: Close the ticket, since nobody complained and it recovered on its own
+        correct: false
+        rep: -7
+        consequence: >
+          It happens again on the busiest morning of the month, for longer, and there is no
+          history to point at.
+        explain: >
+          Something that recovers on its own is a warning, not an all-clear. The monitor exists
+          so that these get investigated while they are cheap.
+      - id: c
+        label: Raise the failure threshold so brief blips do not report as failures
+        correct: false
+        rep: -8
+        consequence: >
+          The next eleven-minute degradation is invisible, and so is the one after that.
+        explain: >
+          Eleven minutes at sixty per cent loss is not a blip. Tuning a monitor to stop
+          reporting real events is how monitoring becomes decorative.
+      - id: d
+        label: Move the depot traffic off the appliance path to restore performance
+        correct: false
+        rep: -9
+        consequence: >
+          The security control requiring inspection is bypassed, in response to a symptom
+          nobody has diagnosed yet.
+        explain: >
+          Routing around the appliance removes a control the security team owns and does so
+          before anyone has confirmed the cause.

@@ -1,0 +1,169 @@
+id: a1mn-b01
+chapter: act1-monitoring
+title: Nobody Read the Alert, Exam Hard
+summary: A rule that has to catch a real failure, ignore a known pattern, and cover eleven machines without eleven rules.
+variant: bonus
+bonus_of: a1mn-q01
+estimated_minutes: 11
+objectives:
+  - AZ104-5.1.1
+  - AZ104-5.1.4
+  - AZ104-5.1.3
+brief: >
+  Alerting questions look like judgment calls until you notice that each option
+  is a different alert type with different behavior.
+debrief: >
+  Metric alerts for what the platform emits, log alerts for what you have to
+  compute, and dimensions instead of duplication.
+encounters:
+  - id: a
+    type: design
+    title: Metric or log
+    speaker: Marek Sobczak
+    objectives: [AZ104-5.1.4, AZ104-5.1.3]
+    intro: >
+      Three things need alerting on.
+
+
+      One: a virtual machine's processor above ninety per cent for fifteen
+      minutes. Two: more than fifty failed sign-ins from one address in five
+      minutes, which needs sign-in logs joined and counted. Three: the intake
+      queue longer than five hundred messages.
+
+
+      "Two of those are one kind of alert and one is another," says Marek.
+    prompt: Which alert types do you use?
+    options:
+      - id: a
+        label: >
+          Metric alerts for the processor and the queue length, and a log search alert for the
+          failed sign-ins
+        correct: true
+        rep: 8
+        consequence: >
+          The processor and queue rules fire within a minute of a threshold; the sign-in rule
+          runs on its schedule and catches the next credential-stuffing attempt.
+        explain: >
+          Metric alerts evaluate platform metrics on a near-real-time pipeline and are cheap
+          and fast. Log search alerts run a query on a schedule, which is what you need when
+          the condition involves aggregating, joining or filtering log records. Use the metric
+          when a metric exists.
+      - id: b
+        label: Log search alerts for all three, so they are configured the same way
+        correct: false
+        rep: -6
+        consequence: >
+          The processor alert now depends on ingestion latency and fires several minutes
+          later, and the logging bill grows.
+        explain: >
+          Consistency is not free here: log alerts add ingestion delay and query cost for
+          conditions the metric pipeline answers immediately.
+      - id: c
+        label: Metric alerts for all three, using a custom metric for the sign-in count
+        correct: false
+        rep: -7
+        consequence: >
+          Somebody has to build and ship the custom metric, which is a small application
+          nobody owns.
+        explain: >
+          Custom metrics are a legitimate pattern when a value is expensive to compute
+          repeatedly in a query. Building one to avoid writing a query is the expensive way
+          round.
+      - id: d
+        label: An activity log alert for the sign-ins and metric alerts for the others
+        correct: false
+        rep: -6
+        consequence: >
+          The activity log alert never fires, because sign-ins are not in the activity log.
+        explain: >
+          Activity log alerts cover control-plane operations on Azure resources: who created,
+          changed or deleted what. Sign-in logs are a different source entirely.
+  - id: b
+    type: design
+    title: Eleven machines, one rule
+    speaker: Dana Ong
+    objectives: [AZ104-5.1.4, AZ104-5.1.1]
+    intro: >
+      "Eleven machines need the processor rule," says Dana. "I do not want eleven
+      rules, I want to know which machine fired, and next month there will be
+      twelve machines."
+    prompt: How do you configure it?
+    options:
+      - id: a
+        label: >
+          One metric alert scoped to the resource group, split by the resource dimension so
+          each machine alerts separately
+        correct: true
+        rep: 8
+        consequence: >
+          The twelfth machine is covered the day it is deployed, and each alert names the
+          machine that fired it.
+        explain: >
+          A metric alert can be scoped to a resource group or subscription for supported
+          resource types, and splitting by dimension raises a separate alert per machine while
+          remaining one rule to maintain. New resources in the scope are covered automatically.
+      - id: b
+        label: One metric alert scoped to the resource group, without splitting
+        correct: false
+        rep: -6
+        consequence: >
+          The alert fires and nobody can tell which of the eleven machines it is about without
+          opening the portal.
+        explain: >
+          Without a dimension split the rule evaluates across the scope and the notification
+          does not identify the instance. It is one rule and much less useful at three in the
+          morning.
+      - id: c
+        label: Eleven metric alerts, one per machine, created by the deployment template
+        correct: false
+        rep: -5
+        consequence: >
+          It works, and the eleven rules drift apart the first time somebody tunes one.
+        explain: >
+          Templating the duplication is better than clicking it, and multi-resource alerts
+          exist so that the duplication is not needed at all.
+      - id: d
+        label: A log search alert grouped by computer name
+        correct: false
+        rep: -6
+        consequence: >
+          It works with ingestion delay and query cost, for a condition the metric pipeline
+          already evaluates.
+        explain: >
+          Grouping in a log alert is a real feature and is the answer when the condition needs
+          a query. Processor percentage does not.
+  - id: c
+    type: knowledge
+    title: The threshold nobody can pick
+    speaker: Marek Sobczak
+    objectives: [AZ104-5.1.1]
+    intro: >
+      "The intake queue is normally under fifty and spikes to eight hundred every
+      morning for ten minutes, legitimately," says Marek. "Static threshold at
+      five hundred pages the NOC every single day. What would you use instead?"
+    question: What fits a metric with a strong daily pattern?
+    options:
+      - id: a
+        label: A dynamic threshold, which learns the metric's pattern and alerts on deviation
+        correct: true
+        rep: 6
+        explain: >
+          Dynamic thresholds model the metric's historical behavior, including daily and weekly
+          seasonality, and fire when values deviate from the expected band. They suit metrics
+          whose normal range varies by time of day, which is exactly the morning ramp.
+      - id: b
+        label: A higher static threshold, above the daily peak
+        correct: false
+        rep: -5
+        consequence: The rule stops paging every morning and also stops catching a genuine backlog at three in the afternoon.
+        explain: >
+          Raising the threshold above the peak makes the rule blind for most of the day, which
+          is when a queue of six hundred would actually be abnormal.
+      - id: c
+        label: A metric alert with a longer aggregation window, such as one hour
+        correct: false
+        rep: -5
+        consequence: A real backlog now takes an hour to page anybody, and the morning spike still averages high.
+        explain: >
+          Longer windows smooth spikes and delay detection. They help with flapping and do not
+          solve a metric whose normal value depends on the time of day.

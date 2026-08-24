@@ -1,0 +1,176 @@
+id: a1cm-q08
+chapter: act1-compute
+title: The Tracking Portal
+summary: Customers want to see where their freight is, and the answer is a web app with a plan behind it.
+variant: core
+estimated_minutes: 13
+objectives:
+  - AZ104-3.4.1
+  - AZ104-3.4.2
+  - AZ104-3.4.3
+brief: >
+  Meridian's first customer-facing application in Azure. Everything about it is a
+  decision somebody will quote back to you.
+debrief: >
+  A plan sized for the load rather than the demo, autoscale that responds to the
+  right signal, and an app that is separate from the plan that hosts it.
+encounters:
+  - id: a
+    type: design
+    title: The plan under it
+    speaker: Dana Ong
+    objectives: [AZ104-3.4.1, AZ104-3.4.3]
+    intro: >
+      "Customer-facing, so it needs a real certificate on a real domain," says
+      Dana. "It has to stay up when we deploy, and the security review wants it to
+      reach the transport database over the virtual network rather than the
+      internet."
+
+
+      Expected traffic is modest: a few hundred concurrent users during the day.
+      The team also wants somewhere to run the same code for testing.
+    prompt: What do you provision?
+    options:
+      - id: a
+        label: >
+          One Standard tier App Service plan hosting the portal, with a second plan in
+          non-production for testing
+        correct: true
+        rep: 8
+        consequence: >
+          The portal is deployed by Friday, and the test environment is on a plan finance can
+          see separately.
+        explain: >
+          The plan is the compute you pay for and the app is what runs on it. Standard is the
+          first tier with custom domains and certificates, deployment slots, autoscale and
+          daily backup, which is the set of features this requirement lists. Separate plans
+          for production and test keep noisy testing away from customers.
+        diagram:
+          - {op: add_node, node: plan-portal}
+          - {op: add_node, node: app-portal}
+          - {op: add_edge, edge: e-portal-plan}
+      - id: b
+        label: A Free tier plan to start with, moving up when traffic justifies it
+        correct: false
+        rep: -7
+        consequence: >
+          The custom domain cannot be added, the certificate cannot be bound, and the plan is
+          changed two days before launch anyway.
+        explain: >
+          Free and Shared tiers run on shared infrastructure with quotas and no custom
+          certificate support. They suit experiments, not a customer-facing site with a
+          domain.
+      - id: c
+        label: A Premium tier plan, so there is room for whatever comes later
+        correct: false
+        rep: -5
+        consequence: >
+          The invoice is four times the estimate for a workload with a few hundred users.
+        explain: >
+          Premium adds more instances, larger sizes and virtual network integration features
+          that matter at scale. Start where the requirements land and move up when a
+          requirement says so.
+      - id: d
+        label: One Standard plan hosting both the portal and the test copy of it
+        correct: false
+        rep: -6
+        consequence: >
+          A load test against the test app slows the customer-facing portal on the same
+          instances.
+        explain: >
+          Apps on one plan share its instances, its processor and its memory. That is exactly
+          why the plan is the unit of isolation.
+  - id: b
+    type: design
+    title: When to add an instance
+    speaker: Marek Sobczak
+    objectives: [AZ104-3.4.2]
+    intro: >
+      "The portal is single instance today," says Marek. "Customers hit it hardest
+      between 08:00 and 10:00 when they check overnight deliveries, and again
+      briefly at five. The rest of the time one instance is bored."
+
+
+      The plan is Standard, which supports up to ten instances.
+    prompt: How do you scale it?
+    options:
+      - id: a
+        label: >
+          Scale out automatically on a processor rule with a minimum of two instances, and add
+          a schedule-based profile for the morning peak
+        correct: true
+        rep: 8
+        consequence: >
+          Mornings are smooth, the afternoon settles back to two, and no single instance
+          failure takes the portal down.
+        explain: >
+          Autoscale rules can combine a metric-based rule with a scheduled profile that raises
+          the minimum during known peaks. A minimum of two also means an instance can be lost,
+          or recycled during a deployment, without an outage.
+        diagram:
+          - {op: set_detail, node: plan-portal, detail: "Autoscale 2 to 6 instances"}
+      - id: b
+        label: Scale up to a larger instance size during the morning and back down afterwards
+        correct: false
+        rep: -6
+        consequence: >
+          Changing the plan's size restarts the apps on it, in the middle of the morning peak.
+        explain: >
+          Scaling up changes the size of every instance in the plan and is disruptive.
+          Scaling out adds instances behind the same front end, which is what a web workload
+          wants.
+      - id: c
+        label: Leave it at one instance and add a content delivery network for the busy period
+        correct: false
+        rep: -7
+        consequence: >
+          Shipment tracking is per customer and per shipment, so almost nothing is cacheable,
+          and the single instance is still the bottleneck.
+        explain: >
+          Caching helps static and shared content. A page whose entire value is the current
+          state of one customer's freight is not that.
+      - id: d
+        label: Set autoscale to a maximum of ten instances with a rule on memory percentage
+        correct: false
+        rep: -5
+        consequence: >
+          Memory sits flat while requests queue, and the plan never scales during the peak
+          that matters.
+        explain: >
+          Choose the metric that moves with the load. For this app requests and processor move
+          in the morning and memory does not.
+  - id: c
+    type: knowledge
+    title: Plan and app
+    speaker: Marek Sobczak
+    objectives: [AZ104-3.4.1]
+    intro: >
+      "One thing people get wrong in interviews," says Marek. "You have a Standard
+      plan with three apps on it, and you scale the plan out to four instances.
+      How many instances of each app are running?"
+    question: What happens to the apps when the plan scales out?
+    options:
+      - id: a
+        label: Every app on the plan runs on all four instances
+        correct: true
+        rep: 4
+        explain: >
+          Scaling is a property of the plan, not of an individual app. Every app assigned to
+          the plan runs on every instance, which is why the plan is what you pay for and why
+          apps that must not compete belong on different plans.
+      - id: b
+        label: The instances are shared out between the apps, so each gets roughly one
+        correct: false
+        rep: -5
+        consequence: A capacity plan is written on a model of App Service that does not exist.
+        explain: >
+          There is no partitioning of instances between apps. All apps run everywhere in the
+          plan and compete for the same resources.
+      - id: c
+        label: Only the app with autoscale configured runs on more than one
+        correct: false
+        rep: -5
+        consequence: Autoscale is configured per app, repeatedly, and none of it does what was expected.
+        explain: >
+          Autoscale is configured on the plan. An app cannot scale independently of the plan
+          that hosts it.

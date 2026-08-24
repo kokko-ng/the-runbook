@@ -1,0 +1,185 @@
+id: a1mn-q04
+chapter: act1-monitoring
+title: Two Vaults
+summary: Backup exists for one virtual machine, by accident, and the auditor's next question is about everything else.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ104-5.2.1
+  - AZ104-5.2.2
+  - AZ104-5.2.3
+brief: >
+  Meridian's backup story is one vault, one machine, and a policy somebody
+  accepted the defaults for in 2023.
+debrief: >
+  Two vaults, chosen for what they protect rather than which button was nearest,
+  and a policy that matches what the business actually said about losing data.
+encounters:
+  - id: a
+    type: design
+    title: Which vault for what
+    speaker: Marek Sobczak
+    objectives: [AZ104-5.2.1, AZ104-5.2.2]
+    intro: >
+      The list of things that need protecting: four virtual machines, the depot
+      file share, the proof-of-delivery blob container, and the transport
+      database, which is an Azure SQL database with its own automated backups.
+
+
+      "Two products with similar names," says Marek. "Recovery Services vault and
+      Backup vault. Put each of these in the right one, and be able to say why."
+    prompt: How do you split them?
+    options:
+      - id: a
+        label: >
+          Virtual machines and the file share in a Recovery Services vault; blobs in a Backup
+          vault; the database keeps its own automated backups
+        correct: true
+        rep: 8
+        consequence: >
+          Two vaults, four protected items and one long-term retention policy on the database,
+          and the diagram fits on one slide.
+        explain: >
+          Recovery Services vaults cover the older workload set: virtual machines, Azure Files,
+          SQL in a virtual machine, and on-premises agents. Backup vaults cover the newer ones,
+          including blobs, disks, PostgreSQL and Kubernetes. Azure SQL Database has its own
+          automated backups, configured on the database, not through a vault.
+        diagram:
+          - {op: add_node, node: rsv-meridian}
+          - {op: add_node, node: bkv-meridian}
+          - {op: add_edge, edge: e-rsv-tms}
+          - {op: add_edge, edge: e-bkv-st}
+      - id: b
+        label: Everything in one Recovery Services vault, since it supports the most workloads
+        correct: false
+        rep: -6
+        consequence: >
+          The blob container cannot be added, and the work has to be redone with a second
+          vault anyway.
+        explain: >
+          A Recovery Services vault does not protect blobs. The two vault types are not
+          interchangeable, and which workloads each supports is exactly what this objective is
+          about.
+      - id: c
+        label: Everything in one Backup vault, which is the newer product
+        correct: false
+        rep: -6
+        consequence: >
+          The virtual machines cannot be added and the file share cannot either.
+        explain: >
+          Newer does not mean superset. Virtual machine and Azure Files backup live in a
+          Recovery Services vault today.
+      - id: d
+        label: >
+          Virtual machines in a Recovery Services vault, and blobs and the database left to
+          storage soft delete and the platform
+        correct: false
+        rep: -8
+        consequence: >
+          A container deleted after the soft delete window is unrecoverable, and the database
+          has thirty-five days of retention against a seven-year contractual requirement.
+        explain: >
+          Soft delete is a short window for accidents, not a backup. Automated database
+          backups have a limited default retention, and long-term retention has to be
+          configured deliberately.
+  - id: b
+    type: design
+    title: How much can we lose
+    speaker: Priya Raghunathan
+    objectives: [AZ104-5.2.3]
+    intro: >
+      "I have been asked to sign a policy," says Priya, "and I would like to
+      understand what I am signing."
+
+
+      The business answers: the transport application can lose at most an hour of
+      shipment records, must be back within four hours, and financial records have
+      to be produceable for seven years. The depot file share can lose a day and
+      nobody would notice by lunchtime.
+    prompt: What do you configure for the transport application machines?
+    options:
+      - id: a
+        label: >
+          Enhanced policy with multiple backups a day, thirty-day daily retention, and monthly
+          points kept for seven years
+        correct: true
+        rep: 8
+        consequence: >
+          Priya signs it, and the recovery objectives are written on the same page as the
+          schedule for the first time.
+        explain: >
+          A backup policy is where recovery point objective and retention are expressed:
+          frequency decides how much data can be lost, retention decides how far back you can
+          reach. The enhanced policy for virtual machines supports multiple backups a day,
+          which is what a one-hour objective needs, and long-term monthly points cover the
+          seven-year requirement without keeping every daily point.
+        diagram:
+          - {op: add_node, node: policy-backup}
+      - id: b
+        label: The default daily policy at 02:00 with thirty-day retention
+        correct: false
+        rep: -8
+        consequence: >
+          A failure at 01:00 loses twenty-three hours of shipments against a one-hour
+          objective, and nobody finds out until it happens.
+        explain: >
+          A daily backup means up to a day of data loss. That is a fine policy where the
+          business has said a day is acceptable, which is true of the file share and not of
+          the transport application.
+      - id: c
+        label: Hourly backups with seven-year daily retention
+        correct: false
+        rep: -6
+        consequence: >
+          The vault stores sixty thousand recovery points per machine and the cost is
+          indefensible.
+        explain: >
+          Meeting the recovery point objective does not require keeping every point forever.
+          Long-term retention is expressed as weekly, monthly and yearly points precisely to
+          avoid this.
+      - id: d
+        label: Daily backups, with the application writing its own hourly export to storage
+        correct: false
+        rep: -5
+        consequence: >
+          There are now two recovery mechanisms, one of which nobody tests, and a restore
+          means combining them.
+        explain: >
+          Application-level exports are genuinely useful for granular recovery. As a way to
+          paper over a policy that does not meet the objective, they add a second thing to get
+          wrong.
+  - id: c
+    type: knowledge
+    title: Two letters that get confused
+    speaker: Marek Sobczak
+    objectives: [AZ104-5.2.3]
+    intro: >
+      "Priya will use these two terms in front of the board and you have to be
+      sure which is which," says Marek. "Recovery point objective and recovery
+      time objective. Backup frequency sets one of them. Which?"
+    question: Which objective does backup frequency determine?
+    options:
+      - id: a
+        label: The recovery point objective, which is how much data you can afford to lose
+        correct: true
+        rep: 4
+        explain: >
+          Frequency sets the recovery point objective: back up every hour and you can lose at
+          most an hour. Recovery time objective is how long it takes to be running again, which
+          depends on restore speed, the size of the data and how practiced the process is.
+      - id: b
+        label: The recovery time objective, because more frequent backups restore faster
+        correct: false
+        rep: -5
+        consequence: A continuity plan is written with the two terms swapped, and the board signs it.
+        explain: >
+          Frequency does not change restore speed. Restoring a large machine takes about as
+          long whether the point is an hour or a day old.
+      - id: c
+        label: Both, since they are two ways of describing the same schedule
+        correct: false
+        rep: -5
+        consequence: The distinction is lost, and a design meets one requirement while missing the other.
+        explain: >
+          They are separate and often in tension. Meeting a tight recovery time objective can
+          need replication or a warm standby rather than a backup at all.

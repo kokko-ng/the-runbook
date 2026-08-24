@@ -1,0 +1,299 @@
+id: a1cm-q09
+chapter: act1-compute
+title: Going Live on the Portal
+summary: A domain, a certificate, a way to deploy without an outage, and a backup nobody asked for until they needed it.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ104-3.4.4
+  - AZ104-3.4.5
+  - AZ104-3.4.6
+  - AZ104-3.4.7
+  - AZ104-3.4.8
+brief: >
+  Launch week. Five things have to be true before the marketing email goes out on
+  Thursday.
+debrief: >
+  A real name, a real certificate, a slot to deploy into, a private path to the
+  database, and a backup schedule.
+encounters:
+  - id: a
+    type: design
+    title: The name customers type, again
+    speaker: Hendrik Salim
+    objectives: [AZ104-3.4.5, AZ104-3.4.4]
+    intro: >
+      "track.meridianlogistics.com," says Hendrik. "Marketing has it on the flyer
+      already, which I am told is my fault for asking."
+
+
+      The zone is hosted in Azure DNS. The app answers today on its default
+      azurewebsites.net name. Customers will type the custom name and must not see
+      a certificate warning.
+    prompt: What do you do, in order?
+    options:
+      - id: a
+        label: >
+          Add the CNAME and validation record in the zone, add the custom domain to the app,
+          then create and bind an App Service managed certificate
+        correct: true
+        rep: 8
+        consequence: >
+          The green padlock is there on Tuesday, two days before the flyer goes out.
+        explain: >
+          App Service verifies domain ownership through a record you add to the zone, which is
+          why the DNS entries come first. A managed certificate is free, issued for a custom
+          domain already added to the app, and renews itself, which removes an annual outage
+          nobody diaries.
+        diagram:
+          - {op: add_node, node: dns-public}
+          - {op: add_edge, edge: e-portal-dns}
+      - id: b
+        label: Bind a certificate first, then add the custom domain, then create the DNS records
+        correct: false
+        rep: -6
+        consequence: >
+          The certificate cannot be created for a domain the app does not know about, and the
+          order has to be worked out live.
+        explain: >
+          The dependency runs the other way: DNS proves ownership, the domain is added, then a
+          certificate can be issued and bound for it.
+      - id: c
+        label: Buy a wildcard certificate and upload the PFX file to the app
+        correct: false
+        rep: -5
+        consequence: >
+          It works, costs money, and expires in twelve months on a date nobody has written
+          down.
+        explain: >
+          Uploading a certificate is entirely valid, particularly for a wildcard used in
+          several places. For a single custom domain the managed certificate is free and
+          renews itself.
+      - id: d
+        label: Point the DNS name at the app's inbound IP address with an A record
+        correct: false
+        rep: -7
+        consequence: >
+          The site works until the app's inbound address changes during a platform migration.
+        explain: >
+          App Service inbound addresses are not guaranteed permanent. A CNAME to the default
+          host name, or an alias record at an apex, tracks the app rather than an address.
+  - id: b
+    type: design
+    title: Deploying on a Thursday
+    speaker: Dana Ong
+    objectives: [AZ104-3.4.8]
+    intro: >
+      "Marketing send the email at 09:00 on Thursday," says Dana. "The developers
+      want to deploy a fix on Thursday morning. I would like those two facts to
+      stop being a problem for me."
+
+
+      The plan is Standard, which supports deployment slots.
+    prompt: How do they deploy?
+    options:
+      - id: a
+        label: >
+          Deploy to a staging slot, warm it up, check it, then swap it into production
+        correct: true
+        rep: 8
+        consequence: >
+          Thursday's deploy happens at 08:20 with no dropped requests and a swap that can be
+          reversed in seconds.
+        explain: >
+          A deployment slot is a separate app with its own host name on the same plan. The
+          swap exchanges the running content after warming up the target, so requests are not
+          served by an application that is still starting, and swapping back is the rollback.
+        diagram:
+          - {op: add_node, node: slot-staging}
+          - {op: add_edge, edge: e-portal-slot}
+      - id: b
+        label: Deploy straight to production early in the morning, before the email goes out
+        correct: false
+        rep: -6
+        consequence: >
+          The app restarts, the first customers to arrive get a cold application, and the
+          rollback is another deploy.
+        explain: >
+          Deploying in place restarts the app and has no rollback except redeploying. Slots
+          exist for exactly this and are included in the tier already being paid for.
+      - id: c
+        label: Deploy to a second app on the same plan and change the DNS record to point at it
+        correct: false
+        rep: -7
+        consequence: >
+          The cutover waits for DNS caches, and some customers are on the old version for
+          hours.
+        explain: >
+          DNS is not a traffic switch; time to live and resolver caching make it slow and
+          uneven. A slot swap changes the routing inside App Service immediately.
+      - id: d
+        label: Deploy to a staging slot and leave it there, sending testers to the slot's host name
+        correct: false
+        rep: -5
+        consequence: >
+          Production still runs the old version on Thursday, which was the thing being fixed.
+        explain: >
+          Testing in the slot is half the point. The swap is the other half.
+  - id: c
+    type: troubleshoot
+    title: INC-4736
+    speaker: Meridian NOC
+    objectives: [AZ104-3.4.7]
+    intro: >
+      The swap happened at 08:20 and the portal is up. Every page that reads
+      shipment data returns an error, and the application log says the database
+      refused the connection.
+
+
+      The database is sql-meridian-tms, which was closed to public access last
+      month as part of the storage and data work. The portal reached it fine
+      yesterday, from the staging slot.
+    ticket:
+      ref: INC-4736
+      opened: "08:26"
+      reporter: Meridian NOC
+      summary: Portal cannot reach the transport database after the slot swap.
+      severity: sev1
+    time_budget: 5
+    investigate:
+      - id: a
+        action: Ask what is different between the slot and production
+        speaker: Marek Sobczak
+        reveals: >
+          "I set up virtual network integration on the staging slot when I was testing.
+          Slots have their own networking configuration unless a setting is marked as a
+          slot setting."
+      - id: b
+        action: Ask what the database allows
+        speaker: Wei Lin Tan
+        reveals: >
+          "Public network access is disabled. It is reachable through the private endpoint
+          in snet-privatelink, and from anything integrated with vnet-app."
+    commands:
+      - id: a
+        label: Check the production app's outbound networking
+        cmd: az webapp show -n app-meridian-portal -g rg-app --query "{vnet:virtualNetworkSubnetId,https:httpsOnly}" -o json
+        output: |
+          {
+            "https": true,
+            "vnet": null
+          }
+        time_cost: 1
+      - id: b
+        label: Check the staging slot for comparison
+        cmd: az webapp show -n app-meridian-portal --slot staging -g rg-app --query "virtualNetworkSubnetId" -o tsv
+        output: |
+          /subscriptions/.../virtualNetworks/vnet-app/subnets/snet-appservice
+        time_cost: 1
+      - id: c
+        label: Check what the app resolves the database name to
+        cmd: az webapp ssh -n app-meridian-portal -g rg-app --command "nslookup sql-meridian-tms.database.windows.net"
+        output: |
+          Name:    sql-meridian-tms.privatelink.database.windows.net
+          Address: 10.20.3.9
+        note: The name resolves privately, so DNS is fine. The traffic has no route to that address.
+        time_cost: 2
+      - id: d
+        label: Check the app settings that came across in the swap
+        cmd: az webapp config appsettings list -n app-meridian-portal -g rg-app --query "[?name=='SQL_CONNECTION'].{name:name,slotSetting:slotSetting}" -o table
+        output: |
+          Name             SlotSetting
+          ---------------  -------------
+          SQL_CONNECTION   False
+        time_cost: 1
+    fixes:
+      - id: a
+        label: Enable virtual network integration on the production app, to the same subnet as the slot
+        correct: true
+        rep: 10
+        consequence: >
+          Shipment pages come back within two minutes of the integration being applied, before
+          the marketing email goes out.
+        explain: >
+          Virtual network integration gives an app outbound access into a virtual network, and
+          it is configured per app and per slot rather than being carried across by a swap.
+          The staging slot had it, production did not, and the private endpoint is only
+          reachable from inside the network.
+        diagram:
+          - {op: set_detail, node: app-portal, detail: "Integrated with snet-app"}
+      - id: b
+        label: Swap back to the previous version
+        correct: false
+        rep: -7
+        consequence: >
+          The old version fails in exactly the same way, because it was never the code.
+        explain: >
+          Swapping back is the right reflex when a deployment breaks something, and here the
+          slot and production differ in configuration rather than content, so the previous
+          version has the same problem.
+      - id: c
+        label: Re-enable public network access on the database and allow the app's outbound addresses
+        correct: false
+        rep: -9
+        consequence: >
+          The portal recovers and the control Wei Lin put in last month is undone during
+          launch week.
+        explain: >
+          It reopens the database to the internet and depends on an outbound address list
+          that changes when the plan scales. The app already has a supported private path.
+      - id: d
+        label: Mark the connection string as a slot setting so it stops moving during swaps
+        correct: false
+        rep: -6
+        consequence: >
+          The connection string stays put and the traffic still has no route to the private
+          address.
+        explain: >
+          Slot settings are worth understanding and are about app settings and connection
+          strings. Networking integration is separate configuration and is not swapped at all.
+  - id: d
+    type: design
+    title: The backup nobody asked for
+    speaker: Priya Raghunathan
+    objectives: [AZ104-3.4.6]
+    intro: >
+      "One question before launch," says Priya. "If somebody deletes the portal
+      content or a bad deployment corrupts its configuration, what do we restore
+      from?"
+
+
+      The code is in git. The configuration is in the app settings. There is a
+      small amount of uploaded content, customer logos for delivery notes, stored
+      on the app's file system.
+    prompt: What do you configure?
+    options:
+      - id: a
+        label: >
+          Scheduled App Service backup to a storage account, covering the app content and its
+          configuration
+        correct: true
+        rep: 7
+        consequence: >
+          The first nightly backup runs on Wednesday, and the restore is tested once in
+          December.
+        explain: >
+          App Service backup on Standard and above snapshots the app's content and
+          configuration on a schedule to a storage account you own, and can restore to the
+          same app or a different one. Code in git covers redeployment; it does not cover
+          uploaded content or the settings that came with a bad change.
+      - id: b
+        label: Nothing. The code is in git and a redeploy rebuilds the app.
+        correct: false
+        rep: -6
+        consequence: >
+          A redeploy in January restores the code and loses two months of uploaded customer
+          logos.
+        explain: >
+          Source control covers what is in source control. Uploaded content and configuration
+          drift are precisely what an app backup is for.
+      - id: c
+        label: Move the uploaded logos to blob storage and rely on that account's soft delete
+        correct: false
+        rep: -5
+        consequence: >
+          It is a better design and it is a sprint of work, and launch is on Thursday.
+        explain: >
+          Storing uploads in blob storage is the right long-term shape for an app that scales
+          out. It does not answer the configuration half of the question, and it is not a
+          launch-week change.

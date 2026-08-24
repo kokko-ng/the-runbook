@@ -1,0 +1,249 @@
+id: a1cm-q03
+chapter: act1-compute
+title: Two Machines, One Rack
+summary: The transport application runs on a single virtual machine, and the maintenance notice arrives on a Tuesday.
+variant: core
+estimated_minutes: 13
+objectives:
+  - AZ104-3.2.1
+  - AZ104-3.2.6
+brief: >
+  Planned maintenance is coming for the host that vm-tms01 sits on. There is no
+  second machine to fail over to, because nobody ever built one.
+debrief: >
+  Two machines, spread deliberately, and a conversation about zones that Meridian
+  will have again in Act 2 with more money at stake.
+encounters:
+  - id: a
+    type: design
+    title: Where the second one goes
+    speaker: Marek Sobczak
+    objectives: [AZ104-3.2.6]
+    intro: >
+      "Second transport application machine," says Marek. "Same size, same image,
+      behind the internal load balancer. The only question is where you put it so
+      that it is not next to the first one."
+
+
+      Southeast Asia has availability zones. Both machines will use premium solid
+      state disks and need to reach the same virtual network.
+    prompt: How do you place the two machines?
+    options:
+      - id: a
+        label: >
+          One machine in zone 1 and one in zone 2, with zone-redundant disks where the disk
+          type allows it
+        correct: true
+        rep: 8
+        consequence: >
+          Maintenance lands on zone 1 a month later and the application does not notice.
+        explain: >
+          Availability zones are physically separate locations within a region with their own
+          power, cooling and network. Spreading two machines across zones protects against a
+          data center level failure as well as host maintenance, which is a stronger
+          guarantee than an availability set gives.
+        diagram:
+          - {op: add_node, node: vm-tms02}
+          - {op: add_node, node: lb-internal-tms}
+          - {op: add_edge, edge: e-ilb-tms}
+          - {op: add_edge, edge: e-ilb-tms02}
+      - id: b
+        label: Both machines in an availability set, in the same zone
+        correct: false
+        rep: -6
+        consequence: >
+          Host maintenance is survived, and the zone-wide power event in the second quarter
+          is not.
+        explain: >
+          An availability set spreads machines across fault and update domains inside one
+          data center, which protects against rack and maintenance failures. It does not
+          protect against losing the whole zone, and a set cannot be combined with zones.
+      - id: c
+        label: Both machines in the same zone, relying on the load balancer to handle failure
+        correct: false
+        rep: -8
+        consequence: >
+          The load balancer faithfully removes both unhealthy machines from rotation and
+          there is nothing left in it.
+        explain: >
+          A load balancer distributes traffic to healthy machines. It cannot create
+          availability that the placement of those machines does not provide.
+      - id: d
+        label: One machine in Southeast Asia and one in East Asia, behind a load balancer
+        correct: false
+        rep: -7
+        consequence: >
+          The database in the primary region is now sixty milliseconds away from half the
+          application, and the internal load balancer cannot span regions anyway.
+        explain: >
+          Cross-region redundancy is a real pattern with a global load balancing service in
+          front of it, and it is an Act 2 conversation. A standard internal load balancer
+          serves one virtual network.
+  - id: b
+    type: design
+    title: Building it
+    speaker: Dana Ong
+    objectives: [AZ104-3.2.1]
+    intro: >
+      The change is approved for Thursday evening. The new machine has to match
+      the existing one closely enough that the application team notices nothing:
+      same image, same size, same subnet, same extensions, no public address.
+
+
+      The existing machine was built by hand in 2023, and there is now a Bicep
+      file that describes it.
+    prompt: How do you create vm-tms02?
+    options:
+      - id: a
+        label: >
+          Deploy it from the Bicep template with a new name and zone parameter, so both
+          machines are described by the same code
+        correct: true
+        rep: 8
+        consequence: >
+          Thursday's deployment takes four minutes and the file now describes two machines
+          instead of one.
+        explain: >
+          Creating a second machine is the moment a template earns its keep: the shape is
+          already described, and parameterizing name and zone makes the difference explicit
+          rather than remembered.
+      - id: b
+        label: Capture an image of vm-tms01 and deploy the new machine from it
+        correct: false
+        rep: -6
+        consequence: >
+          Capturing the image requires generalizing the source machine, which takes the
+          production application down.
+        explain: >
+          Generalizing a machine to capture an image makes the original unusable. Building a
+          managed image or a gallery version from a copy is a legitimate pattern, and it is
+          not something to do to a live server on a Thursday.
+      - id: c
+        label: Build it in the portal, copying each setting from the existing machine
+        correct: false
+        rep: -5
+        consequence: >
+          Two settings are missed, one of which is the boot diagnostics account, and it is
+          found during the next incident.
+        explain: >
+          Hand-building the second of something is how the two drift apart. It also throws
+          away the description you now have.
+      - id: d
+        label: Clone the existing machine's disks and attach them to a new machine
+        correct: false
+        rep: -7
+        consequence: >
+          Two machines come up with the same host name and the same machine identifier, and
+          domain join fails on the second.
+        explain: >
+          A disk copy carries the operating system's identity with it. That is a recovery
+          technique, not a way to build a peer.
+  - id: c
+    type: troubleshoot
+    title: INC-4655
+    speaker: Meridian NOC
+    objectives: [AZ104-3.2.6, AZ104-3.2.1]
+    intro: >
+      vm-tms02 deployed and is running. The internal load balancer shows it as
+      unhealthy and sends no traffic to it. The application service is running on
+      the machine, and a local request to the health path returns 200.
+
+
+      vm-tms01, in zone 1, is healthy and taking everything.
+    ticket:
+      ref: INC-4655
+      opened: "20:35"
+      reporter: Meridian NOC
+      summary: New transport application machine deployed but never becomes healthy in the load balancer.
+      severity: sev3
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what the deployment changed apart from the name
+        speaker: Marek Sobczak
+        reveals: >
+          "Name, zone, and it picked up the newer template default for the network
+          interface, which does not add it to the load balancer's backend pool. The old one
+          was added by hand two years ago."
+      - id: b
+        action: Ask whether the application is really running
+        speaker: Meridian IT
+        reveals: >
+          A local curl to the health path on vm-tms02 returns 200 with the expected body.
+          The service is listening on all interfaces.
+    commands:
+      - id: a
+        label: List the backend pool members
+        cmd: az network lb address-pool show -g rg-app --lb-name ilb-tms -n pool-tms --query "loadBalancerBackendAddresses[].name" -o tsv
+        output: |
+          vm-tms01
+        time_cost: 1
+      - id: b
+        label: Check the health probe configuration
+        cmd: az network lb probe list -g rg-app --lb-name ilb-tms -o table
+        output: |
+          Name        Protocol    Port    RequestPath    IntervalInSeconds
+          ----------  ----------  ------  -------------  -------------------
+          probe-tms   Http        8080    /health        5
+        time_cost: 1
+      - id: c
+        label: Check the new machine's zone and interface
+        cmd: az vm show -n vm-tms02 -g rg-app --query "{zones:zones,nic:networkProfile.networkInterfaces[0].id}" -o json
+        output: |
+          {
+            "nic": "/subscriptions/.../networkInterfaces/vm-tms02-nic",
+            "zones": ["2"]
+          }
+        time_cost: 1
+      - id: d
+        label: Check the security group on the new machine's interface
+        cmd: az network nic list-effective-nsg --name vm-tms02-nic -g rg-app --query "value[0].effectiveSecurityRules[?destinationPortRange=='8080']" -o table
+        output: |
+          Name             Access    Priority    SourceAddressPrefix
+          ---------------  --------  ----------  ---------------------
+          AllowLbProbe     Allow     200         AzureLoadBalancer
+        time_cost: 1
+    fixes:
+      - id: a
+        label: Add vm-tms02's network interface to the load balancer's backend pool
+        correct: true
+        rep: 9
+        consequence: >
+          The probe turns healthy within fifteen seconds and traffic starts splitting between
+          the zones.
+        explain: >
+          A backend pool is a list of network interface configurations, and nothing is in it
+          implicitly. The machine can be perfectly healthy and completely idle until it is a
+          member.
+        diagram:
+          - {op: set_status, node: vm-tms02, status: healthy}
+      - id: b
+        label: Change the probe to a TCP probe on port 8080
+        correct: false
+        rep: -8
+        consequence: >
+          The probe still has nothing to check on the new machine, and the existing machine's
+          health is now measured less precisely.
+        explain: >
+          The probe was never the problem, and weakening it removes the check that catches an
+          application that is up but not serving.
+      - id: c
+        label: Redeploy vm-tms02 into zone 1 to match the healthy machine
+        correct: false
+        rep: -9
+        consequence: >
+          An hour of redeployment produces a second machine that is also not in the backend
+          pool, in the wrong zone.
+        explain: >
+          The zone is the part of the design that was correct. Nothing in the symptom points
+          at placement.
+      - id: d
+        label: Add an inbound rule allowing 8080 from the whole virtual network
+        correct: false
+        rep: -6
+        consequence: >
+          The port is now open more widely and the machine still receives nothing from the
+          load balancer.
+        explain: >
+          The effective rules already allowed the AzureLoadBalancer service tag on 8080.
+          Widening a rule that was not blocking anything is how security groups grow.

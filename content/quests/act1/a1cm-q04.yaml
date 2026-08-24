@@ -1,0 +1,253 @@
+id: a1cm-q04
+chapter: act1-compute
+title: The Disk That Filled Up
+summary: The transport application stopped writing at 04:12 because a data disk nobody sized for peak season ran out.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ104-3.2.5
+  - AZ104-3.2.4
+brief: >
+  Peak season doubles the shipment volume and nobody told the disk. The fix is
+  easy; picking the right one is the exam question.
+debrief: >
+  A bigger disk, a better disk type, and a size change that was chosen from the
+  metrics rather than from the price list.
+encounters:
+  - id: a
+    type: troubleshoot
+    title: INC-4670
+    speaker: Joana Reyes
+    objectives: [AZ104-3.2.5]
+    intro: >
+      "Transport application stopped accepting shipments at 04:12," says Joana.
+      "It is still up, it still answers, and every write fails. The application log
+      says there is no space left on the device."
+
+
+      vm-tms01 has a 128 gibibyte premium data disk holding the application's
+      working files and its local queue. The queue backs up when the database is
+      slow, and the database has been slow all week.
+    ticket:
+      ref: INC-4670
+      opened: "04:20"
+      reporter: Joana Reyes
+      summary: Transport application write failures. Data disk full on vm-tms01.
+      severity: sev1
+    time_budget: 5
+    investigate:
+      - id: a
+        action: Ask what is using the space
+        speaker: Marek Sobczak
+        reveals: >
+          "Ninety-one gigabytes of queue files that should have drained. The rest is the
+          application itself. Nothing is obviously junk, and deleting a queue file loses a
+          shipment."
+      - id: b
+        action: Ask whether this can wait for a maintenance window
+        speaker: Hendrik Salim
+        reveals: >
+          "Every depot that scans a delivery right now gets an error. It cannot wait an
+          hour, never mind until tonight."
+    commands:
+      - id: a
+        label: Look at the disk attached to the machine
+        cmd: az vm show -n vm-tms01 -g rg-app --query "storageProfile.dataDisks[0].{name:name,size:diskSizeGb,lun:lun,caching:caching}" -o json
+        output: |
+          {
+            "caching": "None",
+            "lun": 0,
+            "name": "vm-tms01-data",
+            "size": 128
+          }
+        time_cost: 1
+      - id: b
+        label: Check the disk's type and performance tier
+        cmd: az disk show -n vm-tms01-data -g rg-app --query "{sku:sku.name,size:diskSizeGb,iops:diskIopsReadWrite,mbps:diskMBpsReadWrite}" -o json
+        output: |
+          {
+            "iops": 500,
+            "mbps": 100,
+            "size": 128,
+            "sku": "Premium_LRS"
+          }
+        time_cost: 1
+      - id: c
+        label: Check whether the machine can take a bigger disk
+        cmd: az vm show -n vm-tms01 -g rg-app --query "hardwareProfile.vmSize" -o tsv
+        output: |
+          Standard_D2s_v5
+        note: A D2s_v5 supports four data disks and up to 3750 uncached IOPS.
+        time_cost: 1
+      - id: d
+        label: Check the operating system disk for space as well
+        cmd: az vm run-command invoke -n vm-tms01 -g rg-app --command-id RunShellScript --scripts "df -h /"
+        output: |
+          Filesystem      Size  Used Avail Use% Mounted on
+          /dev/sda1        30G   11G   19G  37% /
+        time_cost: 2
+    fixes:
+      - id: a
+        label: >
+          Expand vm-tms01-data to 512 gibibytes and grow the file system, then look at why
+          the queue is not draining
+        correct: true
+        rep: 10
+        consequence: >
+          Writes resume nine minutes later. The queue drains through the morning once the
+          database contention clears.
+        explain: >
+          Managed disks can be expanded in place; the disk grows first and then the file
+          system inside the guest is extended. On current disk types this no longer requires
+          deallocating the machine, and a larger premium disk also comes with a higher
+          performance tier, which helps the queue drain.
+        diagram:
+          - {op: add_node, node: disk-tms-data}
+      - id: b
+        label: Attach a second data disk and move the queue directory onto it
+        correct: false
+        rep: -6
+        consequence: >
+          It works, and the application now writes across two mount points, which somebody
+          has to remember forever.
+        explain: >
+          Adding a disk is a legitimate way to add capacity, and it changes the shape of the
+          machine for an incident that expanding one disk solves cleanly.
+      - id: c
+        label: Delete the oldest queue files to free space immediately
+        correct: false
+        rep: -12
+        consequence: >
+          Around four hundred shipments are lost and have to be re-entered from paper
+          manifests over the following week.
+        explain: >
+          Those files are undelivered work. Freeing space by discarding data is the one
+          option that turns an outage into a data loss incident.
+      - id: d
+        label: Resize the machine to a larger size, which comes with a bigger temporary disk
+        correct: false
+        rep: -8
+        consequence: >
+          The machine restarts, the application comes back, and the data disk is exactly as
+          full as it was.
+        explain: >
+          The temporary disk is ephemeral local storage and is not where the queue lives.
+          Resizing also restarts the machine, which is an outage for no benefit here.
+  - id: b
+    type: design
+    title: The right disk, not just a bigger one
+    speaker: Marek Sobczak
+    objectives: [AZ104-3.2.5]
+    intro: >
+      The immediate problem is gone. Marek wants the follow-up decision made
+      properly.
+
+
+      "The queue disk does small random writes all day and needs to survive a
+      restart. The reporting extract writes one large file a night and nobody
+      cares if it is lost. And the operating system disk is a P4 doing nothing.
+      Three disks, three answers."
+    prompt: What do you propose for the queue disk?
+    options:
+      - id: a
+        label: Premium solid state, sized so its performance tier matches the write pattern
+        correct: true
+        rep: 7
+        consequence: >
+          Queue latency halves, and the choice is written down with the numbers behind it.
+        explain: >
+          Premium solid-state disks give consistent low latency and their performance scales
+          with size, so sizing is a performance decision as much as a capacity one. For
+          production data that must survive a restart, this is the default.
+      - id: b
+        label: Standard hard disk drive storage, since capacity is the problem and it is cheapest
+        correct: false
+        rep: -8
+        consequence: >
+          The queue backs up worse than before because each small write now waits ten times
+          as long.
+        explain: >
+          Standard hard disk storage suits infrequently accessed data and backups. Small
+          random writes are the workload it is worst at.
+      - id: c
+        label: An ephemeral operating system disk, which is the fastest option available
+        correct: false
+        rep: -10
+        consequence: >
+          The first restart takes the queue with it, and this time nothing can be recovered.
+        explain: >
+          Ephemeral disks live on the host and are gone when the machine is reallocated. They
+          are excellent for stateless workloads and completely wrong for a queue.
+      - id: d
+        label: Ultra disk, so there is headroom for whatever peak season does next year
+        correct: false
+        rep: -6
+        consequence: >
+          Priya asks about a line item that costs more than the virtual machine attached to
+          it.
+        explain: >
+          Ultra disks are for workloads with extreme and specific throughput requirements,
+          configured independently of size. This queue needs consistent premium performance,
+          not the top of the range.
+  - id: c
+    type: design
+    title: Sizing from the metrics
+    speaker: Priya Raghunathan
+    objectives: [AZ104-3.2.4]
+    intro: >
+      "You are asking for a larger virtual machine for peak season," says Priya.
+      "I want to know what tells you it is the right size, and what happens in
+      February when peak is over."
+
+
+      The metrics for the last month: processor averages twenty-two per cent and
+      peaks at forty, memory sits at ninety-one per cent all day, and the disk
+      queue length is high during the morning rush.
+    prompt: What do you ask for?
+    options:
+      - id: a
+        label: >
+          A memory-optimized size in the same family generation, resized back down after peak
+          season
+        correct: true
+        rep: 8
+        consequence: >
+          The machine moves to an E-series size on Thursday night with one restart, and goes
+          back down in February on the same change record.
+        explain: >
+          The metrics say memory, not processor: ninety-one per cent used with processor at
+          twenty-two means a general-purpose size is the wrong shape. Resizing is a restart,
+          not a rebuild, and it works in both directions, so seasonal sizing is a legitimate
+          pattern.
+        diagram:
+          - {op: set_detail, node: vm-tms01, detail: "Memory-optimized for peak season"}
+      - id: b
+        label: The next size up in the same general-purpose family
+        correct: false
+        rep: -6
+        consequence: >
+          Processor headroom doubles, memory pressure barely moves, and the same conversation
+          happens in three weeks.
+        explain: >
+          Doubling a general-purpose size doubles both processor and memory and pays for
+          processor that is already idle. Choosing the family is the decision; choosing the
+          number within it is the easy part.
+      - id: c
+        label: The largest size the subscription quota allows, for the season
+        correct: false
+        rep: -8
+        consequence: >
+          The machine costs six times as much and uses eight per cent of its processor.
+        explain: >
+          Sizing by what is available rather than by what the metrics say is how cloud bills
+          get their reputation.
+      - id: d
+        label: Keep the size and add a second machine behind the load balancer instead
+        correct: false
+        rep: -5
+        consequence: >
+          Two machines now sit at ninety-one per cent memory, and the queue processing that
+          only runs on one of them is no faster.
+        explain: >
+          Scaling out is the right instinct for stateless request handling, which the second
+          machine already does. It does not help a single memory-bound process.

@@ -1,0 +1,214 @@
+id: a1st-q01
+chapter: act1-storage
+title: A Home for the Scans
+summary: Eleven thousand proof-of-delivery images a day, currently landing on a file server in Jurong that is nearly full.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ104-2.2.1
+  - AZ104-2.2.2
+  - AZ104-2.2.4
+  - AZ104-2.3.2
+brief: >
+  Every delivery produces a signed scan. Customers can ask for one up to seven
+  years later, and the disk in Jurong has four weeks left.
+debrief: >
+  A storage account with the right redundancy for the money, one container, and
+  an encryption story you can explain to an auditor without hedging.
+encounters:
+  - id: a
+    type: design
+    title: What kind of account
+    speaker: Marek Sobczak
+    objectives: [AZ104-2.2.1, AZ104-2.3.2]
+    intro: >
+      "Eleven thousand images a day," says Marek. "About four hundred kilobytes
+      each. Written once by the scanner intake service, read rarely, kept for
+      seven years because the customer contracts say so. The claims team reads
+      maybe two hundred a week, and they need them within a second or two."
+
+
+      He writes the options on the whiteboard, then draws a line under the ones he
+      thinks are traps.
+    prompt: What do you create?
+    options:
+      - id: a
+        label: >
+          A general-purpose v2 account, standard performance, with one blob container for
+          the scans
+        correct: true
+        rep: 7
+        consequence: >
+          The intake service writes its first scan into it that afternoon and Marek stops
+          watching over your shoulder.
+        explain: >
+          General-purpose v2 with standard performance is the default for blob workloads and
+          is the only kind that supports the full set of access tiers and lifecycle
+          management. Premium block blobs exist for high transaction rates and low latency,
+          which four hundred kilobyte writes eleven thousand times a day is not.
+        diagram:
+          - {op: add_node, node: st-pod}
+          - {op: add_node, node: cnt-pod}
+      - id: b
+        label: A premium block blob account, so the claims team never waits
+        correct: false
+        rep: -7
+        consequence: >
+          Priya asks why storage costs six times the estimate for a workload of eleven
+          thousand small writes.
+        explain: >
+          Premium block blob storage is priced for consistently high transaction rates and
+          single-digit millisecond latency. It also has no cool or archive tier, which is
+          exactly what a seven-year retention needs.
+      - id: c
+        label: A general-purpose v2 account with a file share, so the intake service can keep writing to a path
+        correct: false
+        rep: -6
+        consequence: >
+          It works, and in year three the claims team is paying file share prices for six
+          hundred gigabytes nobody reads.
+        explain: >
+          Files is the right answer when something must mount a share. The intake service is
+          being written anyway, and blob storage gives lifecycle tiering, versioning and
+          per-blob access that a share does not.
+      - id: d
+        label: A blob storage account with the archive tier as its default
+        correct: false
+        rep: -8
+        consequence: >
+          The first claims request takes several hours to rehydrate, and the claims manager
+          calls Dana rather than you.
+        explain: >
+          Archive is offline storage: reading a blob requires rehydration that takes hours.
+          It suits the tail of a seven-year retention, applied by a lifecycle rule, not the
+          default for freshly written scans.
+  - id: b
+    type: design
+    title: How many copies, and where
+    speaker: Priya Raghunathan
+    objectives: [AZ104-2.2.2]
+    intro: >
+      Priya has read about redundancy options and has arrived with a number.
+
+
+      "The contract says we must be able to produce a scan for seven years. Losing
+      them is a legal problem, not an IT problem. What I want to know is what each
+      option costs and what each one actually protects against."
+
+
+      Meridian runs in Southeast Asia. The secondary region on the paper
+      architecture is East Asia. There is no requirement to read the scans from
+      the second region, only to still have them.
+    prompt: Which redundancy do you recommend?
+    options:
+      - id: a
+        label: Geo-redundant storage, three copies in the primary region and three in East Asia
+        correct: true
+        rep: 8
+        consequence: >
+          Priya writes the annual number down, decides it is cheaper than one lost claim,
+          and signs.
+        explain: >
+          Geo-redundant storage keeps three synchronous copies in the primary region and
+          replicates asynchronously to a paired secondary. That is what protects against
+          losing a region, which is the risk the contract cares about. Read access from the
+          secondary is a separate option that was not asked for.
+        diagram:
+          - {op: set_detail, node: st-pod, detail: GRS to East Asia}
+      - id: b
+        label: Locally redundant storage, since three copies in one data center is already three copies
+        correct: false
+        rep: -8
+        consequence: >
+          It is the cheapest line on the invoice until a regional event, at which point it is
+          the most expensive decision in the company.
+        explain: >
+          Locally redundant storage protects against drive and rack failure inside one data
+          center only. It is a reasonable choice for data you can rebuild, and scans that
+          must survive seven years are not that.
+      - id: c
+        label: Zone-redundant storage, three copies across three availability zones
+        correct: false
+        rep: -5
+        consequence: >
+          Availability improves and the contract requirement about surviving a regional
+          problem is still not met.
+        explain: >
+          Zone-redundant storage is the better answer for availability inside a region and
+          the right default for workloads that must stay online. It does not put a copy
+          outside the region, which is what this requirement is about.
+      - id: d
+        label: Read-access geo-zone-redundant storage, the most durable option available
+        correct: false
+        rep: -5
+        consequence: >
+          Nobody ever reads the secondary endpoint, and the account carries the highest
+          storage price in the estate for seven years.
+        explain: >
+          It is genuinely the most durable and it is the most expensive. Read access from
+          the secondary was explicitly not required, and paying for it forever without a
+          reader is the kind of line Priya finds.
+  - id: c
+    type: design
+    title: The encryption question
+    speaker: Wei Lin Tan
+    objectives: [AZ104-2.2.4]
+    intro: >
+      "The customer's security questionnaire asks whether data at rest is
+      encrypted and who holds the keys," says Wei Lin. "I have to answer it this
+      week. Two of our customers have a further requirement that they can revoke
+      access to their data independently of Microsoft."
+
+
+      Meridian has a key vault. Nobody has yet had to rotate anything in it.
+    prompt: What do you configure and what do you tell her?
+    options:
+      - id: a
+        label: >
+          It is already encrypted with platform-managed keys; switch this account to
+          customer-managed keys in the key vault to meet the revocation requirement
+        correct: true
+        rep: 8
+        consequence: >
+          Wei Lin answers the questionnaire with two sentences and a key vault reference,
+          and the customer's auditor accepts it.
+        explain: >
+          All Azure Storage is encrypted at rest by default with 256-bit AES and
+          platform-managed keys, and it cannot be turned off. Customer-managed keys move key
+          custody to your key vault, which is what makes independent revocation possible:
+          disable the key and the data becomes unreadable.
+        diagram:
+          - {op: add_node, node: kv-meridian}
+      - id: b
+        label: Enable encryption at rest on the storage account, which is off by default
+        correct: false
+        rep: -7
+        consequence: >
+          Wei Lin sends an answer implying the data was previously unencrypted, and the
+          customer asks when that was fixed and what it means for old data.
+        explain: >
+          Storage service encryption is on for every account, always, and there is no switch
+          to turn it off. Saying otherwise creates a compliance question that does not exist.
+      - id: c
+        label: Encrypt each scan in the intake service before uploading it
+        correct: false
+        rep: -6
+        consequence: >
+          The claims team can no longer preview a scan in the portal, and the key handling
+          becomes an application problem nobody owns.
+        explain: >
+          Client-side encryption is a real pattern for the strictest requirements, and it
+          puts key management in your application and breaks every tool that reads the blob
+          directly. Customer-managed keys meet the stated requirement with far less
+          disruption.
+      - id: d
+        label: Enable infrastructure encryption and tell her that covers it
+        correct: false
+        rep: -5
+        consequence: >
+          The answer is technically accurate and does not address revocation, which is the
+          part the customer asked about.
+        explain: >
+          Infrastructure encryption adds a second layer of platform encryption underneath
+          the first. It is worth enabling at account creation for sensitive data, and it
+          does not give the customer any control over keys.

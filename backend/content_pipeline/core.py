@@ -304,6 +304,59 @@ BRITISH_SPELLINGS = {
     "jewellery": "jewelry",
     "cheque": "check",
     "kerb": "curb",
+    "greyed": "grayed",
+    "labour": "labor",
+    "labours": "labors",
+    "favour": "favor",
+    "favours": "favors",
+    "favourite": "favorite",
+    "flavour": "flavor",
+    "neighbour": "neighbor",
+    "honour": "honor",
+    "rumour": "rumor",
+    "armour": "armor",
+    "behavioural": "behavioral",
+    "centred": "centered",
+    "travelled": "traveled",
+    "fulfil": "fulfill",
+    "fulfilment": "fulfillment",
+    "instalment": "installment",
+    "enrolment": "enrollment",
+    "skilful": "skillful",
+    "wilful": "willful",
+    "counsellor": "counselor",
+    "judgement": "judgment",
+    "practising": "practicing",
+    "licencing": "licensing",
+    "defences": "defenses",
+    "offences": "offenses",
+    "analysing": "analyzing",
+    "initialising": "initializing",
+    "optimising": "optimizing",
+    "prioritising": "prioritizing",
+    "minimising": "minimizing",
+    "maximising": "maximizing",
+    "summarising": "summarizing",
+    "recognising": "recognizing",
+    "apologise": "apologize",
+    "organising": "organizing",
+    "authorising": "authorizing",
+    "utilising": "utilizing",
+    "digitise": "digitize",
+    "digitised": "digitized",
+    "normalise": "normalize",
+    "normalised": "normalized",
+    "synchronise": "synchronize",
+    "synchronised": "synchronized",
+    "customise": "customize",
+    "customised": "customized",
+    "standardise": "standardize",
+    "specialised": "specialized",
+    "specialise": "specialize",
+    "categorise": "categorize",
+    "prioritised": "prioritized",
+    "criticise": "criticize",
+    "emphasise": "emphasize",
 }
 
 # Straight quotes only: the command panes are monospace and a curly quote pasted
@@ -408,7 +461,10 @@ def _iter_errors(schema: dict[str, Any], instance: Any, where: str) -> list[Prob
     problems = []
     for error in sorted(validator.iter_errors(instance), key=lambda e: list(e.path)):
         location = "/".join(str(p) for p in error.absolute_path) or "(root)"
-        problems.append(Problem(where, f"{location}: {error.message}"))
+        # Schema errors quote the whole offending instance, which for a quest is
+        # the entire file. Keep the message readable.
+        message = error.message if len(error.message) <= 240 else error.message[:237] + "..."
+        problems.append(Problem(where, f"{location}: {message}"))
     return problems
 
 
