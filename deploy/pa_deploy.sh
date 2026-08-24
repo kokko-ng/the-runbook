@@ -32,6 +32,12 @@ log() { echo "[$(date -u +%H:%M:%S)] $*" >> "${LOG}"; }
 
 fail() {
     log "FAILED: $*"
+    # Reload anyway. The game itself needs no database, so serving the new build
+    # beats leaving stale workers up while somebody fixes the failure. CI still
+    # reports the deploy as failed.
+    if [ -f "${WSGI_FILE}" ]; then
+        touch "${WSGI_FILE}" && log "reloaded despite the failure, so the current build is live"
+    fi
     tail -60 "${LOG}" > "${STATUS_DIR}/${SHA}.failed"
     exit 1
 }

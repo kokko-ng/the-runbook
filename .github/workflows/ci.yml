@@ -149,9 +149,9 @@ jobs:
           # This is idempotent: it adds only the mappings that are missing.
           api="https://${PA_HOST}/api/v0/user/${PA_USER}/webapps/${PA_DOMAIN}/static_files/"
           existing=$(curl -sS -H "Authorization: Token ${PA_TOKEN}" "$api")
-          echo "$existing"
+          echo "$existing" | jq -r '.[] | "existing mapping \(.url) -> \(.path)"'
           ensure() {
-            if echo "$existing" | grep -q "\"url\": \"$1\""; then
+            if echo "$existing" | jq -e --arg u "$1" 'any(.[]; .url == $u)' > /dev/null; then
               echo "mapping $1 already present"
             else
               echo "adding mapping $1 -> $2"

@@ -84,6 +84,23 @@ Django only ever hands out `index.html` for SPA routes:
 Force HTTPS is on. Everything else falls through to Django, which serves the API
 under `/api` and the single-page app everywhere else.
 
+## First run on a new host
+
+1. Create the MySQL database on the Databases tab and note its name. The API
+   cannot create databases, so this is the one step that has to be done by hand.
+2. Write `~/.runbook.env` with the values above, including the MySQL password
+   from that same tab.
+3. Point `/var/www/<domain>_wsgi.py` at `deploy/pa_wsgi.py` (two lines; see the
+   copy in this repository).
+4. Push to `main`. The deploy job creates the static file mappings, uploads the
+   build and the source, and the web app picks the deploy up on reload.
+5. Create a back-office administrator:
+   `~/.virtualenvs/runbook/bin/python manage.py create_admin --username <you>`.
+
+If a deploy step fails, the script still reloads the web app before it reports
+the failure: the game itself needs no database, so serving the current build
+beats leaving stale workers up while somebody fixes the cause.
+
 ## Deploying by hand
 
 If the pipeline is unavailable, from a PythonAnywhere Bash console:
