@@ -1,0 +1,246 @@
+# Objective inventory for Exam AZ-104: Microsoft Azure Administrator.
+#
+# Transcribed from the official study guide. Re-fetch the source before every
+# content milestone: Microsoft revises the skills measured list periodically and
+# the coverage gate is only as honest as this file.
+exam: AZ-104
+act: 1
+title: Microsoft Azure Administrator
+source_url: https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/az-104
+skills_measured_as_of: "2026-04-17"
+fetched_on: "2026-08-24"
+domains:
+  - id: AZ104-1
+    title: Manage Azure identities and governance
+    weight: 20-25%
+    chapter: act1-identity
+    groups:
+      - id: AZ104-1.1
+        title: Manage Microsoft Entra users and groups
+        objectives:
+          - id: AZ104-1.1.1
+            text: Create users and groups
+          - id: AZ104-1.1.2
+            text: Manage user and group properties
+          - id: AZ104-1.1.3
+            text: Manage licenses in Microsoft Entra ID
+          - id: AZ104-1.1.4
+            text: Manage external users
+          - id: AZ104-1.1.5
+            text: Configure self-service password reset (SSPR)
+      - id: AZ104-1.2
+        title: Manage access to Azure resources
+        objectives:
+          - id: AZ104-1.2.1
+            text: Manage built-in Azure roles
+          - id: AZ104-1.2.2
+            text: Assign roles at different scopes
+          - id: AZ104-1.2.3
+            text: Interpret access assignments
+      - id: AZ104-1.3
+        title: Manage Azure subscriptions and governance
+        objectives:
+          - id: AZ104-1.3.1
+            text: Implement and manage Azure Policy
+          - id: AZ104-1.3.2
+            text: Configure resource locks
+          - id: AZ104-1.3.3
+            text: Apply and manage tags on resources
+          - id: AZ104-1.3.4
+            text: Manage resource groups
+          - id: AZ104-1.3.5
+            text: Manage subscriptions
+          - id: AZ104-1.3.6
+            text: Manage costs by using alerts, budgets, and Azure Advisor recommendations
+          - id: AZ104-1.3.7
+            text: Configure management groups
+  - id: AZ104-2
+    title: Implement and manage storage
+    weight: 15-20%
+    chapter: act1-storage
+    groups:
+      - id: AZ104-2.1
+        title: Configure access to storage
+        objectives:
+          - id: AZ104-2.1.1
+            text: Configure Azure Storage firewalls and virtual networks
+          - id: AZ104-2.1.2
+            text: Create and use shared access signature (SAS) tokens
+          - id: AZ104-2.1.3
+            text: Configure stored access policies
+          - id: AZ104-2.1.4
+            text: Manage access keys
+          - id: AZ104-2.1.5
+            text: Configure identity-based access for Azure Files
+      - id: AZ104-2.2
+        title: Configure and manage storage accounts
+        objectives:
+          - id: AZ104-2.2.1
+            text: Create and configure storage accounts
+          - id: AZ104-2.2.2
+            text: Configure Azure Storage redundancy
+          - id: AZ104-2.2.3
+            text: Configure object replication
+          - id: AZ104-2.2.4
+            text: Configure storage account encryption
+          - id: AZ104-2.2.5
+            text: Manage data by using Azure Storage Explorer and AzCopy
+      - id: AZ104-2.3
+        title: Configure Azure Files and Azure Blob Storage
+        objectives:
+          - id: AZ104-2.3.1
+            text: Create and configure a file share in Azure Files
+          - id: AZ104-2.3.2
+            text: Create and configure a container in Azure Blob Storage
+          - id: AZ104-2.3.3
+            text: Configure storage tiers
+          - id: AZ104-2.3.4
+            text: Configure soft delete for blobs and containers
+          - id: AZ104-2.3.5
+            text: Configure snapshots and soft delete for Azure Files
+          - id: AZ104-2.3.6
+            text: Configure blob lifecycle management
+          - id: AZ104-2.3.7
+            text: Configure blob versioning
+  - id: AZ104-3
+    title: Deploy and manage Azure compute resources
+    weight: 20-25%
+    chapter: act1-compute
+    groups:
+      - id: AZ104-3.1
+        title: Automate deployment of resources by using Azure Resource Manager (ARM) templates or Bicep files
+        objectives:
+          - id: AZ104-3.1.1
+            text: Interpret an Azure Resource Manager template or a Bicep file
+          - id: AZ104-3.1.2
+            text: Modify an existing Azure Resource Manager template
+          - id: AZ104-3.1.3
+            text: Modify an existing Bicep file
+          - id: AZ104-3.1.4
+            text: Deploy resources by using an Azure Resource Manager template or a Bicep file
+          - id: AZ104-3.1.5
+            text: Export a deployment as an Azure Resource Manager template or convert an Azure Resource Manager template to a Bicep file
+      - id: AZ104-3.2
+        title: Create and configure virtual machines
+        objectives:
+          - id: AZ104-3.2.1
+            text: Create a virtual machine
+          - id: AZ104-3.2.2
+            text: Configure encryption at host for Azure virtual machines
+          - id: AZ104-3.2.3
+            text: Move a virtual machine to another resource group, subscription, or region
+          - id: AZ104-3.2.4
+            text: Manage virtual machine sizes
+          - id: AZ104-3.2.5
+            text: Manage virtual machine disks
+          - id: AZ104-3.2.6
+            text: Deploy virtual machines to availability zones and availability sets
+          - id: AZ104-3.2.7
+            text: Deploy and configure an Azure Virtual Machine Scale Sets
+      - id: AZ104-3.3
+        title: Provision and manage containers in the Azure portal
+        objectives:
+          - id: AZ104-3.3.1
+            text: Create and manage an Azure Container Registry
+          - id: AZ104-3.3.2
+            text: Provision a container by using Azure Container Instances
+          - id: AZ104-3.3.3
+            text: Provision a container by using Azure Container Apps
+          - id: AZ104-3.3.4
+            text: Manage sizing and scaling for containers, including Azure Container Instances and Azure Container Apps
+      - id: AZ104-3.4
+        title: Create and configure Azure App Service
+        objectives:
+          - id: AZ104-3.4.1
+            text: Provision an App Service plan
+          - id: AZ104-3.4.2
+            text: Configure scaling for an App Service plan
+          - id: AZ104-3.4.3
+            text: Create an App Service
+          - id: AZ104-3.4.4
+            text: Configure certificates and Transport Layer Security (TLS) for an App Service
+          - id: AZ104-3.4.5
+            text: Map an existing custom DNS name to an App Service
+          - id: AZ104-3.4.6
+            text: Configure backup for an App Service
+          - id: AZ104-3.4.7
+            text: Configure networking settings for an App Service
+          - id: AZ104-3.4.8
+            text: Configure deployment slots for an App Service
+  - id: AZ104-4
+    title: Implement and manage virtual networking
+    weight: 15-20%
+    chapter: act1-networking
+    groups:
+      - id: AZ104-4.1
+        title: Configure and manage virtual networks in Azure
+        objectives:
+          - id: AZ104-4.1.1
+            text: Create and configure virtual networks and subnets
+          - id: AZ104-4.1.2
+            text: Create and configure virtual network peering
+          - id: AZ104-4.1.3
+            text: Configure public IP addresses
+          - id: AZ104-4.1.4
+            text: Configure user-defined routes
+          - id: AZ104-4.1.5
+            text: Troubleshoot network connectivity
+      - id: AZ104-4.2
+        title: Configure secure access to virtual networks
+        objectives:
+          - id: AZ104-4.2.1
+            text: Create and configure network security groups (NSGs) and application security groups
+          - id: AZ104-4.2.2
+            text: Evaluate effective security rules in NSGs
+          - id: AZ104-4.2.3
+            text: Implement Azure Bastion
+          - id: AZ104-4.2.4
+            text: Configure service endpoints for Azure platform as a service (PaaS)
+          - id: AZ104-4.2.5
+            text: Configure private endpoints for Azure PaaS
+      - id: AZ104-4.3
+        title: Configure name resolution and load balancing
+        objectives:
+          - id: AZ104-4.3.1
+            text: Configure Azure DNS
+          - id: AZ104-4.3.2
+            text: Configure an internal or public load balancer
+          - id: AZ104-4.3.3
+            text: Troubleshoot load balancing
+  - id: AZ104-5
+    title: Monitor and maintain Azure resources
+    weight: 10-15%
+    chapter: act1-monitoring
+    groups:
+      - id: AZ104-5.1
+        title: Monitor resources in Azure
+        objectives:
+          - id: AZ104-5.1.1
+            text: Interpret metrics in Azure Monitor
+          - id: AZ104-5.1.2
+            text: Configure log settings in Azure Monitor
+          - id: AZ104-5.1.3
+            text: Query and analyze logs in Azure Monitor
+          - id: AZ104-5.1.4
+            text: Set up alert rules, action groups, and alert processing rules in Azure Monitor
+          - id: AZ104-5.1.5
+            text: Configure and interpret monitoring of virtual machines, storage accounts, and networks by using Azure Monitor Insights
+          - id: AZ104-5.1.6
+            text: Use Azure Network Watcher and Connection monitor
+      - id: AZ104-5.2
+        title: Implement backup and recovery
+        objectives:
+          - id: AZ104-5.2.1
+            text: Create a Recovery Services vault
+          - id: AZ104-5.2.2
+            text: Create an Azure Backup vault
+          - id: AZ104-5.2.3
+            text: Create and configure a backup policy
+          - id: AZ104-5.2.4
+            text: Perform backup and restore operations by using Azure Backup
+          - id: AZ104-5.2.5
+            text: Configure Azure Site Recovery for Azure resources
+          - id: AZ104-5.2.6
+            text: Perform a failover to a secondary region by using Site Recovery
+          - id: AZ104-5.2.7
+            text: Configure and interpret reports and alerts for backups

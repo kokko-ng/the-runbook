@@ -1,0 +1,39 @@
+{% extends "admin_qa/_base.html" %}
+{% block qa %}
+<h1>{{ quest.title }}</h1>
+<p><code>{{ quest.id }}</code> &middot; {{ quest.chapter }} &middot; {{ quest.variant }}</p>
+<p>{{ quest.summary }}</p>
+{% for encounter in quest.encounters %}
+  <h2>{{ encounter.id }} &middot; {{ encounter.type }} &middot; {{ encounter.title }}</h2>
+  <p>{{ encounter.intro }}</p>
+  {% if encounter.options %}
+    <table class="qa-table">
+      <thead><tr><th>Id</th><th>Option</th><th>Correct</th><th>Rep</th><th>Explanation</th></tr></thead>
+      <tbody>
+      {% for option in encounter.options %}
+        <tr><td>{{ option.id }}</td><td>{{ option.label }}</td>
+            <td>{% if option.correct %}<span class="qa-pill qa-ok">yes</span>{% else %}no{% endif %}</td>
+            <td>{{ option.rep }}</td><td>{{ option.explain }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+  {% if encounter.fixes %}
+    <h3>Fixes (time budget {{ encounter.time_budget }})</h3>
+    <table class="qa-table">
+      <thead><tr><th>Id</th><th>Fix</th><th>Correct</th><th>Rep</th><th>Explanation</th></tr></thead>
+      <tbody>
+      {% for option in encounter.fixes %}
+        <tr><td>{{ option.id }}</td><td>{{ option.label }}</td>
+            <td>{% if option.correct %}<span class="qa-pill qa-ok">yes</span>{% else %}no{% endif %}</td>
+            <td>{{ option.rep }}</td><td>{{ option.explain }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <h3>Commands</h3>
+    <div class="qa-mono">{% for command in encounter.commands %}$ {{ command.cmd }}
+{{ command.output }}
+{% endfor %}</div>
+  {% endif %}
+{% endfor %}
+{% endblock %}

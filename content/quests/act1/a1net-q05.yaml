@@ -1,0 +1,288 @@
+id: a1net-q05
+chapter: act1-networking
+title: Private Lines
+summary: Proof-of-delivery scans are in a storage account anyone on the internet can reach with the right key, and the auditor noticed.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ104-4.2.4
+  - AZ104-4.2.5
+  - AZ104-4.3.1
+brief: >
+  Customer contracts say the scans stay on Meridian's network. Right now they stay
+  on Meridian's network in the sense that Meridian is the one uploading them.
+debrief: >
+  Traffic to the scans never leaves the private address space now, and there is a
+  private DNS zone with a linked virtual network to prove it.
+encounters:
+  - id: a
+    type: design
+    title: Two ways to close a door
+    speaker: Wei Lin Tan
+    objectives: [AZ104-4.2.4, AZ104-4.2.5]
+    intro: >
+      "stmeridianpod holds every proof-of-delivery scan we have. It accepts
+      connections from any network. The contract with the two largest customers
+      says that data is only reachable from our network."
+
+
+      She lists who needs access: the transport application in vnet-app, the
+      scanners in vnet-depot, and the claims team in Jurong, who open scans over
+      the site-to-site VPN.
+
+
+      "I have read about service endpoints and about private endpoints and the
+      documentation seems to think I already know which one I want."
+    prompt: Which do you take to the change board?
+    options:
+      - id: a
+        label: >
+          A private endpoint for the blob service in vnet-app, with public network access
+          disabled
+        correct: true
+        rep: 9
+        consequence: >
+          Wei Lin asks whether the claims team will notice. They will not, which is the
+          answer she was hoping for.
+        explain: >
+          A private endpoint gives the storage account a private IP address inside your
+          virtual network, so it is reachable from peered networks and from on-premises over
+          the VPN. Service endpoints are the other pattern and they only work from inside
+          Azure virtual networks, so the Jurong claims team would have been cut off.
+        diagram:
+          - {op: add_node, node: pe-st-pod}
+          - {op: add_node, node: snet-pe}
+          - {op: add_edge, edge: e-pe-st-pod}
+          - {op: add_edge, edge: e-pe-subnet}
+      - id: b
+        label: >
+          A service endpoint for Microsoft.Storage on snet-app and snet-depot, with the
+          storage firewall restricted to those subnets
+        correct: false
+        rep: -8
+        consequence: >
+          The scanners and the application keep working, and the claims team in Jurong loses
+          access to every scan at once.
+        explain: >
+          Service endpoints keep the traffic on the Azure backbone and let the storage
+          firewall trust specific subnets, but they are a virtual network feature. Requests
+          arriving over the VPN from on-premises still come from a public path and are
+          blocked by the firewall.
+      - id: c
+        label: Leave the account public and rotate the access keys on a schedule
+        correct: false
+        rep: -10
+        consequence: >
+          The finding stays open, and the first key rotation breaks the scanner upload job
+          nobody knew was using a hard-coded key.
+        explain: >
+          Key rotation is worth doing and it is not network isolation. Anyone holding a key
+          or a valid shared access signature can still reach the account from anywhere, which
+          is exactly what the contract prohibits.
+      - id: d
+        label: Restrict the storage firewall to Meridian's public IP ranges
+        correct: false
+        rep: -7
+        consequence: >
+          It works until a depot's internet provider changes its address, which happens in
+          Cebu about twice a year.
+        explain: >
+          IP allow lists on the storage firewall drift, and traffic from inside Azure often
+          leaves from addresses you do not control. It also does nothing for the requirement
+          that traffic stays off the public internet.
+  - id: b
+    type: troubleshoot
+    title: INC-4566
+    speaker: Meridian NOC
+    objectives: [AZ104-4.3.1, AZ104-4.2.5]
+    intro: >
+      The private endpoint deployed at 11:20 and public network access was disabled
+      at 11:25. At 11:26 the transport application started throwing storage errors,
+      and the scanner uploads began queuing on the handhelds.
+
+
+      The endpoint shows as approved and healthy. Nothing in the application
+      changed. The connection string still points at
+      stmeridianpod.blob.core.windows.net, which is what the documentation says it
+      should do.
+    ticket:
+      ref: INC-4566
+      opened: "11:26"
+      reporter: Meridian NOC
+      summary: Application cannot reach blob storage after public access was disabled.
+      severity: sev1
+    time_budget: 6
+    on_enter:
+      - {op: set_status, node: st-pod, status: broken}
+      - {op: set_status, node: pe-st-pod, status: degraded}
+    investigate:
+      - id: a
+        action: Ask what the application is actually reporting
+        speaker: Marek Sobczak
+        reveals: >
+          "AuthorizationFailure on every request, and a few connection timeouts. It is
+          not a credential problem, the same key works from my laptop over the VPN.
+          Which, now that I say it out loud, is interesting."
+      - id: b
+        action: Check what was deployed with the private endpoint
+        speaker: Meridian IT
+        reveals: >
+          CHG-2261 created pe-stmeridianpod in snet-privatelink and set public network
+          access to Disabled. The private DNS zone integration checkbox is not mentioned
+          anywhere in the record.
+      - id: c
+        action: Ask the NOC whether anything else broke at the same time
+        speaker: Joana Reyes
+        reveals: >
+          "Only storage. The database, the print queue and the portal are all fine. It
+          is specifically anything that talks to stmeridianpod."
+    commands:
+      - id: a
+        label: Resolve the storage endpoint from a virtual machine in the application spoke
+        cmd: nslookup stmeridianpod.blob.core.windows.net
+        output: |
+          Server:  168.63.129.16
+          Address: 168.63.129.16#53
+
+          Non-authoritative answer:
+          stmeridianpod.blob.core.windows.net  canonical name = blob.sin26prdstr03a.store.core.windows.net
+          Name:    blob.sin26prdstr03a.store.core.windows.net
+          Address: 20.195.74.4
+        note: That is a public address. The private endpoint is 10.20.3.4.
+        time_cost: 1
+      - id: b
+        label: Show the private endpoint and its connection state
+        cmd: az network private-endpoint show -n pe-stmeridianpod -g rg-data --query "{state:provisioningState,ip:customDnsConfigs[0].ipAddresses[0],conn:privateLinkServiceConnections[0].privateLinkServiceConnectionState.status}" -o table
+        output: |
+          State      Ip         Conn
+          ---------  ---------  --------
+          Succeeded  10.20.3.4  Approved
+        time_cost: 1
+      - id: c
+        label: List the private DNS zones in the subscription
+        cmd: az network private-dns zone list -o table
+        output: |
+          Name                                  ResourceGroup    NumberOfRecordSets    NumberOfVirtualNetworkLinks
+          ------------------------------------  ---------------  --------------------  ----------------------------
+          privatelink.blob.core.windows.net      rg-data          2                     0
+        note: The zone exists and has records. No virtual network is linked to it.
+        time_cost: 1
+      - id: d
+        label: Check the storage account's network rules
+        cmd: az storage account show -n stmeridianpod -g rg-data --query "{public:publicNetworkAccess,default:networkRuleSet.defaultAction}" -o table
+        output: |
+          Public    Default
+          --------  --------
+          Disabled  Deny
+        time_cost: 1
+      - id: e
+        label: Try the endpoint by its private address directly
+        cmd: curl -sS "https://10.20.3.4/pod-scans?restype=container&comp=list"
+        output: |
+          curl: (60) SSL: no alternative certificate subject name matches
+          target host name '10.20.3.4'
+        note: Something answered on the private address, so the private path is up. TLS fails because the certificate is issued for the storage host name.
+        time_cost: 2
+    fixes:
+      - id: a
+        label: >
+          Link the privatelink.blob.core.windows.net private DNS zone to vnet-app, vnet-depot
+          and the hub so the name resolves to the private address
+        correct: true
+        rep: 10
+        consequence: >
+          Resolution flips to 10.20.3.4 within a minute, the queued scanner uploads drain,
+          and Joana downgrades the incident before you finish the note.
+        explain: >
+          A private endpoint changes where the service lives, not what clients ask for.
+          Clients still resolve the public host name, which is a CNAME to
+          privatelink.blob.core.windows.net. That zone has to exist and be linked to every
+          virtual network whose clients need the private address, or they get the public
+          record and a firewall that now says no.
+        diagram:
+          - {op: set_status, node: st-pod, status: healthy}
+          - {op: set_status, node: pe-st-pod, status: healthy}
+          - {op: add_node, node: dns-private}
+          - {op: add_edge, edge: e-dns-private}
+      - id: b
+        label: Re-enable public network access on the storage account until DNS is sorted out
+        correct: false
+        rep: -9
+        consequence: >
+          The application recovers and the audit finding reopens the same afternoon, with
+          your change number on it.
+        explain: >
+          It restores service by undoing the control you were asked to put in. The actual
+          fault is name resolution, and it is twenty minutes of work to fix properly.
+      - id: c
+        label: Change the application connection string to point at 10.20.3.4
+        correct: false
+        rep: -8
+        consequence: >
+          TLS fails on the first request because the certificate is issued for the storage
+          host name, not for an IP address.
+        explain: >
+          Storage certificates are issued for the account host name, so connecting by
+          address breaks TLS. That is what the 400 from curl was telling you. Private
+          endpoints are designed to be reached by name.
+      - id: d
+        label: Delete and re-create the private endpoint with the DNS integration option ticked
+        correct: false
+        rep: -5
+        consequence: >
+          Forty minutes of downtime later it works, and you have two zones with overlapping
+          records to reconcile.
+        explain: >
+          It reaches the right end state the expensive way. The zone already exists with the
+          correct records: linking it to the virtual networks is a small change with no
+          outage, and re-creating the endpoint means another approval and another
+          disconnection.
+  - id: c
+    type: design
+    title: The name customers type
+    speaker: Hendrik Salim
+    objectives: [AZ104-4.3.1]
+    intro: >
+      "Customers keep asking for a tracking link that is not a Microsoft address,"
+      says Hendrik. "Marketing wants meridianlogistics.com to open the tracking
+      portal. Not www. The bare name."
+
+
+      The domain's zone is hosted in Azure DNS. The portal is an App Service with
+      the default host name app-meridian-portal.azurewebsites.net, which can and
+      does change address.
+    prompt: What record do you create at the zone apex?
+    options:
+      - id: a
+        label: An alias record set at the apex, pointing at the App Service resource
+        correct: true
+        rep: 7
+        consequence: >
+          Marketing gets the link. Six weeks later the app's address changes during a
+          platform migration and nobody notices, which is the point.
+        explain: >
+          DNS does not permit a CNAME at a zone apex. Azure DNS alias record sets solve
+          exactly this: an A record at the apex that tracks an Azure resource and follows it
+          when its address changes.
+      - id: b
+        label: A CNAME at the apex pointing at app-meridian-portal.azurewebsites.net
+        correct: false
+        rep: -7
+        consequence: >
+          Azure DNS refuses to create it, and the explanation you give marketing is longer
+          than the change itself.
+        explain: >
+          A CNAME cannot coexist with the SOA and NS records that every zone apex must have,
+          so it is not allowed there. That restriction is in DNS itself, not something Azure
+          invented.
+      - id: c
+        label: A plain A record at the apex with the App Service's current IP address
+        correct: false
+        rep: -8
+        consequence: >
+          It works for two months and then the tracking site goes dark on a Sunday for
+          reasons nobody connects to a DNS record set in July.
+        explain: >
+          App Service inbound addresses are not guaranteed to be permanent, and a hard-coded
+          A record silently goes stale. That is precisely what an alias record set exists to
+          avoid.

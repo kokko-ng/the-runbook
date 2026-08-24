@@ -1,0 +1,20 @@
+{% extends "admin_qa/_base.html" %}
+{% block qa %}
+<h1>Quest browser</h1>
+<div class="qa-wrap">
+<table class="qa-table">
+  <thead><tr><th>Chapter</th><th>Quest</th><th>Variant</th><th>Encounters</th><th>Objectives</th></tr></thead>
+  <tbody>
+  {% for quest in quests %}
+    <tr>
+      <td>{{ quest.chapter }}</td>
+      <td><a href="{{ quest.id }}/">{{ quest.title }}</a><br><code>{{ quest.id }}</code></td>
+      <td>{{ quest.variant }}</td>
+      <td>{{ quest.encounters|length }}</td>
+      <td class="qa-mono">{{ quest.objectives|join:", " }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

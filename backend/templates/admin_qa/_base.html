@@ -1,0 +1,13 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<style>
+  .qa-table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+  .qa-table th, .qa-table td { border-bottom: 1px solid var(--hairline-color, #ddd); padding: 0.35rem 0.5rem; text-align: left; vertical-align: top; }
+  .qa-pill { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 999px; font-size: 0.75rem; border: 1px solid currentColor; }
+  .qa-ok { color: #1b7f4b; }
+  .qa-bad { color: #b3261e; }
+  .qa-wrap { overflow-x: auto; }
+  .qa-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+</style>
+{% block qa %}{% endblock %}
+{% endblock %}

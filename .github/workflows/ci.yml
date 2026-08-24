@@ -1,0 +1,203 @@
+name: CI
+
+# Every pull request and every push to main runs the same three checks. A push
+# to main that passes them deploys.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.13'
+  NODE_VERSION: '22'
+
+jobs:
+  content:
+    name: Content lint and coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install
+        run: pip install "django>=5.2,<6.0" "django-ninja>=1.4" pyyaml jsonschema
+      - name: Lint content and check the coverage matrix
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+        run: python manage.py validate_content
+      - name: Compile the content bundle
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+        run: python manage.py build_content
+      - name: Publish the coverage matrix
+        run: |
+          echo '### Objective coverage' >> "$GITHUB_STEP_SUMMARY"
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          report = json.load(open('frontend/public/content/coverage.json'))
+          totals = report['totals']
+          print(f"- {totals['covered']} of {totals['objectives']} objectives mapped")
+          print(f"- {totals['quests']} quests, {totals['encounters']} encounters")
+          if report['unmapped']:
+              print(f"- unmapped: {', '.join(report['unmapped'])}")
+          PY
+
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install
+        run: pip install "django>=5.2,<6.0" "django-ninja>=1.4" pyyaml jsonschema pytest pytest-django
+      - name: Run the tests
+        working-directory: backend
+        run: python -m pytest -q
+      - name: Check for missing migrations
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+        run: python manage.py makemigrations --check --dry-run
+
+  frontend:
+    name: Frontend build and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - name: Engine tests
+        run: npm run test
+        working-directory: frontend
+      - name: Type check and production build
+        run: npm run build
+        working-directory: frontend
+
+  deploy:
+    name: Deploy to PythonAnywhere
+    needs: [content, backend, frontend]
+    # A commit can opt out with [skip deploy] in its message, which is how a
+    # change lands while the host is mid-maintenance.
+    if: >-
+      github.ref == 'refs/heads/main' && github.event_name == 'push'
+      && !contains(github.event.head_commit.message, '[skip deploy]')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      PA_USER: ${{ secrets.PYTHONANYWHERE_USERNAME }}
+      PA_DOMAIN: ${{ secrets.PYTHONANYWHERE_DOMAIN }}
+      PA_TOKEN: ${{ secrets.PYTHONANYWHERE_API_TOKEN }}
+      PA_HOST: ${{ vars.PYTHONANYWHERE_HOST || 'www.pythonanywhere.com' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refuse to deploy without credentials
+        run: |
+          for name in PA_USER PA_DOMAIN PA_TOKEN; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not configured. Set the PYTHONANYWHERE_* repository secrets."
+              exit 1
+            fi
+          done
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Compile content into the frontend bundle
+        run: |
+          pip install "django>=5.2,<6.0" "django-ninja>=1.4" pyyaml jsonschema
+          cd backend && DJANGO_SETTINGS_MODULE=config.settings.test python manage.py build_content
+
+      - name: Build the frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build:only
+
+      - name: Pack the build
+        working-directory: frontend/dist
+        run: tar -czf "${GITHUB_WORKSPACE}/dist.tar.gz" .
+
+      - name: Pack the source
+        run: git archive --format=tar.gz -o source.tar.gz HEAD
+
+      - name: Upload the build and the source to PythonAnywhere
+        run: |
+          upload() {
+            curl -sS -f -X POST \
+              -H "Authorization: Token ${PA_TOKEN}" \
+              -F "content=@$1" \
+              "https://${PA_HOST}/api/v0/user/${PA_USER}/files/path/home/${PA_USER}/incoming/$1"
+          }
+          upload dist.tar.gz
+          upload source.tar.gz
+
+      - name: Ask the web app to deploy this commit
+        run: |
+          printf '{"sha": "%s"}' "${GITHUB_SHA}" > deploy_request.json
+          curl -sS -f -X POST \
+            -H "Authorization: Token ${PA_TOKEN}" \
+            -F "content=@deploy_request.json" \
+            "https://${PA_HOST}/api/v0/user/${PA_USER}/files/path/home/${PA_USER}/incoming/deploy_request.json"
+          # Reloading starts a worker, and the worker picks the request up.
+          curl -sS -f -X POST \
+            -H "Authorization: Token ${PA_TOKEN}" \
+            "https://${PA_HOST}/api/v0/user/${PA_USER}/webapps/${PA_DOMAIN}/reload/"
+          # The trigger only fires once a request actually reaches the app.
+          curl -sS -o /dev/null "https://${PA_DOMAIN}/api/health" || true
+
+      - name: Wait for the deploy to finish
+        run: |
+          base="https://${PA_HOST}/api/v0/user/${PA_USER}/files/path/home/${PA_USER}/deploy_status"
+          for attempt in $(seq 1 60); do
+            sleep 10
+            if curl -sS -f -o done.log -H "Authorization: Token ${PA_TOKEN}" "${base}/${GITHUB_SHA}.done"; then
+              echo "--- deploy log ---"; cat done.log
+              exit 0
+            fi
+            if curl -sS -f -o failed.log -H "Authorization: Token ${PA_TOKEN}" "${base}/${GITHUB_SHA}.failed"; then
+              echo "::error::the deploy script failed on PythonAnywhere"
+              cat failed.log
+              exit 1
+            fi
+            echo "waiting (${attempt}/60)"
+          done
+          echo "::error::timed out waiting for the deploy to report back"
+          curl -sS -f -o partial.log -H "Authorization: Token ${PA_TOKEN}" "${base}/${GITHUB_SHA}.log" && cat partial.log
+          exit 1
+
+      - name: Check the site is answering
+        run: |
+          for attempt in $(seq 1 10); do
+            code=$(curl -sS -o body.json -w '%{http_code}' "https://${PA_DOMAIN}/api/health" || echo 000)
+            if [ "$code" = "200" ]; then cat body.json; echo; exit 0; fi
+            echo "health check returned ${code} (${attempt}/10)"
+            sleep 10
+          done
+          echo "::error::the site did not come back healthy after the deploy"
+          exit 1

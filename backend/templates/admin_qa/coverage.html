@@ -1,0 +1,26 @@
+{% extends "admin_qa/_base.html" %}
+{% block qa %}
+<h1>Coverage matrix</h1>
+<p>
+  <span class="qa-pill {% if unmapped %}qa-bad{% else %}qa-ok{% endif %}">
+    {{ covered }} / {{ total }} objectives covered
+  </span>
+  {% if unmapped %}<span class="qa-pill qa-bad">{{ unmapped|length }} unmapped</span>{% endif %}
+</p>
+<div class="qa-wrap">
+<table class="qa-table">
+  <thead><tr><th>Exam</th><th>Domain</th><th>Skill</th><th>Objective</th><th>Encounters</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+    <tr>
+      <td>{{ row.exam }}</td>
+      <td>{{ row.domain }}</td>
+      <td>{{ row.group }}</td>
+      <td><code>{{ row.objective.id }}</code><br>{{ row.objective.text }}</td>
+      <td class="qa-mono">{% if row.encounters %}{{ row.encounters|join:", " }}{% else %}<span class="qa-pill qa-bad">none</span>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

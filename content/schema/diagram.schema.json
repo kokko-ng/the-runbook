@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-runbook.dev/schema/diagram.schema.json",
+  "title": "Living architecture diagram registry",
+  "description": "Declares every node and edge the story is allowed to touch, plus the state the diagram starts an act in.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["act", "groups", "nodes", "edges"],
+  "properties": {
+    "act": {"type": "integer", "enum": [1, 2]},
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+          "label": {"type": "string", "minLength": 1},
+          "note": {"type": "string"}
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "kind", "group", "x", "y"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+          "label": {"type": "string", "minLength": 1},
+          "kind": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+          "group": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+          "x": {"type": "number"},
+          "y": {"type": "number"},
+          "detail": {"type": "string"},
+          "present": {
+            "type": "boolean",
+            "default": false,
+            "description": "true when the node already exists at the start of the act."
+          },
+          "status": {"enum": ["healthy", "degraded", "broken", "planned"], "default": "healthy"}
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "source", "target"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+          "source": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+          "target": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+          "label": {"type": "string"},
+          "kind": {"enum": ["network", "identity", "data", "traffic", "backup"], "default": "network"},
+          "present": {"type": "boolean", "default": false},
+          "status": {"enum": ["healthy", "degraded", "broken", "planned"], "default": "healthy"}
+        }
+      }
+    }
+  }
+}

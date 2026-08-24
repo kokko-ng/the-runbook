@@ -1,0 +1,273 @@
+id: a1net-q02
+chapter: act1-networking
+title: The Peering Problem
+summary: The Johor spoke cannot reach shared services, and the change record says the work was finished at 03:40.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ104-4.1.2
+  - AZ104-4.1.5
+brief: >
+  Overnight maintenance touched the hub. By the time you sit down, the depot has
+  been offline for ninety minutes and the NOC has already written it up properly.
+debrief: >
+  Joana adds a line to the shift handover: peerings are two objects, and both of
+  them count. It is the most useful thing anyone wrote down all week.
+encounters:
+  - id: a
+    type: troubleshoot
+    title: INC-4471
+    speaker: Joana Reyes
+    objectives: [AZ104-4.1.5, AZ104-4.1.2]
+    intro: >
+      The page comes in at 09:12, which means the Cebu desk sat on it for exactly
+      as long as their runbook allows and no longer.
+
+
+      "Johor scanners cannot reach the print server or the license service in the
+      hub. Depot staff can browse the internet from the same laptops. It started
+      some time after 03:00 and nothing at the depot changed."
+
+
+      The Johor spoke was peered to the hub last week and has been fine since.
+      Overnight, the platform team ran maintenance on vnet-hub.
+    ticket:
+      ref: INC-4471
+      opened: "09:12"
+      reporter: Joana Reyes
+      summary: Johor depot cannot reach hub shared services. Internet from the same subnet works.
+      severity: sev2
+    time_budget: 6
+    on_enter:
+      - {op: set_status, node: vnet-depot, status: broken}
+    investigate:
+      - id: a
+        action: Ask the NOC what changed overnight
+        speaker: Joana Reyes
+        reveals: >
+          "Change CHG-2210, platform team, 03:10 to 03:40. Description says
+          re-created peering on vnet-hub after a failed template deployment.
+          Marked successful."
+      - id: b
+        action: Ask Hendrik what the depot staff can and cannot reach
+        speaker: Hendrik Salim
+        reveals: >
+          "Internet is fine. The tracking portal is fine, that one is public. The
+          print queue and the license server are dead, and those are both the ones
+          in the hub."
+      - id: c
+        action: Read the change record for CHG-2210
+        speaker: Meridian IT
+        reveals: >
+          The record lists one task: "Delete and re-create hub-to-depot peering in
+          rg-hub." Nothing about the spoke side. The rollback plan is the word
+          "revert" with no detail.
+        time_cost: 1
+      - id: d
+        action: Check whether anyone touched the security groups
+        speaker: Wei Lin Tan
+        reveals: >
+          "Nothing from my side. The last change to nsg-depot was your own, eleven
+          days ago, and the audit export agrees with me."
+    commands:
+      - id: a
+        label: List the peerings on the hub
+        cmd: az network vnet peering list -g rg-hub --vnet-name vnet-hub -o table
+        output: |
+          Name              PeeringState    AllowForwardedTraffic    AllowVirtualNetworkAccess
+          ----------------  --------------  -----------------------  --------------------------
+          hub-to-app        Connected       True                     True
+          hub-to-depot      Initiated       False                    True
+        time_cost: 1
+      - id: b
+        label: List the peerings on the depot spoke
+        cmd: az network vnet peering list -g rg-depot --vnet-name vnet-depot -o table
+        output: |
+          (no peerings found)
+        time_cost: 1
+      - id: c
+        label: Check the effective security rules on a scanner NIC
+        cmd: az network nic list-effective-nsg --name nic-scan01 -g rg-depot -o table
+        output: |
+          Name              Direction    Access    Priority    SourceAddressPrefix    DestinationPortRange
+          ----------------  -----------  --------  ----------  ---------------------  ----------------------
+          AllowDepotToHub   Outbound     Allow     200         10.30.1.0/24           445,631,27000
+          AllowVnetOutBound Outbound     Allow     65000       VirtualNetwork         0-65535
+        time_cost: 2
+      - id: d
+        label: Test the flow from the scanner subnet to the print server
+        cmd: az network watcher test-ip-flow --vm vm-scan01 -g rg-depot --direction Outbound --protocol TCP --local 10.30.1.14:60122 --remote 10.10.1.20:631
+        output: |
+          {
+            "access": "Allow",
+            "ruleName": "AllowDepotToHub"
+          }
+        time_cost: 2
+      - id: e
+        label: Look at the effective routes on the scanner NIC
+        cmd: az network nic show-effective-route-table --name nic-scan01 -g rg-depot -o table
+        output: |
+          Source    State     AddressPrefix    NextHopType       NextHopIp
+          --------  --------  ---------------  ----------------  ---------
+          Default   Active    10.30.0.0/16     VnetLocal
+          Default   Active    0.0.0.0/0        Internet
+        note: There is no route to 10.10.0.0/16 at all, which is what a missing peering looks like from the guest.
+        time_cost: 1
+    fixes:
+      - id: a
+        label: Create the depot-to-hub peering on vnet-depot to match the hub side
+        correct: true
+        rep: 9
+        consequence: >
+          The peering flips to Connected within seconds, a scanner in Johor prints a test
+          label, and Joana closes the incident with the change number attached.
+        explain: >
+          A virtual network peering is two objects, one on each network, and traffic only
+          flows when both exist. Deleting and re-creating one side leaves the surviving
+          object in PeeringState Initiated until its partner is created, at which point
+          both become Connected.
+        diagram:
+          - {op: set_status, node: vnet-depot, status: healthy}
+          - {op: add_edge, edge: e-hub-depot}
+          - {op: add_edge, edge: e-depot-hub}
+      - id: b
+        label: Add an allow-any outbound rule to nsg-depot so the traffic is definitely not blocked
+        correct: false
+        rep: -11
+        consequence: >
+          Nothing improves, and Wei Lin sees the rule in the daily audit export before you
+          have finished typing the incident note.
+        explain: >
+          The effective rules and the IP flow test both said Allow. Opening a security
+          group to prove a negative leaves a finding behind and does not address a control
+          plane problem.
+      - id: c
+        label: Add a user-defined route on snet-depot pointing 10.10.0.0/16 at the hub
+        correct: false
+        rep: -8
+        consequence: >
+          The route appears in the effective route table and traffic still goes nowhere,
+          which is somehow more confusing than before.
+        explain: >
+          User-defined routes cannot manufacture connectivity that peering has not
+          established. Without a connected peering there is no path for the route to point
+          at, and a next hop of Virtual network only works inside a peered space.
+      - id: d
+        label: Restart the scanners and the print server, since the change was reported successful
+        correct: false
+        rep: -6
+        consequence: >
+          Two depots lose their sessions, rescan the morning's deliveries, and Hendrik
+          calls Dana rather than you.
+        explain: >
+          Nothing in the symptom pointed at either guest. Internet worked from the same
+          NIC, which rules out the scanner, and the route table showed the platform had no
+          path to the hub at all.
+  - id: b
+    type: design
+    title: The other spoke wants in
+    speaker: Dana Ong
+    objectives: [AZ104-4.1.2]
+    intro: >
+      Dana catches the tail end of the incident review.
+
+
+      "While you are in there. The transport application in vnet-app needs to reach
+      the depot scanners directly for a firmware push. Both of them are peered to
+      the hub now, so that already works, yes?"
+
+
+      Marek does not look up from his screen, which is his way of telling you the
+      question is a test.
+    prompt: What do you tell Dana?
+    options:
+      - id: a
+        label: >
+          Peering is not transitive. Either peer vnet-app to vnet-depot directly, or route
+          both through a network appliance in the hub.
+        correct: true
+        rep: 7
+        consequence: >
+          Dana asks for the cost of both and takes the direct peering, on the grounds that
+          nobody has budget for an appliance this quarter.
+        explain: >
+          Two spokes peered to the same hub cannot reach each other through it. Azure
+          peering carries traffic between the two peered networks only. Spoke-to-spoke
+          needs either a direct peering or a routed next hop, such as a firewall or other
+          appliance in the hub, with user-defined routes pointing at it.
+      - id: b
+        label: Yes. Both spokes are peered to the hub, so the hub forwards between them.
+        correct: false
+        rep: -9
+        consequence: >
+          The firmware push is scheduled, fails silently at 22:00, and someone spends the
+          night deciding it is a firewall problem.
+        explain: >
+          Peering is never transitive. Hub forwarding only happens when something in the
+          hub actually routes, such as an appliance or a gateway, and user-defined routes
+          send traffic to it.
+      - id: c
+        label: Enable Allow forwarded traffic on both hub peerings and it will work.
+        correct: false
+        rep: -7
+        consequence: >
+          You turn on a setting, nothing changes, and now the design has an option enabled
+          that nobody can explain.
+        explain: >
+          Allow forwarded traffic only permits a peered network to accept traffic that did
+          not originate in the peer. It matters when an appliance is forwarding, but on its
+          own it creates no path between two spokes.
+  - id: c
+    type: design
+    title: Johor wants Jurong
+    speaker: Marek Sobczak
+    objectives: [AZ104-4.1.2]
+    intro: >
+      "Last one," says Marek. "Johor needs the ERP box in Jurong. That is on the
+      other end of the site-to-site VPN, and the VPN gateway lives in the hub."
+
+
+      He sketches it: vgw-hub in GatewaySubnet, vnet-hub peered to vnet-depot, and
+      an arrow from the depot into the tunnel with a question mark over it.
+
+
+      "I am not building a second gateway. What do you configure?"
+    prompt: How do you get the depot spoke onto the existing VPN gateway?
+    options:
+      - id: a
+        label: >
+          Set Allow gateway transit on the hub side of the peering and Use remote gateways
+          on the spoke side
+        correct: true
+        rep: 8
+        consequence: >
+          Marek nods once. "And when someone builds a gateway in the spoke by accident,
+          that setting stops working and you will know why."
+        explain: >
+          Gateway transit lets a spoke use the hub's VPN or ExpressRoute gateway. The hub
+          peering sets Allow gateway transit, the spoke peering sets Use remote gateways,
+          and the spoke must not have a gateway of its own.
+        diagram:
+          - {op: set_detail, node: vgw-hub, detail: Shared by the hub and both spokes}
+      - id: b
+        label: Set Use remote gateways on both sides of the peering
+        correct: false
+        rep: -7
+        consequence: >
+          The second peering update fails validation and you read the error message three
+          times before it makes sense.
+        explain: >
+          The two settings are a pair, not a switch to flip everywhere. The network with
+          the gateway allows transit; the network without one uses the remote gateway. Both
+          sides claiming to use a remote gateway is not a valid configuration.
+      - id: c
+        label: Deploy a second VPN gateway in the depot spoke and build another tunnel to Jurong
+        correct: false
+        rep: -8
+        consequence: >
+          Priya finds the second gateway on the invoice within the month and asks you to
+          explain it in person.
+        explain: >
+          It would work, and it doubles gateway cost and doubles the tunnels the Jurong
+          firewall has to hold up, to solve something two peering settings solve for
+          nothing.

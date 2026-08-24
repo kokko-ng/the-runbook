@@ -1,0 +1,179 @@
+# The Meridian Azure estate as it stands when Act 1 opens, plus every node the
+# act is allowed to grow. Nodes marked present: true are already there on day
+# one; the rest appear when a quest deploys them.
+#
+# The linter rejects any diagram op in a quest that names something not declared
+# here, which is what keeps the living map from filling up with typos.
+act: 1
+groups:
+  - id: onprem
+    label: Jurong data center
+    note: What Meridian ran before anyone said the word cloud.
+  - id: identity
+    label: Microsoft Entra ID
+  - id: governance
+    label: Management groups and subscriptions
+  - id: edge
+    label: Internet edge
+  - id: hub
+    label: vnet-hub (Southeast Asia)
+  - id: spoke-app
+    label: vnet-app (Southeast Asia)
+  - id: spoke-depot
+    label: vnet-depot (Southeast Asia)
+  - id: data
+    label: Storage and data
+  - id: ops
+    label: Monitoring and recovery
+  - id: dr
+    label: East Asia (secondary)
+
+nodes:
+  # --- on-premises ------------------------------------------------------
+  - {id: dc-jurong, label: Jurong data center, kind: onprem, group: onprem, x: 0, y: 0, present: true, detail: Two racks and a UPS nobody wants to test}
+  - {id: ad-jurong, label: Active Directory, kind: onprem-ad, group: onprem, x: 0, y: 90, present: true, detail: "meridian.local, still authoritative for depot staff"}
+  - {id: vgw-hub, label: vgw-hub, kind: vpn-gateway, group: onprem, x: 0, y: 180, present: true, detail: Site-to-site VPN to Jurong}
+
+  # --- identity ---------------------------------------------------------
+  - {id: entra-tenant, label: meridianlogistics.com, kind: entra, group: identity, x: 0, y: 300, present: true}
+  - {id: entra-connect, label: Entra Connect, kind: entra-connect, group: identity, x: 0, y: 390, present: true, detail: Password hash sync from meridian.local}
+  - {id: grp-depot-admins, label: sg-depot-admins, kind: entra-group, group: identity, x: 0, y: 480}
+  - {id: grp-app-owners, label: sg-app-owners, kind: entra-group, group: identity, x: 0, y: 570}
+  - {id: entra-sspr, label: Self-service password reset, kind: entra-feature, group: identity, x: 0, y: 660}
+  - {id: entra-guests, label: Haulier guest accounts, kind: entra-guest, group: identity, x: 0, y: 750}
+  - {id: entra-licenses, label: Entra ID P1 licenses, kind: license, group: identity, x: 0, y: 840}
+
+  # --- governance -------------------------------------------------------
+  - {id: mg-meridian, label: mg-meridian, kind: management-group, group: governance, x: 240, y: 0}
+  - {id: mg-platform, label: mg-platform, kind: management-group, group: governance, x: 240, y: 90}
+  - {id: mg-workload, label: mg-workload, kind: management-group, group: governance, x: 240, y: 180}
+  - {id: sub-prod, label: sub-meridian-prod, kind: subscription, group: governance, x: 240, y: 270, present: true}
+  - {id: sub-nonprod, label: sub-meridian-nonprod, kind: subscription, group: governance, x: 240, y: 360}
+  - {id: rg-hub, label: rg-hub, kind: resource-group, group: governance, x: 240, y: 450, present: true}
+  - {id: rg-app, label: rg-app, kind: resource-group, group: governance, x: 240, y: 540, present: true}
+  - {id: rg-data, label: rg-data, kind: resource-group, group: governance, x: 240, y: 630, present: true}
+  - {id: rg-ops, label: rg-ops, kind: resource-group, group: governance, x: 240, y: 720}
+  - {id: policy-tags, label: Require costcenter tag, kind: policy, group: governance, x: 240, y: 810}
+  - {id: policy-regions, label: Allowed regions policy, kind: policy, group: governance, x: 240, y: 900}
+  - {id: lock-data, label: CanNotDelete on rg-data, kind: lock, group: governance, x: 240, y: 990}
+  - {id: budget-prod, label: Production budget alert, kind: budget, group: governance, x: 240, y: 1080}
+
+  # --- edge -------------------------------------------------------------
+  - {id: internet, label: Internet, kind: internet, group: edge, x: 480, y: 0, present: true}
+  - {id: dns-public, label: meridianlogistics.com zone, kind: dns, group: edge, x: 480, y: 90}
+  - {id: dns-private, label: privatelink.blob.core.windows.net, kind: dns-private, group: edge, x: 480, y: 180}
+  - {id: pip-lb-pod, label: pip-lb-pod, kind: public-ip, group: edge, x: 480, y: 270}
+  - {id: lb-pod, label: lb-pod-intake, kind: load-balancer, group: edge, x: 480, y: 360}
+  - {id: lb-internal-tms, label: ilb-tms, kind: load-balancer, group: edge, x: 480, y: 450}
+  - {id: nat-hub, label: nat-hub, kind: nat-gateway, group: edge, x: 480, y: 540}
+  - {id: bas-hub, label: bas-hub, kind: bastion, group: edge, x: 480, y: 630}
+
+  # --- hub --------------------------------------------------------------
+  - {id: vnet-hub, label: vnet-hub, kind: vnet, group: hub, x: 720, y: 0, present: true, detail: 10.10.0.0/16}
+  - {id: snet-shared, label: snet-shared, kind: subnet, group: hub, x: 720, y: 90, present: true, detail: 10.10.1.0/24}
+  - {id: snet-bastion, label: AzureBastionSubnet, kind: subnet, group: hub, x: 720, y: 180}
+  - {id: snet-gateway, label: GatewaySubnet, kind: subnet, group: hub, x: 720, y: 270, present: true}
+  - {id: vm-dc01, label: vm-dc01, kind: vm, group: hub, x: 720, y: 360, present: true, detail: Domain controller replica}
+  - {id: nva-hub, label: nva-hub, kind: nva, group: hub, x: 720, y: 450, detail: Inspection appliance the security team asked for}
+  - {id: rt-depot, label: rt-depot, kind: route-table, group: hub, x: 720, y: 540}
+
+  # --- application spoke ------------------------------------------------
+  - {id: vnet-app, label: vnet-app, kind: vnet, group: spoke-app, x: 960, y: 0, present: true, detail: 10.20.0.0/16}
+  - {id: snet-app, label: snet-app, kind: subnet, group: spoke-app, x: 960, y: 90, present: true, detail: 10.20.1.0/24}
+  - {id: snet-db, label: snet-db, kind: subnet, group: spoke-app, x: 960, y: 180, present: true, detail: 10.20.2.0/24}
+  - {id: snet-pe, label: snet-privatelink, kind: subnet, group: spoke-app, x: 960, y: 270}
+  - {id: nsg-app, label: nsg-app, kind: nsg, group: spoke-app, x: 960, y: 360, present: true}
+  - {id: nsg-db, label: nsg-db, kind: nsg, group: spoke-app, x: 960, y: 450}
+  - {id: asg-web, label: asg-web, kind: asg, group: spoke-app, x: 960, y: 540}
+  - {id: asg-db, label: asg-db, kind: asg, group: spoke-app, x: 960, y: 630}
+  - {id: vm-tms01, label: vm-tms01, kind: vm, group: spoke-app, x: 960, y: 720, present: true, detail: "Transport management system, front end"}
+  - {id: vm-tms02, label: vm-tms02, kind: vm, group: spoke-app, x: 960, y: 810}
+  - {id: avset-tms, label: avset-tms, kind: availability-set, group: spoke-app, x: 960, y: 900}
+  - {id: vmss-intake, label: vmss-intake, kind: vmss, group: spoke-app, x: 960, y: 990}
+  - {id: disk-tms-data, label: tms01-data-disk, kind: disk, group: spoke-app, x: 960, y: 1080}
+  - {id: plan-portal, label: plan-portal, kind: app-service-plan, group: spoke-app, x: 960, y: 1170}
+  - {id: app-portal, label: app-meridian-portal, kind: app-service, group: spoke-app, x: 960, y: 1260, detail: Customer shipment tracking portal}
+  - {id: slot-staging, label: portal staging slot, kind: deployment-slot, group: spoke-app, x: 960, y: 1350}
+  - {id: acr-meridian, label: acrmeridian, kind: container-registry, group: spoke-app, x: 960, y: 1440}
+  - {id: aci-labelgen, label: aci-labelgen, kind: container-instance, group: spoke-app, x: 960, y: 1530}
+  - {id: aca-trackapi, label: aca-trackapi, kind: container-app, group: spoke-app, x: 960, y: 1620}
+
+  # --- depot spoke ------------------------------------------------------
+  - {id: vnet-depot, label: vnet-depot, kind: vnet, group: spoke-depot, x: 1200, y: 0, detail: 10.30.0.0/16}
+  - {id: snet-depot, label: snet-depot, kind: subnet, group: spoke-depot, x: 1200, y: 90}
+  - {id: nsg-depot, label: nsg-depot, kind: nsg, group: spoke-depot, x: 1200, y: 180}
+  - {id: vm-scan01, label: vm-scan01, kind: vm, group: spoke-depot, x: 1200, y: 270, detail: Handles proof-of-delivery scanner uploads}
+
+  # --- data -------------------------------------------------------------
+  - {id: st-pod, label: stmeridianpod, kind: storage, group: data, x: 1440, y: 0, present: true, detail: Proof-of-delivery scans}
+  - {id: cnt-pod, label: pod-scans container, kind: blob-container, group: data, x: 1440, y: 90, present: true}
+  - {id: st-edi, label: stmeridianedi, kind: storage, group: data, x: 1440, y: 180, detail: Customer EDI drops}
+  - {id: share-depot, label: fs-depot-config, kind: file-share, group: data, x: 1440, y: 270}
+  - {id: pe-st-pod, label: pe-stmeridianpod, kind: private-endpoint, group: data, x: 1440, y: 360}
+  - {id: kv-meridian, label: kv-meridian, kind: key-vault, group: data, x: 1440, y: 450}
+  - {id: sql-tms, label: sql-meridian-tms, kind: sql-database, group: data, x: 1440, y: 540, present: true}
+  - {id: lifecycle-pod, label: pod-scans lifecycle policy, kind: policy, group: data, x: 1440, y: 630}
+
+  # --- operations -------------------------------------------------------
+  - {id: law-meridian, label: law-meridian, kind: log-analytics, group: ops, x: 1680, y: 0}
+  - {id: ag-oncall, label: ag-oncall, kind: action-group, group: ops, x: 1680, y: 90}
+  - {id: alert-tms-cpu, label: TMS CPU alert rule, kind: alert, group: ops, x: 1680, y: 180}
+  - {id: alert-processing, label: Maintenance suppression rule, kind: alert, group: ops, x: 1680, y: 270}
+  - {id: netwatcher, label: Network Watcher, kind: network-watcher, group: ops, x: 1680, y: 360}
+  - {id: connmon-depot, label: Connection monitor, kind: connection-monitor, group: ops, x: 1680, y: 450}
+  - {id: rsv-meridian, label: rsv-meridian, kind: recovery-vault, group: ops, x: 1680, y: 540}
+  - {id: bkv-meridian, label: bkv-meridian, kind: backup-vault, group: ops, x: 1680, y: 630}
+  - {id: policy-backup, label: TMS backup policy, kind: policy, group: ops, x: 1680, y: 720}
+  - {id: asr-tms, label: Site Recovery for TMS, kind: site-recovery, group: ops, x: 1680, y: 810}
+
+  # --- secondary region -------------------------------------------------
+  - {id: vnet-hub-ea, label: vnet-hub-eastasia, kind: vnet, group: dr, x: 1920, y: 0}
+  - {id: st-pod-dr, label: stmeridianpoddr, kind: storage, group: dr, x: 1920, y: 90}
+  - {id: vm-tms01-dr, label: vm-tms01 (East Asia), kind: vm, group: dr, x: 1920, y: 180}
+
+edges:
+  - {id: e-jurong-vgw, source: dc-jurong, target: vgw-hub, label: site-to-site VPN, kind: network, present: true}
+  - {id: e-vgw-hub, source: vgw-hub, target: vnet-hub, label: gateway, kind: network, present: true}
+  - {id: e-ad-connect, source: ad-jurong, target: entra-connect, label: sync, kind: identity, present: true}
+  - {id: e-connect-tenant, source: entra-connect, target: entra-tenant, label: password hash sync, kind: identity, present: true}
+  - {id: e-tenant-sub, source: entra-tenant, target: sub-prod, label: trusts, kind: identity, present: true}
+  - {id: e-mg-platform, source: mg-meridian, target: mg-platform, kind: identity}
+  - {id: e-mg-workload, source: mg-meridian, target: mg-workload, kind: identity}
+  - {id: e-mg-sub-prod, source: mg-workload, target: sub-prod, kind: identity}
+  - {id: e-mg-sub-nonprod, source: mg-workload, target: sub-nonprod, kind: identity}
+  - {id: e-hub-app, source: vnet-hub, target: vnet-app, label: peering, kind: network, present: true}
+  - {id: e-app-hub, source: vnet-app, target: vnet-hub, label: peering, kind: network, present: true}
+  - {id: e-hub-depot, source: vnet-hub, target: vnet-depot, label: peering, kind: network}
+  - {id: e-depot-hub, source: vnet-depot, target: vnet-hub, label: peering, kind: network}
+  - {id: e-internet-lb, source: internet, target: lb-pod, label: intake traffic, kind: traffic}
+  - {id: e-lb-vmss, source: lb-pod, target: vmss-intake, kind: traffic}
+  - {id: e-lb-pip, source: pip-lb-pod, target: lb-pod, kind: traffic}
+  - {id: e-ilb-tms, source: lb-internal-tms, target: vm-tms01, kind: traffic}
+  - {id: e-ilb-tms02, source: lb-internal-tms, target: vm-tms02, kind: traffic}
+  - {id: e-bastion-hub, source: bas-hub, target: snet-bastion, kind: network}
+  - {id: e-nat-hub, source: nat-hub, target: snet-shared, label: outbound, kind: network}
+  - {id: e-rt-depot, source: rt-depot, target: snet-depot, label: user-defined route, kind: network}
+  - {id: e-rt-nva, source: rt-depot, target: nva-hub, label: next hop, kind: network}
+  - {id: e-app-st-pod, source: vm-tms01, target: st-pod, label: writes scans, kind: data, present: true}
+  - {id: e-scan-st-pod, source: vm-scan01, target: st-pod, label: uploads, kind: data}
+  - {id: e-pe-st-pod, source: pe-st-pod, target: st-pod, label: private endpoint, kind: data}
+  - {id: e-pe-subnet, source: snet-pe, target: pe-st-pod, kind: network}
+  - {id: e-dns-private, source: dns-private, target: pe-st-pod, label: A record, kind: network}
+  - {id: e-portal-internet, source: internet, target: app-portal, label: customers, kind: traffic}
+  - {id: e-portal-plan, source: app-portal, target: plan-portal, kind: traffic}
+  - {id: e-portal-slot, source: app-portal, target: slot-staging, label: swap, kind: traffic}
+  - {id: e-portal-dns, source: dns-public, target: app-portal, label: track.meridianlogistics.com, kind: traffic}
+  - {id: e-aca-acr, source: aca-trackapi, target: acr-meridian, label: pulls image, kind: data}
+  - {id: e-aci-acr, source: aci-labelgen, target: acr-meridian, label: pulls image, kind: data}
+  - {id: e-tms-sql, source: vm-tms01, target: sql-tms, label: shipment data, kind: data, present: true}
+  - {id: e-share-depot, source: vm-scan01, target: share-depot, label: mounts, kind: data}
+  - {id: e-kv-app, source: app-portal, target: kv-meridian, label: reads secrets, kind: data}
+  - {id: e-law-vm, source: vm-tms01, target: law-meridian, label: diagnostics, kind: data}
+  - {id: e-law-st, source: st-pod, target: law-meridian, label: diagnostics, kind: data}
+  - {id: e-alert-ag, source: alert-tms-cpu, target: ag-oncall, label: fires, kind: data}
+  - {id: e-connmon-depot, source: connmon-depot, target: vm-scan01, kind: data}
+  - {id: e-rsv-tms, source: rsv-meridian, target: vm-tms01, label: backs up, kind: backup}
+  - {id: e-bkv-st, source: bkv-meridian, target: st-pod, label: backs up, kind: backup}
+  - {id: e-asr-tms, source: asr-tms, target: vm-tms01-dr, label: replicates, kind: backup}
+  - {id: e-objrepl-pod, source: st-pod, target: st-pod-dr, label: object replication, kind: backup}
+  - {id: e-hub-ea, source: vnet-hub, target: vnet-hub-ea, label: global peering, kind: network}

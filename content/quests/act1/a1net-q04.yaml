@@ -1,0 +1,285 @@
+id: a1net-q04
+chapter: act1-networking
+title: The Jump Box Problem
+summary: Three virtual machines have public IP addresses and RDP open to the world, and one of them is a domain controller.
+variant: core
+estimated_minutes: 13
+objectives:
+  - AZ104-4.2.3
+  - AZ104-4.1.3
+brief: >
+  The quarterly external scan came back. Wei Lin has already forwarded it to Dana,
+  which means the conversation about jump boxes is happening today.
+debrief: >
+  Three public addresses are gone, one Bastion host is up, and the scan report for
+  next quarter is going to be much shorter.
+encounters:
+  - id: a
+    type: design
+    title: Take the addresses away
+    speaker: Wei Lin Tan
+    objectives: [AZ104-4.2.3]
+    intro: >
+      The scan output is four pages. Wei Lin has highlighted three lines.
+
+
+      "vm-dc01, vm-tms01 and the print relay all answer on 3389 from the public
+      internet. The source restriction is a security group rule listing our office
+      address, which changed in March and nobody updated. Administrators still need
+      to get to these machines. Fix it properly."
+
+
+      Marek adds, without being asked: "Whatever you do, I am not installing an
+      agent on the domain controller."
+    prompt: How do administrators reach these machines after the public addresses go?
+    options:
+      - id: a
+        label: >
+          Deploy Azure Bastion in the hub, on an AzureBastionSubnet of /26, and remove the
+          public IP addresses from the virtual machines
+        correct: true
+        rep: 8
+        consequence: >
+          Wei Lin marks the finding as remediated pending verification, which is as close as
+          she gets to enthusiasm.
+        explain: >
+          Bastion gives browser-based RDP and SSH over TLS to virtual machines that have no
+          public IP address at all. It is a platform service, so there is no agent on the
+          guest, and a Bastion host in a peered hub can reach virtual machines in the
+          spokes.
+        diagram:
+          - {op: add_node, node: bas-hub}
+          - {op: add_node, node: snet-bastion}
+          - {op: add_edge, edge: e-bastion-hub}
+      - id: b
+        label: Keep the public addresses and tighten the security group to the current office range
+        correct: false
+        rep: -8
+        consequence: >
+          The office range changes again in September, and the finding reopens with a note
+          that it was closed once already.
+        explain: >
+          It puts the same control back in place that already failed, and it leaves RDP
+          exposed to whoever else happens to be on that address range. The scan will find it
+          again because it is still there to find.
+      - id: c
+        label: Build a jump box virtual machine with a public IP and let administrators hop through it
+        correct: false
+        rep: -6
+        consequence: >
+          The jump box is unpatched within two months and becomes the thing the next scan is
+          about.
+        explain: >
+          A jump box is a virtual machine you now own, patch, monitor and log into. Bastion
+          is the managed version of that idea with no exposed port, no guest to maintain and
+          no shared local account.
+      - id: d
+        label: Put everything behind the site-to-site VPN and require administrators to be in an office
+        correct: false
+        rep: -5
+        consequence: >
+          The first out-of-hours incident is handled by someone driving to Jurong at 02:00.
+        explain: >
+          It is genuinely more secure and it does not meet the requirement, which is that
+          administrators can reach these machines. Meridian's admins are on call from home
+          and one of them is in Cebu.
+  - id: b
+    type: design
+    title: What Bastion actually needs
+    speaker: Marek Sobczak
+    objectives: [AZ104-4.1.3, AZ104-4.2.3]
+    intro: >
+      Marek pulls the deployment blade up on your screen before you can.
+
+
+      "Before you click create. This thing has three requirements people get wrong
+      and then blame the product for. Subnet, address, and where it sits. Tell me
+      the shape of it."
+
+
+      The hub is 10.10.0.0/16. snet-shared is 10.10.1.0/24 and GatewaySubnet is
+      10.10.0.0/27.
+    prompt: What do you deploy?
+    options:
+      - id: a
+        label: >
+          A subnet named AzureBastionSubnet at 10.10.2.0/26 in vnet-hub, with a Standard SKU
+          static public IP address
+        correct: true
+        rep: 7
+        consequence: >
+          "Right," says Marek, and goes back to his own screen, which is the end of the
+          review.
+        explain: >
+          The subnet must be named exactly AzureBastionSubnet and must be at least a /26.
+          Bastion requires a Standard SKU public IP address, which is always statically
+          allocated. Placing it in the hub means every peered spoke can be reached from the
+          one deployment.
+      - id: b
+        label: A subnet named snet-bastion at 10.10.2.0/26 with a Standard SKU public IP address
+        correct: false
+        rep: -6
+        consequence: Deployment fails validation immediately and you lose ten minutes to a naming rule.
+        explain: >
+          The name is not a convention, it is a requirement. Bastion will only deploy into a
+          subnet named AzureBastionSubnet.
+      - id: c
+        label: An AzureBastionSubnet at 10.10.2.0/27 with a Basic SKU dynamic public IP address
+        correct: false
+        rep: -7
+        consequence: >
+          Two validation errors at once, and the second one only appears after you fix the
+          first.
+        explain: >
+          The subnet is too small: /26 is the minimum, because Bastion scales out host
+          instances inside it. Basic SKU public IP addresses are also retired and are not
+          accepted here.
+      - id: d
+        label: An AzureBastionSubnet in each spoke, so each depot has its own
+        correct: false
+        rep: -5
+        consequence: Priya finds three Bastion hosts on the invoice and asks which two you meant to delete.
+        explain: >
+          Bastion is billed per host per hour plus outbound data. One deployment in a peered
+          hub serves the spokes, which is most of the reason the hub exists.
+  - id: c
+    type: troubleshoot
+    title: INC-4530
+    speaker: Meridian NOC
+    objectives: [AZ104-4.2.3]
+    intro: >
+      Bastion deployed cleanly at 14:10. At 14:40 nobody can use it.
+
+
+      The portal offers the Connect button, the session window opens, and after
+      about twenty seconds it fails with a message about the connection being
+      closed. It fails the same way for every administrator, from every network,
+      to every target virtual machine.
+
+
+      The only other change in the window is Wei Lin's hardening baseline, which
+      applies a standard security group to every subnet that does not have one.
+    ticket:
+      ref: INC-4530
+      opened: "14:40"
+      reporter: Meridian NOC
+      summary: Bastion sessions fail to establish for all users and all targets.
+      severity: sev3
+    time_budget: 5
+    on_enter:
+      - {op: set_status, node: bas-hub, status: broken}
+    investigate:
+      - id: a
+        action: Ask Wei Lin what the hardening baseline applies
+        speaker: Wei Lin Tan
+        reveals: >
+          "nsg-baseline. Inbound: allow 443 from our address ranges, deny everything else.
+          Outbound: allow 443 to the internet, deny everything else. It is applied to
+          every subnet that did not already have a group. That is the standard."
+      - id: b
+        action: Ask the administrators whether anything at all works
+        speaker: Marek Sobczak
+        reveals: >
+          "Connect goes through the portal, so the portal side is fine. The session
+          itself never comes up. Same from my machine and from Joana's in Cebu."
+      - id: c
+        action: Check whether the target virtual machines are healthy
+        speaker: Joana Reyes
+        reveals: >
+          "All three are running, and the monitoring agent on vm-tms01 is reporting
+          normally, so the guests are alive and have network."
+    commands:
+      - id: a
+        label: List the security groups attached to the hub subnets
+        cmd: az network vnet subnet list -g rg-hub --vnet-name vnet-hub --query "[].{name:name,nsg:networkSecurityGroup.id}" -o table
+        output: |
+          Name                 Nsg
+          -------------------  ------------------------------------------------
+          snet-shared          .../networkSecurityGroups/nsg-shared
+          GatewaySubnet
+          AzureBastionSubnet   .../networkSecurityGroups/nsg-baseline
+        time_cost: 1
+      - id: b
+        label: Show the rules on the baseline security group
+        cmd: az network nsg rule list -g rg-hub --nsg-name nsg-baseline -o table
+        output: |
+          Name                  Priority  Direction  Access  SourcePrefix     DestinationPortRange
+          --------------------  --------  ---------  ------  ---------------  --------------------
+          AllowCorpHttps        100       Inbound    Allow   203.0.113.0/24   443
+          DenyAllInbound        4000      Inbound    Deny    *                *
+          AllowInternetHttps    100       Outbound   Allow   Internet         443
+          DenyAllOutbound       4000      Outbound   Deny    *                *
+        time_cost: 1
+      - id: c
+        label: Read the Bastion host's own health state
+        cmd: az network bastion show -n bas-hub -g rg-hub --query "{state:provisioningState,sku:sku.name,dns:dnsName}" -o table
+        output: |
+          State      Sku       Dns
+          ---------  --------  ---------------------------------------
+          Succeeded  Standard  bst-9f2c1ab4-1d33-4d7f-9a0e.bastion.azure.com
+        time_cost: 1
+      - id: d
+        label: Check the target virtual machine will accept RDP from the Bastion subnet
+        cmd: az network watcher test-ip-flow --vm vm-tms01 -g rg-app --direction Inbound --protocol TCP --local 10.20.1.11:3389 --remote 10.10.2.4:47122
+        output: |
+          {
+            "access": "Allow",
+            "ruleName": "AllowBastionRdp"
+          }
+        time_cost: 2
+      - id: e
+        label: Look at what the platform is being denied
+        cmd: az network watcher flow-log show --location southeastasia -n fl-hub --query "enabled" -o tsv
+        output: |
+          false
+        note: Flow logs were never turned on for the hub, so there is nothing recorded to read.
+        time_cost: 2
+    fixes:
+      - id: a
+        label: >
+          Add the Bastion service rules to nsg-baseline on AzureBastionSubnet: inbound 443 from
+          Internet and GatewayManager, and outbound 3389 and 22 to VirtualNetwork
+        correct: true
+        rep: 9
+        consequence: >
+          Marek reconnects while you are still typing the change note and says nothing, which
+          means it worked.
+        explain: >
+          A security group on AzureBastionSubnet is allowed, but it must permit what Bastion
+          needs: inbound 443 from Internet for the client, inbound 443 from GatewayManager for
+          the control plane, inbound 8080 and 5701 from VirtualNetwork for host communication,
+          and outbound 3389 and 22 to VirtualNetwork plus 443 to AzureCloud. The baseline
+          denied the control plane, so sessions opened and then died.
+        diagram:
+          - {op: set_status, node: bas-hub, status: healthy}
+      - id: b
+        label: Remove the security group from AzureBastionSubnet entirely
+        correct: false
+        rep: -7
+        consequence: >
+          Sessions work again and Wei Lin's baseline scan flags an unprotected subnet within
+          the hour, so you have traded one ticket for another.
+        explain: >
+          It would restore service, and it drops the control the security team requires.
+          Bastion supports a security group; it just has documented rules that have to be in
+          it.
+      - id: c
+        label: Redeploy Bastion with the Standard SKU and IP-based connection enabled
+        correct: false
+        rep: -8
+        consequence: >
+          An hour of redeployment later, the new host fails in exactly the same way, because
+          it lands in the same subnet.
+        explain: >
+          It is already Standard, and the SKU has nothing to do with this. The subnet's
+          security group is denying the traffic regardless of which Bastion sits behind it.
+      - id: d
+        label: Add an inbound allow for 3389 from the internet to AzureBastionSubnet
+        correct: false
+        rep: -10
+        consequence: >
+          It does not help, and it puts an internet-facing RDP rule back into the estate you
+          were asked to remove one from.
+        explain: >
+          Clients reach Bastion on 443, not 3389. The 3389 traffic is outbound from the
+          Bastion subnet to the target virtual machine inside the virtual network.

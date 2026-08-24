@@ -1,0 +1,157 @@
+# The world bible in machine-readable form: acts, chapters, career ranks, and the
+# recurring cast. The frontend reads this for chapter navigation and speaker
+# attribution; the linter reads it to check that every quest lands in a real
+# chapter and every speaker is a real person.
+company:
+  name: Meridian Logistics
+  descriptor: a mid-size regional freight and warehousing firm
+  headquarters: Singapore
+  footprint: >
+    Twenty-two depots across Singapore, Malaysia, Indonesia, the Philippines and
+    Vietnam, a legacy data center in Jurong, and a follow-the-sun NOC in Cebu.
+  primary_region: Southeast Asia
+  secondary_region: East Asia
+  tenant: meridianlogistics.com
+ranks:
+  - id: junior-cloud-admin
+    title: Junior Cloud Admin
+  - id: cloud-admin
+    title: Cloud Admin
+  - id: senior-cloud-admin
+    title: Senior Cloud Admin
+  - id: associate-architect
+    title: Associate Architect
+  - id: solutions-architect
+    title: Solutions Architect
+cast:
+  - id: dana
+    name: Dana Ong
+    role: IT Operations Manager
+    note: Your manager. Pragmatic, allergic to drama, will back you if you show your reasoning.
+  - id: marek
+    name: Marek Sobczak
+    role: Senior Cloud Admin
+    note: Your mentor. Twenty years of on-call has left him blunt, precise and quietly generous.
+  - id: priya
+    name: Priya Raghunathan
+    role: Chief Financial Officer
+    note: Reads the Azure invoice line by line and asks about every one of them.
+  - id: weilin
+    name: Wei Lin Tan
+    role: Information Security Officer
+    note: Owns the audit findings. Says no slowly and yes in writing.
+  - id: joana
+    name: Joana Reyes
+    role: NOC Shift Lead, Cebu
+    note: Runs the overnight desk. Escalates with timestamps, which you learn to appreciate.
+  - id: hendrik
+    name: Hendrik Salim
+    role: Warehouse Systems Lead
+    note: Speaks for the depots. Measures every change in trucks left waiting.
+  - id: grace
+    name: Grace Mendoza
+    role: Principal Architect
+    note: Joins in Act 2. Asks what the requirement is until you stop guessing.
+  - id: noc
+    name: Meridian NOC
+    role: Cebu operations desk
+    note: The shared inbox that pages you at 02:00.
+  - id: system
+    name: Meridian IT
+    role: Ticketing and alerting
+    note: Automated ticket and alert text.
+acts:
+  - id: act1
+    number: 1
+    exam: AZ-104
+    title: The Ticket Queue
+    tagline: You are the person the queue belongs to now.
+    chapters: [act1-identity, act1-storage, act1-compute, act1-networking, act1-monitoring]
+  - id: act2
+    number: 2
+    exam: AZ-305
+    title: The Design Review
+    tagline: Nobody hands you a runbook for a decision that has not been made yet.
+    chapters: [act2-identity, act2-data, act2-continuity, act2-infrastructure]
+chapters:
+  - id: act1-identity
+    act: act1
+    order: 1
+    domain: AZ104-1
+    title: Least Privilege, Loudly
+    rank: junior-cloud-admin
+    blurb: >
+      Week one. Your predecessor left, the Owner role was handed out like sweets,
+      and the auditor arrives in a fortnight.
+  - id: act1-storage
+    act: act1
+    order: 2
+    domain: AZ104-2
+    title: Everything Lands in a Bucket
+    rank: junior-cloud-admin
+    blurb: >
+      Proof-of-delivery scans, EDI drops and a shared account key that has been
+      pasted into more places than anyone wants to admit.
+  - id: act1-compute
+    act: act1
+    order: 3
+    domain: AZ104-3
+    title: The Fleet
+    rank: cloud-admin
+    blurb: >
+      Virtual machines, containers and App Service, sized by people who guessed,
+      and a template you are now expected to own.
+  - id: act1-networking
+    act: act1
+    order: 4
+    domain: AZ104-4
+    title: Wires and Rules
+    rank: cloud-admin
+    blurb: >
+      Peerings, routes and security groups. Nothing in Azure is broken until the
+      packets say so.
+  - id: act1-monitoring
+    act: act1
+    order: 5
+    domain: AZ104-5
+    title: Pager Discipline
+    rank: senior-cloud-admin
+    blurb: >
+      Alerts nobody reads, logs nobody keeps, and a restore that has never once
+      been tested.
+  - id: act2-identity
+    act: act2
+    order: 6
+    domain: AZ305-1
+    title: The Landing Zone
+    rank: associate-architect
+    blurb: >
+      Meridian is buying a competitor. Somebody has to design the identity,
+      governance and monitoring the merged estate will run on.
+  - id: act2-data
+    act: act2
+    order: 7
+    domain: AZ305-2
+    title: Where the Data Lives
+    rank: associate-architect
+    blurb: >
+      Shipment records, telemetry from ten thousand trailers, and a finance team
+      that wants both queried in the same dashboard.
+  - id: act2-continuity
+    act: act2
+    order: 8
+    domain: AZ305-3
+    title: The Tabletop
+    rank: solutions-architect
+    blurb: >
+      The board wants numbers for how long Meridian can be down and how much data
+      it can afford to lose. You have to defend both.
+  - id: act2-infrastructure
+    act: act2
+    order: 9
+    domain: AZ305-4
+    title: Cutover
+    rank: solutions-architect
+    blurb: >
+      Compute, application architecture, migration waves and the network under all
+      of it, reviewed by people who will have to run it.
