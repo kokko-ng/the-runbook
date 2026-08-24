@@ -1,0 +1,191 @@
+id: a2bc-q01
+chapter: act2-continuity
+title: The Numbers on the Slide
+summary: The board wants two numbers per system, and the last person who wrote them down guessed.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ305-3.1.1
+brief: >
+  Continuity design starts with requirements, not products. Getting the numbers
+  agreed is most of the work and all of the accountability.
+debrief: >
+  Objectives per workload, agreed by the people who own the consequences, and a
+  tiering that says what Meridian will and will not pay to protect.
+encounters:
+  - id: a
+    type: design
+    title: Asking the right people
+    speaker: Grace Mendoza
+    objectives: [AZ305-3.1.1]
+    intro: >
+      "The continuity plan has one recovery time objective for everything: four
+      hours," says Grace. "It was written by somebody in IT in 2022. Nobody in the
+      business has ever been asked."
+
+
+      Dispatch stops trucks when it is down. The tracking portal is
+      customer-facing but read-only. The analytics platform is used by six people
+      during office hours. The Straits ERP posts invoices.
+    prompt: How do you establish the objectives?
+    options:
+      - id: a
+        label: >
+          Work out the business impact per workload with the people who own it, and set
+          recovery point and time objectives per tier from that
+        correct: true
+        rep: 9
+        consequence: >
+          Dispatch lands at fifteen minutes and one hour, analytics at a day and a day, and the
+          board sees a defensible slide instead of one number.
+        explain: >
+          Recovery objectives are business decisions with a cost attached. A business impact
+          assessment establishes what each hour of downtime and each hour of lost data actually
+          costs, which is what justifies the difference between protecting dispatch and
+          protecting analytics.
+      - id: b
+        label: Apply the strictest objective everywhere, so nothing is under-protected
+        correct: false
+        rep: -7
+        consequence: >
+          The analytics platform gets active replication to a second region, and the board asks
+          why the continuity budget tripled.
+        explain: >
+          Uniform strictness is expensive and unfocused. The point of tiering is to spend where
+          downtime hurts.
+      - id: c
+        label: Keep four hours, since it has not caused a problem so far
+        correct: false
+        rep: -8
+        consequence: >
+          Dispatch is down for three hours in March and the board discovers that four hours was
+          never acceptable for it.
+        explain: >
+          Nothing having gone wrong is not evidence that the number is right. It is evidence
+          that it has not been tested.
+      - id: d
+        label: Ask each application team to set their own objectives
+        correct: false
+        rep: -6
+        consequence: >
+          Every team returns zero and zero, because nobody who is not paying for it ever asks
+          for less.
+        explain: >
+          Objectives without a cost attached are wishes. The conversation has to involve
+          whoever owns the budget as well as whoever owns the system.
+  - id: b
+    type: design
+    title: Two numbers, two mechanisms
+    speaker: Marek Sobczak
+    objectives: [AZ305-3.1.1]
+    intro: >
+      Dispatch has come back with fifteen minutes of acceptable data loss and one
+      hour to be running again. Analytics has come back with twenty-four hours for
+      both.
+
+
+      "Same continuity plan, two very different systems," says Marek. "Say what
+      each one gets."
+    prompt: What do you recommend for each?
+    options:
+      - id: a
+        label: >
+          Dispatch: replication to a second region with a tested failover. Analytics: backup
+          and redeploy from templates.
+        correct: true
+        rep: 9
+        consequence: >
+          The design costs about a fifth of what protecting everything the same way would, and
+          the expensive part is the part that stops trucks.
+        explain: >
+          A one-hour recovery time objective cannot be met by restoring from backup, so it
+          needs something already running or continuously replicated. A twenty-four hour
+          objective is comfortably met by backups plus infrastructure as code, which is far
+          cheaper. Matching the mechanism to the number is the whole exercise.
+      - id: b
+        label: Both replicated to a second region, so the failover procedure is the same for everything
+        correct: false
+        rep: -6
+        consequence: >
+          The analytics platform runs a warm copy nobody would ever fail over to inside its
+          twenty-four hour window.
+        explain: >
+          Operational consistency is genuinely valuable and it is not worth the cost of warm
+          capacity for a workload with a day to recover.
+      - id: c
+        label: Both backed up hourly, with a documented rebuild procedure
+        correct: false
+        rep: -8
+        consequence: >
+          Dispatch's rebuild takes five hours in the first rehearsal, against a one-hour
+          commitment.
+        explain: >
+          The backup meets the data loss objective and not the time objective. Both numbers
+          have to be satisfied by the mechanism.
+      - id: d
+        label: Dispatch replicated, analytics protected by the storage account's geo-redundancy
+        correct: false
+        rep: -5
+        consequence: >
+          The analytics data survives and the compute, pipelines and configuration do not, so
+          the rebuild is undesigned.
+        explain: >
+          Geo-redundant storage protects the data in that account. It is not a recovery plan
+          for a platform, which also needs its pipelines, workspaces and permissions back.
+  - id: c
+    type: design
+    title: The part that is not in Azure
+    speaker: Wei Lin Tan
+    objectives: [AZ305-3.1.1]
+    intro: >
+      "Straits still runs a warehouse management system in Port Klang and will for
+      at least a year," says Wei Lin. "It is on two physical servers. Their
+      continuity plan is a tape drive and a contract with a company that no longer
+      answers the phone."
+    prompt: What do you recommend for the hybrid part of the estate?
+    options:
+      - id: a
+        label: >
+          Azure Backup with the agent for the servers, and Site Recovery replicating them to
+          Azure so they can be brought up there
+        correct: true
+        rep: 8
+        consequence: >
+          The tape drive is retired, and a test failover in the second quarter brings the
+          warehouse system up in Azure in forty minutes.
+        explain: >
+          Azure Backup protects on-premises servers, files and workloads to a vault, and Site
+          Recovery replicates physical or virtualized servers into Azure so they can run there
+          after a site loss. Together they give a hybrid estate a recovery target that is not
+          another room in the same building.
+        diagram:
+          - {op: add_node, node: rsv-platform}
+          - {op: add_node, node: asr-platform}
+      - id: b
+        label: Replicate the servers to Meridian's Jurong data center
+        correct: false
+        rep: -6
+        consequence: >
+          Both sites are in the same country under the same regional risks, and Jurong is
+          itself being decommissioned.
+        explain: >
+          Replicating to another site you are retiring solves the problem for as long as that
+          site exists. Azure is the destination the rest of the estate is already moving to.
+      - id: c
+        label: Migrate the warehouse system to Azure immediately so the question disappears
+        correct: false
+        rep: -7
+        consequence: >
+          The migration is a year of work, and the servers are unprotected for all of it.
+        explain: >
+          Migration is the plan and it is not the continuity answer for the intervening year.
+          Protect what exists while it exists.
+      - id: d
+        label: Keep the tape drive and add a second copy stored off site
+        correct: false
+        rep: -8
+        consequence: >
+          Recovery still requires hardware to restore onto, which the plan does not include.
+        explain: >
+          Off-site copies address media loss. They do not provide somewhere to run, which is
+          what a recovery time objective is measured against.

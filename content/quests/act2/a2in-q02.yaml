@@ -1,0 +1,172 @@
+id: a2in-q02
+chapter: act2-infrastructure
+title: Containers and Functions
+summary: The dispatch platform, three integrations and a webhook, all of which somebody wants to put on Kubernetes.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ305-4.1.3
+  - AZ305-4.1.4
+brief: >
+  Two managed compute models that overlap heavily, and a set of requirements that
+  separate them cleanly if you read them.
+debrief: >
+  Kubernetes where the platform is worth operating, serverless where the work is
+  intermittent, and nothing on a cluster because it was already there.
+encounters:
+  - id: a
+    type: design
+    title: How much platform to run
+    speaker: Grace Mendoza
+    objectives: [AZ305-4.1.3]
+    intro: >
+      "Dispatch is eleven services, with service-to-service calls, its own
+      routing rules, per-service scaling and a team of six who have used
+      Kubernetes before," says Grace. "The tracking API is one container. The
+      label generator runs for eleven minutes a night."
+
+
+      "Somebody has proposed one cluster for all of it, on the grounds that we
+      would only have one thing to operate."
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          Kubernetes for the dispatch platform, Container Apps for the tracking API, and a
+          container instance or job for the nightly generator
+        correct: true
+        rep: 9
+        consequence: >
+          The cluster carries the workload that justifies it, and two small things stay small.
+        explain: >
+          Kubernetes is worth its operational cost when a workload needs its primitives:
+          many services, custom scheduling, service mesh, node-level control. Container Apps
+          gives revisions, ingress and scale to zero with no cluster to run, which fits a single
+          container. A nightly job needs neither.
+        diagram:
+          - {op: add_node, node: aca-services}
+      - id: b
+        label: Everything on the Kubernetes cluster, since it is being built anyway
+        correct: false
+        rep: -6
+        consequence: >
+          The nightly job holds a node awake and the tracking API's deployments are gated behind
+          cluster upgrades it has no interest in.
+        explain: >
+          A shared cluster couples unrelated workloads to one upgrade cycle and one blast
+          radius. The marginal cost of putting a small workload on Container Apps is close to
+          nothing.
+      - id: c
+        label: Container Apps for everything, to avoid operating a cluster at all
+        correct: false
+        rep: -6
+        consequence: >
+          The dispatch platform's routing rules and node-level requirements do not map, and
+          three services are rewritten to fit.
+        explain: >
+          Container Apps deliberately hides Kubernetes, which is its strength and its limit.
+          A workload that needs the primitives should have them.
+      - id: d
+        label: Two clusters, one for dispatch and one for everything else
+        correct: false
+        rep: -7
+        consequence: >
+          Meridian now operates two clusters, one of which exists to run a nightly job and a
+          single API.
+        explain: >
+          Cluster count is operational cost. A second one needs its own justification, which
+          two small workloads do not provide.
+  - id: b
+    type: design
+    title: The webhook that fires eleven times a day
+    speaker: Marek Sobczak
+    objectives: [AZ305-4.1.4]
+    intro: >
+      "Customs send a webhook when a declaration clears," says Marek. "Eleven
+      times a day, unpredictably, and the handler writes a row and sends a message.
+      It has to respond in under five seconds or they retry, and they treat a retry
+      storm as our fault."
+    prompt: What do you run it on?
+    options:
+      - id: a
+        label: >
+          A function app on a plan that avoids cold starts, such as the Premium or Flex
+          Consumption model
+        correct: true
+        rep: 9
+        consequence: >
+          The handler costs a few dollars a month and answers in under a second, including the
+          first call of the day.
+        explain: >
+          Event-driven work that runs for milliseconds a few times a day is the serverless case:
+          no idle capacity, scaling handled by the platform. The five-second response
+          requirement is what rules out the plain consumption plan's cold start, which is why
+          Premium or Flex exists.
+        diagram:
+          - {op: add_node, node: func-events}
+      - id: b
+        label: A function app on the consumption plan, which is cheapest
+        correct: false
+        rep: -6
+        consequence: >
+          The first call after an idle period takes several seconds, customs retry, and the
+          retry is treated as Meridian's fault.
+        explain: >
+          Consumption is the cheapest and cold starts are its trade-off. With an explicit
+          latency requirement, the plan that keeps instances warm is the one that meets it.
+      - id: c
+        label: A container in the dispatch cluster, so it is with everything else
+        correct: false
+        rep: -5
+        consequence: >
+          A pod runs continuously for eleven invocations a day, and its deployments are tied to
+          the cluster's release cycle.
+        explain: >
+          It works and pays for idle capacity to serve seconds of work. Serverless exists for
+          precisely this shape.
+      - id: d
+        label: An App Service web app, always on
+        correct: false
+        rep: -5
+        consequence: >
+          A plan instance runs all month for eleven requests a day.
+        explain: >
+          App Service is a good home for a continuously used web application. For an
+          intermittent webhook it is capacity bought and unused.
+  - id: c
+    type: knowledge
+    title: The word that decides it
+    speaker: Grace Mendoza
+    objectives: [AZ305-4.1.4]
+    intro: >
+      "The review board will ask what makes something a serverless candidate,"
+      says Grace. "One sentence, and it is not that it is cheap."
+    question: What characterizes a workload that suits serverless compute?
+    options:
+      - id: a
+        label: >
+          Event-driven and intermittent, with work that finishes quickly and no state kept
+          between invocations
+        correct: true
+        rep: 6
+        explain: >
+          Serverless bills for execution rather than for capacity, so it wins where the work is
+          bursty and short. Long-running, continuously busy or stateful workloads either cost
+          more or hit execution limits, which is where a container or a machine is the better
+          shape.
+      - id: b
+        label: Any workload that can be packaged as a container image
+        correct: false
+        rep: -5
+        consequence: A continuously busy service is moved to a consumption plan and costs more than the plan it left.
+        explain: >
+          Packaging is not the criterion. A container that runs constantly is cheaper on
+          reserved capacity than on per-execution billing.
+      - id: c
+        label: Workloads with unpredictable scale, whatever their duration
+        correct: false
+        rep: -5
+        consequence: A six-hour batch job is written as a function and hits the execution timeout.
+        explain: >
+          Scale elasticity is part of it and duration matters as much. Long-running work belongs
+          in a container, a batch service or a durable orchestration.

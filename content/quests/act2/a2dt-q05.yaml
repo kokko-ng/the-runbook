@@ -1,0 +1,191 @@
+id: a2dt-q05
+chapter: act2-data
+title: One Dashboard, Two Systems
+summary: Finance want shipment revenue and trailer utilization on the same page, and the two live nowhere near each other.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ305-2.3.1
+  - AZ305-2.3.2
+brief: >
+  The last data question of the merger: how the pieces get into one place, and
+  what that place is.
+debrief: >
+  A pipeline that runs on a schedule with lineage, and an analytics layer sized
+  for the questions finance actually ask.
+encounters:
+  - id: a
+    type: design
+    title: Getting it into one place
+    speaker: Grace Mendoza
+    objectives: [AZ305-2.3.1]
+    intro: >
+      Four sources. The transport database in Azure SQL. The Straits ERP in the
+      managed instance. Trailer telemetry in Cosmos DB. Fuel card charges, which
+      arrive as a CSV file on an SFTP server every night.
+
+
+      Finance need yesterday's data by 07:00. The data team have written SQL for
+      fifteen years and no Spark.
+    prompt: How do you move the data?
+    options:
+      - id: a
+        label: >
+          Azure Data Factory pipelines on a nightly schedule, landing all four sources in the
+          data lake
+        correct: true
+        rep: 9
+        consequence: >
+          The first end-to-end run finishes at 04:50, and the failure of the fuel card file to
+          arrive is an alert rather than a mystery.
+        explain: >
+          Data Factory is the managed integration service: connectors for databases, Cosmos DB
+          and SFTP, scheduled and event triggers, retries, monitoring and lineage. Landing
+          everything in a lake first keeps the sources decoupled from whatever consumes them.
+        diagram:
+          - {op: add_node, node: adf-pipelines}
+          - {op: add_node, node: st-datalake}
+          - {op: add_edge, edge: e2-adf-lake}
+          - {op: add_edge, edge: e2-adf-sql}
+      - id: b
+        label: Nightly scripts on a virtual machine, one per source
+        correct: false
+        rep: -7
+        consequence: >
+          Four scripts, four failure modes, and no view of whether last night worked without
+          reading four logs.
+        explain: >
+          It is the same work with the orchestration, retries and monitoring left as an
+          exercise. Those are most of what an integration service provides.
+      - id: c
+        label: Direct queries from the reporting tool against each source system
+        correct: false
+        rep: -8
+        consequence: >
+          The month-end report runs a large scan against the production dispatch database at
+          09:00.
+        explain: >
+          Reporting directly against production couples the report to the transactional system
+          and puts analytical load where it hurts most.
+      - id: d
+        label: Databricks notebooks scheduled nightly to pull and transform each source
+        correct: false
+        rep: -6
+        consequence: >
+          A capable platform is introduced that nobody on the team can maintain, for four
+          nightly copies.
+        explain: >
+          Spark earns its complexity on large-scale transformation and machine learning. Here
+          the work is scheduled movement and modest transformation, by a team who write SQL.
+  - id: b
+    type: design
+    title: What finance query
+    speaker: Priya Raghunathan
+    objectives: [AZ305-2.3.2]
+    intro: >
+      "Six analysts," says Priya. "They write SQL, they build dashboards, and they
+      ask questions like revenue per lane per month against trailer utilization.
+      Roughly four hundred gigabytes of curated data, growing slowly. Nobody is
+      doing machine learning and nobody is asking to."
+    prompt: What analytics layer do you recommend?
+    options:
+      - id: a
+        label: >
+          A serverless SQL layer over the lake for exploration, with curated tables published
+          for the dashboards
+        correct: true
+        rep: 8
+        consequence: >
+          Analysts query the lake with the SQL they already write, and the dashboards read
+          curated tables that are fast and cheap.
+        explain: >
+          Serverless SQL over a lake charges per query and needs no cluster to size, which
+          suits six analysts and a few hundred gigabytes. Publishing curated tables for the
+          dashboards keeps the interactive experience quick without a dedicated warehouse.
+        diagram:
+          - {op: add_node, node: synapse-analytics}
+          - {op: add_edge, edge: e2-synapse-lake}
+      - id: b
+        label: A dedicated data warehouse sized for the peak reporting period
+        correct: false
+        rep: -7
+        consequence: >
+          A provisioned warehouse runs all month for six analysts and four hundred gigabytes.
+        explain: >
+          Dedicated capacity is the right answer at terabyte scale with sustained concurrency.
+          At this size it is capacity bought and mostly idle.
+      - id: c
+        label: Let the dashboards query the data lake files directly
+        correct: false
+        rep: -6
+        consequence: >
+          Each dashboard refresh scans raw files, and the 07:00 load takes eleven minutes per
+          page.
+        explain: >
+          Raw files are for pipelines. Interactive dashboards need a curated, columnar layer in
+          between, which is what publishing curated tables provides.
+      - id: d
+        label: Keep reporting in the transport database and copy the other sources into it
+        correct: false
+        rep: -8
+        consequence: >
+          The transactional database grows analytical tables, and peak dispatch competes with
+          the month-end report again.
+        explain: >
+          This is the architecture the whole exercise is moving away from. Analytical and
+          transactional workloads have different shapes and belong apart.
+  - id: c
+    type: design
+    title: Who can see what
+    speaker: Wei Lin Tan
+    objectives: [AZ305-2.3.1]
+    intro: >
+      "The lake will hold shipment values, customer names and driver identities,"
+      says Wei Lin. "Six analysts, two of whom are contractors. Somebody will ask
+      me at the next review who can see driver data, and I want a better answer
+      than a list of people."
+    prompt: How do you handle access in the data platform?
+    options:
+      - id: a
+        label: >
+          Separate the lake into zones with different access, publish curated views without
+          driver identifiers, and catalog what is where
+        correct: true
+        rep: 8
+        explain: >
+          Access in a lake is a design problem before it is a permissions problem: raw, curated
+          and published zones with different access, personal data excluded from the published
+          layer unless a role requires it, and a catalog so the question of what lives where has
+          a documented answer.
+        diagram:
+          - {op: add_node, node: purview-catalog}
+          - {op: add_edge, edge: e2-purview-lake}
+      - id: b
+        label: Grant the analysts read access to the whole lake and rely on their contracts
+        correct: false
+        rep: -9
+        consequence: >
+          Two contractors can read every driver's identity and location history, which is a
+          notifiable exposure waiting to happen.
+        explain: >
+          Contracts are not a technical control. Personal data in a lake needs the same
+          treatment it would get anywhere else.
+      - id: c
+        label: Mask the driver identifiers at query time in the reporting tool
+        correct: false
+        rep: -7
+        consequence: >
+          Anyone querying the lake directly, which is the point of the design, bypasses the
+          masking entirely.
+        explain: >
+          Controls applied at the presentation layer only protect the presentation layer.
+          Exclude the data from the layer people query, or protect it where it sits.
+      - id: d
+        label: Give each analyst their own copy of the curated data
+        correct: false
+        rep: -8
+        consequence: >
+          Six copies of customer and driver data exist, in six places, with six lifecycles.
+        explain: >
+          Copying data to solve an access problem multiplies the exposure and the storage, and
+          nobody can say which copy is current.

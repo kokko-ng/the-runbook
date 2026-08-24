@@ -1,0 +1,164 @@
+id: a2in-b01
+chapter: act2-infrastructure
+title: Containers and Functions, Exam Hard
+summary: The cluster is agreed. Now the questions that decide whether it costs twice what it should.
+variant: bonus
+bonus_of: a2in-q02
+estimated_minutes: 11
+objectives:
+  - AZ305-4.1.1
+  - AZ305-4.1.3
+brief: >
+  Node pools, interruption tolerance and the boundary between what the platform
+  scales and what you do.
+debrief: >
+  Workload classes get their own pools, interruptible work gets the cheap
+  capacity, and nothing shares a node that should not.
+encounters:
+  - id: a
+    type: design
+    title: One pool or several
+    speaker: Grace Mendoza
+    objectives: [AZ305-4.1.3]
+    intro: >
+      "The dispatch cluster will run eleven services, an ingress controller, the
+      monitoring agents, and the analytics team's occasional Spark job," says
+      Grace. "Somebody has proposed one node pool with autoscaling and letting the
+      scheduler sort it out."
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          A system pool for platform components and separate user pools sized for the workload
+          classes, with the analytics job on its own
+        correct: true
+        rep: 9
+        consequence: >
+          A Spark job that fills its nodes no longer evicts the ingress controller, and each pool
+          scales on its own shape.
+        explain: >
+          Node pools separate workloads that have different resource shapes, scaling behavior or
+          interruption tolerance. A dedicated system pool keeps cluster components away from
+          application load, and giving a memory-hungry batch job its own pool stops it competing
+          with request-serving services.
+      - id: b
+        label: One pool with autoscaling, using resource requests and limits to keep workloads apart
+        correct: false
+        rep: -6
+        consequence: >
+          Requests and limits are set correctly for nine of thirteen workloads, and the other
+          four cause evictions during the Spark run.
+        explain: >
+          Requests and limits are necessary and are not isolation. They do not stop a large
+          workload forcing the pool to scale on the wrong dimension, and they depend on every
+          team setting them correctly.
+      - id: c
+        label: Two clusters, one for services and one for analytics
+        correct: false
+        rep: -5
+        consequence: >
+          A second control plane is operated and upgraded for a job that runs a few times a
+          month.
+        explain: >
+          A separate cluster is the strongest isolation and the highest operational cost. Node
+          pools give most of the separation inside one cluster.
+      - id: d
+        label: One pool, with the analytics job moved to a virtual machine outside the cluster
+        correct: false
+        rep: -5
+        consequence: >
+          A machine is maintained for an occasional job, and the pool still mixes platform
+          components with application load.
+        explain: >
+          Moving the job out is reasonable and leaves the system and user workload mixing
+          unaddressed, which is the other half of the problem.
+  - id: b
+    type: design
+    title: The cheap capacity
+    speaker: Priya Raghunathan
+    objectives: [AZ305-4.1.1]
+    intro: >
+      "Somebody has shown me spot pricing," says Priya. "It is a fraction of the
+      price. What can we run on it?"
+
+
+      The cluster runs the dispatch services, the nightly routing batch and the
+      analytics job.
+    prompt: What goes on interruptible capacity?
+    options:
+      - id: a
+        label: >
+          The batch and analytics work, which can be evicted and restarted, on a spot pool with
+          the services staying on regular capacity
+        correct: true
+        rep: 8
+        explain: >
+          Spot capacity is reclaimed with short notice, so it suits work that can be interrupted
+          and resumed: batch, analytics, build agents, dev and test. Request-serving workloads
+          with an availability commitment do not belong on it.
+      - id: b
+        label: Everything, with more replicas to absorb evictions
+        correct: false
+        rep: -8
+        consequence: >
+          A capacity reclaim during peak evicts several dispatch pods at once, and there is no
+          guarantee replacements can be scheduled.
+        explain: >
+          Spot eviction can take many nodes at once and offers no capacity guarantee on the way
+          back. Extra replicas do not change that.
+      - id: c
+        label: Nothing, because eviction risk is not worth the saving
+        correct: false
+        rep: -5
+        consequence: >
+          Batch capacity costs several times what it needs to, for work that already retries.
+        explain: >
+          Avoiding spot entirely is a defensible conservative position and leaves a large saving
+          on the table for workloads designed to be restarted.
+      - id: d
+        label: The dispatch services overnight, when traffic is low
+        correct: false
+        rep: -7
+        consequence: >
+          The overnight window is when the batch runs and when a depot in another time zone is
+          busiest.
+        explain: >
+          Interruption tolerance is a property of the workload, not of the hour. A service with
+          an availability commitment has it at three in the morning too.
+  - id: c
+    type: knowledge
+    title: Where the boundary sits
+    speaker: Grace Mendoza
+    objectives: [AZ305-4.1.3]
+    intro: >
+      "One sentence," says Grace. "What does a managed Kubernetes service manage,
+      and what is still yours?"
+    question: What remains your responsibility on managed Kubernetes?
+    options:
+      - id: a
+        label: >
+          The nodes, the workloads and the upgrade decisions; the control plane is the
+          platform's
+        correct: true
+        rep: 6
+        explain: >
+          The managed service runs and scales the control plane. Node pools, node image and
+          Kubernetes version upgrades, workload configuration, networking choices and cluster
+          security posture remain yours, which is exactly the operational cost being weighed
+          against a serverless container platform.
+      - id: b
+        label: Only the workloads. Nodes and upgrades are handled by the platform.
+        correct: false
+        rep: -6
+        consequence: A cluster runs eleven months behind on node images because nobody believed it was theirs to upgrade.
+        explain: >
+          Automatic upgrade channels exist and are opt-in. Left alone, the cluster stays where it
+          is and eventually falls out of support.
+      - id: c
+        label: Everything, including the control plane, which is simply hosted for you
+        correct: false
+        rep: -5
+        consequence: Effort is budgeted for control plane operations the platform already performs.
+        explain: >
+          The control plane is genuinely managed, which is most of the reason to use the service
+          rather than building a cluster yourself.

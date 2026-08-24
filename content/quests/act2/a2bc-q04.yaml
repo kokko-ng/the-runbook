@@ -1,0 +1,191 @@
+id: a2bc-q04
+chapter: act2-continuity
+title: Documents and Streams
+summary: The manifests, the scans and the telemetry all need a continuity answer, and none of them is a database.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ305-3.2.3
+  - AZ305-3.1.4
+brief: >
+  Storage looks like the easy part of a continuity plan until somebody asks what
+  happens when a container is deleted rather than a region lost.
+debrief: >
+  Redundancy for the region, vaulted backup for the mistakes, and a document
+  store that stays readable when a region does not.
+encounters:
+  - id: a
+    type: design
+    title: Keeping documents readable
+    speaker: Grace Mendoza
+    objectives: [AZ305-3.2.3]
+    intro: >
+      "The tracking portal reads proof-of-delivery scans, and customers use it
+      during an outage more than at any other time," says Grace. "The manifests are
+      only read by legal, occasionally."
+
+
+      Scans are in a geo-redundant account today. Manifests are in a separate
+      geo-redundant account.
+    prompt: What do you change?
+    options:
+      - id: a
+        label: >
+          Make the scans read-access geo-redundant so the portal can read the secondary, and
+          leave the manifests as they are
+        correct: true
+        rep: 8
+        consequence: >
+          A regional incident leaves the portal serving scans from East Asia read-only, and
+          nobody pays for read access on documents legal look at four times a month.
+        explain: >
+          Read-access geo-redundant storage exposes a secondary endpoint that clients can read
+          during a primary outage, which is exactly what a read-heavy customer-facing workload
+          needs. Data that is not read during an incident gains nothing from the option and
+          costs more for it.
+        diagram:
+          - {op: set_detail, node: st-manifests, detail: "GRS, no secondary reads"}
+      - id: b
+        label: Make both accounts read-access geo-zone-redundant, as one standard
+        correct: false
+        rep: -6
+        consequence: >
+          Fifteen terabytes of manifests are held at the most expensive redundancy option for a
+          read pattern of four requests a month.
+        explain: >
+          Consistency of configuration is not worth much when the data sets have nothing in
+          common operationally. Choose per requirement.
+      - id: c
+        label: Add a second storage account in East Asia and copy the scans nightly
+        correct: false
+        rep: -7
+        consequence: >
+          The copy is up to a day behind, and the portal has to be taught which account to read
+          from.
+        explain: >
+          Geo-redundancy already replicates continuously. Rebuilding it with a nightly job is
+          more work and worse.
+      - id: d
+        label: Put a content delivery network in front of the scans so they are cached at the edge
+        correct: false
+        rep: -8
+        consequence: >
+          Customer documents are cached in edge locations worldwide, which the contracts
+          prohibit, and a cache miss during an outage still fails.
+        explain: >
+          Caching helps repeat reads of shared content. These are per-customer documents with a
+          locality requirement, and a cache is not a durability control.
+  - id: b
+    type: design
+    title: The container that gets deleted
+    speaker: Wei Lin Tan
+    objectives: [AZ305-3.1.4]
+    intro: >
+      "Redundancy copies whatever we do, including deleting things," says Wei Lin.
+      "Soft delete gives us a window. What covers a mistake that is noticed in
+      month four, or somebody with access deleting the account itself?"
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          Vaulted backup of the blob containers in a Backup vault, with a resource lock on the
+          account and immutability on the manifests
+        correct: true
+        rep: 9
+        consequence: >
+          The backup is in a separate vault with its own retention, and deleting the storage
+          account is refused by the lock.
+        explain: >
+          Operational backup keeps recovery points in the account itself, which is fast and does
+          not survive the account being deleted. Vaulted backup copies data into a Backup vault
+          under separate control, which is what survives a compromised or deleted account. Locks
+          and immutability stop the deletion happening in the first place.
+        diagram:
+          - {op: add_node, node: bkv-platform}
+          - {op: add_edge, edge: e2-bkv-lake}
+      - id: b
+        label: Extend blob soft delete to the maximum retention period
+        correct: false
+        rep: -6
+        consequence: >
+          A mistake found in month four is still outside the window, and deleting the account
+          takes the soft-deleted data with it.
+        explain: >
+          Soft delete is a short window inside the same account. It is a good first control and
+          it does not survive the account.
+      - id: c
+        label: Object replication to a second account owned by a different team
+        correct: false
+        rep: -5
+        consequence: >
+          A deletion in the source does not replicate, so old data survives, and the copy has no
+          point-in-time history.
+        explain: >
+          Replication gives a second copy under separate access, which has real value. It is not
+          a backup: there are no recovery points and no retention policy.
+      - id: d
+        label: A weekly AzCopy job to a second subscription
+        correct: false
+        rep: -7
+        consequence: >
+          A job nobody owns copies fifteen terabytes weekly and fails silently in month three.
+        explain: >
+          Hand-built copying has no catalog, no retention and no restore path. Vaulted backup
+          provides all three.
+  - id: c
+    type: design
+    title: The document store in two regions
+    speaker: Marek Sobczak
+    objectives: [AZ305-3.2.3]
+    intro: >
+      "Trailer telemetry is in Cosmos DB in Southeast Asia," says Marek. "If the
+      region goes, the dispatch screen has no positions at all, which is the screen
+      the control room stares at during exactly that kind of event."
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          Add East Asia as a second region with service-managed failover, keeping a single write
+          region
+        correct: true
+        rep: 8
+        consequence: >
+          Reads continue from East Asia during the rehearsal, and writes follow within the
+          platform's failover.
+        explain: >
+          Cosmos DB replicates a container to every region associated with the account. A second
+          read region keeps the dispatch screen alive during a regional problem, and
+          service-managed failover promotes it for writes without an application change.
+          Multi-region writes are a further step with conflict resolution to design.
+        diagram:
+          - {op: set_detail, node: cosmos-telemetry, detail: "Second region, service-managed failover"}
+      - id: b
+        label: Enable multi-region writes across both regions
+        correct: false
+        rep: -6
+        consequence: >
+          Conflict resolution has to be designed for a workload that has a single writer per
+          trailer anyway.
+        explain: >
+          Multi-region writes suit workloads with writers in several regions and bring conflict
+          handling with them. Here every write comes from one place.
+      - id: c
+        label: Take periodic backups of the container to storage in East Asia
+        correct: false
+        rep: -7
+        consequence: >
+          The dispatch screen is dark for as long as a restore takes, which is far longer than
+          the objective.
+        explain: >
+          Backups protect against data loss, not against a region being unavailable for a
+          read-heavy screen. Continuous replication is what keeps it readable.
+      - id: d
+        label: Cache the last known position of every trailer in Redis in East Asia
+        correct: false
+        rep: -8
+        consequence: >
+          The cache is warm for the trailers recently queried and empty for the rest, and there
+          is no durable store behind it in that region.
+        explain: >
+          A cache is not a replica. It has no completeness guarantee and no durability, which is
+          the opposite of what a continuity design needs.

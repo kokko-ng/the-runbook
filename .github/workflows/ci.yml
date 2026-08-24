@@ -32,7 +32,7 @@ jobs:
         working-directory: backend
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
-        run: python manage.py validate_content
+        run: python manage.py validate_content --require-all-chapters
       - name: Compile the content bundle
         working-directory: backend
         env:

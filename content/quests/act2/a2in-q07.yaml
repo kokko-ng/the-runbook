@@ -1,0 +1,180 @@
+id: a2in-q07
+chapter: act2-infrastructure
+title: The Migration Plan
+summary: Eighty-one servers in two data centers, an eighteen-month runway and a board that wants a wave plan.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ305-4.3.1
+  - AZ305-4.3.2
+  - AZ305-4.3.3
+brief: >
+  The migration chapter. Assessment first, waves second, and a target state per
+  workload rather than one strategy for eighty-one servers.
+debrief: >
+  A plan with dependencies in it, a target for each workload, and a first wave
+  chosen because it teaches something.
+encounters:
+  - id: a
+    type: design
+    title: Before anything moves
+    speaker: Grace Mendoza
+    objectives: [AZ305-4.3.2]
+    intro: >
+      "Eighty-one servers, two sites, and an inventory spreadsheet that was last
+      accurate in 2023," says Grace. "The board wants dates. I want to know what
+      is actually running, what talks to what, and what it costs to run in Azure
+      before I give them any."
+    prompt: What do you do first?
+    options:
+      - id: a
+        label: >
+          An Azure Migrate assessment with dependency analysis, producing readiness, sizing and
+          a cost estimate per server
+        correct: true
+        rep: 9
+        consequence: >
+          Six weeks later there are seventy-three servers that are actually running, eleven
+          dependency clusters, and a cost estimate the board can argue with.
+        explain: >
+          Assessment is the first step of any migration: discovery of what exists, readiness
+          checks for the target, right-sizing from observed utilization, and dependency analysis
+          so workloads move as groups rather than as servers. Dates without it are guesses.
+        diagram:
+          - {op: add_node, node: migrate-project}
+          - {op: add_edge, edge: e2-sf-migrate}
+      - id: b
+        label: Agree the wave plan with the business, then assess as each wave approaches
+        correct: false
+        rep: -7
+        consequence: >
+          Wave two discovers a dependency on a server scheduled for wave five, and the plan is
+          rebuilt.
+        explain: >
+          Dependencies decide the waves. Committing to an order before knowing them is how
+          migrations acquire their reputation.
+      - id: c
+        label: Start with a lift and shift of the least important servers to build experience
+        correct: false
+        rep: -5
+        consequence: >
+          Ten servers move successfully and teach the team nothing about the workloads that
+          matter.
+        explain: >
+          A first wave should build both confidence and knowledge. Choosing only trivial
+          workloads defers every real question, and it should still follow an assessment.
+      - id: d
+        label: Ask each application owner to describe their servers and dependencies
+        correct: false
+        rep: -6
+        consequence: >
+          Three owners answer, two have left, and one describes an architecture from before a
+          rewrite.
+        explain: >
+          Owner knowledge is valuable as a cross-check. It is not a substitute for measured
+          discovery, particularly across an acquisition.
+  - id: b
+    type: design
+    title: What each workload becomes
+    speaker: Dana Ong
+    objectives: [AZ305-4.3.3, AZ305-4.3.1]
+    intro: >
+      The assessment is in. The ERP cannot change. The warehouse system has an
+      active vendor and a supported platform version. Six internal web
+      applications are .NET on Windows with no special requirements. Fourteen
+      servers are running nothing anyone can identify.
+    prompt: What target do you recommend for each group?
+    options:
+      - id: a
+        label: >
+          Rehost the ERP, replatform the warehouse system and the web applications to managed
+          services, and retire the fourteen after confirming
+        correct: true
+        rep: 9
+        consequence: >
+          The board sees four numbers instead of eighty-one, and retiring the fourteen pays for
+          the first wave.
+        explain: >
+          The adoption framework's migration strategies exist so each workload gets the cheapest
+          adequate answer: rehost where nothing can change, replatform where a managed service
+          fits with modest effort, refactor where the payoff justifies it, and retire what
+          nobody uses. Retiring is usually the highest-value finding in an assessment.
+      - id: b
+        label: Rehost everything first, then modernize once it is all in Azure
+        correct: false
+        rep: -6
+        consequence: >
+          Eighty-one virtual machines arrive in Azure, and the modernization phase is deferred
+          indefinitely once the deadline passes.
+        explain: >
+          Rehost everything is fast and defensible when a data center lease is ending. It also
+          carries every operational cost forward, and the second phase competes with whatever
+          comes next.
+      - id: c
+        label: Refactor each application to cloud-native services as it moves
+        correct: false
+        rep: -8
+        consequence: >
+          The eighteen-month runway is consumed by three applications.
+        explain: >
+          Refactoring is the most expensive strategy per workload and is justified where the
+          business case is clear. Applying it uniformly is how migrations miss deadlines.
+      - id: d
+        label: Rehost the ERP and the warehouse system, and rewrite the six web applications
+        correct: false
+        rep: -5
+        consequence: >
+          Six rewrites run in parallel with the migration, staffed by the same people.
+        explain: >
+          Replatforming a standard .NET web application to App Service is usually days of work
+          rather than a rewrite. Reach for a rewrite when the application is the constraint.
+  - id: c
+    type: design
+    title: Choosing wave one
+    speaker: Grace Mendoza
+    objectives: [AZ305-4.3.1]
+    intro: >
+      "Give me a first wave," says Grace. "It has to prove the landing zone, the
+      network path and the cutover process, and it cannot stop trucks if it goes
+      wrong."
+    prompt: What goes in wave one?
+    options:
+      - id: a
+        label: >
+          A small, real workload with a genuine dependency and a business owner who will be
+          available on cutover day
+        correct: true
+        rep: 8
+        explain: >
+          The first wave is a rehearsal of the whole process: landing zone, connectivity,
+          identity, cutover, validation and rollback. It has to be real enough to exercise them
+          and small enough that a bad day is survivable.
+      - id: b
+        label: The fourteen unidentified servers, since nothing depends on them
+        correct: false
+        rep: -6
+        consequence: >
+          The wave proves that servers nobody uses can be moved, which nobody doubted.
+        explain: >
+          Those servers should be retired, not migrated. A wave that exercises nothing teaches
+          nothing.
+      - id: c
+        label: The ERP, since it is the hardest and the rest will be easier afterwards
+        correct: false
+        rep: -8
+        consequence: >
+          The hardest workload is attempted by a team that has never done a cutover, and the
+          program's credibility rides on it.
+        explain: >
+          Sequencing from hardest to easiest maximizes the chance that the first visible event
+          is a failure. Build the muscle on something smaller.
+      - id: d
+        label: A copy of a production workload, run in parallel without cutting over
+        correct: false
+        rep: -5
+        consequence: >
+          The pilot succeeds and the cutover process, which is the risky part, is still
+          untested.
+        explain: >
+          Parallel runs are useful for validating behavior. They deliberately avoid the step
+          that most needs rehearsing.

@@ -1,0 +1,178 @@
+id: a2in-q06
+chapter: act2-infrastructure
+title: Config and Deployments
+summary: Eleven services, four environments, and a feature flag that lives in three places.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ305-4.2.5
+  - AZ305-4.2.6
+brief: >
+  Where configuration lives and how code reaches production are the two decisions
+  the platform team lives with every day.
+debrief: >
+  One place for settings, one place for secrets, and a deployment path that can
+  be reversed without a heroic evening.
+encounters:
+  - id: a
+    type: design
+    title: Where settings live
+    speaker: Marek Sobczak
+    objectives: [AZ305-4.2.5]
+    intro: >
+      "Right now settings are in environment variables in the deployment
+      manifests, some are in a JSON file baked into the image, and the feature
+      flags are in a database table one service reads and the others do not," says
+      Marek. "Changing a flag means a deployment. Changing it consistently means
+      four."
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          Azure App Configuration for settings and feature flags, with secrets kept in Key Vault
+          and referenced from it
+        correct: true
+        rep: 9
+        consequence: >
+          A flag changes in one place and all eleven services see it, and no secret has moved
+          into the configuration store.
+        explain: >
+          App Configuration centralizes settings and feature flags with labels per environment,
+          point-in-time history and change notifications, and it references Key Vault for
+          secrets so the two concerns stay separated. Configuration that can be changed without
+          a deployment is what makes flags useful.
+        diagram:
+          - {op: add_node, node: appconfig}
+          - {op: add_edge, edge: e2-aks-config}
+      - id: b
+        label: Key Vault for everything, since it is already there and access is controlled
+        correct: false
+        rep: -6
+        consequence: >
+          Non-secret settings are stored at secret prices with secret access controls, and
+          feature flags have no structure at all.
+        explain: >
+          Key Vault is designed for secrets, with the throughput limits and access model that
+          implies. Ordinary configuration and flags belong in a configuration service.
+      - id: c
+        label: Keep configuration in the deployment manifests, which are already in source control
+        correct: false
+        rep: -5
+        consequence: >
+          Every flag change is a pull request and a deployment, which is what the requirement is
+          about.
+        explain: >
+          Manifests in source control are good practice for infrastructure and deployment. Runtime
+          configuration that has to change independently of a release needs somewhere else to
+          live.
+      - id: d
+        label: A configuration table in the transport database that every service reads
+        correct: false
+        rep: -7
+        consequence: >
+          Eleven services now depend on the dispatch database to start, and a database failover
+          takes the whole platform with it.
+        explain: >
+          Sharing a transactional database as a configuration store creates a dependency in the
+          wrong direction and puts start-up behind an operational system.
+  - id: b
+    type: design
+    title: Getting code to production
+    speaker: Grace Mendoza
+    objectives: [AZ305-4.2.6]
+    intro: >
+      "Deployments are a person running a pipeline and watching," says Grace.
+      "There is no way to reverse one except deploying the previous commit, and
+      the last rollback took forty minutes because the database migration had
+      already run."
+    prompt: What deployment approach do you recommend?
+    options:
+      - id: a
+        label: >
+          Environments promoted through a pipeline with approvals, and progressive delivery with
+          health checks and automatic rollback
+        correct: true
+        rep: 9
+        consequence: >
+          A bad release stops at five per cent of traffic and reverses itself, and the operator
+          reads about it afterwards.
+        explain: >
+          Automated deployment means the pipeline decides: promote through environments with
+          gates, roll out gradually while watching health signals, and reverse automatically when
+          they degrade. That is what turns rollback from an evening into a metric threshold.
+        diagram:
+          - {op: add_node, node: deploy-pipeline}
+          - {op: add_edge, edge: e2-deploy-aks}
+      - id: b
+        label: Blue-green deployments with a manual switch after verification
+        correct: false
+        rep: -5
+        consequence: >
+          It works well, at the cost of a full second environment per service and a person
+          deciding at every release.
+        explain: >
+          Blue-green is a strong pattern, particularly where a rollback must be instantaneous.
+          It costs double capacity during a release and still depends on someone judging the
+          verification.
+      - id: c
+        label: Deploy on merge to the main branch, straight to production
+        correct: false
+        rep: -8
+        consequence: >
+          The first bad merge reaches every customer at once, and the rollback problem is
+          unchanged.
+        explain: >
+          Continuous deployment without gates or progressive rollout removes the human and adds
+          nothing to catch a bad release.
+      - id: d
+        label: Keep the manual pipeline and add a documented rollback runbook
+        correct: false
+        rep: -6
+        consequence: >
+          The runbook is followed correctly at three in the morning and still takes forty
+          minutes, because the migration is the slow part.
+        explain: >
+          Documenting a slow process does not make it fast. The design question is how to
+          detect and reverse automatically, and how to make migrations reversible.
+  - id: c
+    type: design
+    title: The migration that cannot be reversed
+    speaker: Wei Lin Tan
+    objectives: [AZ305-4.2.6]
+    intro: >
+      "You have said rollback is automatic," says Wei Lin. "The last incident
+      could not be rolled back because the release included a schema change that
+      dropped a column. What does the design say about that?"
+    prompt: How do you handle database changes in an automated deployment?
+    options:
+      - id: a
+        label: >
+          Backward-compatible migrations released ahead of the code, with destructive changes
+          deferred to a later release
+        correct: true
+        rep: 8
+        explain: >
+          The expand and contract pattern: add the new structure, deploy code that works with
+          both, then remove the old structure in a later release once no running version needs
+          it. That keeps every individual release reversible, which is what makes automatic
+          rollback possible at all.
+      - id: b
+        label: Take a database backup before each release and restore it on rollback
+        correct: false
+        rep: -8
+        consequence: >
+          Restoring loses every transaction since the release, which during business hours is
+          thousands of shipments.
+        explain: >
+          Restoring a production database as a rollback mechanism discards real data. It is a
+          last resort, not a deployment step.
+      - id: c
+        label: Run migrations manually before the release, so they are separated from the code
+        correct: false
+        rep: -6
+        consequence: >
+          The manual step drifts from the code, and one environment ends up a migration behind.
+        explain: >
+          Separating them in time is right; making the separation manual reintroduces the human
+          error the pipeline was removing. The pattern is about compatibility, not about who
+          runs it.

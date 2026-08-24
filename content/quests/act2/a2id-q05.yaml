@@ -1,0 +1,204 @@
+id: a2id-q05
+chapter: act2-identity
+title: One Workspace or Five
+summary: Fourteen subscriptions, two security teams and a logging bill that nobody has forecast.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ305-1.1.1
+  - AZ305-1.1.2
+  - AZ305-1.1.3
+brief: >
+  Logging design is where architecture meets the invoice. Get the shape wrong and
+  it is expensive to change and expensive to keep.
+debrief: >
+  A platform workspace for security, workload workspaces for teams, routing that
+  reflects who needs what, and monitoring that answers the questions users ask.
+encounters:
+  - id: a
+    type: design
+    title: How many workspaces
+    speaker: Grace Mendoza
+    objectives: [AZ305-1.1.1]
+    intro: >
+      "Security want everything in one place with two years of retention," says
+      Grace. "The transport team want their application logs queryable without a
+      ticket, and they change their diagnostic settings weekly. Straits will be a
+      third party in the estate for a year, and their data has to stay separable."
+
+
+      "There is no single right answer here, which is why it is worth arguing
+      about."
+    prompt: What logging topology do you recommend?
+    options:
+      - id: a
+        label: >
+          A central platform workspace for security and platform logs, plus a workspace per
+          workload team, with resource-context access for developers
+        correct: true
+        rep: 9
+        consequence: >
+          Security get their two years in one place, the transport team stop raising access
+          tickets, and Straits data sits in its own workspace until the merger completes.
+        explain: >
+          A single workspace is simplest and makes everything visible to everyone with access;
+          one per team gives isolation and fragments correlation. The common answer is both: a
+          platform workspace for security and platform sources, workload workspaces for teams,
+          and resource-context access so engineers see the logs for resources they own without
+          workspace-wide permission.
+        diagram:
+          - {op: add_node, node: law-platform}
+          - {op: add_node, node: law-workload}
+      - id: b
+        label: One workspace for everything, with role-based access to control who sees what
+        correct: false
+        rep: -6
+        consequence: >
+          Retention is two years for application debug logs as well as security data, and the
+          bill reflects it.
+        explain: >
+          A single workspace is a defensible choice for smaller estates and it forces one
+          retention and one cost center across very different data. At fourteen subscriptions
+          with a third party in the mix, that becomes the constraint.
+      - id: c
+        label: A workspace per subscription, so ownership and cost follow the subscription
+        correct: false
+        rep: -7
+        consequence: >
+          A security investigation spanning six subscriptions becomes six queries and a
+          spreadsheet.
+        explain: >
+          Per-subscription workspaces fragment exactly the data that most needs to be
+          correlated. Cost attribution is solvable with tags and workspace-level charges.
+      - id: d
+        label: Everything to a storage account, with queries run against exports as needed
+        correct: false
+        rep: -8
+        consequence: >
+          The first real investigation takes two days to answer a question a query would have
+          answered in a minute.
+        explain: >
+          Storage is the right destination for long, cold retention. It is not where you
+          investigate, and security monitoring needs interactive queries.
+  - id: b
+    type: design
+    title: Where each stream goes
+    speaker: Wei Lin Tan
+    objectives: [AZ305-1.1.2]
+    intro: >
+      Four streams need a destination.
+
+
+      Sign-in and audit logs from Entra. Activity logs from every subscription.
+      Application telemetry from the dispatch service. And the customer's
+      requirement that certain access records are retained for seven years and
+      provided to their security operations center on request.
+    prompt: How do you route them?
+    options:
+      - id: a
+        label: >
+          Diagnostic settings to the platform workspace for the first two, the workload
+          workspace for telemetry, and an event hub for the customer's center with archive to
+          storage for seven years
+        correct: true
+        rep: 9
+        consequence: >
+          Each stream lands where it is used, and the customer's operations center receives a
+          feed rather than a monthly export.
+        explain: >
+          A diagnostic setting can send to several destinations at once: a workspace for
+          interactive analysis, storage for cheap long retention, and an event hub for
+          streaming to a third-party system. Choosing per stream is what keeps the workspace
+          bill proportional to what people actually query.
+        diagram:
+          - {op: add_node, node: eventhub-logs}
+          - {op: add_node, node: st-logs-archive}
+          - {op: add_edge, edge: e2-law-eventhub}
+          - {op: add_edge, edge: e2-law-archive}
+      - id: b
+        label: Everything to the platform workspace, with exports generated when the customer asks
+        correct: false
+        rep: -6
+        consequence: >
+          Each customer request becomes a piece of work, and seven-year retention in the
+          workspace is expensive.
+        explain: >
+          Workspace retention beyond the interactive period is cheaper than it used to be and
+          still costs more than storage, and a manual export is a recurring task with a
+          deadline attached.
+      - id: c
+        label: Everything to an event hub, and let each consumer take what it needs
+        correct: false
+        rep: -7
+        consequence: >
+          Meridian builds and operates the consumers, the retention and the query layer that
+          the platform already provides.
+        explain: >
+          Event hubs are for streaming to systems that want a feed. Making them the primary
+          destination means rebuilding the workspace's storage and query capabilities
+          yourself.
+      - id: d
+        label: Agents on each machine writing to the workspace, and no diagnostic settings
+        correct: false
+        rep: -8
+        consequence: >
+          Platform sources such as sign-in logs and activity logs never arrive, because no
+          agent can collect them.
+        explain: >
+          Agents collect from inside a machine. Platform and resource logs come from diagnostic
+          settings, and both are needed.
+  - id: c
+    type: design
+    title: Monitoring the thing users feel
+    speaker: Dana Ong
+    objectives: [AZ305-1.1.3]
+    intro: >
+      "Every dashboard we have is green while the depots tell me the dispatch
+      screen is slow," says Dana. "I want to know what the depot experiences, not
+      what the virtual machines think of themselves."
+    prompt: What monitoring do you recommend?
+    options:
+      - id: a
+        label: >
+          Application Insights in the dispatch service for real user telemetry, with
+          availability tests and alerts on the metrics users feel
+        correct: true
+        rep: 9
+        consequence: >
+          The next slow morning shows a ninety-fifth percentile page load of eleven seconds
+          from Johor while every host metric is unremarkable.
+        explain: >
+          Infrastructure metrics tell you a resource is healthy. Application performance
+          monitoring measures request duration, dependency latency and failures as the user
+          experiences them, and availability tests measure it from outside. Alerting on those
+          is what makes a dashboard mean something.
+        diagram:
+          - {op: add_node, node: appinsights-portal}
+          - {op: add_edge, edge: e2-appinsights}
+      - id: b
+        label: More infrastructure alerts, covering processor, memory and disk on every machine
+        correct: false
+        rep: -6
+        consequence: >
+          The estate is comprehensively monitored and the depot experience is still invisible.
+        explain: >
+          Resource metrics are necessary and are a proxy. When the proxy and the experience
+          disagree, as they do here, only the experience is worth alerting on.
+      - id: c
+        label: A synthetic test that loads the site every five minutes from one location
+        correct: false
+        rep: -5
+        consequence: >
+          The test passes from Singapore while Johor is slow, which is the report Dana already
+          has.
+        explain: >
+            Availability tests are valuable and are one probe from one place. Real user
+            telemetry is what shows a per-region distribution.
+      - id: d
+        label: A monthly report of application errors from the workspace
+        correct: false
+        rep: -7
+        consequence: >
+          Slow mornings are still discovered by the depots phoning in.
+        explain: >
+          Reporting is not monitoring. The requirement is to know while it is happening.

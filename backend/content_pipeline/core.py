@@ -291,6 +291,11 @@ BRITISH_SPELLINGS = {
     "modelling": "modeling",
     "programme": "program",
     "metres": "meters",
+    "metre": "meter",
+    "kilometres": "kilometers",
+    "kilometre": "kilometer",
+    "litres": "liters",
+    "litre": "liter",
     "sceptical": "skeptical",
     "grey": "gray",
     "fibre": "fiber",
@@ -391,8 +396,10 @@ def check_prose(text: str, where: str) -> list[Problem]:
             )
         elif _is_emoji(char):
             problems.append(Problem(where, f"contains the non-text character {char!r}"))
-    lowered = re.findall(r"[a-z']+", text.lower())
-    for word in set(lowered):
+    # Strip possessives so "programme's" is caught the same as "programme".
+    lowered = {word.rstrip("'s").rstrip("'") for word in re.findall(r"[a-z']+", text.lower())}
+    lowered |= set(re.findall(r"[a-z]+", text.lower()))
+    for word in lowered:
         if word in BRITISH_SPELLINGS:
             problems.append(
                 Problem(where, f"en-GB spelling {word!r}; Azure docs use {BRITISH_SPELLINGS[word]!r}")

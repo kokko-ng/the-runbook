@@ -1,0 +1,174 @@
+id: a2bc-q02
+chapter: act2-continuity
+title: Keeping the Fleet Alive
+summary: The dispatch service has to survive a rack, a zone and a region, and each one costs more than the last.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ305-3.2.1
+brief: >
+  High availability for compute, decided per failure domain rather than as a
+  single word on a slide.
+debrief: >
+  Zone redundancy where it is nearly free, a second region where the objective
+  demands it, and nothing paid for twice.
+encounters:
+  - id: a
+    type: design
+    title: Surviving a zone
+    speaker: Grace Mendoza
+    objectives: [AZ305-3.2.1]
+    intro: >
+      Dispatch runs on a Kubernetes cluster in Southeast Asia. Today it has one
+      node pool, in one zone, with three nodes.
+
+
+      "One hour recovery time," says Grace. "Start with the cheapest failure to
+      survive and work outwards."
+    prompt: What do you change first?
+    options:
+      - id: a
+        label: >
+          Spread the node pool across three availability zones and require pods to spread
+          across them
+        correct: true
+        rep: 8
+        consequence: >
+          A zone maintenance event three months later removes a third of the nodes and nobody
+          notices.
+        explain: >
+          Zone redundancy inside a region is the cheapest large improvement available: separate
+          power, cooling and network for a small increase in inter-zone traffic. A node pool
+          across zones plus topology spread constraints is what makes the workload survive
+          losing one.
+        diagram:
+          - {op: add_node, node: aks-transport}
+          - {op: set_detail, node: aks-transport, detail: "Three zones, spread constraints"}
+      - id: b
+        label: Add a second cluster in East Asia and load balance between them
+        correct: false
+        rep: -6
+        consequence: >
+          The most expensive option is bought first, and the cluster still loses a third of its
+          capacity to a single zone event.
+        explain: >
+          Multi-region is the answer to losing a region and costs a full second environment.
+          Zone redundancy inside the region is a fraction of the price and addresses the more
+          common failure.
+      - id: c
+        label: Increase the node count from three to six in the same zone
+        correct: false
+        rep: -7
+        consequence: >
+          Capacity doubles and a zone failure still takes the entire cluster.
+        explain: >
+          More instances in one failure domain do not survive that domain failing. Placement is
+          the property that matters.
+      - id: d
+        label: Enable the cluster autoscaler so capacity recovers automatically after a failure
+        correct: false
+        rep: -5
+        consequence: >
+          The autoscaler tries to add nodes in a zone that is unavailable.
+        explain: >
+          Autoscaling handles load and node loss within a healthy region. It cannot place nodes
+          in a zone that is down.
+  - id: b
+    type: design
+    title: Surviving a region
+    speaker: Dana Ong
+    objectives: [AZ305-3.2.1]
+    intro: >
+      "The board's question is what happens if Southeast Asia is unavailable for a
+      day," says Dana. "Dispatch has an hour. I need to know what we are proposing
+      and what it costs, not a diagram with two clouds on it."
+    prompt: What do you propose for regional failure?
+    options:
+      - id: a
+        label: >
+          A smaller cluster in East Asia kept current by the deployment pipeline, with a global
+          load balancer failing over on health, scaled up on activation
+        correct: true
+        rep: 9
+        consequence: >
+          The second region costs about a fifth of the primary at rest and reaches full size in
+          minutes when it is used.
+        explain: >
+          Warm standby meets a one-hour objective without paying for a full second environment:
+          the platform and the deployment path stay current, capacity is minimal until needed,
+          and a global load balancer with health probes moves traffic. Cold standby cannot meet
+          an hour; full active-active costs twice and is only justified when the objective or
+          the load demands it.
+        diagram:
+          - {op: add_node, node: aks-secondary}
+          - {op: add_node, node: front-door}
+          - {op: add_edge, edge: e2-aks-secondary}
+          - {op: add_edge, edge: e2-internet-fd}
+      - id: b
+        label: Active-active across both regions, with traffic split evenly
+        correct: false
+        rep: -6
+        consequence: >
+          The bill doubles, and the database write path still lives in one region, so half the
+          traffic crosses regions on every write.
+        explain: >
+          Active-active is the strongest answer and the most expensive, and it forces the data
+          tier to be genuinely multi-region, which is a much larger change. It is justified by
+          load or by a near-zero objective, neither of which applies.
+      - id: c
+        label: Site Recovery replication of the cluster nodes to East Asia
+        correct: false
+        rep: -8
+        consequence: >
+          Replicated nodes come up out of step with the cluster control plane and the cluster
+          does not form.
+        explain: >
+          Kubernetes nodes are cattle managed by the platform. Recovering a cluster means
+          deploying it and its workloads, not replicating its virtual machines.
+      - id: d
+        label: Rely on the platform's own regional redundancy, since it is a managed service
+        correct: false
+        rep: -9
+        consequence: >
+          The board is told the workload survives a region loss, and it does not.
+        explain: >
+          Managed services are regional unless the design makes them otherwise. Nothing about
+          a managed cluster spans regions on its own.
+  - id: c
+    type: knowledge
+    title: What the load balancer decides
+    speaker: Grace Mendoza
+    objectives: [AZ305-3.2.1]
+    intro: >
+      "You have proposed a global load balancer in front of two regions," says
+      Grace. "Somebody will ask why not Traffic Manager, or why not a regional load
+      balancer. Be precise."
+    question: What distinguishes these load balancing choices?
+    options:
+      - id: a
+        label: >
+          Front Door is a global layer seven service with caching and web application firewall;
+          Traffic Manager is DNS-based global routing; Load Balancer is regional layer four
+        correct: true
+        rep: 6
+        explain: >
+          Front Door terminates and routes HTTP traffic globally at the edge, with failover in
+          seconds, caching and a web application firewall. Traffic Manager routes by DNS, so
+          failover waits for time to live and it cannot inspect requests. Load Balancer is a
+          regional layer four service and does not span regions at all.
+      - id: b
+        label: They are interchangeable for web traffic; the difference is only pricing
+        correct: false
+        rep: -6
+        consequence: DNS-based failover is proposed for a one-hour objective and adds a caching delay nobody accounted for.
+        explain: >
+          The failover behavior differs materially. DNS-based routing depends on resolver
+          caching, which can leave clients pointed at a dead region for minutes.
+      - id: c
+        label: Traffic Manager is the only one that supports multiple regions
+        correct: false
+        rep: -5
+        consequence: A design excludes a service that would have handled both routing and the web application firewall.
+        explain: >
+          Front Door is global by design. Traffic Manager is one way to do global routing, not
+          the only one.

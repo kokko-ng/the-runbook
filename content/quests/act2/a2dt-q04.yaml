@@ -1,0 +1,177 @@
+id: a2dt-q04
+chapter: act2-data
+title: The Cost of Keeping Everything
+summary: Seven years of manifests, ten years of telemetry, and a finance director who has done the arithmetic.
+variant: core
+estimated_minutes: 14
+objectives:
+  - AZ305-2.2.3
+  - AZ305-2.2.4
+brief: >
+  Retention requirements and storage prices meet in a room, and somebody has to
+  leave with a number.
+debrief: >
+  A tiering plan with the read pattern behind it, and durability chosen from what
+  each data set is worth rather than from the same default everywhere.
+encounters:
+  - id: a
+    type: design
+    title: Three data sets, three answers
+    speaker: Priya Raghunathan
+    objectives: [AZ305-2.2.3]
+    intro: >
+      Priya has the projections. Manifests: fourteen terabytes now, growing by
+      about one a year, read four times a month, kept seven years. Telemetry
+      history: nine terabytes a year, queried by analytics monthly for the last
+      three months and almost never beyond that. Proof-of-delivery scans: already
+      tiered, and the model works.
+
+
+      "Do not tell me it depends," she says. "Tell me what each one costs and
+      why."
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          Manifests to cool then archive by age, telemetry history to cool with the last three
+          months hot, and the existing scan policy left alone
+        correct: true
+        rep: 8
+        consequence: >
+          The projection drops by roughly two thirds against keeping everything hot, and Priya
+          signs it with one question about rehydration time.
+        explain: >
+          Balancing features, performance and cost means matching each data set's read pattern
+          to a tier: rarely read documents belong in cool and then archive, an analytical window
+          belongs hot for the window and cool afterwards, and a policy that already works should
+          not be reopened.
+        diagram:
+          - {op: set_detail, node: st-manifests, detail: "Cool at 30 days, archive at 1 year"}
+      - id: b
+        label: Everything to the archive tier, since almost nothing is read
+        correct: false
+        rep: -7
+        consequence: >
+          The monthly analytics run rehydrates three months of telemetry every month, which
+          costs more than keeping it hot.
+        explain: >
+          Archive charges heavily for reads and rehydration takes hours. Data with a known,
+          regular read pattern does not belong there.
+      - id: c
+        label: Everything hot, and revisit when the volume becomes a problem
+        correct: false
+        rep: -8
+        consequence: >
+          The storage line grows every month and the conversation happens anyway, with more
+          data to move.
+        explain: >
+          Tiering later is more work than tiering now, because the lifecycle rules have to be
+          applied to a larger estate and the saving was available all along.
+      - id: d
+        label: Compress the manifests and telemetry before storing them
+        correct: false
+        rep: -5
+        consequence: >
+          PDF files compress by about four per cent, and the telemetry is already compact
+          JSON.
+        explain: >
+          Compression is worth considering for text-heavy raw data. For already-compressed
+          documents it buys almost nothing and costs processing on every read.
+  - id: b
+    type: design
+    title: What must never be lost
+    speaker: Wei Lin Tan
+    objectives: [AZ305-2.2.4]
+    intro: >
+      "Three data sets, three different consequences if we lose them," says Wei
+      Lin. "The manifests are a contractual obligation. Telemetry history is
+      useful and reproducible from nothing. Proof-of-delivery scans are the ones
+      customers sue about."
+
+
+      "The regulator's other question is whether a manifest can be altered after
+      the fact."
+    prompt: What durability and protection do you recommend?
+    options:
+      - id: a
+        label: >
+          Geo-redundant storage with versioning and an immutability policy for manifests and
+          scans, and locally or zone-redundant storage for telemetry history
+        correct: true
+        rep: 9
+        consequence: >
+          The immutability policy is set to seven years with legal hold available, and the
+          telemetry bill halves against the same redundancy as the manifests.
+        explain: >
+          Durability is a per-data-set decision. Contractual documents need a copy outside the
+          region, versioning to survive an overwrite and an immutability policy so they cannot
+          be altered or deleted within the retention period. Reproducible telemetry does not
+          need any of that, and paying for it everywhere is how storage bills grow.
+        diagram:
+          - {op: add_node, node: st-grs-manifests}
+          - {op: add_edge, edge: e2-st-grs}
+      - id: b
+        label: Geo-zone-redundant storage for all three, as a single standard
+        correct: false
+        rep: -6
+        consequence: >
+          Nine terabytes a year of reproducible telemetry is stored at the most durable and
+          most expensive setting available.
+        explain: >
+          One standard is simple to administer and pays the highest price for the least
+          valuable data. Durability should follow consequence.
+      - id: c
+        label: Locally redundant storage with a nightly copy to a second account in another region
+        correct: false
+        rep: -7
+        consequence: >
+          The copy job becomes a system to maintain, and the immutability requirement is
+          unaddressed.
+        explain: >
+          Hand-built replication reimplements geo-redundancy less reliably, and it does not
+          answer whether a document can be altered after the fact.
+      - id: d
+        label: Geo-redundant storage with soft delete, which covers accidental deletion
+        correct: false
+        rep: -5
+        consequence: >
+          A manifest is overwritten rather than deleted, and the regulator's question about
+          alteration has no answer.
+        explain: >
+          Soft delete handles deletion within a window. Versioning handles overwrites, and
+          immutability is what prevents alteration at all.
+  - id: c
+    type: knowledge
+    title: Immutable and unavailable
+    speaker: Grace Mendoza
+    objectives: [AZ305-2.2.4]
+    intro: >
+      "Somebody in the review will ask whether a time-based retention policy can
+      be shortened if we get it wrong," says Grace. "Know the answer before you
+      propose it."
+    question: What can be changed about a locked time-based immutability policy?
+    options:
+      - id: a
+        label: The retention interval can be extended but never reduced, and the policy cannot be removed
+        correct: true
+        rep: 6
+        explain: >
+          A time-based retention policy can be created unlocked for testing, and once locked it
+          can only be extended. That is what makes it acceptable as a regulatory control, and
+          it is also why the interval has to be right before locking.
+      - id: b
+        label: Nothing. A locked policy is fixed for its whole duration.
+        correct: false
+        rep: -5
+        consequence: A retention period is set too short because nobody realized it could be extended later.
+        explain: >
+          Extension is permitted, up to the service limit. Only shortening and removal are
+          prohibited.
+      - id: c
+        label: It can be reduced with an audit record, since the account owner keeps control
+        correct: false
+        rep: -6
+        consequence: A compliance answer is given that the control does not support, and the audit finds it.
+        explain: >
+          If it could be reduced by the owner it would not be a compliance control. That is the
+          whole point of locking it.

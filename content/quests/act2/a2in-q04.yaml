@@ -1,0 +1,177 @@
+id: a2in-q04
+chapter: act2-infrastructure
+title: Loosely Coupled
+summary: The dispatch platform calls six services synchronously, and when one is slow everything is.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ305-4.2.1
+  - AZ305-4.2.2
+brief: >
+  The application architecture review. Two patterns that look similar on a
+  whiteboard and behave nothing alike in an incident.
+debrief: >
+  Commands on a queue, facts on a topic, and a dispatch service that no longer
+  falls over because customs are slow.
+encounters:
+  - id: a
+    type: design
+    title: The call that blocks
+    speaker: Grace Mendoza
+    objectives: [AZ305-4.2.1]
+    intro: >
+      "When a shipment is booked, dispatch calls the pricing service, the customs
+      service and the label generator, in order, and waits," says Grace. "Customs
+      took eleven seconds last Tuesday and dispatch queued up behind it."
+
+
+      Label generation can happen minutes later. Pricing must complete before the
+      booking is confirmed. Customs must happen exactly once per shipment and must
+      not be lost.
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          Keep pricing synchronous, and put customs and label generation on a queue with
+          at-least-once delivery and idempotent handlers
+        correct: true
+        rep: 9
+        consequence: >
+          Booking latency drops to the pricing call alone, and a slow customs service becomes a
+          longer queue rather than an outage.
+        explain: >
+          Asynchronous messaging decouples the caller from the handler's availability and speed.
+          A queue with delivery guarantees suits commands that must happen exactly once, with
+          idempotent handlers because at-least-once delivery means duplicates. Work whose result
+          the caller genuinely needs stays synchronous.
+        diagram:
+          - {op: add_node, node: servicebus-orders}
+          - {op: add_edge, edge: e2-aca-sb}
+      - id: b
+        label: Put all three on queues, so nothing blocks
+        correct: false
+        rep: -6
+        consequence: >
+          The booking is confirmed before it is priced, and two customers are quoted a price
+          that changes afterwards.
+        explain: >
+          Asynchronous is not free: it changes what the user is told and when. Work whose result
+          the response depends on has to stay in the request.
+      - id: c
+        label: Call the three services in parallel and wait for all of them
+        correct: false
+        rep: -5
+        consequence: >
+          Booking latency becomes the slowest of the three instead of the sum, and an unavailable
+          customs service still fails the booking.
+        explain: >
+          Parallelism helps latency and does not decouple availability. The eleven-second customs
+          call still blocks the booking.
+      - id: d
+        label: Add retries with exponential backoff to the synchronous calls
+        correct: false
+        rep: -7
+        consequence: >
+          A slow customs service is now called repeatedly by a caller that is already waiting,
+          which makes it slower.
+        explain: >
+          Retrying inside a blocking call amplifies load on the struggling dependency. Retry
+          belongs on the consumer side of a queue, where the caller is not waiting.
+  - id: b
+    type: design
+    title: Telling everyone something happened
+    speaker: Marek Sobczak
+    objectives: [AZ305-4.2.2]
+    intro: >
+      "When a shipment is delivered, four things want to know," says Marek.
+      "Billing, the customer notification service, analytics, and now the Straits
+      warehouse system. Today dispatch calls each of them, and adding the fifth
+      means changing dispatch again."
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          Publish a delivery event to Event Grid and let each interested service subscribe
+        correct: true
+        rep: 9
+        consequence: >
+          The Straits system subscribes without a change to dispatch, and analytics adds a
+          second subscriber the following month.
+        explain: >
+          Event-driven publish and subscribe inverts the dependency: the publisher announces a
+          fact and knows nothing about the consumers. Adding a consumer is a subscription rather
+          than a change to the producer, which is the property being asked for.
+        diagram:
+          - {op: add_node, node: eventgrid-events}
+          - {op: add_edge, edge: e2-func-eg}
+      - id: b
+        label: A single queue that all four services read from
+        correct: false
+        rep: -7
+        consequence: >
+          The first service to read a message removes it, and the other three never see it.
+        explain: >
+          A queue delivers each message to one consumer. Broadcasting to several needs a topic
+          with subscriptions or an event service.
+      - id: c
+        label: A Service Bus topic with a subscription per service
+        correct: false
+        rep: -5
+        consequence: >
+          It works well, and it is a heavier tool than the requirement needs for simple fact
+          notifications.
+        explain: >
+          This is a genuinely good answer: topics give ordering, sessions, dead-lettering and
+          transactions. Event Grid is lighter, cheaper for high-volume discrete events and has
+          the platform integrations. Either can be defended; the distinction is the delivery
+          guarantees each workload needs.
+      - id: d
+        label: Have each service poll the shipment database for changes
+        correct: false
+        rep: -8
+        consequence: >
+          Four services poll a production database every few seconds forever, and the events
+          arrive late.
+        explain: >
+          Polling couples every consumer to the producer's data store and adds constant load for
+          latency nobody wanted.
+  - id: c
+    type: design
+    title: The message that fails forever
+    speaker: Wei Lin Tan
+    objectives: [AZ305-4.2.1]
+    intro: >
+      "One customs message has failed nineteen thousand times since Tuesday," says
+      Wei Lin. "The handler throws, the message returns to the queue, and it tries
+      again. Nobody noticed until the metrics did."
+    prompt: What does the design need?
+    options:
+      - id: a
+        label: >
+          A dead-letter queue with a maximum delivery count, and an alert on dead-lettered
+          messages
+        correct: true
+        rep: 8
+        explain: >
+          A poison message is a permanent failure that retrying cannot fix. Moving it to a
+          dead-letter queue after a delivery limit keeps the main queue flowing, preserves the
+          message for inspection, and gives something concrete to alert on.
+      - id: b
+        label: Discard messages that fail more than ten times
+        correct: false
+        rep: -8
+        consequence: >
+          A shipment's customs declaration is silently lost, which is a regulatory problem
+          rather than an operational one.
+        explain: >
+          Discarding removes the symptom and the evidence. Dead-lettering keeps the message.
+      - id: c
+        label: Increase the retry interval so the failures are less frequent
+        correct: false
+        rep: -6
+        consequence: >
+          The message fails every ten minutes instead of every second, forever, and still blocks
+          nothing anybody watches.
+        explain: >
+          Backoff is worth having for transient failures. A permanent failure needs somewhere to
+          go and someone to be told.

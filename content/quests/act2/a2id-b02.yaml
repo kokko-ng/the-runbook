@@ -1,0 +1,160 @@
+id: a2id-b02
+chapter: act2-identity
+title: The Landing Zone Diagram, Exam Hard
+summary: The hierarchy is agreed. Now somebody has to say how it is deployed, exempted and kept true.
+variant: bonus
+bonus_of: a2id-q04
+estimated_minutes: 11
+objectives:
+  - AZ305-1.3.1
+  - AZ305-1.3.2
+brief: >
+  Governance at scale is a set of choices between tools that overlap. The exam
+  cares about which one fits which sentence.
+debrief: >
+  Policy for state, initiatives for grouping, exemptions with an expiry, and a
+  deployment mechanism that does not depend on anyone's memory.
+encounters:
+  - id: a
+    type: design
+    title: Making a new subscription arrive governed
+    speaker: Grace Mendoza
+    objectives: [AZ305-1.3.1]
+    intro: >
+      "Fourteen subscriptions, arriving over a year, requested by teams who will
+      not read our documentation," says Grace. "Each one needs the initiative, a
+      budget, diagnostic settings to the platform workspace and a network
+      connected to the hub."
+
+
+      "Describe the mechanism, not the wish."
+    prompt: How does a new subscription arrive already governed?
+    options:
+      - id: a
+        label: >
+          Place it in the landing zones management group, where the initiative applies, and
+          have the deploy-if-not-exists effects configure diagnostics and the rest
+        correct: true
+        rep: 9
+        consequence: >
+          The analytics subscription is created on a Tuesday and has its diagnostic settings,
+          budget and policy set by Wednesday morning without anyone touching it.
+        explain: >
+          Inheritance does the assignment and deploy-if-not-exists effects do the configuring:
+          the policy detects a resource that lacks a setting and deploys it, with a managed
+          identity and a remediation task for anything that already exists. That is the
+          difference between governance that describes a state and governance that reaches it.
+      - id: b
+        label: A runbook that the platform team follows whenever a subscription is created
+        correct: false
+        rep: -7
+        consequence: >
+          Subscription nine is created during a busy week and misses two of the four steps.
+        explain: >
+          Any process that depends on a person doing four things in order will eventually
+          produce a subscription that had three of them.
+      - id: c
+        label: A deployment template run against each new subscription by the requesting team
+        correct: false
+        rep: -6
+        consequence: >
+          Teams run it once and never again, and drift is invisible until an audit.
+        explain: >
+          Templates deploy a state and do not maintain it. Policy evaluates continuously, which
+          is what catches the setting somebody turned off in March.
+      - id: d
+        label: Require every subscription request to go through a change board
+        correct: false
+        rep: -5
+        consequence: >
+          Subscriptions take three weeks to arrive and teams start deploying into whichever
+          one they already have.
+        explain: >
+          Process without automation slows delivery and does not guarantee the outcome.
+          Approval and automated configuration are not alternatives.
+  - id: b
+    type: design
+    title: The exception the business needs
+    speaker: Wei Lin Tan
+    objectives: [AZ305-1.3.2]
+    intro: >
+      The analytics team need a virtual machine size that the allowed-sizes policy
+      forbids, for a nine-week proof of concept with a named business sponsor and
+      a budget.
+    prompt: How do you handle it?
+    options:
+      - id: a
+        label: >
+          A policy exemption scoped to that resource group, with a waiver category, an expiry
+          date and the sponsor recorded
+        correct: true
+        rep: 8
+        explain: >
+          Exemptions exist for exactly this: a scoped, documented, expiring carve-out that
+          remains visible in the compliance view as an exemption rather than as a failure.
+          Expiry is what stops a nine-week exception becoming a permanent one.
+      - id: b
+        label: Add the size to the allowed list, since the business has approved it
+        correct: false
+        rep: -7
+        consequence: >
+          The size is permitted estate-wide for everyone, forever, because of one proof of
+          concept.
+        explain: >
+          Changing the policy changes the rule for everybody. An exemption changes it for one
+          scope and says when it ends.
+      - id: c
+        label: Move the analytics workload to the sandbox management group for the duration
+        correct: false
+        rep: -6
+        consequence: >
+          The proof of concept runs without the security baseline that applies to landing
+          zones, on data that came from production.
+        explain: >
+          Sandboxes are deliberately less governed and are for work with no production data.
+          Moving a workload to escape one policy discards all the others.
+      - id: d
+        label: Set the policy to audit instead of deny while the proof of concept runs
+        correct: false
+        rep: -8
+        consequence: >
+          Every team can deploy any size for nine weeks, and two of them do.
+        explain: >
+          Weakening the effect removes enforcement everywhere the policy applies. Exemptions
+          are scoped; effects are not.
+  - id: c
+    type: knowledge
+    title: Initiative or policy
+    speaker: Grace Mendoza
+    objectives: [AZ305-1.3.2]
+    intro: >
+      "Somebody in the review will ask why we are assigning an initiative rather
+      than thirty policies," says Grace. "Answer in one sentence, then in three."
+    question: What does grouping policies into an initiative give you?
+    options:
+      - id: a
+        label: >
+          One assignment, one set of parameters and one compliance result for a set of related
+          rules
+        correct: true
+        rep: 6
+        explain: >
+          An initiative is a set of policy definitions assigned together, with shared
+          parameters and a single compliance view. It is how regulatory standards are expressed
+          and how a platform baseline stays manageable when it grows from three rules to
+          eighty.
+      - id: b
+        label: It makes the policies evaluate faster across large scopes
+        correct: false
+        rep: -5
+        consequence: A performance claim is made in a design review and cannot be supported.
+        explain: >
+          Grouping is about management and reporting, not evaluation speed.
+      - id: c
+        label: It allows policies to be assigned at management group scope, which single policies cannot
+        correct: false
+        rep: -5
+        consequence: A design avoids single-policy assignments on a restriction that does not exist.
+        explain: >
+          Individual policy definitions can be assigned at any scope. Initiatives group them;
+          they do not unlock scopes.

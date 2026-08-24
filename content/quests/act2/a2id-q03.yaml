@@ -1,0 +1,273 @@
+id: a2id-q03
+chapter: act2-identity
+title: The ERP Nobody Will Rewrite
+summary: Straits runs on an ERP from 2016 that speaks Kerberos, and its certificate expires in November.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ305-1.2.4
+  - AZ305-1.2.5
+brief: >
+  Some applications cannot be modernized this year. The design has to give them
+  modern access controls anyway.
+debrief: >
+  Remote access without a VPN client, and a place for keys and certificates that
+  is not a spreadsheet in Port Klang.
+encounters:
+  - id: a
+    type: design
+    title: Reaching an application that cannot be moved
+    speaker: Grace Mendoza
+    objectives: [AZ305-1.2.4]
+    intro: >
+      "Straits ERP runs on two Windows servers in Port Klang," says Grace. "It
+      authenticates with integrated Windows authentication. Twenty Meridian
+      finance staff need it from the Singapore office and from home, and it cannot
+      be published to the internet."
+
+
+      Migrating it is on the roadmap for next year. This is about the next twelve
+      months.
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          Publish it through Microsoft Entra application proxy with Kerberos constrained
+          delegation, protected by Conditional Access
+        correct: true
+        rep: 9
+        consequence: >
+          Finance sign in with their Meridian account, get a multi-factor prompt on an
+          unfamiliar device, and reach an ERP that thinks they authenticated with Kerberos.
+        explain: >
+          Application proxy publishes an internal web application through Entra without
+          opening inbound ports: a connector in the data center makes an outbound connection.
+          Constrained delegation lets the connector obtain a Kerberos ticket on the user's
+          behalf, so a legacy application gets modern authentication and Conditional Access
+          in front of it.
+        diagram:
+          - {op: add_node, node: entra-appproxy}
+          - {op: add_edge, edge: e2-appproxy-erp}
+      - id: b
+        label: A point-to-site VPN for the finance staff into the Port Klang network
+        correct: false
+        rep: -6
+        consequence: >
+          Twenty laptops get a VPN client, the helpdesk gets the calls, and a device on the
+          VPN reaches far more than the ERP.
+        explain: >
+          A VPN grants network access and then relies on the application for authorization. It
+          is a much larger grant than publishing one application, and it puts a client on every
+          device.
+      - id: c
+        label: Publish the ERP through the firewall with a public address and an IP allow list
+        correct: false
+        rep: -10
+        consequence: >
+          A 2016 application with integrated Windows authentication is exposed to the
+          internet, behind an address list that changes.
+        explain: >
+          This is the design that produces incident reports. Inbound exposure of a legacy
+          application is precisely what application proxy exists to avoid.
+      - id: d
+        label: Azure Bastion into a jump box on the Port Klang network
+        correct: false
+        rep: -7
+        consequence: >
+          Finance staff work inside a remote desktop session to use a web application, and
+          twenty concurrent sessions need a much larger jump box.
+        explain: >
+          Bastion is for administrative access to virtual machines, and it is not a way to
+          publish a business application to twenty end users.
+  - id: b
+    type: design
+    title: Where the keys live
+    speaker: Wei Lin Tan
+    objectives: [AZ305-1.2.5]
+    intro: >
+      "Three separate problems keep arriving as one," says Wei Lin. "Application
+      secrets, TLS certificates for the public sites, and the encryption keys the
+      customer contracts say we must control."
+
+
+      One customer contract requires keys in hardware that Meridian alone
+      controls, with a compliance attestation. The rest are ordinary.
+    prompt: What do you recommend?
+    options:
+      - id: a
+        label: >
+          Key Vault for secrets and certificates with autorotation, and a Managed HSM for the
+          keys under the contractual requirement
+        correct: true
+        rep: 9
+        consequence: >
+          Certificates renew themselves, secrets are referenced rather than copied, and the
+          contract requirement is satisfied by a service with the attestation attached.
+        explain: >
+          Key Vault stores secrets, certificates and keys with access controlled by Entra, and
+          can issue and rotate certificates from an integrated authority. Managed HSM gives a
+          single-tenant, FIPS 140-3 Level 3 validated pool for keys where the contract or
+          regulator requires it, at a cost that only makes sense for those keys.
+        diagram:
+          - {op: add_node, node: kv-platform}
+          - {op: add_node, node: managed-hsm}
+          - {op: add_edge, edge: e2-mi-kv}
+          - {op: add_edge, edge: e2-hsm-data}
+      - id: b
+        label: One Managed HSM for everything, so there is a single place to look
+        correct: false
+        rep: -7
+        consequence: >
+          Ordinary application secrets are now stored in the most expensive key service Azure
+          offers, and it does not store secrets at all.
+        explain: >
+          Managed HSM holds keys, not secrets or certificates. It is a specialized service
+          with a price to match, appropriate for the keys that require it.
+      - id: c
+        label: Key Vault for everything, with the premium tier for the contractual keys
+        correct: false
+        rep: -5
+        consequence: >
+          The customer's auditor asks for single-tenant hardware and premium key vaults are
+          shared.
+        explain: >
+          Premium Key Vault uses hardware security modules and is multi-tenant. Where a
+          contract requires sole control and a specific validation level, Managed HSM is the
+          service that meets it.
+      - id: d
+        label: Key Vault for secrets, and let each application manage its own certificates
+        correct: false
+        rep: -6
+        consequence: >
+          A certificate expires on a Sunday in November and the tracking portal goes dark.
+        explain: >
+          Certificate lifecycle is the part people forget until it fails. Centralizing issuance
+          and renewal is most of the value of using a vault at all.
+  - id: c
+    type: troubleshoot
+    title: DRV-1104
+    speaker: Marek Sobczak
+    objectives: [AZ305-1.2.5, AZ305-1.2.4]
+    intro: >
+      The proof of concept is built. Finance can reach the ERP through the
+      application proxy, and it works for eighteen of the twenty users.
+
+
+      The other two get a single sign-on failure and are prompted for credentials
+      by the ERP itself, which then rejects them. Both are recent joiners.
+
+
+      This is a design review, so the artifacts are configuration rather than an
+      outage, and Grace wants the cause named before the write-up.
+    ticket:
+      ref: DRV-1104
+      opened: "14:00"
+      reporter: Marek Sobczak
+      summary: Application proxy single sign-on fails for two of twenty pilot users.
+      severity: sev3
+    time_budget: 4
+    investigate:
+      - id: a
+        action: Ask what is different about the two users
+        speaker: Marek Sobczak
+        reveals: >
+          "Both joined after the Straits acquisition. Both are cloud-only Meridian
+          accounts. The other eighteen are synchronized from the Jurong domain."
+      - id: b
+        action: Ask how the ERP identifies a user
+        speaker: Grace Mendoza
+        reveals: >
+          "Integrated Windows authentication against straitsfreight.local. It needs a
+          Kerberos ticket for a real account in a domain it trusts."
+    commands:
+      - id: a
+        label: Check how the application is configured to sign users in
+        cmd: az rest --method get --url "https://graph.microsoft.com/v1.0/applications?$filter=displayName eq 'Straits ERP'&$select=onPremisesPublishing"
+        output: |
+          {
+            "onPremisesPublishing": {
+              "singleSignOnSettings": {
+                "kerberosSignOnSettings": {
+                  "kerberosServicePrincipalName": "HTTP/erp.straitsfreight.local",
+                  "kerberosSignOnMappingAttributeType": "userPrincipalName"
+                },
+                "singleSignOnMode": "onPremisesKerberos"
+              }
+            }
+          }
+        time_cost: 1
+      - id: b
+        label: Check one of the failing users
+        cmd: az ad user show --id nadia.rahman@meridianlogistics.com --query "{upn:userPrincipalName,onprem:onPremisesUserPrincipalName,sync:onPremisesSyncEnabled}" -o json
+        output: |
+          {
+            "onprem": null,
+            "sync": null,
+            "upn": "nadia.rahman@meridianlogistics.com"
+          }
+        time_cost: 1
+      - id: c
+        label: Check a working user for comparison
+        cmd: az ad user show --id tomas.lim@meridianlogistics.com --query "{upn:userPrincipalName,onprem:onPremisesUserPrincipalName,sync:onPremisesSyncEnabled}" -o json
+        output: |
+          {
+            "onprem": "tomas.lim@meridian.local",
+            "sync": true,
+            "upn": "tomas.lim@meridianlogistics.com"
+          }
+        time_cost: 1
+      - id: d
+        label: Check the connector's own health
+        cmd: az rest --method get --url "https://graph.microsoft.com/v1.0/onPremisesPublishingProfiles/applicationProxy/connectorGroups"
+        output: |
+          {
+            "value": [ { "name": "Port Klang", "connectorCount": 2, "status": "active" } ]
+          }
+        time_cost: 1
+    fixes:
+      - id: a
+        label: >
+          Give the two users on-premises accounts that the proxy can delegate for, or move the
+          ERP to a modern authentication path for them
+        correct: true
+        rep: 9
+        consequence: >
+          Both get synchronized accounts within the week, and the design document records the
+          constraint in bold.
+        explain: >
+          Kerberos constrained delegation needs an on-premises account to impersonate. A
+          cloud-only user has no such account, so single sign-on cannot produce a ticket for
+          them. That constraint has to be in the design, because it decides who can use the
+          application at all until it is modernized.
+        diagram:
+          - {op: set_detail, node: sf-erp, detail: "Published through application proxy"}
+      - id: b
+        label: Change the sign-on mapping attribute to the on-premises SAM account name
+        correct: false
+        rep: -6
+        consequence: >
+          The eighteen working users break, because their tickets were being issued against
+          the attribute that was there.
+        explain: >
+          The mapping attribute matters when the on-premises identifier differs from the cloud
+          one. It cannot conjure an on-premises account where none exists.
+      - id: c
+        label: Add a second connector in Singapore to improve delegation
+        correct: false
+        rep: -7
+        consequence: >
+          Latency improves for nobody in particular and the two users still cannot sign in.
+        explain: >
+          Connector placement affects performance and resilience. The failure is an identity
+          mapping problem, and the connectors are healthy.
+      - id: d
+        label: Switch the application to header-based single sign-on
+        correct: false
+        rep: -8
+        consequence: >
+          The ERP ignores the headers, because it authenticates with integrated Windows
+          authentication and always has.
+        explain: >
+          Header-based sign-on works for applications that accept identity in headers, often
+          with a third-party product in front. It is not a substitute for Kerberos on an
+          application that only speaks Kerberos.

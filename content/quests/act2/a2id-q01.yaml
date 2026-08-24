@@ -1,0 +1,249 @@
+id: a2id-q01
+chapter: act2-identity
+title: Two Tenants, One Company
+summary: Meridian has bought Straits Freight, and on Monday four hundred people need to sign in to things they do not have accounts for.
+variant: core
+estimated_minutes: 15
+objectives:
+  - AZ305-1.2.1
+  - AZ305-1.2.2
+brief: >
+  Day one of the acquisition. Legal says the companies merge in eighteen months.
+  The depots need to share dispatch data next week.
+debrief: >
+  A staged identity plan: collaboration now, consolidation later, and nobody
+  waiting on a tenant migration to do their job.
+encounters:
+  - id: a
+    type: design
+    title: What happens on Monday
+    speaker: Grace Mendoza
+    objectives: [AZ305-1.2.2]
+    intro: >
+      Grace has drawn two circles on the whiteboard and one arrow between them.
+
+
+      "Straits Freight has its own Microsoft Entra tenant, four hundred and ten
+      users, and an on-premises Active Directory in Port Klang. Meridian has ours.
+      Legal completion is in eighteen months. Operations want shared dispatch
+      visibility inside a fortnight."
+
+
+      "Every architect I have watched answer this reaches for a tenant migration.
+      Tell me what you would do for the fortnight, and be honest about what it
+      costs later."
+    prompt: What do you recommend for the immediate need?
+    options:
+      - id: a
+        label: >
+          Cross-tenant collaboration: invite the Straits users who need dispatch access as
+          guests, governed by cross-tenant access settings
+        correct: true
+        rep: 9
+        consequence: >
+          Thirty-one Straits planners are working in the dispatch application eleven days
+          later, and the tenant question stays open for the people paid to decide it.
+        explain: >
+          Business-to-business collaboration lets users keep their home tenant identity and
+          its lifecycle while accessing resources in yours. Cross-tenant access settings
+          control which tenants and users are permitted and whether their multi-factor claims
+          are trusted. It is reversible, it does not block the merger decision, and it works
+          in days rather than quarters.
+        diagram:
+          - {op: add_node, node: entra-b2b}
+          - {op: add_edge, edge: e2-sf-tenant}
+          - {op: add_edge, edge: e2-b2b-meridian}
+      - id: b
+        label: Migrate the Straits tenant into Meridian's tenant before anything else
+        correct: false
+        rep: -8
+        consequence: >
+          The fortnight becomes nine months, and dispatch visibility waits for a licensing
+          and mailbox migration nobody has budgeted.
+        explain: >
+          Tenant consolidation is a large program touching identity, mail, devices and every
+          application. It may well be the right end state, and it cannot be the answer to a
+          two-week operational requirement.
+      - id: c
+        label: Create Meridian accounts for the Straits staff who need access
+        correct: false
+        rep: -7
+        consequence: >
+          Four hundred people now have two identities, two passwords and two sets of
+          multi-factor prompts, and nobody knows which one leaves when they do.
+        explain: >
+          Duplicate identities break the joiner and leaver process at exactly the moment two
+          organizations are least able to keep track. The guest model keeps one authoritative
+          source per person.
+      - id: d
+        label: Federate the two tenants directly so users authenticate across them
+        correct: false
+        rep: -6
+        consequence: >
+          Weeks are spent on a federation design that cross-tenant settings already express
+          declaratively.
+        explain: >
+          Direct federation between Entra tenants is not how this is done. Cross-tenant access
+          settings are the supported mechanism, including trusting the other tenant's
+          multi-factor and device claims.
+  - id: b
+    type: design
+    title: The Port Klang problem
+    speaker: Marek Sobczak
+    objectives: [AZ305-1.2.1]
+    intro: >
+      "The Straits warehouse staff do not have Entra accounts at all," says Marek.
+      "They sign in to Windows against straitsfreight.local, and half the site has
+      an internet link that drops for a few minutes a day."
+
+
+      Those staff will need Meridian's dispatch application, which is
+      cloud-hosted, within the year. Straits IT is two people and a contractor.
+    prompt: What authentication design do you recommend for those users?
+    options:
+      - id: a
+        label: >
+          Synchronize them with Entra Connect using password hash synchronization, with
+          seamless single sign-on
+        correct: true
+        rep: 8
+        consequence: >
+          The first sixty warehouse accounts sync in a morning and keep working through the
+          afternoon's link outage.
+        explain: >
+          Password hash synchronization keeps authentication in the cloud, so a broken site
+          link stops file access but not sign-in. It is the lowest-maintenance option, needs
+          no additional servers, and supports leaked-credential detection because Entra sees
+          the hashes.
+      - id: b
+        label: Federate with Active Directory Federation Services in Port Klang
+        correct: false
+        rep: -8
+        consequence: >
+          Every sign-in depends on two servers and an internet link at a site that loses it
+          daily, maintained by two people.
+        explain: >
+          Federation puts authentication on infrastructure you now have to make highly
+          available. It is the right answer when a requirement genuinely needs it, such as
+          smart card sign-in or an existing federation estate, and this is the opposite case.
+      - id: c
+        label: Pass-through authentication with agents in Port Klang
+        correct: false
+        rep: -6
+        consequence: >
+          Sign-ins fail during every link outage, and the agents become another thing to patch
+          at a site with no spare capacity.
+        explain: >
+          Pass-through authentication validates the password against the domain controller in
+          real time, which is exactly what a flaky link breaks. It suits organizations that
+          must not have password hashes in the cloud, which nobody here has asked for.
+      - id: d
+        label: Cloud-only accounts for the warehouse staff, disconnected from the local domain
+        correct: false
+        rep: -7
+        consequence: >
+          Warehouse staff have two passwords, one for the domain-joined PC and one for
+          everything else.
+        explain: >
+          They still sign in to Windows against the local domain, so a disconnected cloud
+          account is a second identity rather than a replacement.
+  - id: c
+    type: design
+    title: The multi-factor question
+    speaker: Wei Lin Tan
+    objectives: [AZ305-1.2.1]
+    intro: >
+      "Meridian requires multi-factor authentication for everyone," says Wei Lin.
+      "Straits requires it for administrators only. Their planners are about to be
+      guests in our tenant, using our dispatch application, from their own laptops
+      and their own network."
+
+
+      Straits already enforce multi-factor with the Microsoft Authenticator app
+      for those administrators.
+    prompt: How do you handle multi-factor for the guests?
+    options:
+      - id: a
+        label: >
+          Require multi-factor in Meridian's Conditional Access for guests, and configure
+          cross-tenant access to trust the Straits tenant's multi-factor claims
+        correct: true
+        rep: 9
+        consequence: >
+          Straits planners who already satisfy multi-factor at home are not challenged twice,
+          and the ones who never had it are, which is what changes behavior at Straits.
+        explain: >
+          Requiring multi-factor for guests is Meridian's policy to set. Trusting the home
+          tenant's claim avoids double prompting for users who already comply, while users
+          from a tenant with no multi-factor still have to satisfy Meridian's requirement
+          against their guest identity.
+        diagram:
+          - {op: add_node, node: cond-access}
+          - {op: add_edge, edge: e2-ca-entra}
+      - id: b
+        label: Exempt guests from multi-factor until the tenants merge
+        correct: false
+        rep: -10
+        consequence: >
+          The weakest identities in the tenant become the ones with access to another
+          company's shipment data.
+        explain: >
+          Guests are the accounts you control least. Exempting them inverts the risk model,
+          and eighteen months is a long time to run with it.
+      - id: c
+        label: Require multi-factor for guests without trusting the home tenant's claims
+        correct: false
+        rep: -5
+        consequence: >
+          Straits administrators register a second authenticator for Meridian and complain
+          about it in every steering meeting for a quarter.
+        explain: >
+          It is secure and it makes compliant users register twice. Trusting the claim is the
+          setting built to avoid exactly this friction.
+      - id: d
+        label: Ask Straits to enable multi-factor for all their users before granting access
+        correct: false
+        rep: -6
+        consequence: >
+          It is the right long-term ask and it delays dispatch visibility by a quarter while
+          another company changes its policy.
+        explain: >
+          Meridian can enforce its own requirement on access to its own resources today, and
+          raise the Straits baseline as a separate workstream.
+  - id: d
+    type: knowledge
+    title: What Grace is checking
+    speaker: Grace Mendoza
+    objectives: [AZ305-1.2.2]
+    intro: >
+      "One thing before you write this up," says Grace. "Somebody in the steering
+      meeting will ask why we are not just migrating the tenant. Give me the
+      shortest honest answer."
+    question: What is the strongest argument for collaboration before consolidation?
+    options:
+      - id: a
+        label: >
+          It meets the operational deadline without pre-empting a decision the business has
+          not made
+        correct: true
+        rep: 6
+        explain: >
+          Architecture is largely about sequencing. Collaboration is reversible, delivers in
+          weeks and leaves consolidation available. Migrating first commits the organization
+          to an outcome before anyone has decided it, on a timeline nobody has asked for.
+      - id: b
+        label: Guest access is more secure than having the users in one tenant
+        correct: false
+        rep: -5
+        consequence: A claim that does not survive contact with the security team is made in front of the security team.
+        explain: >
+          One tenant with consistent policy is usually easier to secure. The argument for
+          collaboration is speed and reversibility, not superior security.
+      - id: c
+        label: Tenant migrations are not supported by Microsoft
+        correct: false
+        rep: -6
+        consequence: A factually wrong statement is minuted and quoted back to you six months later.
+        explain: >
+          Tenant-to-tenant migration is well trodden, with tooling and partners. It is large
+          and disruptive, which is a different objection.

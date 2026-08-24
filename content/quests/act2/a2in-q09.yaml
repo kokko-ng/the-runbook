@@ -1,0 +1,259 @@
+id: a2in-q09
+chapter: act2-infrastructure
+title: The Network Under All of It
+summary: Two regions, two data centers, twenty-two depots and every service in the design assuming the network is already there.
+variant: core
+estimated_minutes: 16
+objectives:
+  - AZ305-4.4.1
+  - AZ305-4.4.2
+  - AZ305-4.4.3
+  - AZ305-4.4.4
+brief: >
+  The last design review before the board. Everything else in the architecture
+  rests on this and nobody has drawn it yet.
+debrief: >
+  A hub that scales to the sites Meridian will have, a private path to
+  on-premises, and traffic that is inspected without being slow.
+encounters:
+  - id: a
+    type: design
+    title: Getting to on-premises
+    speaker: Grace Mendoza
+    objectives: [AZ305-4.4.2]
+    intro: >
+      "Two data centers for the next eighteen months, twenty-two depots
+      indefinitely, and the ERP will be talking to Azure constantly once it
+      moves," says Grace. "Today there is one site-to-site tunnel to Jurong, built
+      by somebody who has left, and nothing to Port Klang."
+    prompt: What connectivity do you recommend?
+    options:
+      - id: a
+        label: >
+          ExpressRoute to the two data centers for predictable throughput, with site-to-site VPN
+          to the depots and as ExpressRoute's backup
+        correct: true
+        rep: 9
+        consequence: >
+          The ERP's database traffic gets a private path with an availability commitment, and
+          the depots stay on VPN where the cost of a circuit could never be justified.
+        explain: >
+          ExpressRoute provides a private connection with a service level agreement and
+          predictable latency, which is what a constantly chatty workload needs. VPN over the
+          internet is right where sites are numerous, small or temporary, and it also makes a
+          sensible failover path for the circuit.
+        diagram:
+          - {op: add_node, node: er-circuit}
+          - {op: add_node, node: vwan-hub}
+          - {op: add_edge, edge: e2-er-hub}
+          - {op: add_edge, edge: e2-vpn-hub}
+      - id: b
+        label: Site-to-site VPN everywhere, since it already works for Jurong
+        correct: false
+        rep: -6
+        consequence: >
+          The ERP's cross-premises latency varies with the internet, and the finance team notice
+          it every month end.
+        explain: >
+          VPN is cost-effective and rides the public internet, so throughput and latency vary.
+          For a workload that depends on it continuously, a circuit is the difference between a
+          predictable system and a variable one.
+      - id: c
+        label: ExpressRoute to every site including the depots
+        correct: false
+        rep: -8
+        consequence: >
+          Twenty-two circuits are quoted and the project stops at the first invoice.
+        explain: >
+          A circuit per depot is an order of magnitude more expensive than the depots' traffic
+          justifies. Match the connection to what each site does.
+      - id: d
+        label: Public endpoints with strict firewall rules, avoiding private connectivity entirely
+        correct: false
+        rep: -9
+        consequence: >
+          The ERP's database traffic traverses the public internet, which the security review
+          rejects in one line.
+        explain: >
+          Cross-premises traffic for internal systems belongs on a private path. Firewall rules
+          do not change where the packets travel.
+  - id: b
+    type: design
+    title: How many hubs
+    speaker: Marek Sobczak
+    objectives: [AZ305-4.4.1, AZ305-4.4.4]
+    intro: >
+      "Two regions, and the workloads will be in five or six subscriptions each,"
+      says Marek. "Today there is one hub network in Southeast Asia with a gateway
+      and a firewall appliance somebody bought."
+
+
+      "Everything outbound has to be inspected, and the security team want one
+      place to write the rules."
+    prompt: What hub design do you recommend?
+    options:
+      - id: a
+        label: >
+          A secured virtual hub per region with Azure Firewall, spokes peered to it, and forced
+          tunneling of outbound traffic through the firewall
+        correct: true
+        rep: 9
+        consequence: >
+          Spokes attach with two clicks, the firewall policy is written once and inherited, and
+          both regions look the same.
+        explain: >
+          A managed hub removes the peering and routing work as spokes multiply, and a firewall
+          in the hub gives a single policy point for outbound inspection and for spoke-to-spoke
+          traffic. Policies can be inherited from a parent policy so both regions stay
+          consistent.
+        diagram:
+          - {op: add_node, node: fw-hub}
+          - {op: add_edge, edge: e2-fw-hub}
+          - {op: add_edge, edge: e2-hub-sea}
+          - {op: add_edge, edge: e2-hub-ea}
+      - id: b
+        label: One hub in Southeast Asia, with East Asia spokes peered to it globally
+        correct: false
+        rep: -7
+        consequence: >
+          Every East Asia egress crosses to Southeast Asia and back, and a regional failure takes
+          the second region's connectivity with it.
+        explain: >
+          A single hub makes the other region depend on it for routing and inspection, which
+          defeats the point of having a second region.
+      - id: c
+        label: Keep the appliance-based hub and replicate the design manually in East Asia
+        correct: false
+        rep: -6
+        consequence: >
+          Two appliance clusters have to be sized, patched and licensed, and their rule sets
+          drift apart within a quarter.
+        explain: >
+          Third-party appliances are the right answer when a specific capability requires them.
+          Otherwise they add scaling, patching and licensing that a managed firewall does not.
+      - id: d
+        label: No hub. Peer each spoke to each other spoke as needed, with security groups per subnet.
+        correct: false
+        rep: -8
+        consequence: >
+          Twelve spokes need sixty-six peerings, and there is nowhere to enforce outbound
+          inspection.
+        explain: >
+          Full mesh peering grows quadratically and leaves no central inspection point. The hub
+          exists precisely to avoid both.
+  - id: c
+    type: design
+    title: The latency the depots feel
+    speaker: Hendrik Salim
+    objectives: [AZ305-4.4.3]
+    intro: >
+      "Scanner uploads from Cebu take about four times as long as from Johor,"
+      says Hendrik. "The depot staff notice, because they stand there holding the
+      handheld while it uploads."
+
+
+      Cebu's traffic goes over the internet to the public intake endpoint. Johor's
+      goes over the VPN to the hub.
+    prompt: What do you recommend for the Cebu path?
+    options:
+      - id: a
+        label: >
+          Bring the traffic onto the Microsoft network earlier, using the global edge for the
+          intake endpoint
+        correct: true
+        rep: 8
+        consequence: >
+          Upload times from Cebu drop by about half, because most of the journey is on a network
+          somebody optimizes.
+        explain: >
+          Network performance over distance is mostly about how much of the path is on the
+          public internet. Terminating at a nearby edge location and carrying traffic on the
+          provider's backbone is what accelerates a long-haul client, and it needs no change at
+          the depot.
+      - id: b
+        label: A site-to-site VPN from Cebu to the hub, like Johor
+        correct: false
+        rep: -5
+        consequence: >
+          The tunnel still crosses the same internet path, with encryption overhead added.
+        explain: >
+          A VPN changes the privacy and the routing destination, not the physics of the path. It
+          is worth having for other reasons, and it is not a performance fix.
+      - id: c
+        label: A second intake endpoint deployed in a region closer to Cebu
+        correct: false
+        rep: -6
+        consequence: >
+          A second regional deployment is operated for one depot, and the data still has to reach
+          the primary region afterwards.
+        explain: >
+          Regional expansion is a real answer when a whole user population is far away. For one
+          site, edge acceleration achieves most of it with none of the operational cost.
+      - id: d
+        label: Compress the scans on the handheld before uploading
+        correct: false
+        rep: -5
+        consequence: >
+          Image quality drops below what the claims process accepts, and upload time improves
+          modestly.
+        explain: >
+          Reducing payload size helps and it trades away the thing the scan exists for. Fix the
+          path before degrading the data.
+  - id: d
+    type: design
+    title: Inspecting without slowing
+    speaker: Wei Lin Tan
+    objectives: [AZ305-4.4.4]
+    intro: >
+      "Everything outbound goes through the firewall, which I want," says Wei Lin.
+      "The data platform also copies about two terabytes a night from the lake to
+      the analytics workspace, and last night that went through the firewall too."
+    prompt: How do you handle the high-volume internal traffic?
+    options:
+      - id: a
+        label: >
+          Route platform-to-platform traffic over private endpoints inside the network, and keep
+          the firewall for traffic leaving it
+        correct: true
+        rep: 9
+        consequence: >
+          The nightly copy stops touching the firewall, and the firewall's throughput graph
+          becomes readable again.
+        explain: >
+          Inspection belongs on traffic crossing a trust boundary. Service-to-service traffic
+          inside the estate can use private endpoints, which keeps it on the virtual network,
+          off the internet and out of the firewall's throughput budget.
+        diagram:
+          - {op: add_node, node: pe-subnet2}
+          - {op: add_node, node: dns-private2}
+          - {op: add_edge, edge: e2-dns-pe}
+      - id: b
+        label: Scale the firewall up so it can carry the nightly volume
+        correct: false
+        rep: -6
+        consequence: >
+          The firewall is sized and paid for according to a bulk copy that never needed
+          inspecting.
+        explain: >
+          Sizing a security control around traffic it should not be seeing is expensive and
+          makes the control's capacity a data platform concern.
+      - id: c
+        label: Exclude the data platform's addresses from forced tunneling with a route
+        correct: false
+        rep: -5
+        consequence: >
+          The traffic bypasses the firewall and goes out over the internet to a public endpoint
+          instead.
+        explain: >
+          A route exclusion removes the inspection without making the path private. Private
+          endpoints do both.
+      - id: d
+        label: Run the copy during the day, when the firewall is less busy
+        correct: false
+        rep: -8
+        consequence: >
+          Two terabytes of internal copying now competes with dispatch traffic through the same
+          firewall.
+        explain: >
+          Moving the load to a busier period makes the problem worse and leaves the design
+          unchanged.

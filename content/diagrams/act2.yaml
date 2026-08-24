@@ -1,0 +1,186 @@
+# The Act 2 estate: what Meridian is designing, not what it is running.
+#
+# Act 2 opens with the acquisition of Straits Freight, so the diagram starts
+# nearly empty on purpose. Nodes appear as designs are agreed, which makes the
+# map a record of decisions rather than an inventory.
+act: 2
+groups:
+  - id: acquired
+    label: Straits Freight (acquired)
+  - id: platform
+    label: Platform (management groups and subscriptions)
+  - id: identity
+    label: Identity and access
+  - id: management
+    label: Management and monitoring
+  - id: connectivity
+    label: Connectivity
+  - id: edge
+    label: Application edge
+  - id: workload
+    label: Workload landing zones
+  - id: data
+    label: Data platform
+  - id: integration
+    label: Integration and messaging
+  - id: continuity
+    label: Business continuity
+
+nodes:
+  # --- what Meridian is buying ------------------------------------------
+  - {id: sf-datacenter, label: Straits Freight data center, kind: onprem, group: acquired, x: 0, y: 0, present: true, detail: Two racks in Port Klang}
+  - {id: sf-ad, label: straitsfreight.local, kind: onprem-ad, group: acquired, x: 0, y: 90, present: true}
+  - {id: sf-tenant, label: straitsfreight.com tenant, kind: entra, group: acquired, x: 0, y: 180, present: true}
+  - {id: sf-erp, label: Straits ERP, kind: onprem-app, group: acquired, x: 0, y: 270, present: true, detail: Windows Server 2016 and SQL Server 2016}
+  - {id: sf-fileserver, label: Straits file server, kind: onprem, group: acquired, x: 0, y: 360, present: true, detail: 14 TB of scanned manifests}
+  - {id: migrate-project, label: Azure Migrate project, kind: migrate, group: acquired, x: 0, y: 450}
+  - {id: arc-servers, label: Azure Arc-enabled servers, kind: onprem, group: acquired, x: 0, y: 540}
+
+  # --- platform ---------------------------------------------------------
+  - {id: mg-root2, label: mg-meridian, kind: management-group, group: platform, x: 240, y: 0, present: true}
+  - {id: mg-platform2, label: mg-platform, kind: management-group, group: platform, x: 240, y: 90}
+  - {id: mg-landingzones, label: mg-landing-zones, kind: management-group, group: platform, x: 240, y: 180}
+  - {id: mg-sandbox, label: mg-sandbox, kind: management-group, group: platform, x: 240, y: 270}
+  - {id: sub-connectivity, label: sub-connectivity, kind: subscription, group: platform, x: 240, y: 360}
+  - {id: sub-identity2, label: sub-identity, kind: subscription, group: platform, x: 240, y: 450}
+  - {id: sub-management, label: sub-management, kind: subscription, group: platform, x: 240, y: 540}
+  - {id: sub-lz-transport, label: sub-lz-transport, kind: subscription, group: platform, x: 240, y: 630}
+  - {id: sub-lz-analytics, label: sub-lz-analytics, kind: subscription, group: platform, x: 240, y: 720}
+  - {id: policy-initiative, label: Governance initiative, kind: policy, group: platform, x: 240, y: 810}
+  - {id: tag-strategy, label: Tag strategy, kind: policy, group: platform, x: 240, y: 900}
+
+  # --- identity ---------------------------------------------------------
+  - {id: entra-meridian, label: meridianlogistics.com, kind: entra, group: identity, x: 480, y: 0, present: true}
+  - {id: entra-b2b, label: Cross-tenant collaboration, kind: entra-guest, group: identity, x: 480, y: 90}
+  - {id: entra-connect2, label: Entra Connect, kind: entra-connect, group: identity, x: 480, y: 180, present: true}
+  - {id: entra-appproxy, label: Entra application proxy, kind: entra-feature, group: identity, x: 480, y: 270}
+  - {id: entra-pim, label: Privileged Identity Management, kind: entra-feature, group: identity, x: 480, y: 360}
+  - {id: entra-idgov, label: Entitlement management, kind: entra-feature, group: identity, x: 480, y: 450}
+  - {id: cond-access, label: Conditional Access, kind: entra-feature, group: identity, x: 480, y: 540}
+  - {id: kv-platform, label: kv-platform, kind: key-vault, group: identity, x: 480, y: 630}
+  - {id: managed-hsm, label: Managed HSM, kind: key-vault, group: identity, x: 480, y: 720}
+  - {id: mi-workloads, label: Managed identities, kind: managed-identity, group: identity, x: 480, y: 810}
+
+  # --- management -------------------------------------------------------
+  - {id: law-platform, label: law-platform, kind: log-analytics, group: management, x: 720, y: 0}
+  - {id: law-workload, label: law-transport, kind: log-analytics, group: management, x: 720, y: 90}
+  - {id: dcr-servers, label: Data collection rules, kind: workbook, group: management, x: 720, y: 180}
+  - {id: sentinel, label: Microsoft Sentinel, kind: alert, group: management, x: 720, y: 270}
+  - {id: defender-cloud, label: Defender for Cloud, kind: alert, group: management, x: 720, y: 360}
+  - {id: st-logs-archive, label: stmeridianlogs, kind: storage, group: management, x: 720, y: 450, detail: Long-term log archive}
+  - {id: eventhub-logs, label: Log export event hub, kind: event-hub, group: management, x: 720, y: 540}
+  - {id: appinsights-portal, label: Application Insights, kind: workbook, group: management, x: 720, y: 630}
+
+  # --- connectivity -----------------------------------------------------
+  - {id: vwan-hub, label: Virtual WAN hub, kind: vnet, group: connectivity, x: 960, y: 0}
+  - {id: vnet-hub2, label: vnet-hub-sea, kind: vnet, group: connectivity, x: 960, y: 90, present: true}
+  - {id: vnet-hub-ea2, label: vnet-hub-eastasia, kind: vnet, group: connectivity, x: 960, y: 180}
+  - {id: er-circuit, label: ExpressRoute circuit, kind: expressroute, group: connectivity, x: 960, y: 270}
+  - {id: vpn-branch, label: Branch VPN gateway, kind: vpn-gateway, group: connectivity, x: 960, y: 360, present: true}
+  - {id: fw-hub, label: Azure Firewall, kind: firewall, group: connectivity, x: 960, y: 450}
+  - {id: dns-private2, label: Private DNS zones, kind: dns-private, group: connectivity, x: 960, y: 540}
+  - {id: pe-subnet2, label: Private endpoint subnet, kind: subnet, group: connectivity, x: 960, y: 630}
+
+  # --- edge -------------------------------------------------------------
+  - {id: front-door, label: Azure Front Door, kind: front-door, group: edge, x: 1200, y: 0}
+  - {id: appgw-waf, label: Application Gateway with WAF, kind: application-gateway, group: edge, x: 1200, y: 90}
+  - {id: traffic-manager, label: Traffic Manager, kind: traffic-manager, group: edge, x: 1200, y: 180}
+  - {id: apim-gateway, label: API Management, kind: apim, group: edge, x: 1200, y: 270}
+  - {id: internet2, label: Internet, kind: internet, group: edge, x: 1200, y: 360, present: true}
+
+  # --- workloads --------------------------------------------------------
+  - {id: aks-transport, label: aks-transport, kind: aks, group: workload, x: 1440, y: 0}
+  - {id: aca-services, label: Container Apps environment, kind: container-app, group: workload, x: 1440, y: 90}
+  - {id: func-events, label: Function app, kind: functions, group: workload, x: 1440, y: 180}
+  - {id: vmss-legacy, label: vmss-erp, kind: vmss, group: workload, x: 1440, y: 270}
+  - {id: batch-routing, label: Batch pool, kind: batch, group: workload, x: 1440, y: 360}
+  - {id: appconfig, label: App Configuration, kind: app-config, group: workload, x: 1440, y: 450}
+  - {id: redis-sessions, label: Azure Cache for Redis, kind: redis, group: workload, x: 1440, y: 540}
+  - {id: deploy-pipeline, label: Deployment pipeline, kind: workbook, group: workload, x: 1440, y: 630}
+
+  # --- data -------------------------------------------------------------
+  - {id: sqlmi-erp, label: SQL Managed Instance, kind: sql-mi, group: data, x: 1680, y: 0}
+  - {id: sqldb-transport, label: Azure SQL Database, kind: sql-database, group: data, x: 1680, y: 90, present: true}
+  - {id: cosmos-telemetry, label: Cosmos DB, kind: cosmos, group: data, x: 1680, y: 180}
+  - {id: st-datalake, label: Data lake, kind: data-lake, group: data, x: 1680, y: 270}
+  - {id: st-manifests, label: Manifest archive, kind: storage, group: data, x: 1680, y: 360}
+  - {id: adf-pipelines, label: Data Factory, kind: data-factory, group: data, x: 1680, y: 450}
+  - {id: synapse-analytics, label: Synapse Analytics, kind: synapse, group: data, x: 1680, y: 540}
+  - {id: dms-migration, label: Database Migration Service, kind: migrate, group: data, x: 1680, y: 630}
+  - {id: purview-catalog, label: Data governance catalog, kind: policy, group: data, x: 1680, y: 720}
+
+  # --- integration ------------------------------------------------------
+  - {id: servicebus-orders, label: Service Bus, kind: service-bus, group: integration, x: 1920, y: 0}
+  - {id: eventgrid-events, label: Event Grid, kind: event-grid, group: integration, x: 1920, y: 90}
+  - {id: eventhub-telemetry, label: Event Hubs, kind: event-hub, group: integration, x: 1920, y: 180}
+  - {id: logicapp-edi, label: Logic Apps, kind: functions, group: integration, x: 1920, y: 270}
+
+  # --- continuity -------------------------------------------------------
+  - {id: bkv-platform, label: Backup vault, kind: backup-vault, group: continuity, x: 2160, y: 0}
+  - {id: rsv-platform, label: Recovery Services vault, kind: recovery-vault, group: continuity, x: 2160, y: 90}
+  - {id: asr-platform, label: Site Recovery, kind: site-recovery, group: continuity, x: 2160, y: 180}
+  - {id: sql-failover-group, label: SQL failover group, kind: sql-database, group: continuity, x: 2160, y: 270}
+  - {id: st-grs-manifests, label: Manifest archive replica, kind: storage, group: continuity, x: 2160, y: 360}
+  - {id: aks-secondary, label: aks-transport (East Asia), kind: aks, group: continuity, x: 2160, y: 450}
+
+edges:
+  - {id: e2-sf-migrate, source: sf-datacenter, target: migrate-project, label: assessment, kind: data}
+  - {id: e2-sf-arc, source: sf-datacenter, target: arc-servers, label: onboarded, kind: identity}
+  - {id: e2-sf-erp-mi, source: sf-erp, target: sqlmi-erp, label: database migration, kind: data}
+  - {id: e2-sf-files, source: sf-fileserver, target: st-manifests, label: manifest copy, kind: data}
+  - {id: e2-sf-tenant, source: sf-tenant, target: entra-b2b, label: cross-tenant access, kind: identity}
+  - {id: e2-b2b-meridian, source: entra-b2b, target: entra-meridian, kind: identity}
+  - {id: e2-mg-platform, source: mg-root2, target: mg-platform2, kind: identity}
+  - {id: e2-mg-lz, source: mg-root2, target: mg-landingzones, kind: identity}
+  - {id: e2-mg-sandbox, source: mg-root2, target: mg-sandbox, kind: identity}
+  - {id: e2-mg-conn, source: mg-platform2, target: sub-connectivity, kind: identity}
+  - {id: e2-mg-idsub, source: mg-platform2, target: sub-identity2, kind: identity}
+  - {id: e2-mg-mgmt, source: mg-platform2, target: sub-management, kind: identity}
+  - {id: e2-lz-transport, source: mg-landingzones, target: sub-lz-transport, kind: identity}
+  - {id: e2-lz-analytics, source: mg-landingzones, target: sub-lz-analytics, kind: identity}
+  - {id: e2-policy-mg, source: policy-initiative, target: mg-landingzones, label: assigned at, kind: identity}
+  - {id: e2-pim-entra, source: entra-pim, target: entra-meridian, kind: identity}
+  - {id: e2-ca-entra, source: cond-access, target: entra-meridian, kind: identity}
+  - {id: e2-idgov-entra, source: entra-idgov, target: entra-meridian, kind: identity}
+  - {id: e2-appproxy-erp, source: entra-appproxy, target: sf-erp, label: publishes, kind: identity}
+  - {id: e2-mi-kv, source: mi-workloads, target: kv-platform, label: reads secrets, kind: identity}
+  - {id: e2-hsm-data, source: managed-hsm, target: st-datalake, label: customer-managed keys, kind: data}
+  - {id: e2-law-platform, source: law-platform, target: sentinel, kind: data}
+  - {id: e2-dcr-law, source: dcr-servers, target: law-workload, label: routes, kind: data}
+  - {id: e2-law-archive, source: law-platform, target: st-logs-archive, label: archive, kind: data}
+  - {id: e2-law-eventhub, source: law-platform, target: eventhub-logs, label: export, kind: data}
+  - {id: e2-defender-law, source: defender-cloud, target: law-platform, kind: data}
+  - {id: e2-appinsights, source: appinsights-portal, target: law-workload, kind: data}
+  - {id: e2-er-hub, source: er-circuit, target: vwan-hub, label: private peering, kind: network}
+  - {id: e2-vpn-hub, source: vpn-branch, target: vwan-hub, kind: network}
+  - {id: e2-hub-sea, source: vwan-hub, target: vnet-hub2, kind: network}
+  - {id: e2-hub-ea, source: vwan-hub, target: vnet-hub-ea2, kind: network}
+  - {id: e2-fw-hub, source: fw-hub, target: vwan-hub, label: secured hub, kind: network}
+  - {id: e2-dns-pe, source: dns-private2, target: pe-subnet2, kind: network}
+  - {id: e2-internet-fd, source: internet2, target: front-door, kind: traffic}
+  - {id: e2-fd-appgw, source: front-door, target: appgw-waf, label: origin, kind: traffic}
+  - {id: e2-appgw-aks, source: appgw-waf, target: aks-transport, kind: traffic}
+  - {id: e2-tm-regions, source: traffic-manager, target: aks-secondary, label: failover profile, kind: traffic}
+  - {id: e2-apim-aks, source: apim-gateway, target: aks-transport, kind: traffic}
+  - {id: e2-apim-func, source: apim-gateway, target: func-events, kind: traffic}
+  - {id: e2-aks-sql, source: aks-transport, target: sqldb-transport, kind: data}
+  - {id: e2-aks-redis, source: aks-transport, target: redis-sessions, label: session cache, kind: data}
+  - {id: e2-aks-config, source: aks-transport, target: appconfig, kind: data}
+  - {id: e2-aca-sb, source: aca-services, target: servicebus-orders, kind: data}
+  - {id: e2-func-eg, source: eventgrid-events, target: func-events, label: triggers, kind: data}
+  - {id: e2-eh-telemetry, source: eventhub-telemetry, target: cosmos-telemetry, kind: data}
+  - {id: e2-logic-edi, source: logicapp-edi, target: servicebus-orders, kind: data}
+  - {id: e2-batch-lake, source: batch-routing, target: st-datalake, kind: data}
+  - {id: e2-adf-lake, source: adf-pipelines, target: st-datalake, label: ingests, kind: data}
+  - {id: e2-synapse-lake, source: synapse-analytics, target: st-datalake, kind: data}
+  - {id: e2-adf-sql, source: adf-pipelines, target: sqldb-transport, label: reads, kind: data}
+  - {id: e2-purview-lake, source: purview-catalog, target: st-datalake, kind: data}
+  - {id: e2-dms-mi, source: dms-migration, target: sqlmi-erp, kind: data}
+  - {id: e2-vmss-erp, source: vmss-legacy, target: sqlmi-erp, kind: data}
+  - {id: e2-deploy-aks, source: deploy-pipeline, target: aks-transport, label: deploys, kind: traffic}
+  - {id: e2-sql-fog, source: sqldb-transport, target: sql-failover-group, label: failover group, kind: backup}
+  - {id: e2-st-grs, source: st-manifests, target: st-grs-manifests, kind: backup}
+  - {id: e2-bkv-lake, source: bkv-platform, target: st-datalake, label: backs up, kind: backup}
+  - {id: e2-rsv-vmss, source: rsv-platform, target: vmss-legacy, label: backs up, kind: backup}
+  - {id: e2-asr-vmss, source: asr-platform, target: vmss-legacy, label: replicates, kind: backup}
+  - {id: e2-aks-secondary, source: aks-transport, target: aks-secondary, label: second region, kind: backup}
