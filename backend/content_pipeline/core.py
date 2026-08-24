@@ -854,7 +854,9 @@ def build_bundle(library: Library, out_dir: Path | None = None) -> dict[str, Any
 
     chapters = []
     for chapter in library.chapters:
-        quests = sorted(library.quests_in(chapter["id"]), key=lambda q: q.id)
+        # Core quests in id order first, then the bonus variants: that is the
+        # order a player works through a chapter.
+        quests = sorted(library.quests_in(chapter["id"]), key=lambda q: (q.is_bonus, q.id))
         chapters.append(
             {
                 **chapter,
