@@ -4,10 +4,12 @@ import { computed } from 'vue'
 /**
  * A small monogram badge per resource kind.
  *
- * Deliberately not the official Azure icon set: those are licensed for
- * architecture diagrams and documentation, and shipping them inside an
- * application is a different thing to ask permission for. The diagram is data,
- * so the badge is swappable if that ever gets cleared.
+ * Microsoft permits its Azure architecture icons "in architectural diagrams,
+ * training materials, or documentation", which this map arguably is. We ship
+ * neutral monograms anyway: it avoids redistributing a third-party asset set
+ * inside an application, keeps the bundle small, and keeps one visual language.
+ * The diagram is data and the badge is looked up by `kind`, so swapping the
+ * official set in later is a change to this file and nothing else.
  */
 const KINDS: Record<string, [string, string]> = {
   vnet: ['VN', 'network'],
