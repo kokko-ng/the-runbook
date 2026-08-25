@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { VueFlow, useVueFlow, type Edge, type Node } from '@vue-flow/core'
+import { MarkerType, VueFlow, useVueFlow, type Edge, type Node } from '@vue-flow/core'
 import { computed, nextTick, watch } from 'vue'
 
 import MapNode from '@/components/MapNode.vue'
+import MapWire from '@/components/MapWire.vue'
 import type { DiagramSpec, NodeStatus } from '@/engine'
 import { useContentStore } from '@/stores/content'
 import { useGameStore } from '@/stores/game'
@@ -21,6 +22,11 @@ import '@vue-flow/core/dist/theme-default.css'
  * where the columns go. That means two groups can never collide because someone
  * gave them the same x, and empty columns close up while the estate is still
  * half built.
+ *
+ * Because this file knows where every box ends up, it also picks which face of
+ * a box each link leaves from and arrives at. A link to something on the left
+ * leaves by the left, a link to something in the same column leaves by the
+ * bottom, and nothing doubles back through the box it started in.
  */
 const props = withDefaults(defineProps<{ act?: string; compact?: boolean }>(), {
   act: 'act1',
@@ -40,13 +46,28 @@ const EDGE_TONE: Record<NodeStatus, string> = {
   planned: 'var(--color-planned)',
 }
 
-const COLUMN_WIDTH = 264
-const ROW_HEIGHT = 88
+const NODE_WIDTH = 208
+/** Room between two columns for a link and the words describing it. */
+const GUTTER = 132
+const COLUMN_WIDTH = NODE_WIDTH + GUTTER
+const ROW_HEIGHT = 96
 const HEADER_OFFSET = 96
 
-const nodes = computed<Node[]>(() => {
+/** Where a box ended up, so a link can work out which faces to join. */
+interface Cell {
+  column: number
+  row: number
+}
+
+interface Layout {
+  nodes: Node[]
+  placement: Map<string, Cell>
+}
+
+const layout = computed<Layout>(() => {
+  const placement = new Map<string, Cell>()
   const diagram = game.save?.diagram
-  if (!spec.value || !diagram) return []
+  if (!spec.value || !diagram) return { nodes: [], placement }
 
   const byGroup = new Map<string, typeof spec.value.nodes>()
   for (const node of spec.value.nodes) {
@@ -78,13 +99,14 @@ const nodes = computed<Node[]>(() => {
       data: { label },
       class:
         'map-group rounded-md border-0 bg-transparent px-0 text-xs font-semibold uppercase tracking-wide',
-      style: { width: '208px' },
+      style: { width: `${NODE_WIDTH}px` },
     })
     members
       .slice()
       .sort((a, b) => a.y - b.y)
       .forEach((node, position) => {
         const state = diagram.nodes[node.id]
+        placement.set(node.id, { column: columnIndex, row: position })
         out.push({
           id: node.id,
           type: 'resource',
@@ -101,25 +123,55 @@ const nodes = computed<Node[]>(() => {
         })
       })
   })
-  return out
+  return { nodes: out, placement }
 })
+
+const nodes = computed<Node[]>(() => layout.value.nodes)
+
+/**
+ * The pair of faces to join two boxes by: top to bottom within a column,
+ * otherwise the two sides that already point at each other.
+ */
+function ports(from: Cell, to: Cell): { sourceHandle: string; targetHandle: string } {
+  if (from.column === to.column) {
+    return to.row > from.row
+      ? { sourceHandle: 'out-b', targetHandle: 'in-t' }
+      : { sourceHandle: 'out-t', targetHandle: 'in-b' }
+  }
+  return to.column > from.column
+    ? { sourceHandle: 'out-r', targetHandle: 'in-l' }
+    : { sourceHandle: 'out-l', targetHandle: 'in-r' }
+}
 
 const edges = computed<Edge[]>(() => {
   const diagram = game.save?.diagram
+  const placement = layout.value.placement
   if (!spec.value || !diagram) return []
-  const visible = new Set(nodes.value.map((node) => node.id))
+
+  // A peering is authored as two links, one each way, and both say the same
+  // thing. Print that once; the arrowheads carry the direction.
+  const spoken = new Set<string>()
+
   return spec.value.edges
     .filter((edge) => diagram.edges[edge.id]?.present)
-    .filter((edge) => visible.has(edge.source) && visible.has(edge.target))
+    .filter((edge) => placement.has(edge.source) && placement.has(edge.target))
     .map((edge) => {
       const status = diagram.edges[edge.id].status
+      const tone = EDGE_TONE[status]
+      const pair = [edge.source, edge.target].sort().join(' ') + ' ' + (edge.label ?? '')
+      const alreadySaid = Boolean(edge.label) && spoken.has(pair)
+      if (edge.label) spoken.add(pair)
+
       return {
         id: edge.id,
         source: edge.source,
         target: edge.target,
-        label: props.compact ? undefined : edge.label,
+        ...ports(placement.get(edge.source)!, placement.get(edge.target)!),
+        type: 'wire',
+        label: props.compact || alreadySaid ? undefined : edge.label,
         animated: status === 'broken',
-        style: { stroke: EDGE_TONE[status], strokeWidth: status === 'healthy' ? 1.5 : 2.5 },
+        markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: tone },
+        style: { stroke: tone, strokeWidth: status === 'healthy' ? 1.5 : 2.5 },
       } satisfies Edge
     })
 })
@@ -134,7 +186,7 @@ watch(
 </script>
 
 <template>
-  <div class="relative h-full w-full">
+  <div class="relative h-full w-full" :style="{ '--map-gutter': `${GUTTER - 16}px` }">
     <p
       v-if="!nodes.length"
       class="grid h-full place-items-center px-6 text-center text-sm text-ink-500 dark:text-ink-400"
@@ -156,6 +208,9 @@ watch(
       <template #node-resource="nodeProps">
         <MapNode :data="nodeProps.data" />
       </template>
+      <template #edge-wire="edgeProps">
+        <MapWire v-bind="edgeProps" :grid="{ columnWidth: COLUMN_WIDTH, nodeWidth: NODE_WIDTH }" />
+      </template>
     </VueFlow>
   </div>
 </template>
@@ -167,24 +222,22 @@ watch(
   box-shadow: none;
   font-size: 0.7rem;
 }
+/* Boxes are joined edge to edge, so the ports themselves are never drawn.
+   There are eight per box now and dotting all of them would be clutter. */
 :deep(.vue-flow__handle) {
-  opacity: 0.35;
+  opacity: 0;
+  height: 1px;
+  width: 1px;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
 }
 :deep(.map-group) {
   color: var(--color-map-label);
 }
-/* Edge labels sit on the wires themselves. The halo keeps them readable on
-   either theme without a solid box that would hide what runs behind it. */
-:deep(.vue-flow__edge-textbg) {
-  display: none;
-}
-:deep(.vue-flow__edge-text) {
-  fill: var(--color-map-label);
-  font-size: 11px;
-  font-weight: 500;
-  paint-order: stroke;
-  stroke: var(--color-map-halo);
-  stroke-width: 4px;
-  stroke-linejoin: round;
+/* Link labels ride above the boxes rather than under them, which is what stops
+   the box beside a label from slicing the words in half. */
+:deep(.vue-flow__edge-labels) {
+  z-index: 10;
 }
 </style>
