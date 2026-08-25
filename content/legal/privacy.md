@@ -27,6 +27,15 @@ for itself. This exists to find scenarios that are unfair or unclear. It is not
 linked to you unless you are signed in, in which case the event records your
 account so support requests can be answered.
 
+**Feedback you send:** the feedback button attaches what you wrote to a snapshot
+of where you were: the page, the quest and encounter, the state of the attempt,
+your reputation and progress counts, the content version, your theme and the
+size of the browser window. The panel shows you that snapshot in full before you
+send it. It carries no name, no email address, and nothing about your device
+beyond the window size. If you are signed in, the report records your account so
+a reply is possible; if you are not, it carries the same random identifier as
+the anonymous events above.
+
 **Server logs:** the hosting provider records ordinary web server access logs,
 which include IP addresses, and holds them under its own retention policy.
 
@@ -40,13 +49,15 @@ tracking or third-party cookies, and no third-party scripts on any page.
 ## Why it is collected
 
 To let you continue the game on another device, to keep your account secure, and
-to improve the written scenarios. Nothing is sold, rented or shared with third
+to improve the written scenarios. Feedback is used to find and fix scenarios that
+are unclear, wrong or broken, which is the only way most of them get found. Nothing is sold, rented or shared with third
 parties. No profiling and no automated decisions are made about you.
 
 ## How long it is kept
 
 Account and save data are kept until you delete the account or ask for it to be
-removed. Anonymous events are kept for up to 24 months. You can wipe the local
+removed. Anonymous events are kept for up to 24 months, and feedback for as long
+as the scenario it refers to is still in the game. You can wipe the local
 save at any time from the Account page.
 
 ## Your rights under the PDPA

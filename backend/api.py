@@ -7,6 +7,7 @@ There are no entitlement checks anywhere because there is nothing to buy.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from datetime import timezone as dt_timezone
 
@@ -25,6 +26,7 @@ from ninja.security import django_auth
 from ninja.throttling import AnonRateThrottle, AuthRateThrottle
 
 from analytics.models import AnalyticsEvent
+from feedback.models import Feedback
 from saves.models import SaveGame
 
 User = get_user_model()
@@ -36,6 +38,8 @@ api = NinjaAPI(
 )
 
 MAX_BLOB_BYTES = 256 * 1024
+MAX_MESSAGE_CHARS = 2000
+MAX_CONTEXT_BYTES = 8 * 1024
 SAVE_SCHEMA_VERSION = 1
 
 
@@ -93,6 +97,13 @@ class EventIn(Schema):
 
 class EventBatch(Schema):
     events: list[EventIn]
+
+
+class FeedbackIn(Schema):
+    category: str
+    message: str = ""
+    anonymous_id: str = ""
+    context: dict = {}
 
 
 # --------------------------------------------------------------------------
@@ -253,3 +264,45 @@ def record_events(request, payload: EventBatch):
     ]
     AnalyticsEvent.objects.bulk_create(rows)
     return {"recorded": len(rows)}
+
+
+# --------------------------------------------------------------------------
+# feedback
+# --------------------------------------------------------------------------
+
+
+@api.post("/feedback", auth=None, tags=["feedback"], throttle=[AnonRateThrottle("20/h")])
+def submit_feedback(request, payload: FeedbackIn):
+    """Take a player's report, with the state they were looking at.
+
+    The context is whatever the client chose to send: route, quest, encounter,
+    reputation, viewport. It is stored as given rather than modelled, because the
+    useful fields change as the game does and a report from an old client should
+    still be readable.
+    """
+    require_csrf(request)
+
+    known = {value for value, _ in Feedback.CATEGORIES}
+    if payload.category not in known:
+        raise HttpError(400, "Pick one of the offered categories.")
+
+    message = payload.message.strip()
+    if len(message) > MAX_MESSAGE_CHARS:
+        raise HttpError(400, f"Keep it under {MAX_MESSAGE_CHARS} characters.")
+
+    context = payload.context if isinstance(payload.context, dict) else {}
+    if len(json.dumps(context, default=str)) > MAX_CONTEXT_BYTES:
+        context = {"truncated": True}
+
+    entry = Feedback.objects.create(
+        anonymous_id=payload.anonymous_id[:64],
+        user=request.user if request.user.is_authenticated else None,
+        category=payload.category,
+        message=message,
+        route=str(context.get("route", ""))[:200],
+        quest_id=str(context.get("quest_id") or "")[:64],
+        encounter_id=str(context.get("encounter_id") or "")[:64],
+        content_version=str(context.get("content_version") or "")[:32],
+        context=context,
+    )
+    return {"recorded": True, "id": entry.pk}

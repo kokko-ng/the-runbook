@@ -32,15 +32,6 @@ def test_the_admin_requires_a_login(client):
     assert "/admin/login" in response["Location"]
 
 
-@pytest.fixture
-def admin(django_user_model, client):
-    user = django_user_model.objects.create_user(
-        username="backoffice", password="long-enough-pass", is_staff=True, is_superuser=True
-    )
-    client.force_login(user)
-    return client
-
-
 @pytest.mark.django_db
 def test_the_back_office_shows_the_coverage_matrix(admin):
     response = admin.get("/admin/qa/coverage/")
