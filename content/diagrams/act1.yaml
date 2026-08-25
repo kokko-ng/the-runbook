@@ -4,6 +4,10 @@
 #
 # The linter rejects any diagram op in a quest that names something not declared
 # here, which is what keeps the living map from filling up with typos.
+#
+# On coordinates: the map lays groups out in the order they are declared below
+# and compacts each column, so x is an authoring hint and only y matters, as
+# the order of a node within its group.
 act: 1
 groups:
   - id: onprem

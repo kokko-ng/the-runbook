@@ -179,6 +179,16 @@ encounters:
 
       Marek does not look up from his screen, which is his way of telling you the
       question is a test.
+    sketch:
+      caption: What Dana is picturing, and the link she assumes comes free
+      nodes:
+        - {id: app, label: vnet-app, kind: vnet, col: 0, row: 0, note: 10.20.0.0/16}
+        - {id: hub, label: vnet-hub, kind: vnet, col: 1, row: 0, note: 10.10.0.0/16}
+        - {id: depot, label: vnet-depot, kind: vnet, col: 2, row: 0, note: 10.30.0.0/16}
+      edges:
+        - {source: app, target: hub, label: peering}
+        - {source: hub, target: depot, label: peering}
+        - {source: app, target: depot, label: assumed, tone: problem}
     prompt: What do you tell Dana?
     options:
       - id: a

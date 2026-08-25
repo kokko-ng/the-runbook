@@ -26,6 +26,18 @@ encounters:
 
       "The application has one connection string," says Grace. "I would prefer it
       stayed that way after a failover."
+    sketch:
+      caption: One name the application connects to, whichever region is primary
+      nodes:
+        - {id: app, label: Dispatch, kind: aks, col: 0, row: 1}
+        - {id: listener, label: Failover group listener, kind: dns, col: 1, row: 1, tone: proposed}
+        - {id: primary, label: transport, kind: sql-database, col: 2, row: 0, note: Southeast Asia}
+        - {id: secondary, label: transport, kind: sql-database, col: 2, row: 2, note: East Asia, tone: proposed}
+      edges:
+        - {source: app, target: listener, label: one connection string}
+        - {source: listener, target: primary, label: read-write}
+        - {source: listener, target: secondary, label: on failover, tone: proposed}
+        - {source: primary, target: secondary, label: geo-replication, tone: proposed}
     prompt: What do you recommend?
     options:
       - id: a

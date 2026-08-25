@@ -90,6 +90,22 @@ encounters:
 
       "Everything outbound has to be inspected, and the security team want one
       place to write the rules."
+    sketch:
+      caption: Two regions, and the question of what sits in the middle of each
+      nodes:
+        - {id: onprem, label: Jurong and Port Klang, kind: onprem, col: 0, row: 1}
+        - {id: hubsea, label: Hub, kind: vnet, col: 1, row: 0, note: Southeast Asia}
+        - {id: hubea, label: Hub, kind: vnet, col: 1, row: 2, note: East Asia, tone: proposed}
+        - {id: lz1, label: sub-lz-transport, kind: subscription, col: 2, row: 0}
+        - {id: lz2, label: sub-lz-analytics, kind: subscription, col: 2, row: 1}
+        - {id: lz3, label: Straits workloads, kind: subscription, col: 2, row: 2, tone: proposed}
+      edges:
+        - {source: onprem, target: hubsea, label: ExpressRoute}
+        - {source: onprem, target: hubea, label: VPN backup, tone: proposed}
+        - {source: hubsea, target: lz1}
+        - {source: hubsea, target: lz2}
+        - {source: hubea, target: lz3, tone: proposed}
+        - {source: hubsea, target: hubea, label: hub to hub, tone: proposed}
     prompt: What hub design do you recommend?
     options:
       - id: a

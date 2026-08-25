@@ -27,6 +27,20 @@ encounters:
 
       Southeast Asia has availability zones. Both machines will use premium solid
       state disks and need to reach the same virtual network.
+    sketch:
+      caption: One region, three zones, and two machines to place in them
+      nodes:
+        - {id: z1, label: Zone 1, kind: zone, col: 0, row: 0}
+        - {id: z2, label: Zone 2, kind: zone, col: 1, row: 0}
+        - {id: z3, label: Zone 3, kind: zone, col: 2, row: 0}
+        - {id: vm1, label: vm-tms01, kind: vm, col: 0, row: 1, note: running today}
+        - {id: vm2, label: vm-tms02, kind: vm, col: 1, row: 1, note: to place, tone: proposed}
+        - {id: lb, label: ilb-tms, kind: load-balancer, col: 1, row: 2, tone: proposed}
+      edges:
+        - {source: vm1, target: z1}
+        - {source: vm2, target: z2, tone: proposed}
+        - {source: lb, target: vm1}
+        - {source: lb, target: vm2, tone: proposed}
     prompt: How do you place the two machines?
     options:
       - id: a
