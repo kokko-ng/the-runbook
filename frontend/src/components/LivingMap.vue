@@ -14,8 +14,13 @@ import '@vue-flow/core/dist/theme-default.css'
  * The world map is the company's Azure estate.
  *
  * Nodes appear as the story deploys them and turn red when an incident touches
- * them. Positions come from the content registry, but each column is compacted
- * at render time so the diagram stays tight while it is still half empty.
+ * them.
+ *
+ * The layout is computed here rather than taken from the registry. The registry
+ * decides which group a node belongs to and the order within it; this decides
+ * where the columns go. That means two groups can never collide because someone
+ * gave them the same x, and empty columns close up while the estate is still
+ * half built.
  */
 const props = withDefaults(defineProps<{ act?: string; compact?: boolean }>(), {
   act: 'act1',
@@ -35,9 +40,14 @@ const EDGE_TONE: Record<NodeStatus, string> = {
   planned: 'var(--color-planned)',
 }
 
+const COLUMN_WIDTH = 264
+const ROW_HEIGHT = 88
+const HEADER_OFFSET = 96
+
 const nodes = computed<Node[]>(() => {
   const diagram = game.save?.diagram
   if (!spec.value || !diagram) return []
+
   const byGroup = new Map<string, typeof spec.value.nodes>()
   for (const node of spec.value.nodes) {
     if (!diagram.nodes[node.id]?.present) continue
@@ -46,14 +56,22 @@ const nodes = computed<Node[]>(() => {
     byGroup.set(node.group, bucket)
   }
 
+  // Columns follow the order the groups are declared in, skipping any group
+  // with nothing deployed in it yet.
+  const order = (spec.value.groups ?? []).map((group) => group.id)
+  const visible = [...byGroup.keys()].sort(
+    (a, b) => (order.indexOf(a) + 1 || 999) - (order.indexOf(b) + 1 || 999),
+  )
+
   const out: Node[] = []
-  for (const [groupId, members] of byGroup) {
-    const label = spec.value.groups.find((group) => group.id === groupId)?.label ?? groupId
-    const column = members[0].x
+  visible.forEach((groupId, columnIndex) => {
+    const members = byGroup.get(groupId) ?? []
+    const label = spec.value?.groups.find((group) => group.id === groupId)?.label ?? groupId
+    const column = columnIndex * COLUMN_WIDTH
     out.push({
       id: `group:${groupId}`,
       type: 'default',
-      position: { x: column, y: -80 },
+      position: { x: column, y: -HEADER_OFFSET },
       draggable: false,
       selectable: false,
       connectable: false,
@@ -70,7 +88,7 @@ const nodes = computed<Node[]>(() => {
         out.push({
           id: node.id,
           type: 'resource',
-          position: { x: column, y: position * 84 },
+          position: { x: column, y: position * ROW_HEIGHT },
           draggable: false,
           selectable: false,
           connectable: false,
@@ -82,7 +100,7 @@ const nodes = computed<Node[]>(() => {
           },
         })
       })
-  }
+  })
   return out
 })
 

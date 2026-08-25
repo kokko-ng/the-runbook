@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SketchDiagram from '@/components/SketchDiagram.vue'
 import type { LogEntry } from '@/engine'
 
 defineProps<{ entry: LogEntry }>()
@@ -45,6 +46,9 @@ defineProps<{ entry: LogEntry }>()
       </div>
       <p v-if="entry.note" class="text-xs text-ink-500 dark:text-ink-400">{{ entry.note }}</p>
     </div>
+
+    <!-- The topology being argued about, drawn from the encounter's own data. -->
+    <SketchDiagram v-else-if="entry.kind === 'sketch'" :sketch="entry.sketch" />
 
     <div v-else-if="entry.kind === 'choice'" class="text-sm">
       <span class="text-ink-500 dark:text-ink-400">You went with: </span>

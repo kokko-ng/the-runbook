@@ -58,6 +58,30 @@ export interface Ticket {
   severity?: 'sev1' | 'sev2' | 'sev3' | 'sev4'
 }
 
+export interface SketchNode {
+  id: string
+  label: string
+  kind: string
+  col: number
+  row: number
+  note?: string
+  tone?: 'normal' | 'proposed' | 'problem'
+}
+
+export interface SketchEdge {
+  source: string
+  target: string
+  label?: string
+  tone?: 'normal' | 'proposed' | 'problem'
+}
+
+/** A small diagram drawn inline in the feed, authored as data rather than an image. */
+export interface Sketch {
+  caption: string
+  nodes: SketchNode[]
+  edges?: SketchEdge[]
+}
+
 interface EncounterBase {
   id: string
   title: string
@@ -65,6 +89,7 @@ interface EncounterBase {
   speaker?: string
   objectives?: string[]
   on_enter?: DiagramOp[]
+  sketch?: Sketch
   resolution?: string
 }
 
@@ -236,6 +261,7 @@ export interface DiagramState {
 export type LogEntry =
   | { seq: number; kind: 'intro'; text: string; speaker?: string; title: string }
   | { seq: number; kind: 'ticket'; ticket: Ticket }
+  | { seq: number; kind: 'sketch'; sketch: Sketch }
   | { seq: number; kind: 'reveal'; id: string; action: string; reveals: string; speaker?: string }
   | { seq: number; kind: 'command'; id: string; cmd: string; output: string; note?: string; cost: number }
   | { seq: number; kind: 'choice'; option_id: string; label: string; correct: boolean }

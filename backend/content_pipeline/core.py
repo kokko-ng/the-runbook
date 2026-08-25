@@ -663,6 +663,7 @@ def _validate_encounters(
                 )
 
         problems += _validate_ops(encounter.get("on_enter", []), nodes, edges, f"{spot}.on_enter")
+        problems += _validate_sketch(encounter.get("sketch"), spot)
 
         etype = encounter.get("type")
         if etype in ("design", "knowledge"):
@@ -670,6 +671,32 @@ def _validate_encounters(
         elif etype == "troubleshoot":
             problems += _validate_options(encounter.get("fixes", []), nodes, edges, spot, "fixes")
             problems += _validate_troubleshoot(encounter, spot, speakers)
+    return problems
+
+
+def _validate_sketch(sketch: dict[str, Any] | None, spot: str) -> list[Problem]:
+    """An inline diagram has to be readable and internally consistent."""
+    if not sketch:
+        return []
+    problems: list[Problem] = []
+    problems += check_prose(sketch.get("caption", ""), f"{spot}.sketch.caption")
+    ids = [node["id"] for node in sketch.get("nodes", [])]
+    duplicates = {node_id for node_id in ids if ids.count(node_id) > 1}
+    for duplicate in sorted(duplicates):
+        problems.append(Problem(spot, f"sketch has two nodes with id {duplicate}"))
+    cells = [(node["col"], node["row"]) for node in sketch.get("nodes", [])]
+    for cell in sorted({cell for cell in cells if cells.count(cell) > 1}):
+        problems.append(Problem(spot, f"sketch puts two nodes in the same cell {cell}"))
+    for node in sketch.get("nodes", []):
+        problems += check_prose(node["label"], f"{spot}.sketch/{node['id']}.label")
+        if node.get("note"):
+            problems += check_prose(node["note"], f"{spot}.sketch/{node['id']}.note")
+    for edge in sketch.get("edges", []):
+        for end in ("source", "target"):
+            if edge[end] not in ids:
+                problems.append(Problem(spot, f"sketch edge points at unknown node {edge[end]}"))
+        if edge.get("label"):
+            problems += check_prose(edge["label"], f"{spot}.sketch.edge.label")
     return problems
 
 

@@ -300,6 +300,9 @@
         "resolution": {
           "type": "string",
           "minLength": 10
+        },
+        "sketch": {
+          "$ref": "#/$defs/sketch"
         }
       },
       "allOf": [
@@ -384,7 +387,8 @@
           "items": {
             "$ref": "#/$defs/option"
           }
-        }
+        },
+        "sketch": true
       }
     },
     "knowledgeEncounter": {
@@ -422,7 +426,8 @@
           "items": {
             "$ref": "#/$defs/option"
           }
-        }
+        },
+        "sketch": true
       }
     },
     "troubleshootEncounter": {
@@ -578,6 +583,110 @@
           "maxItems": 4,
           "items": {
             "$ref": "#/$defs/option"
+          }
+        },
+        "sketch": true
+      }
+    },
+    "sketch": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A small diagram drawn inline in the feed: the topology under discussion, as data rather than an image.",
+      "required": [
+        "caption",
+        "nodes"
+      ],
+      "properties": {
+        "caption": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 160
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "label",
+              "kind",
+              "col",
+              "row"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40
+              },
+              "kind": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+$"
+              },
+              "col": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5
+              },
+              "row": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 5
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "tone": {
+                "enum": [
+                  "normal",
+                  "proposed",
+                  "problem"
+                ],
+                "default": "normal"
+              }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source",
+              "target"
+            ],
+            "properties": {
+              "source": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+$"
+              },
+              "target": {
+                "type": "string",
+                "pattern": "^[a-z0-9-]+$"
+              },
+              "label": {
+                "type": "string",
+                "maxLength": 28
+              },
+              "tone": {
+                "enum": [
+                  "normal",
+                  "proposed",
+                  "problem"
+                ],
+                "default": "normal"
+              }
+            }
           }
         }
       }

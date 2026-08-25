@@ -5,19 +5,41 @@
   "description": "Declares every node and edge the story is allowed to touch, plus the state the diagram starts an act in.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["act", "groups", "nodes", "edges"],
+  "required": [
+    "act",
+    "groups",
+    "nodes",
+    "edges"
+  ],
   "properties": {
-    "act": {"type": "integer", "enum": [1, 2]},
+    "act": {
+      "type": "integer",
+      "enum": [
+        1,
+        2
+      ]
+    },
     "groups": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "label"],
+        "required": [
+          "id",
+          "label"
+        ],
         "properties": {
-          "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
-          "label": {"type": "string", "minLength": 1},
-          "note": {"type": "string"}
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "note": {
+            "type": "string"
+          }
         }
       }
     },
@@ -27,21 +49,56 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "label", "kind", "group", "x", "y"],
+        "required": [
+          "id",
+          "label",
+          "kind",
+          "group",
+          "x",
+          "y"
+        ],
         "properties": {
-          "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
-          "label": {"type": "string", "minLength": 1},
-          "kind": {"type": "string", "pattern": "^[a-z0-9-]+$"},
-          "group": {"type": "string", "pattern": "^[a-z0-9-]+$"},
-          "x": {"type": "number"},
-          "y": {"type": "number"},
-          "detail": {"type": "string"},
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "group": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "x": {
+            "type": "number",
+            "description": "Authoring hint only. The map assigns columns from the group order, so two groups can never collide because they were given the same x."
+          },
+          "y": {
+            "type": "number",
+            "description": "Orders this node within its group, top to bottom."
+          },
+          "detail": {
+            "type": "string"
+          },
           "present": {
             "type": "boolean",
             "default": false,
             "description": "true when the node already exists at the start of the act."
           },
-          "status": {"enum": ["healthy", "degraded", "broken", "planned"], "default": "healthy"}
+          "status": {
+            "enum": [
+              "healthy",
+              "degraded",
+              "broken",
+              "planned"
+            ],
+            "default": "healthy"
+          }
         }
       }
     },
@@ -50,15 +107,50 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "source", "target"],
+        "required": [
+          "id",
+          "source",
+          "target"
+        ],
         "properties": {
-          "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
-          "source": {"type": "string", "pattern": "^[a-z0-9-]+$"},
-          "target": {"type": "string", "pattern": "^[a-z0-9-]+$"},
-          "label": {"type": "string"},
-          "kind": {"enum": ["network", "identity", "data", "traffic", "backup"], "default": "network"},
-          "present": {"type": "boolean", "default": false},
-          "status": {"enum": ["healthy", "degraded", "broken", "planned"], "default": "healthy"}
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "source": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "network",
+              "identity",
+              "data",
+              "traffic",
+              "backup"
+            ],
+            "default": "network"
+          },
+          "present": {
+            "type": "boolean",
+            "default": false
+          },
+          "status": {
+            "enum": [
+              "healthy",
+              "degraded",
+              "broken",
+              "planned"
+            ],
+            "default": "healthy"
+          }
         }
       }
     }

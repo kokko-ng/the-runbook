@@ -3,6 +3,10 @@
 # Act 2 opens with the acquisition of Straits Freight, so the diagram starts
 # nearly empty on purpose. Nodes appear as designs are agreed, which makes the
 # map a record of decisions rather than an inventory.
+#
+# On coordinates: the map lays groups out in the order they are declared below
+# and compacts each column, so x is an authoring hint and only y matters, as
+# the order of a node within its group.
 act: 2
 groups:
   - id: acquired

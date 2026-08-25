@@ -212,6 +212,7 @@ function beginRun(encounter: Encounter, quest: Quest, index: number): EncounterR
     text: encounter.intro,
     ...(encounter.speaker ? { speaker: encounter.speaker } : {}),
   })
+  if (encounter.sketch) push(run, { kind: 'sketch', sketch: encounter.sketch })
   return run
 }
 
