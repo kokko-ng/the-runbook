@@ -3,6 +3,7 @@ import { onMounted } from 'vue'
 
 import AppFooter from '@/components/AppFooter.vue'
 import AppHeader from '@/components/AppHeader.vue'
+import FeedbackButton from '@/components/FeedbackButton.vue'
 import ToastStack from '@/components/ToastStack.vue'
 import { useAccountStore } from '@/stores/account'
 import { useContentStore } from '@/stores/content'
@@ -29,7 +30,7 @@ onMounted(async () => {
   </a>
   <div class="flex min-h-dvh flex-col">
     <AppHeader />
-    <main id="main" class="mx-auto w-full max-w-7xl grow px-3 py-4 sm:px-5 sm:py-6">
+    <main id="main" class="mx-auto w-full max-w-7xl grow px-3 py-4 pb-20 sm:px-5 sm:py-6 sm:pb-20">
       <p
         v-if="content.error"
         class="card mb-4 border-broken/40 p-4 text-sm text-broken"
@@ -48,6 +49,7 @@ onMounted(async () => {
       <RouterView />
     </main>
     <AppFooter />
+    <FeedbackButton />
     <ToastStack />
   </div>
 </template>

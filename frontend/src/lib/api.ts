@@ -72,6 +72,11 @@ export const api = {
       }),
     }),
   deleteSave: () => request<{ deleted: boolean }>('/api/save', { method: 'DELETE' }),
+  feedback: (body: { category: string; message: string; anonymous_id: string; context: unknown }) =>
+    request<{ recorded: boolean; id: number }>('/api/feedback', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   events: (events: unknown[]) =>
     request<{ recorded: number }>('/api/events', {
       method: 'POST',

@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "accounts",
     "saves",
     "analytics",
+    "feedback",
     "content_pipeline",
 ]
 
