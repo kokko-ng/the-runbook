@@ -1,5 +1,6 @@
 """The linter is the safety net for hundreds of authored files, so test it."""
 
+import collections
 import copy
 import json
 
@@ -146,6 +147,39 @@ def test_the_bundle_carries_every_quest_and_the_legal_pages(library, tmp_path):
         quest.id for quest in library.quests
     }
     assert (tmp_path / "legal" / "privacy.md").exists()
+
+
+def test_the_right_answer_is_not_always_the_first_one(library):
+    """Authors write the correct answer first; the bundle must not ship it there."""
+    positions = collections.Counter()
+    lists = 0
+    for quest in library.quests:
+        for encounter in core.deal_answers(quest)["encounters"]:
+            for field_name in ("options", "fixes"):
+                choices = encounter.get(field_name)
+                if not choices:
+                    continue
+                lists += 1
+                positions[next(i for i, c in enumerate(choices) if c.get("correct"))] += 1
+    assert lists > 100
+    # Every seat is used, and no seat holds more than a third of the answers.
+    assert set(positions) == {0, 1, 2, 3}
+    assert max(positions.values()) < lists / 3
+
+
+def test_dealing_answers_is_stable_and_lossless(library):
+    quest = next(q for q in library.quests if any("options" in e for e in q.encounters))
+    first = core.deal_answers(quest)
+    second = core.deal_answers(quest)
+    assert first == second
+    for authored, dealt in zip(quest.encounters, first["encounters"]):
+        if "options" not in authored:
+            continue
+        assert sorted(o["id"] for o in dealt["options"]) == sorted(
+            o["id"] for o in authored["options"]
+        )
+        # The authored file itself is never rewritten.
+        assert authored["options"][0]["correct"] is True
 
 
 def test_schemas_are_valid_json(library):

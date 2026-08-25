@@ -77,7 +77,7 @@ const nodes = computed<Node[]>(() => {
       connectable: false,
       data: { label },
       class:
-        'rounded-md border-0 bg-transparent px-0 text-xs font-semibold uppercase tracking-wide text-ink-500',
+        'map-group rounded-md border-0 bg-transparent px-0 text-xs font-semibold uppercase tracking-wide',
       style: { width: '208px' },
     })
     members
@@ -120,8 +120,6 @@ const edges = computed<Edge[]>(() => {
         label: props.compact ? undefined : edge.label,
         animated: status === 'broken',
         style: { stroke: EDGE_TONE[status], strokeWidth: status === 'healthy' ? 1.5 : 2.5 },
-        labelBgStyle: { fill: 'transparent' },
-        labelStyle: { fontSize: '10px', fill: 'var(--color-ink-500)' },
       } satisfies Edge
     })
 })
@@ -171,5 +169,22 @@ watch(
 }
 :deep(.vue-flow__handle) {
   opacity: 0.35;
+}
+:deep(.map-group) {
+  color: var(--color-map-label);
+}
+/* Edge labels sit on the wires themselves. The halo keeps them readable on
+   either theme without a solid box that would hide what runs behind it. */
+:deep(.vue-flow__edge-textbg) {
+  display: none;
+}
+:deep(.vue-flow__edge-text) {
+  fill: var(--color-map-label);
+  font-size: 11px;
+  font-weight: 500;
+  paint-order: stroke;
+  stroke: var(--color-map-halo);
+  stroke-width: 4px;
+  stroke-linejoin: round;
 }
 </style>
