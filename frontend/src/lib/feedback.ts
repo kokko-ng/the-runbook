@@ -103,3 +103,22 @@ export function buildFeedbackContext(snapshot: FeedbackSnapshot): FeedbackContex
 export function describeContext(context: FeedbackContext): string {
   return JSON.stringify(context, null, 2)
 }
+
+/**
+ * Where the feedback sheet has to sit, and how tall it may be.
+ *
+ * A fixed element is laid out against the layout viewport, which does not
+ * shrink when a phone raises its keyboard, so a bottom sheet would end up
+ * behind it. The visual viewport does shrink: `inset` is how much of the
+ * layout viewport is covered, and `maxHeight` is what is left to draw in.
+ */
+export function sheetMetrics(
+  layoutHeight: number,
+  visual?: { height: number; offsetTop: number } | null,
+): { inset: number; maxHeight: number } {
+  const usable = visual ? visual.height : layoutHeight
+  const inset = visual
+    ? Math.max(0, Math.round(layoutHeight - visual.height - visual.offsetTop))
+    : 0
+  return { inset, maxHeight: Math.max(260, Math.round(usable * 0.94)) }
+}

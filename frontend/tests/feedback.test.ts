@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildFeedbackContext, FEEDBACK_CATEGORIES } from '../src/lib/feedback'
+import { buildFeedbackContext, FEEDBACK_CATEGORIES, sheetMetrics } from '../src/lib/feedback'
 import { createSave, reduce } from '../src/engine'
 import type { SaveState } from '../src/engine'
 import { NOW, incident, index } from './fixtures'
@@ -117,5 +117,29 @@ describe('the feedback context', () => {
       'idea',
       'praise',
     ])
+  })
+})
+
+describe('the feedback sheet on a phone', () => {
+  it('fills the screen when no keyboard is up', () => {
+    const { inset, maxHeight } = sheetMetrics(812, { height: 812, offsetTop: 0 })
+    expect(inset).toBe(0)
+    expect(maxHeight).toBe(763)
+  })
+
+  it('sits on top of the keyboard rather than behind it', () => {
+    // iPhone-ish: 812 tall, keyboard takes the bottom 392.
+    const { inset, maxHeight } = sheetMetrics(812, { height: 420, offsetTop: 0 })
+    expect(inset).toBe(392)
+    expect(maxHeight).toBe(395)
+  })
+
+  it('accounts for a viewport the browser has scrolled up', () => {
+    expect(sheetMetrics(812, { height: 420, offsetTop: 40 }).inset).toBe(352)
+  })
+
+  it('stays usable on a short landscape phone and without visualViewport', () => {
+    expect(sheetMetrics(280, { height: 200, offsetTop: 0 }).maxHeight).toBe(260)
+    expect(sheetMetrics(667, null)).toEqual({ inset: 0, maxHeight: 627 })
   })
 })
