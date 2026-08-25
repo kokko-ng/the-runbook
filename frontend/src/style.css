@@ -47,6 +47,18 @@
     @apply bg-ink-950 text-ink-100;
   }
 
+  /* The living map paints labels straight onto the canvas, over the lines it
+     draws, so they carry their own color and a halo that punches through. */
+  :root {
+    --color-map-label: var(--color-ink-600);
+    --color-map-halo: oklch(1 0 0 / 0.88);
+  }
+
+  .dark {
+    --color-map-label: var(--color-ink-200);
+    --color-map-halo: oklch(0.16 0.024 252 / 0.88);
+  }
+
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-signal-500;
   }

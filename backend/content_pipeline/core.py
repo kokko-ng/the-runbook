@@ -14,6 +14,7 @@ import hashlib
 import json
 import re
 import unicodedata
+from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -869,6 +870,37 @@ def content_version(library: Library) -> str:
     return digest.hexdigest()[:12]
 
 
+def _dealt_order(seed: str, count: int) -> list[int]:
+    """A stable seating order for one encounter's answers.
+
+    Authors write the correct answer first because a quest file reads better
+    that way, but shipping it first would make every question free. The bundle
+    therefore deals the answers into an order derived from the encounter's own
+    identity: the same content always compiles to the same order, so a save
+    made against one build still lines up with the next, and no position is
+    systematically the right one.
+    """
+    order = list(range(count))
+    digest = hashlib.blake2b(seed.encode(), digest_size=16).digest()
+    for index in range(count - 1, 0, -1):
+        swap = digest[(count - 1 - index) % len(digest)] % (index + 1)
+        order[index], order[swap] = order[swap], order[index]
+    return order
+
+
+def deal_answers(quest: Quest) -> dict[str, Any]:
+    """A copy of the quest with every answer list dealt out of authoring order."""
+    data = deepcopy(quest.data)
+    for encounter in data.get("encounters", []):
+        for field_name in ("options", "fixes"):
+            choices = encounter.get(field_name)
+            if not choices:
+                continue
+            order = _dealt_order(f"{quest.id}/{encounter['id']}/{field_name}", len(choices))
+            encounter[field_name] = [choices[index] for index in order]
+    return data
+
+
 def build_bundle(library: Library, out_dir: Path | None = None) -> dict[str, Any]:
     out_dir = Path(out_dir or build_dir())
     quests_dir = out_dir / "quests"
@@ -945,7 +977,7 @@ def build_bundle(library: Library, out_dir: Path | None = None) -> dict[str, Any
 
     _write_json(out_dir / "index.json", index)
     for quest in library.quests:
-        _write_json(quests_dir / f"{quest.id}.json", quest.data)
+        _write_json(quests_dir / f"{quest.id}.json", deal_answers(quest))
     _write_json(
         out_dir / "coverage.json",
         {
