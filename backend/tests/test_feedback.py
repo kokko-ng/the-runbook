@@ -30,7 +30,8 @@ def post(client, payload):
 
 @pytest.mark.django_db
 def test_feedback_records_where_the_player_was(client):
-    response = post(client, {"category": "confusing", "message": "  The fix list contradicts the log.  ",
+    response = post(client, {"category": "confusing",
+                             "message": "  The fix list contradicts the log.  ",
                              "anonymous_id": "abc123", "context": CONTEXT})
     assert response.status_code == 200
     assert response.json()["recorded"] is True

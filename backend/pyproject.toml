@@ -20,9 +20,4 @@ python_files = ["test_*.py"]
 testpaths = ["tests"]
 pythonpath = ["."]
 
-[tool.ruff]
-line-length = 100
-target-version = "py313"
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+# Ruff is configured repo-wide in /.ruff.toml.

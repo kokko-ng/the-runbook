@@ -54,7 +54,9 @@ def legal_page(request, page: str):
     source = settings.CONTENT_DIR / "legal" / f"{page}.md"
     if not source.exists():
         raise Http404(page)
-    return HttpResponse(source.read_text(encoding="utf-8"), content_type="text/plain; charset=utf-8")
+    return HttpResponse(
+        source.read_text(encoding="utf-8"), content_type="text/plain; charset=utf-8"
+    )
 
 
 @ensure_csrf_cookie

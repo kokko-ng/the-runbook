@@ -403,7 +403,9 @@ def check_prose(text: str, where: str) -> list[Problem]:
     for word in lowered:
         if word in BRITISH_SPELLINGS:
             problems.append(
-                Problem(where, f"en-GB spelling {word!r}; Azure docs use {BRITISH_SPELLINGS[word]!r}")
+                Problem(
+                    where, f"en-GB spelling {word!r}; Azure docs use {BRITISH_SPELLINGS[word]!r}"
+                )
             )
     return problems
 
@@ -459,7 +461,9 @@ def validate(
         for chapter in library.world["chapters"]:
             if not library.quests_in(chapter["id"]):
                 problems.append(
-                    Problem(f"chapter {chapter['id']}", "has no quests, and every chapter must ship")
+                    Problem(
+                        f"chapter {chapter['id']}", "has no quests, and every chapter must ship"
+                    )
                 )
     return problems
 
@@ -516,14 +520,19 @@ def _validate_world(library: Library) -> list[Problem]:
             problems.append(Problem("world.yaml", f"chapter {chapter['id']} has unknown rank"))
         if chapter["domain"] not in domain_ids:
             problems.append(
-                Problem("world.yaml", f"chapter {chapter['id']} maps to unknown domain {chapter['domain']}")
+                Problem(
+                    "world.yaml",
+                    f"chapter {chapter['id']} maps to unknown domain {chapter['domain']}",
+                )
             )
         problems += check_prose(chapter["blurb"], f"world.yaml:{chapter['id']}.blurb")
 
     for act in world["acts"]:
         for chapter_id in act["chapters"]:
             if chapter_id not in chapter_ids:
-                problems.append(Problem("world.yaml", f"act {act['id']} lists unknown chapter {chapter_id}"))
+                problems.append(
+                    Problem("world.yaml", f"act {act['id']} lists unknown chapter {chapter_id}")
+                )
 
     # Every domain in the inventory needs a chapter to live in, or its objectives
     # can never be reached.
@@ -553,11 +562,15 @@ def _validate_diagrams(library: Library) -> list[Problem]:
         known = set(node_ids)
         for node in data.get("nodes", []):
             if node["group"] not in group_ids:
-                problems.append(Problem(where, f"node {node['id']} sits in undeclared group {node['group']}"))
+                problems.append(
+                    Problem(where, f"node {node['id']} sits in undeclared group {node['group']}")
+                )
         for edge in data.get("edges", []):
             for end in ("source", "target"):
                 if edge[end] not in known:
-                    problems.append(Problem(where, f"edge {edge['id']} points at unknown node {edge[end]}"))
+                    problems.append(
+                        Problem(where, f"edge {edge['id']} points at unknown node {edge[end]}")
+                    )
     return problems
 
 
@@ -583,7 +596,9 @@ def _validate_quests(library: Library) -> list[Problem]:
             problems.append(Problem(where, f"unknown chapter {quest.chapter}"))
         expected_dir = library.root / "quests" / _act_of_chapter(quest.chapter)
         if expected_dir not in quest.path.parents:
-            problems.append(Problem(where, f"quest for {quest.chapter} must live under {expected_dir.name}/"))
+            problems.append(
+                Problem(where, f"quest for {quest.chapter} must live under {expected_dir.name}/")
+            )
 
         if quest.is_bonus:
             if not quest.bonus_of:
@@ -593,7 +608,9 @@ def _validate_quests(library: Library) -> list[Problem]:
             else:
                 parent = next(q for q in library.quests if q.id == quest.bonus_of)
                 if parent.chapter != quest.chapter:
-                    problems.append(Problem(where, "a bonus quest must sit in the same chapter as its parent"))
+                    problems.append(
+                        Problem(where, "a bonus quest must sit in the same chapter as its parent")
+                    )
         elif quest.bonus_of:
             problems.append(Problem(where, "bonus_of is only meaningful on a bonus quest"))
 
@@ -668,7 +685,9 @@ def _validate_encounters(
 
         etype = encounter.get("type")
         if etype in ("design", "knowledge"):
-            problems += _validate_options(encounter.get("options", []), nodes, edges, spot, "options")
+            problems += _validate_options(
+                encounter.get("options", []), nodes, edges, spot, "options"
+            )
         elif etype == "troubleshoot":
             problems += _validate_options(encounter.get("fixes", []), nodes, edges, spot, "fixes")
             problems += _validate_troubleshoot(encounter, spot, speakers)
@@ -711,7 +730,9 @@ def _validate_options(
     problems: list[Problem] = []
     correct = [o for o in options if o.get("correct")]
     if len(correct) != 1:
-        problems.append(Problem(spot, f"{label} must hold exactly one correct answer, found {len(correct)}"))
+        problems.append(
+            Problem(spot, f"{label} must hold exactly one correct answer, found {len(correct)}")
+        )
     ids = [o.get("id") for o in options]
     if len(set(ids)) != len(ids):
         problems.append(Problem(spot, f"duplicate option id in {label}"))
@@ -721,12 +742,20 @@ def _validate_options(
         if option.get("correct"):
             if not CORRECT_REP[0] <= rep <= CORRECT_REP[1]:
                 problems.append(
-                    Problem(spot, f"{label}/{oid}: a correct answer restores {CORRECT_REP[0]}-{CORRECT_REP[1]} rep")
+                    Problem(
+                        spot,
+                        f"{label}/{oid}: a correct answer restores "
+                        f"{CORRECT_REP[0]}-{CORRECT_REP[1]} rep",
+                    )
                 )
         else:
             if not WRONG_REP[0] <= rep <= WRONG_REP[1]:
                 problems.append(
-                    Problem(spot, f"{label}/{oid}: a wrong answer costs {-WRONG_REP[1]}-{-WRONG_REP[0]} rep")
+                    Problem(
+                        spot,
+                        f"{label}/{oid}: a wrong answer costs "
+                        f"{-WRONG_REP[1]}-{-WRONG_REP[0]} rep",
+                    )
                 )
             if not option.get("consequence"):
                 problems.append(
@@ -739,7 +768,9 @@ def _validate_options(
     return problems
 
 
-def _validate_troubleshoot(encounter: dict[str, Any], spot: str, speakers: set[str]) -> list[Problem]:
+def _validate_troubleshoot(
+    encounter: dict[str, Any], spot: str, speakers: set[str]
+) -> list[Problem]:
     problems: list[Problem] = []
     budget = encounter.get("time_budget", 0)
     commands = encounter.get("commands", [])
@@ -762,7 +793,9 @@ def _validate_troubleshoot(encounter: dict[str, Any], spot: str, speakers: set[s
         cmd = command.get("cmd", "")
         if not cmd.startswith(ALLOWED_COMMAND_PREFIXES):
             problems.append(
-                Problem(spot, f"commands/{cid}: {cmd.split()[0]!r} is not a recognized diagnostic tool")
+                Problem(
+                    spot, f"commands/{cid}: {cmd.split()[0]!r} is not a recognized diagnostic tool"
+                )
             )
         problems += check_prose(cmd, f"{spot}.commands/{cid}.cmd")
         if command.get("note"):
@@ -772,7 +805,9 @@ def _validate_troubleshoot(encounter: dict[str, Any], spot: str, speakers: set[s
         problems += check_prose(step.get("action", ""), f"{spot}.investigate/{iid}.action")
         problems += check_prose(step.get("reveals", ""), f"{spot}.investigate/{iid}.reveals")
         if step.get("speaker") and step["speaker"] not in speakers:
-            problems.append(Problem(spot, f"investigate/{iid}: speaker {step['speaker']!r} is not in the cast"))
+            problems.append(
+                Problem(spot, f"investigate/{iid}: speaker {step['speaker']!r} is not in the cast")
+            )
     return problems
 
 

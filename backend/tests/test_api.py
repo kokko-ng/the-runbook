@@ -29,7 +29,9 @@ def test_health_is_open(client):
 
 @pytest.mark.django_db
 def test_signup_creates_an_account_and_signs_in(client):
-    response = post(client, "/api/auth/signup", {"username": "joana", "password": "long-enough-pass"})
+    response = post(
+        client, "/api/auth/signup", {"username": "joana", "password": "long-enough-pass"}
+    )
     assert response.status_code == 200
     assert response.json() == {"username": "joana", "authenticated": True}
     assert client.get("/api/auth/me").json()["authenticated"] is True
@@ -49,7 +51,9 @@ def test_signup_rejects_a_weak_password(client):
 
 @pytest.mark.django_db
 def test_signup_rejects_a_taken_username(client, user):
-    response = post(client, "/api/auth/signup", {"username": "marek", "password": "long-enough-pass"})
+    response = post(
+        client, "/api/auth/signup", {"username": "marek", "password": "long-enough-pass"}
+    )
     assert response.status_code == 409
 
 
@@ -61,8 +65,10 @@ def test_signup_rejects_an_unusable_username(client):
 
 @pytest.mark.django_db
 def test_login_and_logout(client, user):
-    assert post(client, "/api/auth/login", {"username": "marek", "password": "wrong-one"}).status_code == 401
-    assert post(client, "/api/auth/login", {"username": "marek", "password": "correct-horse-42"}).status_code == 200
+    wrong = post(client, "/api/auth/login", {"username": "marek", "password": "wrong-one"})
+    assert wrong.status_code == 401
+    right = post(client, "/api/auth/login", {"username": "marek", "password": "correct-horse-42"})
+    assert right.status_code == 200
     assert client.get("/api/auth/me").json()["username"] == "marek"
     client.post("/api/auth/logout")
     assert client.get("/api/auth/me").json()["authenticated"] is False
@@ -94,7 +100,11 @@ def test_a_second_save_overwrites_rather_than_multiplying(client_signed_in):
 
 @pytest.mark.django_db
 def test_an_older_save_is_refused_and_the_newer_one_comes_back(client_signed_in):
-    put(client_signed_in, "/api/save", {**SAVE, "updated_at": "2026-08-24T12:00:00Z", "blob": {"rep": 80}})
+    put(
+        client_signed_in,
+        "/api/save",
+        {**SAVE, "updated_at": "2026-08-24T12:00:00Z", "blob": {"rep": 80}},
+    )
     stale = {**SAVE, "updated_at": "2026-08-24T09:00:00Z", "blob": {"rep": 10}}
     response = put(client_signed_in, "/api/save", stale)
     assert response.status_code == 409
@@ -137,5 +147,7 @@ def test_events_from_a_signed_in_player_are_attributed(client_signed_in):
 @pytest.mark.django_db
 def test_login_refuses_a_cross_site_post_without_a_csrf_token(user):
     strict = Client(enforce_csrf_checks=True)
-    response = post(strict, "/api/auth/login", {"username": "marek", "password": "correct-horse-42"})
+    response = post(
+        strict, "/api/auth/login", {"username": "marek", "password": "correct-horse-42"}
+    )
     assert response.status_code == 403

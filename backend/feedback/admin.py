@@ -10,7 +10,9 @@ from .models import Feedback
 class FeedbackAdmin(admin.ModelAdmin):
     list_display = ("created_at", "category", "summary", "quest_id", "route", "who", "handled")
     list_filter = ("handled", "category", "created_at")
-    search_fields = ("message", "quest_id", "encounter_id", "route", "user__username", "anonymous_id")
+    search_fields = (
+        "message", "quest_id", "encounter_id", "route", "user__username", "anonymous_id",
+    )
     date_hierarchy = "created_at"
     list_editable = ("handled",)
     actions = ["mark_handled", "mark_unhandled"]

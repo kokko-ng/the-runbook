@@ -1,6 +1,6 @@
 name: CI
 
-# Every pull request and every push to main runs the same three checks. A push
+# Every pull request and every push to main runs the same four checks. A push
 # to main that passes them deploys.
 on:
   pull_request:
@@ -26,6 +26,33 @@ env:
   NODE_VERSION: '22'
 
 jobs:
+  checks:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Cache the hook environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: Install
+        run: pip install pre-commit
+      - name: Run every hook over the whole tree
+        run: pre-commit run --all-files --show-diff-on-failure
+      # shellcheck's own hook runs in Docker, which is a heavy thing to need
+      # before a commit lands. The runner already has the binary, and the two
+      # scripts it covers are the ones that deploy the site.
+      - name: Shell scripts
+        run: shellcheck deploy/*.sh
+
   content:
     name: Content lint and coverage
     runs-on: ubuntu-latest
@@ -110,7 +137,7 @@ jobs:
 
   deploy:
     name: Deploy to PythonAnywhere
-    needs: [content, backend, frontend]
+    needs: [checks, content, backend, frontend]
     # A commit can opt out with [skip deploy] in its message, which is how a
     # change lands while the host is mid-maintenance.
     if: >-

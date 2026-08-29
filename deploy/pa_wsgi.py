@@ -75,6 +75,8 @@ _load_env()
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.prod")
 _claim_pending_deploy()
 
+# Imported here rather than at the top of the file on purpose: Django reads
+# DJANGO_SETTINGS_MODULE at import time, and the lines above are what set it.
 from django.core.wsgi import get_wsgi_application  # noqa: E402
 
 application = get_wsgi_application()
