@@ -8,9 +8,18 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# A superseded run is cancelled on every ref except main. On main the run may
+# already be part-way through a production deploy, and killing it leaves the
+# host half-updated with nothing reporting the failure, so those runs are
+# allowed to finish and the deploy job queues them one at a time instead.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+# The repository is public: pull requests from forks run this file. Read-only is
+# all any job needs, and the deploy job is gated to pushes on main.
+permissions:
+  contents: read
 
 env:
   PYTHON_VERSION: '3.13'
@@ -20,8 +29,11 @@ jobs:
   content:
     name: Content lint and coverage
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -54,8 +66,11 @@ jobs:
   backend:
     name: Backend tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -74,8 +89,11 @@ jobs:
   frontend:
     name: Frontend build and tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -99,6 +117,7 @@ jobs:
       github.ref == 'refs/heads/main' && github.event_name == 'push'
       && !contains(github.event.head_commit.message, '[skip deploy]')
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     concurrency:
       group: deploy-production
       cancel-in-progress: false
@@ -109,6 +128,8 @@ jobs:
       PA_HOST: ${{ vars.PYTHONANYWHERE_HOST || 'www.pythonanywhere.com' }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Refuse to deploy without credentials
         run: |
@@ -148,7 +169,7 @@ jobs:
           # The build is served off disk by the host rather than through Python.
           # This is idempotent: it adds only the mappings that are missing.
           api="https://${PA_HOST}/api/v0/user/${PA_USER}/webapps/${PA_DOMAIN}/static_files/"
-          existing=$(curl -sS -H "Authorization: Token ${PA_TOKEN}" "$api")
+          existing=$(curl -sS -f -H "Authorization: Token ${PA_TOKEN}" "$api")
           echo "$existing" | jq -r '.[] | "existing mapping \(.url) -> \(.path)"'
           ensure() {
             if echo "$existing" | jq -e --arg u "$1" 'any(.[]; .url == $u)' > /dev/null; then
