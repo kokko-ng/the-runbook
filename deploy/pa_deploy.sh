@@ -96,7 +96,9 @@ run "${VENV}/bin/pip" install --quiet \
 
 # --- environment --------------------------------------------------------
 set -a
-# shellcheck disable=SC1090
+# The env file is written by hand on the host and is deliberately not in git,
+# so there is nothing here for shellcheck to read and follow.
+# shellcheck source=/dev/null
 [ -f "${HOME_DIR}/.runbook.env" ] && . "${HOME_DIR}/.runbook.env"
 set +a
 export DJANGO_SETTINGS_MODULE=config.settings.prod
