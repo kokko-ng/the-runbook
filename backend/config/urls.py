@@ -10,7 +10,11 @@ urlpatterns = [
     path("api/", api.urls),
     # Machine-readable copies of the pages that have to exist even if the SPA
     # never loads.
-    re_path(r"^(?P<filename>favicon\.svg|robots\.txt|manifest\.webmanifest)$", dist_file, name="dist_file"),
+    re_path(
+        r"^(?P<filename>favicon\.svg|robots\.txt|manifest\.webmanifest)$",
+        dist_file,
+        name="dist_file",
+    ),
     path("legal/privacy.txt", legal_page, {"page": "privacy"}, name="privacy_txt"),
     path("legal/terms.txt", legal_page, {"page": "terms"}, name="terms_txt"),
     # Everything else is the single-page app. The host's static file mappings

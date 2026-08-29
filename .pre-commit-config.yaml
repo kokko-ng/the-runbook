@@ -1,0 +1,49 @@
+# Fast, local checks that run before a commit. Anything that needs the content
+# pipeline, the test suites or a build stays in CI, where it has Django, node
+# and the compiled content bundle to hand.
+exclude: '^(frontend/public/content/|\.legacy/)'
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        # Markdown uses two trailing spaces for a hard line break.
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+
+  # The quests, objectives and diagrams are all YAML, and a duplicate key there
+  # silently drops an authored encounter rather than failing anything.
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+        args: [--strict]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.5
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+
+  # The deploy job talks to a live host, so a typo in the workflow is expensive
+  # to find the slow way.
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+
+  # The repository is public now.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks

@@ -1,0 +1,15 @@
+# The quests, objectives and diagrams are authored YAML full of prose, so the
+# rules worth enforcing are the ones that silently change meaning rather than
+# the ones about shape.
+extends: relaxed
+
+rules:
+  # An encounter's text is a paragraph. Wrapping it at 80 would mean folding
+  # every line of dialogue in the game.
+  line-length: disable
+  # This is the one that matters: a repeated key drops an authored encounter
+  # without failing anything.
+  key-duplicates: enable
+  truthy:
+    # GitHub Actions workflows are keyed on `on:`.
+    check-keys: false

@@ -129,14 +129,17 @@ def test_a_made_up_diagnostic_tool_is_rejected(library):
     quest = _quest(library, "a1net-q02")
     quest.encounters[0]["commands"][0]["cmd"] = "sudo fix-the-network --now"
     quest.data["encounters"] = quest.encounters
-    assert any("not a recognized diagnostic tool" in problem for problem in _problems(library, quest))
+    problems = _problems(library, quest)
+    assert any("not a recognized diagnostic tool" in problem for problem in problems)
 
 
 def test_the_bundle_compiles_deterministically(library, tmp_path):
     first = core.build_bundle(library, tmp_path / "one")
     second = core.build_bundle(library, tmp_path / "two")
     assert first["version"] == second["version"]
-    assert (tmp_path / "one" / "index.json").read_bytes() == (tmp_path / "two" / "index.json").read_bytes()
+    one = (tmp_path / "one" / "index.json").read_bytes()
+    two = (tmp_path / "two" / "index.json").read_bytes()
+    assert one == two
 
 
 def test_the_bundle_carries_every_quest_and_the_legal_pages(library, tmp_path):
@@ -172,7 +175,7 @@ def test_dealing_answers_is_stable_and_lossless(library):
     first = core.deal_answers(quest)
     second = core.deal_answers(quest)
     assert first == second
-    for authored, dealt in zip(quest.encounters, first["encounters"]):
+    for authored, dealt in zip(quest.encounters, first["encounters"], strict=True):
         if "options" not in authored:
             continue
         assert sorted(o["id"] for o in dealt["options"]) == sorted(

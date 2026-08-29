@@ -8,8 +8,7 @@ There are no entitlement checks anywhere because there is nothing to buy.
 from __future__ import annotations
 
 import json
-from datetime import datetime
-from datetime import timezone as dt_timezone
+from datetime import UTC, datetime
 
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth import login as django_login
@@ -209,14 +208,16 @@ def put_save(request, payload: SavePayload):
         raise HttpError(413, "Save is too large.")
     incoming = payload.updated_at
     if timezone.is_naive(incoming):
-        incoming = timezone.make_aware(incoming, dt_timezone.utc)
+        incoming = timezone.make_aware(incoming, UTC)
 
     save = SaveGame.objects.filter(user=request.user).first()
     if save and save.client_updated_at > incoming:
         return Status(
             409,
             SaveOut(
-                schema_version=save.schema_version, updated_at=save.client_updated_at, blob=save.blob
+                schema_version=save.schema_version,
+                updated_at=save.client_updated_at,
+                blob=save.blob,
             ),
         )
     if save is None:
