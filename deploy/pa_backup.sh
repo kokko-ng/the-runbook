@@ -23,7 +23,9 @@ BACKUP_DIR="${HOME_DIR}/backups"
 KEEP=8
 
 set -a
-# shellcheck disable=SC1090
+# The env file is written by hand on the host and is deliberately not in git,
+# so there is nothing here for shellcheck to read and follow.
+# shellcheck source=/dev/null
 [ -f "${HOME_DIR}/.runbook.env" ] && . "${HOME_DIR}/.runbook.env"
 set +a
 
@@ -42,7 +44,10 @@ mysqldump --single-transaction --no-tablespaces \
 
 echo "wrote ${TARGET} ($(du -h "${TARGET}" | cut -f1))"
 
-# Keep the most recent few and drop the rest.
+# Keep the most recent few and drop the rest. This is the case ls is right
+# for: the ordering wanted is by modification time, and the names are not
+# arbitrary but written by this script as runbook-<timestamp>.sql.gz.
+# shellcheck disable=SC2012
 ls -1t "${BACKUP_DIR}"/runbook-*.sql.gz 2>/dev/null | tail -n +$((KEEP + 1)) | while read -r old; do
     rm -f "${old}" && echo "removed ${old}"
 done
