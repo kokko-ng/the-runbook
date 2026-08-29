@@ -35,7 +35,7 @@ const props = withDefaults(defineProps<{ act?: string; compact?: boolean }>(), {
 
 const content = useContentStore()
 const game = useGameStore()
-const { fitView } = useVueFlow()
+const { fitView, onNodesInitialized } = useVueFlow()
 
 const spec = computed<DiagramSpec | undefined>(() => content.index?.diagrams?.[props.act])
 
@@ -176,11 +176,32 @@ const edges = computed<Edge[]>(() => {
     })
 })
 
+/**
+ * Frame the whole act.
+ *
+ * This waits for Vue Flow to have measured the boxes rather than for Vue to
+ * have rendered them. A box has no width until it has been through a layout
+ * pass, and fitting to boxes that still measure zero lands on a zoom that has
+ * nothing to do with the diagram: switching to Act 2 used to settle at 0.86
+ * with eight of its eighteen boxes off the edge of the pane. onNodesInitialized
+ * fires once every box has real dimensions, which is the moment the bounds are
+ * worth reading.
+ *
+ * The act was also only refitted when the number of boxes changed, so two acts
+ * with the same count would have kept the previous act's framing. It watches
+ * which boxes are on screen instead.
+ */
+function frameAct(): void {
+  fitView({ padding: 0.18, duration: 300 })
+}
+
+onNodesInitialized(frameAct)
+
 watch(
-  () => nodes.value.length,
+  () => nodes.value.map((node) => node.id).join(','),
   async () => {
     await nextTick()
-    fitView({ padding: 0.18, duration: 300 })
+    frameAct()
   },
 )
 </script>
