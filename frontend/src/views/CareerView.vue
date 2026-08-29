@@ -17,6 +17,28 @@ function chapterDone(chapterId: string): boolean {
 }
 
 const empty = computed(() => !content.chapters.some((chapter) => chapter.quests.length))
+
+/**
+ * Whether to offer to open an act rather than make the player earn it.
+ *
+ * The two acts are two exams. Somebody who already administers Azure and only
+ * wants AZ-305 should not have to play the whole of AZ-104 first, so an act
+ * whose first chapter is still shut offers a way in. The offer disappears once
+ * the act is reachable, whether it was opened or simply reached.
+ */
+function firstChapterOf(actId: string): string | undefined {
+  return content.acts.find((act) => act.id === actId)?.chapterList[0]?.id
+}
+
+function canOpen(actId: string): boolean {
+  const first = firstChapterOf(actId)
+  if (!first || !game.save) return false
+  return !game.chapterOpen(first)
+}
+
+function openAct(actId: string): void {
+  game.dispatch({ type: 'open_act', act: actId })
+}
 </script>
 
 <template>
@@ -33,12 +55,26 @@ const empty = computed(() => !content.chapters.some((chapter) => chapter.quests.
     </p>
 
     <section v-for="act in content.acts" :key="act.id" class="space-y-6">
-      <div class="border-l-4 border-signal-600 pl-3">
-        <h2 class="text-lg font-semibold tracking-tight">
-          Act {{ act.number }} &middot; {{ act.title }}
-        </h2>
-        <p class="text-sm text-ink-500 dark:text-ink-400">{{ act.tagline }} ({{ act.exam }})</p>
+      <div class="flex flex-wrap items-end justify-between gap-3 border-l-4 border-signal-600 pl-3">
+        <div>
+          <h2 class="text-lg font-semibold tracking-tight">
+            Act {{ act.number }} &middot; {{ act.title }}
+          </h2>
+          <p class="text-sm text-ink-500 dark:text-ink-400">{{ act.tagline }} ({{ act.exam }})</p>
+        </div>
+        <button
+          v-if="canOpen(act.id)"
+          class="btn-quiet shrink-0"
+          type="button"
+          @click="openAct(act.id)"
+        >
+          Start here instead
+        </button>
       </div>
+      <p v-if="canOpen(act.id)" class="max-w-2xl pl-3 text-sm text-ink-500 dark:text-ink-400">
+        {{ act.exam }} is a separate exam. Start here and its chapters open from the first one;
+        Act {{ act.number - 1 }} stays exactly where you left it.
+      </p>
 
       <section
         v-for="chapter in act.chapterList"

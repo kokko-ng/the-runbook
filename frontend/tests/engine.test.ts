@@ -7,11 +7,12 @@ import {
   buildTrees,
   createSave,
   migrateSave,
+  chapterUnlocked,
   questAvailability,
   readiness,
   reduce,
 } from '../src/engine'
-import type { Action, EngineContext, SaveState } from '../src/engine'
+import type { Action, ContentIndex, EngineContext, SaveState } from '../src/engine'
 import { NOW, index, questById } from './fixtures'
 
 function ctx(questId?: string): EngineContext {
@@ -347,5 +348,81 @@ describe('save migration', () => {
     const migrated = migrateSave(save, index, NOW)
     expect(migrated.progress.objectives).toEqual(['AZ104-4.1.2'])
     expect(migrated.diagram.nodes['vnet-depot'].present).toBe(false)
+  })
+})
+
+describe('starting at an act instead of earning it', () => {
+  // The shipped content is two acts and two exams; the fixture is one act, so
+  // this bolts a second one on rather than reshaping what every other test uses.
+  const twoActs: ContentIndex = {
+    ...index,
+    acts: [
+      ...index.acts,
+      { id: 'act2', number: 2, exam: 'AZ-305', title: 'The Design Review', tagline: '', chapters: ['act2-identity', 'act2-data'] },
+    ],
+    chapters: [
+      ...index.chapters,
+      {
+        id: 'act2-identity',
+        act: 'act2',
+        order: 3,
+        domain: 'AZ305-1',
+        title: 'Identity and Governance',
+        rank: 'junior-cloud-admin',
+        blurb: '',
+        quests: [
+          { id: 'q-a2-first', title: 'First', summary: '', variant: 'core', bonus_of: null, objectives: [], estimated_minutes: 10, encounter_count: 1, encounter_types: ['design'] },
+        ],
+      },
+      {
+        id: 'act2-data',
+        act: 'act2',
+        order: 4,
+        domain: 'AZ305-2',
+        title: 'Data Platforms',
+        rank: 'junior-cloud-admin',
+        blurb: '',
+        quests: [
+          { id: 'q-a2-second', title: 'Second', summary: '', variant: 'core', bonus_of: null, objectives: [], estimated_minutes: 10, encounter_count: 1, encounter_types: ['design'] },
+        ],
+      },
+    ],
+  }
+  const at = (state: SaveState, action: Action) =>
+    reduce(state, action, { index: twoActs, quest: null, now: NOW })
+
+  it('keeps the second act shut until the first one is finished', () => {
+    const save = createSave(twoActs, NOW)
+    expect(chapterUnlocked(save, twoActs, 'act2-identity')).toBe(false)
+  })
+
+  it('opens the act on request without touching the act before it', () => {
+    const opened = at(createSave(twoActs, NOW), { type: 'open_act', act: 'act2' }).state
+    expect(opened.progress.acts_opened).toEqual(['act2'])
+    expect(chapterUnlocked(opened, twoActs, 'act2-identity')).toBe(true)
+    // Act 1 is untouched: nothing was completed on the player's behalf.
+    expect(opened.progress.quests_completed).toEqual([])
+    expect(chapterUnlocked(opened, twoActs, 'act1-monitoring')).toBe(false)
+  })
+
+  it('opens the act at its first chapter, not all of it at once', () => {
+    const opened = at(createSave(twoActs, NOW), { type: 'open_act', act: 'act2' }).state
+    expect(chapterUnlocked(opened, twoActs, 'act2-identity')).toBe(true)
+    expect(chapterUnlocked(opened, twoActs, 'act2-data')).toBe(false)
+  })
+
+  it('refuses an act that is not in the build, and refuses to open one twice', () => {
+    const fresh = createSave(twoActs, NOW)
+    expect(at(fresh, { type: 'open_act', act: 'act9' }).events[0]).toMatchObject({ type: 'rejected' })
+    const opened = at(fresh, { type: 'open_act', act: 'act2' }).state
+    expect(at(opened, { type: 'open_act', act: 'act2' }).events[0]).toMatchObject({ type: 'rejected' })
+  })
+
+  it('gives an older save the field rather than throwing it away', () => {
+    const old = createSave(twoActs, NOW)
+    delete (old.progress as Partial<SaveState['progress']>).acts_opened
+    const migrated = migrateSave(old, twoActs, NOW)
+    expect(migrated.progress.acts_opened).toEqual([])
+    expect(chapterUnlocked(migrated, twoActs, 'act2-identity')).toBe(false)
   })
 })

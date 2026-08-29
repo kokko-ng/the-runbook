@@ -67,6 +67,7 @@ export function createSave(index: ContentIndex, now: string): SaveState {
       first_try: [],
       objectives: [],
       chapter_checkpoints: {},
+      acts_opened: [],
     },
     history: [],
     stats: { pips: 0, correct: 0, wrong: 0, quests: 0 },
@@ -123,11 +124,19 @@ export function chapterUnlocked(state: SaveState, index: ContentIndex, chapterId
   const ordered = [...index.chapters].sort((a, b) => a.order - b.order)
   const position = ordered.findIndex((chapter) => chapter.id === chapterId)
   if (position <= 0) return true
-  return ordered
-    .slice(0, position)
-    .every((chapter) =>
-      coreQuests(chapter).every((quest) => state.progress.quests_completed.includes(quest.id)),
-    )
+  const chapter = ordered[position]
+  // Normally every chapter ahead of this one has to be clear. An act the player
+  // opened directly is exempt from the acts before it: inside that act the
+  // chapters still run in order, so the AZ-305 material opens at its first
+  // chapter rather than all at once.
+  const opened = state.progress.acts_opened ?? []
+  const earlier = ordered.slice(0, position)
+  const required = opened.includes(chapter.act)
+    ? earlier.filter((entry) => entry.act === chapter.act)
+    : earlier
+  return required.every((entry) =>
+    coreQuests(entry).every((quest) => state.progress.quests_completed.includes(quest.id)),
+  )
 }
 
 export interface Availability {
@@ -253,7 +262,29 @@ export function reduce(state: SaveState, action: Action, ctx: EngineContext): En
       return usePerk(state, action.perk, ctx)
     case 'restart_checkpoint':
       return restartCheckpoint(state, ctx)
+    case 'open_act':
+      return openAct(state, action.act, ctx)
   }
+}
+
+/**
+ * Start at an act instead of arriving at it.
+ *
+ * The two acts are two exams, and somebody sitting AZ-305 should not have to
+ * play all of AZ-104 to reach it. Opening an act only lifts the gate between
+ * acts: the chapters inside it still unlock one after another, and nothing
+ * already completed is touched.
+ */
+function openAct(state: SaveState, actId: string, ctx: EngineContext): EngineResult {
+  const act = ctx.index.acts.find((entry) => entry.id === actId)
+  if (!act) return reject(state, 'That act is not in this build.')
+  if ((state.progress.acts_opened ?? []).includes(actId)) {
+    return reject(state, 'That act is already open.')
+  }
+  const next = copy(state)
+  next.progress.acts_opened = [...(next.progress.acts_opened ?? []), actId]
+  next.updated_at = ctx.now
+  return { state: next, events: [{ type: 'act_opened', act_id: actId }] }
 }
 
 function startQuest(state: SaveState, questId: string, ctx: EngineContext): EngineResult {

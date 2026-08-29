@@ -320,6 +320,12 @@ export interface Progress {
   first_try: string[]
   objectives: string[]
   chapter_checkpoints: Record<string, string>
+  /**
+   * Acts the player asked to start at rather than arriving at by finishing the
+   * one before. An act in here stands on its own: its chapters unlock in their
+   * own order and owe nothing to the act ahead of it.
+   */
+  acts_opened: string[]
 }
 
 export interface SaveState {
@@ -353,6 +359,7 @@ export type Action =
   | { type: 'buy_perk'; perk: PerkId }
   | { type: 'use_perk'; perk: PerkId }
   | { type: 'restart_checkpoint' }
+  | { type: 'open_act'; act: string }
 
 export type GameEvent =
   | { type: 'quest_start'; quest_id: string }
@@ -364,6 +371,7 @@ export type GameEvent =
   | { type: 'perk_use'; perk: PerkId }
   | { type: 'rejected'; reason: string }
   | { type: 'objectives'; ids: string[] }
+  | { type: 'act_opened'; act_id: string }
 
 export interface EngineResult {
   state: SaveState
