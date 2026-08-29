@@ -16,6 +16,19 @@ import { computed, type CSSProperties } from 'vue'
  * parked in the nearest empty lane instead: the gap between two columns for a
  * link that runs across, and the gap between two rows for one that runs down a
  * column.
+ *
+ * A label in a row gap is held clear of the box the wire leaves by, and it is
+ * the label's own near edge that is held clear, not its centre. Holding the
+ * centre a fixed distance away only ever moves the first line: a label that
+ * wraps to two puts the second line back inside the box, which is what
+ * "password hash sync" did to Entra Connect. Anchoring the edge and shifting by
+ * the label's own height leaves it clear whether it runs to one line or four.
+ *
+ * It stays anchored to the box the wire leaves by rather than sitting midway
+ * between the two ends, because the two ends are not always one row apart. A
+ * link down a column can skip a row, and the midpoint of that one is over the
+ * box in between: that is "site-to-site VPN" landing on AD. The lane the wire
+ * leaves into is empty by construction, so that is where the words go.
  */
 const props = defineProps<{
   id: string
@@ -34,9 +47,6 @@ const props = defineProps<{
 }>()
 
 const text = computed(() => (typeof props.label === 'string' ? props.label : ''))
-
-/** How far outside a box a label sits when it has a row gap to sit in. */
-const ROW_CLEARANCE = 13
 
 /** The same curve Vue Flow's bezier edge draws, kept here so it can be sampled. */
 const curve = computed(() => {
@@ -69,15 +79,40 @@ function at(t: number): { x: number; y: number } {
   }
 }
 
-const anchor = computed<{ x: number; y: number }>(() => {
-  const acrossColumns =
-    props.sourcePosition === Position.Left || props.sourcePosition === Position.Right
+/** Kept off the boxes either side of a column gutter. */
+const LANE_INSET = 16
 
-  if (!acrossColumns) {
-    // Down or up a column: the gap between two rows, just clear of the box the
-    // wire leaves by.
+/** True when the wire runs between columns rather than down one. */
+const acrossColumns = computed(
+  () => props.sourcePosition === Position.Left || props.sourcePosition === Position.Right,
+)
+
+/**
+ * How wide the words may run before they wrap. A label between two columns has
+ * only the gutter, and reaching past it would touch the box alongside. A label
+ * in a row gap has a whole box width of empty space, so it gets that: wider
+ * means fewer lines, and fewer lines is what keeps it inside the gap.
+ */
+const labelWidth = computed(() =>
+  acrossColumns.value
+    ? props.grid.columnWidth - props.grid.nodeWidth - LANE_INSET
+    : props.grid.nodeWidth,
+)
+
+/** How far the near edge of a label sits from the box the wire leaves by. */
+const ROW_CLEARANCE = 8
+
+const anchor = computed<{ x: number; y: number; shift: string }>(() => {
+  if (!acrossColumns.value) {
+    // Down or up a column: the lane the wire leaves into, which is empty
+    // whether or not the far end is the very next row. `shift` puts the
+    // label's near edge on the anchor, so extra lines grow away from the box.
     const heading = props.sourcePosition === Position.Bottom ? 1 : -1
-    return { x: props.sourceX, y: props.sourceY + heading * ROW_CLEARANCE }
+    return {
+      x: (props.sourceX + props.targetX) / 2,
+      y: props.sourceY + heading * ROW_CLEARANCE,
+      shift: heading === 1 ? '0' : '-100%',
+    }
   }
 
   // Across: the middle of whichever gap between two columns the wire crosses
@@ -87,7 +122,7 @@ const anchor = computed<{ x: number; y: number }>(() => {
   const low = Math.min(props.sourceX, props.targetX)
   const high = Math.max(props.sourceX, props.targetX)
 
-  let best: { x: number; y: number } | null = null
+  let best: { x: number; y: number; shift: string } | null = null
   let bestDistanceFromMiddle = Number.POSITIVE_INFINITY
   for (let column = Math.floor(low / columnWidth); column <= Math.ceil(high / columnWidth); column++) {
     const lane = column * columnWidth + nodeWidth + gap / 2
@@ -106,10 +141,10 @@ const anchor = computed<{ x: number; y: number }>(() => {
     const distanceFromMiddle = Math.abs(closest - 0.5)
     if (distanceFromMiddle < bestDistanceFromMiddle) {
       bestDistanceFromMiddle = distanceFromMiddle
-      best = { x: lane, y: at(closest).y }
+      best = { x: lane, y: at(closest).y, shift: '-50%' }
     }
   }
-  return best ?? at(0.5)
+  return best ?? { ...at(0.5), shift: '-50%' }
 })
 </script>
 
@@ -118,7 +153,10 @@ const anchor = computed<{ x: number; y: number }>(() => {
   <EdgeLabelRenderer v-if="text">
     <div
       class="map-wire-label"
-      :style="{ transform: `translate(-50%, -50%) translate(${anchor.x}px, ${anchor.y}px)` }"
+      :style="{
+        transform: `translate(-50%, ${anchor.shift}) translate(${anchor.x}px, ${anchor.y}px)`,
+        maxWidth: `${labelWidth}px`,
+      }"
     >
       {{ text }}
     </div>
@@ -128,8 +166,6 @@ const anchor = computed<{ x: number; y: number }>(() => {
 <style scoped>
 .map-wire-label {
   position: absolute;
-  /* The gap between two columns, so a label never reaches the box beside it. */
-  max-width: var(--map-gutter, 8rem);
   border-radius: 4px;
   padding: 1px 5px;
   background: var(--color-map-halo);

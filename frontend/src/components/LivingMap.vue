@@ -186,7 +186,7 @@ watch(
 </script>
 
 <template>
-  <div class="relative h-full w-full" :style="{ '--map-gutter': `${GUTTER - 16}px` }">
+  <div class="relative h-full w-full">
     <p
       v-if="!nodes.length"
       class="grid h-full place-items-center px-6 text-center text-sm text-ink-500 dark:text-ink-400"
