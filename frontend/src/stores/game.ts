@@ -11,6 +11,7 @@ import { computed, ref, shallowRef } from 'vue'
 
 import {
   buildTrees,
+  chapterUnlocked,
   createSave,
   currentEncounter,
   migrateSave,
@@ -125,6 +126,10 @@ export const useGameStore = defineStore('game', () => {
       case 'perk_buy':
         track('perk_buy', { outcome: event.perk })
         break
+      case 'act_opened':
+        ui.toast('Act 2 is open. The AZ-305 chapters start from the first one.', 'good')
+        track('act_opened', { outcome: event.act_id })
+        break
       case 'objectives':
         ui.toast(
           event.ids.length === 1
@@ -192,6 +197,12 @@ export const useGameStore = defineStore('game', () => {
     return questAvailability(save.value, content.index, questId)
   }
 
+  /** Whether a chapter can be entered at all, ignoring quest order inside it. */
+  function chapterOpen(chapterId: string): boolean {
+    if (!save.value || !content.index) return false
+    return chapterUnlocked(save.value, content.index, chapterId)
+  }
+
   const hasProgress = computed(
     () =>
       Boolean(save.value) &&
@@ -211,6 +222,7 @@ export const useGameStore = defineStore('game', () => {
     dirty,
     hasProgress,
     boot,
+    chapterOpen,
     dispatch,
     startQuest,
     resume,

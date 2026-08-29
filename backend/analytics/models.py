@@ -17,6 +17,7 @@ class AnalyticsEvent(models.Model):
         ("choice", "Choice made"),
         ("pip", "Reputation hit zero"),
         ("perk_buy", "Perk purchased"),
+        ("act_opened", "Act opened without finishing the one before"),
     ]
 
     anonymous_id = models.CharField(max_length=64, blank=True, db_index=True)
