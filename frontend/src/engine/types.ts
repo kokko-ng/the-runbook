@@ -33,6 +33,29 @@ export interface Option {
   diagram?: DiagramOp[]
 }
 
+export interface PostMortemOption {
+  id: string
+  label: string
+  correct: boolean
+  explain: string
+}
+
+/**
+ * The follow-up a mentor asks after the first wrong answer: what actually went
+ * wrong there? Answering it well claws back some of the reputation just lost.
+ */
+export interface PostMortem {
+  question: string
+  speaker?: string
+  options: PostMortemOption[]
+}
+
+/** The diagnostic path a senior would have run, shown once the fix lands. */
+export interface PostIncident {
+  path: string[]
+  text: string
+}
+
 export interface InvestigateStep {
   id: string
   action: string
@@ -91,6 +114,9 @@ interface EncounterBase {
   on_enter?: DiagramOp[]
   sketch?: Sketch
   resolution?: string
+  /** A nudge toward the governing principle, spent via the hint perk. */
+  hint?: string
+  post_mortem?: PostMortem
 }
 
 export interface DesignEncounter extends EncounterBase {
@@ -112,6 +138,7 @@ export interface TroubleshootEncounter extends EncounterBase {
   investigate: InvestigateStep[]
   commands: CommandStep[]
   fixes: Option[]
+  post_incident?: PostIncident
 }
 
 export type Encounter = DesignEncounter | KnowledgeEncounter | TroubleshootEncounter
@@ -130,6 +157,13 @@ export interface Quest {
   encounters: Encounter[]
 }
 
+export interface EncounterSummary {
+  id: string
+  type: EncounterType
+  /** Effective objectives: the encounter's own, or the quest's when it has none. */
+  objectives: string[]
+}
+
 export interface QuestSummary {
   id: string
   title: string
@@ -140,6 +174,12 @@ export interface QuestSummary {
   estimated_minutes: number
   encounter_count: number
   encounter_types: EncounterType[]
+  /**
+   * One entry per encounter. Lets the engine map an objective to the cleared
+   * encounters that cover it without loading every quest file: review drills
+   * and save migration both lean on it.
+   */
+  encounters?: EncounterSummary[]
 }
 
 export interface Chapter {
@@ -243,7 +283,7 @@ export interface ContentIndex {
 // save state
 // --------------------------------------------------------------------------
 
-export const SAVE_SCHEMA_VERSION = 1
+export const SAVE_SCHEMA_VERSION = 2
 
 export type PerkId = 'hint' | 'overtime' | 'rep_shield'
 
@@ -275,6 +315,22 @@ export type LogEntry =
     }
   | { seq: number; kind: 'resolution'; text: string }
   | { seq: number; kind: 'system'; text: string }
+  | { seq: number; kind: 'hint'; text: string }
+  | { seq: number; kind: 'post_mortem_ask'; question: string; speaker?: string }
+  | {
+      seq: number
+      kind: 'post_mortem'
+      correct: boolean
+      label: string
+      explain: string
+      rep_delta: number
+    }
+  | {
+      seq: number
+      kind: 'post_incident'
+      text: string
+      steps: { cmd: string; label?: string; ran: boolean }[]
+    }
 
 /** Omit that distributes over a union, so log entries keep their shape. */
 export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
@@ -295,6 +351,11 @@ export interface EncounterRun {
   shield: boolean
   resolved: boolean
   outcome: 'first_try' | 'recovered' | null
+  /** True when this run is a drill from the review queue, not the story. */
+  review: boolean
+  hint_used: boolean
+  /** Set once the first wrong answer opens a post-mortem; null before that. */
+  post_mortem: { pending: boolean; loss: number } | null
   log: LogEntry[]
   seq: number
 }
@@ -319,6 +380,12 @@ export interface Progress {
   encounters_cleared: string[]
   first_try: string[]
   objectives: string[]
+  /**
+   * Objectives cleared without a wrong turn somewhere along the way. The skill
+   * tree shows the difference: covered is "you have seen it", mastered is "it
+   * held up". A lapse in a review drill takes an objective back out.
+   */
+  mastered: string[]
   chapter_checkpoints: Record<string, string>
   /**
    * Acts the player asked to start at rather than arriving at by finishing the
@@ -326,6 +393,25 @@ export interface Progress {
    * own order and owe nothing to the act ahead of it.
    */
   acts_opened: string[]
+}
+
+/** One objective's place in the spaced-review schedule. */
+export interface ReviewItem {
+  /** ISO instant after which the objective is due for a drill. */
+  due: string
+  /** Index into REVIEW_INTERVALS_DAYS; grows on recall, resets on a lapse. */
+  interval: number
+  /** When the objective was last earned or drilled. */
+  last: string
+}
+
+export interface ReviewSession {
+  mode: 'due' | 'act'
+  act?: string
+  items: { quest_id: string; encounter_id: string }[]
+  index: number
+  correct: number
+  wrong: number
 }
 
 export interface SaveState {
@@ -341,8 +427,11 @@ export interface SaveState {
   active: EncounterRun | null
   diagram: DiagramState
   progress: Progress
+  /** The spaced-review schedule, one entry per objective the player has lit. */
+  review: Record<string, ReviewItem>
+  review_session: ReviewSession | null
   history: HistoryEntry[]
-  stats: { pips: number; correct: number; wrong: number; quests: number }
+  stats: { pips: number; correct: number; wrong: number; quests: number; drills: number }
 }
 
 // --------------------------------------------------------------------------
@@ -354,12 +443,16 @@ export type Action =
   | { type: 'investigate'; id: string }
   | { type: 'command'; id: string }
   | { type: 'choose'; option_id: string }
+  | { type: 'post_mortem'; option_id: string }
   | { type: 'advance' }
   | { type: 'abandon' }
   | { type: 'buy_perk'; perk: PerkId }
   | { type: 'use_perk'; perk: PerkId }
   | { type: 'restart_checkpoint' }
   | { type: 'open_act'; act: string }
+  | { type: 'start_review'; mode: 'due' }
+  | { type: 'start_review'; mode: 'act'; act: string }
+  | { type: 'review_next' }
 
 export type GameEvent =
   | { type: 'quest_start'; quest_id: string }
@@ -372,6 +465,13 @@ export type GameEvent =
   | { type: 'rejected'; reason: string }
   | { type: 'objectives'; ids: string[] }
   | { type: 'act_opened'; act_id: string }
+  | { type: 'post_mortem'; quest_id: string; encounter_id: string; correct: boolean }
+  /** Objectives promoted to mastered after being merely covered before. */
+  | { type: 'mastered'; ids: string[] }
+  | { type: 'review_start'; mode: 'due' | 'act'; quest_id: string }
+  /** The drill moved on to an encounter in another quest; load it and send review_next. */
+  | { type: 'review_advance'; quest_id: string }
+  | { type: 'review_complete'; mode: 'due' | 'act'; correct: number; wrong: number }
 
 export interface EngineResult {
   state: SaveState

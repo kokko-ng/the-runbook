@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import type { Option } from '@/engine'
+/** Anything with an id and a label deals: options, fixes, post-mortem answers. */
+interface Choice {
+  id: string
+  label: string
+}
 
 defineProps<{
-  options: Option[]
+  options: Choice[]
   eliminated: string[]
   disabled: boolean
   prompt?: string

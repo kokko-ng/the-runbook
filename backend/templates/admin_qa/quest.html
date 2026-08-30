@@ -6,6 +6,7 @@
 {% for encounter in quest.encounters %}
   <h2>{{ encounter.id }} &middot; {{ encounter.type }} &middot; {{ encounter.title }}</h2>
   <p>{{ encounter.intro }}</p>
+  {% if encounter.hint %}<p><strong>Hint:</strong> {{ encounter.hint }}</p>{% endif %}
   {% if encounter.options %}
     <table class="qa-table">
       <thead><tr><th>Id</th><th>Option</th><th>Correct</th><th>Rep</th><th>Explanation</th></tr></thead>
@@ -34,6 +35,23 @@
     <div class="qa-mono">{% for command in encounter.commands %}$ {{ command.cmd }}
 {{ command.output }}
 {% endfor %}</div>
+    {% if encounter.post_incident %}
+      <h3>Post-incident review (path: {{ encounter.post_incident.path|join:", " }})</h3>
+      <p>{{ encounter.post_incident.text }}</p>
+    {% endif %}
+  {% endif %}
+  {% if encounter.post_mortem %}
+    <h3>Post-mortem: {{ encounter.post_mortem.question }}</h3>
+    <table class="qa-table">
+      <thead><tr><th>Id</th><th>Answer</th><th>Correct</th><th>Explanation</th></tr></thead>
+      <tbody>
+      {% for option in encounter.post_mortem.options %}
+        <tr><td>{{ option.id }}</td><td>{{ option.label }}</td>
+            <td>{% if option.correct %}<span class="qa-pill qa-ok">yes</span>{% else %}no{% endif %}</td>
+            <td>{{ option.explain }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
   {% endif %}
 {% endfor %}
 {% endblock %}

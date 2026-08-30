@@ -77,9 +77,20 @@ const totals = computed(() => {
         </div>
         <div>
           <dt class="text-ink-500 dark:text-ink-400">Objectives</dt>
-          <dd>{{ game.examReadiness.covered }} / {{ game.examReadiness.total }}</dd>
+          <dd>
+            {{ game.examReadiness.mastered }} solid /
+            {{ game.examReadiness.covered }} of {{ game.examReadiness.total }}
+          </dd>
         </div>
       </dl>
+      <div v-if="game.reviewDue().length" class="mt-4 flex flex-wrap items-center gap-3">
+        <RouterLink to="/review" class="btn-quiet">
+          Follow-ups due: {{ game.reviewDue().length }}
+        </RouterLink>
+        <p class="text-xs text-ink-500 dark:text-ink-400">
+          Cleared objectives come due for a drill; recall them before they fade.
+        </p>
+      </div>
     </section>
   </div>
 </template>

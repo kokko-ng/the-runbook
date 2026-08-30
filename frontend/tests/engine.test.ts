@@ -2,21 +2,28 @@ import { describe, expect, it } from 'vitest'
 
 import {
   REP_AFTER_PIP,
-  REP_BONUS_UNLOCK,
   REP_START,
+  actDrillReady,
   buildTrees,
   createSave,
+  dueObjectives,
   migrateSave,
   chapterUnlocked,
   questAvailability,
   readiness,
   reduce,
+  selectDueDrill,
 } from '../src/engine'
 import type { Action, ContentIndex, EngineContext, SaveState } from '../src/engine'
 import { NOW, index, questById } from './fixtures'
 
-function ctx(questId?: string): EngineContext {
-  return { index, quest: questId ? questById(questId) : null, now: NOW }
+function ctx(questId?: string, now = NOW): EngineContext {
+  return { index, quest: questId ? questById(questId) : null, now }
+}
+
+/** An instant a number of days after the test epoch. */
+function later(days: number): string {
+  return new Date(Date.parse(NOW) + days * 24 * 60 * 60 * 1000).toISOString()
 }
 
 function run(state: SaveState, actions: [Action, string?][]): SaveState {
@@ -60,12 +67,12 @@ describe('progression gates', () => {
     expect(questAvailability(save, index, 'q-incident').unlocked).toBe(false)
   })
 
-  it('keeps bonus scenarios shut until reputation is high enough', () => {
+  it('opens a bonus scenario once its original ticket is closed, whatever the rep', () => {
     const save = fresh()
-    save.progress.quests_completed = ['q-design', 'q-incident']
-    save.rep = REP_BONUS_UNLOCK - 1
+    save.rep = 41
     expect(questAvailability(save, index, 'q-bonus').unlocked).toBe(false)
-    save.rep = REP_BONUS_UNLOCK
+    save.progress.quests_completed = ['q-design', 'q-incident']
+    // Struggling players need the extra practice most; low rep is no bar.
     expect(questAvailability(save, index, 'q-bonus').unlocked).toBe(true)
   })
 
@@ -95,20 +102,49 @@ describe('design decisions', () => {
     expect(state.diagram.edges['e-hub-depot'].present).toBe(true)
   })
 
-  it('costs reputation for a wrong answer, teaches, and lets you choose again', () => {
+  it('costs reputation for a wrong answer, teaches, and opens the post-mortem', () => {
     const state = run(fresh(), [[{ type: 'start_quest', quest_id: 'q-design' }, 'q-design']])
     const wrong = reduce(state, { type: 'choose', option_id: 'b' }, ctx('q-design')).state
     expect(wrong.rep).toBe(REP_START - 10)
     expect(wrong.active?.resolved).toBe(false)
     expect(wrong.active?.eliminated).toEqual(['b'])
-    const feedback = wrong.active?.log.at(-1)
-    expect(feedback).toMatchObject({ kind: 'feedback', correct: false })
+    expect(wrong.active?.post_mortem).toMatchObject({ pending: true, loss: -10 })
+    expect(wrong.active?.log.at(-1)).toMatchObject({ kind: 'post_mortem_ask' })
 
-    const recovered = reduce(wrong, { type: 'choose', option_id: 'a' }, ctx('q-design')).state
+    // The encounter stays shut until the post-mortem is walked.
+    const blocked = reduce(wrong, { type: 'choose', option_id: 'a' }, ctx('q-design'))
+    expect(blocked.events[0]).toMatchObject({ type: 'rejected' })
+
+    // Naming the real failure claws back half the loss.
+    const walked = reduce(wrong, { type: 'post_mortem', option_id: 'a' }, ctx('q-design')).state
+    expect(walked.rep).toBe(REP_START - 10 + 5)
+    expect(walked.active?.post_mortem).toMatchObject({ pending: false })
+
+    const recovered = reduce(walked, { type: 'choose', option_id: 'a' }, ctx('q-design')).state
     expect(recovered.active?.outcome).toBe('recovered')
     // No first-try bonus and no skill point once you have already missed.
-    expect(recovered.rep).toBe(REP_START - 10 + 6)
+    expect(recovered.rep).toBe(REP_START - 10 + 5 + 6)
     expect(recovered.skill_points).toBe(0)
+  })
+
+  it('pays nothing back for a post-mortem answer that misses the lesson', () => {
+    const state = run(fresh(), [
+      [{ type: 'start_quest', quest_id: 'q-design' }, 'q-design'],
+      [{ type: 'choose', option_id: 'b' }, 'q-design'],
+    ])
+    const walked = reduce(state, { type: 'post_mortem', option_id: 'b' }, ctx('q-design')).state
+    expect(walked.rep).toBe(REP_START - 10)
+    expect(walked.active?.post_mortem).toMatchObject({ pending: false })
+    // The encounter reopens either way; understanding is checked, not gated on.
+    const recovered = reduce(walked, { type: 'choose', option_id: 'a' }, ctx('q-design')).state
+    expect(recovered.active?.outcome).toBe('recovered')
+  })
+
+  it('refuses an answer dispatched against the wrong quest', () => {
+    const state = run(fresh(), [[{ type: 'start_quest', quest_id: 'q-design' }, 'q-design']])
+    const result = reduce(state, { type: 'choose', option_id: 'a' }, ctx('q-incident'))
+    expect(result.events[0]).toMatchObject({ type: 'rejected' })
+    expect(result.state.rep).toBe(REP_START)
   })
 
   it('will not let you pick an option that is already ruled out', () => {
@@ -258,13 +294,23 @@ describe('perks', () => {
     expect(state.perks_bought.hint).toBe(8)
   })
 
-  it('rules out a wrong option with a hint', () => {
-    let state = withPoints(1)
+  it('nudges toward the principle with a hint, ruling nothing out', () => {
+    let state = withPoints(2)
+    state = reduce(state, { type: 'buy_perk', perk: 'hint' }, ctx()).state
     state = reduce(state, { type: 'buy_perk', perk: 'hint' }, ctx()).state
     state = reduce(state, { type: 'start_quest', quest_id: 'q-design' }, ctx('q-design')).state
     state = reduce(state, { type: 'use_perk', perk: 'hint' }, ctx('q-design')).state
-    expect(state.active?.eliminated).toEqual(['b'])
-    expect(state.perks.hint).toBe(0)
+    // Telling the options apart stays the player's job.
+    expect(state.active?.eliminated).toEqual([])
+    expect(state.active?.log.at(-1)).toMatchObject({
+      kind: 'hint',
+      text: 'Think about what a peering needs on each side before it connects.',
+    })
+    expect(state.perks.hint).toBe(1)
+    // One nudge per encounter; the second stays in the pocket.
+    const again = reduce(state, { type: 'use_perk', perk: 'hint' }, ctx('q-design'))
+    expect(again.events[0]).toMatchObject({ type: 'rejected' })
+    expect(again.state.perks.hint).toBe(1)
   })
 
   it('halves the next hit with a shield and then drops it', () => {
@@ -332,6 +378,182 @@ describe('skill trees', () => {
   })
 })
 
+describe('the post-incident review', () => {
+  it('lays the senior path next to what the player actually ran', () => {
+    let state = fresh()
+    state.progress.quests_completed = ['q-design']
+    state = run(state, [
+      [{ type: 'start_quest', quest_id: 'q-incident' }, 'q-incident'],
+      [{ type: 'command', id: 'a' }, 'q-incident'],
+      [{ type: 'choose', option_id: 'a' }, 'q-incident'],
+    ])
+    const review = state.active?.log.at(-1)
+    expect(review).toMatchObject({ kind: 'post_incident' })
+    if (review?.kind !== 'post_incident') throw new Error('no post-incident entry')
+    expect(review.steps.map((step) => step.ran)).toEqual([true, false])
+    expect(review.steps[1].cmd).toContain('rg-depot')
+  })
+})
+
+describe('mastery', () => {
+  it('marks a first-try objective solid and schedules the longer rest', () => {
+    const state = run(fresh(), [
+      [{ type: 'start_quest', quest_id: 'q-design' }, 'q-design'],
+      [{ type: 'choose', option_id: 'a' }, 'q-design'],
+    ])
+    expect(state.progress.mastered).toContain('AZ104-4.1.2')
+    expect(state.review['AZ104-4.1.2']).toMatchObject({ interval: 1, due: later(3) })
+  })
+
+  it('holds the ladder for recalls that come before the date', () => {
+    // Several encounters can cover one objective in a single sitting; recall
+    // before the date is massed practice and must not stretch the rest.
+    const primed = fresh()
+    primed.review['AZ104-4.1.2'] = { interval: 1, due: later(3), last: NOW }
+    const state = run(primed, [
+      [{ type: 'start_quest', quest_id: 'q-design' }, 'q-design'],
+      [{ type: 'choose', option_id: 'a' }, 'q-design'],
+    ])
+    expect(state.review['AZ104-4.1.2']).toMatchObject({ interval: 1, due: later(3) })
+  })
+
+  it('covers but does not master an objective recovered on a later try', () => {
+    const state = run(fresh(), [
+      [{ type: 'start_quest', quest_id: 'q-design' }, 'q-design'],
+      [{ type: 'choose', option_id: 'b' }, 'q-design'],
+      [{ type: 'post_mortem', option_id: 'a' }, 'q-design'],
+      [{ type: 'choose', option_id: 'a' }, 'q-design'],
+    ])
+    expect(state.progress.objectives).toContain('AZ104-4.1.2')
+    expect(state.progress.mastered).not.toContain('AZ104-4.1.2')
+    // Shaky knowledge comes due tomorrow, not next week.
+    expect(state.review['AZ104-4.1.2']).toMatchObject({ interval: 0, due: later(1) })
+  })
+})
+
+describe('review drills', () => {
+  /** Both quests closed, everything first try, three objectives resting. */
+  function veteran(): SaveState {
+    return run(fresh(), [
+      [{ type: 'start_quest', quest_id: 'q-design' }, 'q-design'],
+      [{ type: 'choose', option_id: 'a' }, 'q-design'],
+      [{ type: 'advance' }, 'q-design'],
+      [{ type: 'choose', option_id: 'a' }, 'q-design'],
+      [{ type: 'advance' }, 'q-design'],
+      [{ type: 'start_quest', quest_id: 'q-incident' }, 'q-incident'],
+      [{ type: 'choose', option_id: 'a' }, 'q-incident'],
+      [{ type: 'advance' }, 'q-incident'],
+    ])
+  }
+
+  it('has nothing due until the dates arrive, then queues the overdue', () => {
+    const state = veteran()
+    expect(dueObjectives(index, state, NOW)).toEqual([])
+    expect(dueObjectives(index, state, later(4))).toEqual([
+      'AZ104-4.1.2',
+      'AZ104-4.1.4',
+      'AZ104-4.1.5',
+    ])
+    expect(selectDueDrill(index, state, later(4))).toEqual([
+      { quest_id: 'q-design', encounter_id: 'a' },
+      { quest_id: 'q-design', encounter_id: 'b' },
+      { quest_id: 'q-incident', encounter_id: 'a' },
+    ])
+  })
+
+  it('walks the queue with no rep at stake, promoting and demoting as it goes', () => {
+    let state = veteran()
+    const at = later(4)
+    const go = (action: Action, questId?: string) => {
+      const result = reduce(state, action, ctx(questId, at))
+      state = result.state
+      return result
+    }
+
+    const opened = go({ type: 'start_review', mode: 'due' })
+    expect(opened.events[0]).toMatchObject({ type: 'review_start', quest_id: 'q-design' })
+    go({ type: 'review_next' }, 'q-design')
+    expect(state.active).toMatchObject({ review: true, encounter_id: 'a' })
+
+    const repBefore = state.rep
+    const pointsBefore = state.skill_points
+    go({ type: 'choose', option_id: 'a' }, 'q-design')
+    // Rep never moves in a drill; a clean recall pays a point and a longer rest.
+    expect(state.rep).toBe(repBefore)
+    expect(state.skill_points).toBe(pointsBefore + 1)
+    expect(state.review['AZ104-4.1.2']).toMatchObject({ interval: 2 })
+
+    const moved = go({ type: 'advance' }, 'q-design')
+    expect(moved.events[0]).toMatchObject({ type: 'review_advance', quest_id: 'q-design' })
+    go({ type: 'review_next' }, 'q-design')
+    expect(state.active?.encounter_id).toBe('b')
+    go({ type: 'choose', option_id: 'a' }, 'q-design')
+    go({ type: 'advance' }, 'q-design')
+    go({ type: 'review_next' }, 'q-incident')
+
+    // A lapse: the objective was not as solid as the ladder thought.
+    go({ type: 'choose', option_id: 'b' }, 'q-incident')
+    expect(state.rep).toBe(repBefore)
+    expect(state.progress.mastered).not.toContain('AZ104-4.1.5')
+    expect(state.review['AZ104-4.1.5']).toMatchObject({ interval: 0 })
+    go({ type: 'choose', option_id: 'a' }, 'q-incident')
+
+    const closed = go({ type: 'advance' }, 'q-incident')
+    expect(closed.events[0]).toMatchObject({ type: 'review_complete', correct: 2, wrong: 1 })
+    expect(state.review_session).toBeNull()
+    expect(state.stats.drills).toBe(1)
+    // The story never moved.
+    expect(state.progress.quests_completed).toEqual(['q-design', 'q-incident'])
+  })
+
+  it('keeps the on-call rotation shut until the act is done, then deals what is cleared', () => {
+    const state = veteran()
+    expect(actDrillReady(index, state, 'act1')).toBe(false)
+    state.progress.quests_completed = [...state.progress.quests_completed, 'q-later']
+    expect(actDrillReady(index, state, 'act1')).toBe(true)
+    const result = reduce(state, { type: 'start_review', mode: 'act', act: 'act1' }, ctx())
+    expect(result.state.review_session).toMatchObject({ mode: 'act', act: 'act1' })
+    // One file per chapter that has cleared encounters; monitoring has none.
+    expect(result.state.review_session?.items).toEqual([
+      { quest_id: 'q-design', encounter_id: 'a' },
+    ])
+  })
+
+  it('refuses to open a drill while a live story ticket is open, but not over a replay', () => {
+    let state = fresh()
+    state = run(state, [[{ type: 'start_quest', quest_id: 'q-design' }, 'q-design']])
+    state.review['AZ104-4.1.5'] = { interval: 0, due: NOW, last: NOW }
+    state.progress.encounters_cleared = ['q-incident/a']
+    const refused = reduce(state, { type: 'start_review', mode: 'due' }, ctx(undefined, later(4)))
+    expect(refused.events[0]).toMatchObject({ type: 'rejected' })
+
+    // A replay of a closed quest has nothing at stake; the drill wins.
+    let replaying = veteran()
+    replaying = run(replaying, [[{ type: 'start_quest', quest_id: 'q-design' }, 'q-design']])
+    const opened = reduce(replaying, { type: 'start_review', mode: 'due' }, ctx(undefined, later(4)))
+    expect(opened.events[0]).toMatchObject({ type: 'review_start' })
+    expect(opened.state.active).toBeNull()
+  })
+
+  it('drops the drill when the player walks back into the story', () => {
+    let state = veteran()
+    state = reduce(state, { type: 'start_review', mode: 'due' }, ctx(undefined, later(4))).state
+    state = reduce(state, { type: 'review_next' }, ctx('q-design', later(4))).state
+    state = reduce(state, { type: 'start_quest', quest_id: 'q-design' }, ctx('q-design', later(4))).state
+    expect(state.review_session).toBeNull()
+    expect(state.active).toMatchObject({ review: false, quest_id: 'q-design' })
+  })
+
+  it('leaves the story position alone when a drill is put down', () => {
+    let state = veteran()
+    const standing = state.position?.quest_id
+    state = reduce(state, { type: 'start_review', mode: 'due' }, ctx(undefined, later(4))).state
+    state = reduce(state, { type: 'abandon' }, ctx()).state
+    expect(state.review_session).toBeNull()
+    expect(state.position?.quest_id).toBe(standing)
+  })
+})
+
 describe('save migration', () => {
   it('fills in fields an older save never had', () => {
     const old = { ...fresh(), perks: undefined, stats: undefined } as unknown as SaveState
@@ -348,6 +570,32 @@ describe('save migration', () => {
     const migrated = migrateSave(save, index, NOW)
     expect(migrated.progress.objectives).toEqual(['AZ104-4.1.2'])
     expect(migrated.diagram.nodes['vnet-depot'].present).toBe(false)
+  })
+
+  it('derives mastery for a first-schema save and puts everything on the ladder', () => {
+    const old = fresh()
+    old.schema_version = 1
+    old.progress.objectives = ['AZ104-4.1.2', 'AZ104-4.1.4']
+    old.progress.encounters_cleared = ['q-design/a', 'q-design/b']
+    old.progress.first_try = ['q-design/a']
+    delete (old.progress as Partial<SaveState['progress']>).mastered
+    delete (old as Partial<SaveState>).review
+    delete (old as Partial<SaveState>).review_session
+    const migrated = migrateSave(old, index, NOW)
+    expect(migrated.schema_version).toBe(2)
+    expect(migrated.progress.mastered).toEqual(['AZ104-4.1.2'])
+    expect(migrated.review['AZ104-4.1.2']).toMatchObject({ interval: 1, due: later(3) })
+    expect(migrated.review['AZ104-4.1.4']).toMatchObject({ interval: 0, due: later(1) })
+  })
+
+  it('defaults the new run fields on a save captured mid-encounter', () => {
+    const state = run(fresh(), [[{ type: 'start_quest', quest_id: 'q-design' }, 'q-design']])
+    const active = state.active as unknown as Record<string, unknown>
+    delete active.review
+    delete active.hint_used
+    delete active.post_mortem
+    const migrated = migrateSave(state, index, NOW)
+    expect(migrated.active).toMatchObject({ review: false, hint_used: false, post_mortem: null })
   })
 })
 

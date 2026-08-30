@@ -73,6 +73,31 @@ const perkList = computed(() =>
   })),
 )
 
+// The first wrong turn opens a post-mortem: the encounter stays shut until the
+// player names what actually went wrong.
+const postMortemOpen = computed(() =>
+  Boolean(run.value?.post_mortem?.pending && encounter.value?.post_mortem),
+)
+
+// The debrief: every option the player never picked, with the reasoning they
+// never got to see. The best teaching in the game hides in the roads not taken.
+const debriefOpen = ref(false)
+const debriefOptions = computed(() => {
+  if (!run.value?.resolved || !encounter.value) return []
+  const all =
+    encounter.value.type === 'troubleshoot' ? encounter.value.fixes : encounter.value.options
+  const picked = new Set(
+    run.value.log.flatMap((entry) => (entry.kind === 'choice' ? [entry.option_id] : [])),
+  )
+  return all.filter((option) => !picked.has(option.id))
+})
+watch(
+  () => run.value?.encounter_id,
+  () => {
+    debriefOpen.value = false
+  },
+)
+
 async function open(): Promise<void> {
   loading.value = true
   await game.boot()
@@ -81,7 +106,12 @@ async function open(): Promise<void> {
     loading.value = false
     return
   }
-  const standingHere = save.value?.position?.quest_id === props.questId && save.value?.active
+  // A drill's run belongs to the review view, not here: only a story run for
+  // this very quest counts as standing in it.
+  const standingHere =
+    save.value?.active &&
+    !save.value.active.review &&
+    save.value.active.quest_id === props.questId
   const alreadyDone = save.value?.progress.quests_completed.includes(props.questId)
   if (!standingHere) {
     if (game.availability(props.questId).unlocked) {
@@ -153,7 +183,20 @@ watch(() => props.questId, () => {
         <NarrativeFeed :entries="run?.log ?? lastLog" />
       </section>
 
-      <section v-if="run && !run.resolved && encounter" class="min-w-0 space-y-3">
+      <section
+        v-if="postMortemOpen && encounter?.post_mortem"
+        class="card border-l-4 border-l-degraded p-3 sm:p-4"
+        aria-label="Post-mortem"
+      >
+        <ChoiceList
+          :options="encounter.post_mortem.options"
+          :eliminated="[]"
+          :disabled="false"
+          @choose="(id) => game.dispatch({ type: 'post_mortem', option_id: id })"
+        />
+      </section>
+
+      <section v-else-if="run && !run.resolved && encounter" class="min-w-0 space-y-3">
         <IncidentPanel
           v-if="encounter.type === 'troubleshoot'"
           :encounter="encounter"
@@ -190,10 +233,42 @@ watch(() => props.questId, () => {
         </div>
       </section>
 
-      <section v-else-if="run?.resolved" class="flex flex-wrap gap-2">
-        <button class="btn-primary" type="button" @click="game.dispatch({ type: 'advance' })">
-          Continue
-        </button>
+      <section v-else-if="run?.resolved" class="space-y-3">
+        <div v-if="debriefOptions.length" class="card p-3 sm:p-4">
+          <button
+            type="button"
+            class="flex w-full items-center justify-between text-left text-sm font-medium"
+            :aria-expanded="debriefOpen"
+            @click="debriefOpen = !debriefOpen"
+          >
+            <span>Debrief: the options you did not take</span>
+            <span aria-hidden="true" class="font-mono text-xs text-ink-500 dark:text-ink-400">
+              {{ debriefOpen ? 'hide' : 'show' }}
+            </span>
+          </button>
+          <ul v-if="debriefOpen" class="mt-3 space-y-3">
+            <li
+              v-for="option in debriefOptions"
+              :key="option.id"
+              class="border-l-2 border-ink-300 pl-3 dark:border-ink-700"
+            >
+              <p class="text-sm font-medium">
+                {{ option.label }}
+                <span class="ml-1 text-xs font-normal text-ink-500 dark:text-ink-400">
+                  would not have held
+                </span>
+              </p>
+              <p class="prose-beat mt-1 text-sm text-ink-600 dark:text-ink-300">
+                {{ option.explain }}
+              </p>
+            </li>
+          </ul>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button class="btn-primary" type="button" @click="game.dispatch({ type: 'advance' })">
+            Continue
+          </button>
+        </div>
       </section>
 
       <section v-else-if="onPip" class="card space-y-3 border-l-4 border-l-broken p-4 sm:p-5">

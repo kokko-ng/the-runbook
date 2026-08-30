@@ -133,6 +133,74 @@ def test_a_made_up_diagnostic_tool_is_rejected(library):
     assert any("not a recognized diagnostic tool" in problem for problem in problems)
 
 
+def _post_mortem():
+    return {
+        "question": "What did that change actually get wrong?",
+        "options": [
+            {
+                "id": "a",
+                "label": "It treated a routing gap as a security problem",
+                "correct": True,
+                "explain": "The traffic was allowed; it simply had no path to travel.",
+            },
+            {
+                "id": "b",
+                "label": "It used the wrong port range",
+                "correct": False,
+                "explain": "Ports were never in question; the flow log showed allowed traffic.",
+            },
+            {
+                "id": "c",
+                "label": "It should have gone through a change freeze",
+                "correct": False,
+                "explain": "Process was not the failure; the technical control chosen was.",
+            },
+        ],
+    }
+
+
+def test_a_post_mortem_with_two_lessons_is_rejected(library):
+    quest = _quest(library)
+    post_mortem = _post_mortem()
+    post_mortem["options"][1]["correct"] = True
+    quest.encounters[0]["post_mortem"] = post_mortem
+    quest.data["encounters"] = quest.encounters
+    assert any(
+        "post_mortem must hold exactly one correct" in problem
+        for problem in _problems(library, quest)
+    )
+
+
+def test_a_post_mortem_must_deal_three_answers(library):
+    quest = _quest(library)
+    post_mortem = _post_mortem()
+    del post_mortem["options"][2]
+    quest.encounters[0]["post_mortem"] = post_mortem
+    quest.data["encounters"] = quest.encounters
+    assert any("exactly 3 answers" in problem for problem in _problems(library, quest))
+
+
+def test_a_post_incident_path_may_only_name_real_commands(library):
+    quest = _quest(library, "a1net-q02")
+    troubleshoot = next(e for e in quest.encounters if e["type"] == "troubleshoot")
+    troubleshoot["post_incident"] = {
+        "path": ["zz"],
+        "text": "Two checks would have settled this, and neither was the reboot.",
+    }
+    quest.data["encounters"] = quest.encounters
+    assert any(
+        "post_incident.path names unknown command" in problem
+        for problem in _problems(library, quest)
+    )
+
+
+def test_an_overlong_hint_is_rejected(library):
+    quest = _quest(library)
+    quest.encounters[0]["hint"] = "word " * 50
+    quest.data["encounters"] = quest.encounters
+    assert any("hint is 50 words" in problem for problem in _problems(library, quest))
+
+
 def test_the_bundle_compiles_deterministically(library, tmp_path):
     first = core.build_bundle(library, tmp_path / "one")
     second = core.build_bundle(library, tmp_path / "two")
@@ -183,6 +251,49 @@ def test_dealing_answers_is_stable_and_lossless(library):
         )
         # The authored file itself is never rewritten.
         assert authored["options"][0]["correct"] is True
+
+
+def test_the_index_maps_every_encounter_to_its_objectives(library, tmp_path):
+    """Review drills and save migration read objectives from the index alone."""
+    core.build_bundle(library, tmp_path)
+    index = json.loads((tmp_path / "index.json").read_text())
+    summaries = {q["id"]: q for chapter in index["chapters"] for q in chapter["quests"]}
+    for quest in library.quests:
+        entries = summaries[quest.id]["encounters"]
+        assert [entry["id"] for entry in entries] == [e["id"] for e in quest.encounters]
+        for entry, encounter in zip(entries, quest.encounters, strict=True):
+            assert entry["objectives"] == encounter.get("objectives", quest.objectives)
+            assert entry["objectives"], f"{quest.id}/{entry['id']} covers nothing"
+
+
+def test_post_mortem_answers_are_dealt_and_lossless(library):
+    quest = _quest(library)
+    quest.data["encounters"][0]["post_mortem"] = _post_mortem()
+    first = core.deal_answers(quest)
+    second = core.deal_answers(quest)
+    assert first == second
+    dealt = first["encounters"][0]["post_mortem"]["options"]
+    assert sorted(option["id"] for option in dealt) == ["a", "b", "c"]
+    # The authored dict itself keeps the correct answer first.
+    assert quest.data["encounters"][0]["post_mortem"]["options"][0]["correct"] is True
+
+
+def test_the_post_mortem_lesson_is_not_always_the_first_answer(library):
+    positions = collections.Counter()
+    lists = 0
+    for quest in library.quests:
+        for encounter in core.deal_answers(quest)["encounters"]:
+            post_mortem = encounter.get("post_mortem")
+            if not post_mortem:
+                continue
+            lists += 1
+            positions[
+                next(i for i, c in enumerate(post_mortem["options"]) if c.get("correct"))
+            ] += 1
+    if not lists:
+        pytest.skip("no post-mortems authored yet")
+    assert set(positions) == {0, 1, 2}
+    assert max(positions.values()) < lists * 0.55
 
 
 def test_schemas_are_valid_json(library):

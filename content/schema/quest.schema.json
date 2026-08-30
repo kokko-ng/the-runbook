@@ -303,6 +303,15 @@
         },
         "sketch": {
           "$ref": "#/$defs/sketch"
+        },
+        "hint": {
+          "description": "A nudge toward the governing principle, spent via the hint perk.",
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 400
+        },
+        "post_mortem": {
+          "$ref": "#/$defs/postMortem"
         }
       },
       "allOf": [
@@ -388,7 +397,13 @@
             "$ref": "#/$defs/option"
           }
         },
-        "sketch": true
+        "sketch": true,
+        "hint": {
+          "$ref": "#/$defs/encounter/properties/hint"
+        },
+        "post_mortem": {
+          "$ref": "#/$defs/postMortem"
+        }
       }
     },
     "knowledgeEncounter": {
@@ -427,7 +442,10 @@
             "$ref": "#/$defs/option"
           }
         },
-        "sketch": true
+        "sketch": true,
+        "hint": {
+          "$ref": "#/$defs/encounter/properties/hint"
+        }
       }
     },
     "troubleshootEncounter": {
@@ -585,7 +603,16 @@
             "$ref": "#/$defs/option"
           }
         },
-        "sketch": true
+        "sketch": true,
+        "hint": {
+          "$ref": "#/$defs/encounter/properties/hint"
+        },
+        "post_mortem": {
+          "$ref": "#/$defs/postMortem"
+        },
+        "post_incident": {
+          "$ref": "#/$defs/postIncident"
+        }
       }
     },
     "sketch": {
@@ -688,6 +715,83 @@
               }
             }
           }
+        }
+      }
+    },
+    "postMortemOption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "correct",
+        "explain"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/localId"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 220
+        },
+        "correct": {
+          "type": "boolean"
+        },
+        "explain": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    },
+    "postMortem": {
+      "description": "The follow-up a mentor asks after the first wrong answer: what actually went wrong? Naming the real failure claws back half the reputation lost.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "question",
+        "options"
+      ],
+      "properties": {
+        "question": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 400
+        },
+        "speaker": {
+          "$ref": "#/$defs/speaker"
+        },
+        "options": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/postMortemOption"
+          }
+        }
+      }
+    },
+    "postIncident": {
+      "description": "The diagnostic path a senior would have run, shown once the fix lands. path names command ids in the order a senior would run them.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "text"
+      ],
+      "properties": {
+        "path": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/localId"
+          }
+        },
+        "text": {
+          "type": "string",
+          "minLength": 20
         }
       }
     }

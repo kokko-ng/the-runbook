@@ -15,10 +15,13 @@ const menuOpen = ref(false)
 
 const links = [
   { to: '/career', label: 'Career' },
+  { to: '/review', label: 'Review' },
   { to: '/skills', label: 'Skills' },
   { to: '/map', label: 'Map' },
   { to: '/account', label: 'Account' },
 ]
+
+const dueCount = computed(() => game.reviewDue().length)
 
 const themeLabel = computed(
   () => ({ system: 'Auto', light: 'Light', dark: 'Dark' })[ui.theme],
@@ -57,6 +60,13 @@ function cycleTheme(): void {
         >
           {{ link.label }}
           <span v-if="link.to === '/account' && account.signedIn" class="text-signal-500">.</span>
+          <span
+            v-if="link.to === '/review' && dueCount"
+            class="ml-1 rounded-full bg-degraded/20 px-1.5 font-mono text-[0.65rem] text-degraded"
+            :aria-label="`${dueCount} objectives due for review`"
+          >
+            {{ dueCount }}
+          </span>
         </RouterLink>
         <button class="btn-quiet px-3" type="button" @click="cycleTheme">
           {{ themeLabel }}
