@@ -24,11 +24,25 @@ companies. Meridian Logistics is fictional.
 - **Reputation, not lives.** A global 0-100 bar. Wrong answers cost 5 to 15 and
   teach you why. Zero means a performance improvement plan and a restart from the
   chapter's checkpoint with 40 reputation.
+- **Post-mortems claw back half.** The first wrong answer in an encounter opens
+  a follow-up: name what actually went wrong, from three candidate lessons, and
+  half the reputation comes back. Failure teaches twice or it costs double.
 - **A living architecture diagram.** The world map is Meridian's Azure estate. It
   grows when you deploy something and turns red when an incident touches it.
-- **Skill trees that light themselves.** One tree per exam domain. Clearing an
-  encounter lights the objectives it covers, so the tree doubles as a readiness
-  view.
+- **Skill trees that tell the truth in two shades.** One tree per exam domain.
+  An objective cleared without a wrong turn is solid; one recovered on a later
+  attempt is only covered, and the tree shows the difference, so it doubles as
+  an honest readiness view.
+- **A review queue with a memory.** Every cleared objective carries a follow-up
+  date on an expanding ladder (1, 3, 7, 14, 30 days). When it comes due, a
+  drill re-runs a closed ticket from the runbook: recall it cleanly and the
+  date moves out, wobble and it comes back tomorrow and the tree goes amber.
+  Finishing an act opens an on-call rotation drill that deals one closed file
+  per chapter, domains mixed the way the exam mixes them. Drills never touch
+  reputation.
+- **Hints nudge, incidents debrief.** The hint perk points at the governing
+  principle and rules nothing out. Closing an incident shows the diagnostic
+  path a senior would have run next to what you actually ran.
 
 ## What is in it
 
@@ -90,8 +104,10 @@ cd frontend && npm run build                                 # type check + prod
 CI runs all four on every pull request and every push to `main`. The content
 linter fails the build if an objective in a written chapter has no encounter, if
 a diagram operation names a node that does not exist, if a wrong answer has no
-teaching explanation, if a beat runs past 250 words, or if en-GB spelling creeps
-into text that sits next to en-US Azure documentation.
+teaching explanation, if an encounter is missing its hint or its post-mortem,
+if a post-incident path names a command the incident does not offer, if a beat
+runs past 250 words, or if en-GB spelling creeps into text that sits next to
+en-US Azure documentation.
 
 ## Writing content
 
@@ -102,6 +118,11 @@ One YAML file per quest under `content/quests/act1` or `act2`, validated against
   consequence and a teaching explanation.
 - Correct answers restore 2 to 10 reputation, wrong answers cost 5 to 15.
 - Beats are at most 250 words and answerable from the facts on the page.
+- Every encounter carries a hint (a nudge toward the principle, at most 45
+  words, never eliminating an option). Design and troubleshoot encounters carry
+  a three-option post-mortem whose correct lesson is the encounter's decisive
+  discrimination. Troubleshoot encounters carry a post-incident review naming
+  the minimal diagnostic path among their own commands.
 - Command output is realistic and current, and every diagnostic starts with a
   tool that exists.
 - Diagram operations may only name nodes and edges declared in

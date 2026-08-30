@@ -676,7 +676,9 @@ def _validate_encounters(
                 problems += check_prose(encounter[field_name], f"{spot}.{field_name}")
 
         hint = encounter.get("hint")
-        if hint:
+        if not hint:
+            problems.append(Problem(spot, "every encounter needs a hint for the hint perk"))
+        else:
             problems += check_prose(hint, f"{spot}.hint")
             if word_count(hint) > MAX_HINT_WORDS:
                 problems.append(
@@ -685,7 +687,16 @@ def _validate_encounters(
                         f"hint is {word_count(hint)} words; the limit is {MAX_HINT_WORDS}",
                     )
                 )
-        problems += _validate_post_mortem(encounter.get("post_mortem"), spot, speakers)
+        post_mortem = encounter.get("post_mortem")
+        if encounter.get("type") in ("design", "troubleshoot") and not post_mortem:
+            problems.append(
+                Problem(spot, "design and troubleshoot encounters need a post_mortem")
+            )
+        if encounter.get("type") == "knowledge" and post_mortem:
+            problems.append(
+                Problem(spot, "a knowledge check is already a recall probe; no post_mortem")
+            )
+        problems += _validate_post_mortem(post_mortem, spot, speakers)
 
         speaker = encounter.get("speaker")
         if speaker and speaker not in speakers:
@@ -779,7 +790,7 @@ def _validate_post_incident(encounter: dict[str, Any], spot: str) -> list[Proble
     """The senior's diagnostic path may only name checks the incident offers."""
     post = encounter.get("post_incident")
     if not post:
-        return []
+        return [Problem(spot, "a troubleshoot encounter needs a post_incident review")]
     problems: list[Problem] = []
     command_ids = {c.get("id") for c in encounter.get("commands", [])}
     path = post.get("path", [])

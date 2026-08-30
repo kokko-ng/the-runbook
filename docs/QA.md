@@ -6,9 +6,9 @@ What has been verified, how, and what still needs a human with a real device.
 
 | Check | Where |
 | --- | --- |
-| Content schema, house style, dead ends, coverage of all 131 objectives | `manage.py validate_content --require-all-chapters` in CI |
-| Engine rules: reputation, perks, time budgets, progression, migration | 30 Vitest tests in CI |
-| API, back office, content pipeline | 43 pytest tests in CI |
+| Content schema, house style, dead ends, coverage of all 131 objectives, hints, post-mortems, post-incident reviews | `manage.py validate_content --require-all-chapters` in CI |
+| Engine rules: reputation, perks, time budgets, progression, migration, mastery, review drills, post-mortems | 60 Vitest tests in CI |
+| API, back office, content pipeline | 59 pytest tests in CI |
 | Type check and production build | `vue-tsc` and `vite build` in CI |
 
 ## Verified by hand with a headless Chromium
@@ -23,9 +23,15 @@ Run at 320, 390, 768 and 1440 CSS pixels against the built app.
 | 1440 | Persistent two-pane: feed 808 px, map 416 px | Side by side, no horizontal scroll. |
 
 Also verified: dark theme tokens apply to body, cards and text; the map opens as a
-full-screen sheet on phones and closes again; a wrong answer costs reputation and
-re-prompts from the remaining options; command output renders in the monospace
-console pane; a completed quest offers the next one.
+full-screen sheet on phones and closes again; a wrong answer costs reputation,
+opens the post-mortem, and only then re-prompts from the remaining options, with
+the claw-back applied on a correct lesson; the resolved-encounter debrief reveals
+the options not taken; a closed incident shows the senior's diagnostic path with
+ran and missed markers; the hint perk posts its nudge without ruling anything
+out; a due follow-up drill runs end to end with reputation untouched and the
+ladder stretched; a schema-1 save with a run mid-encounter migrates in place and
+resumes; command output renders in the monospace console pane; a completed quest
+offers the next one.
 
 ## Still needs a real device
 
