@@ -29,6 +29,38 @@ encounters:
       "The dispatch screen asks for the last known state of one trailer,
       constantly, and wants it back in single-digit milliseconds. Analytics reads
       the whole month once a month."
+    hint: >
+      Write down the query that runs constantly and the shape a reading actually
+      has. The store, and the key it is organized by, should fall out of those two
+      facts; the monthly work does not get a vote.
+    post_mortem:
+      question: >
+        Grace writes the dispatch query on the whiteboard and nothing else. "One
+        question runs every few seconds, all day. What should it have decided?"
+      options:
+        - id: a
+          label: >
+            The dominant query picks the store and the key; other workloads get
+            their own copy
+          correct: true
+          explain: >
+            A constant point read of one trailer's latest state, against documents
+            whose shape drifts, is the document store case, keyed by trailer. The
+            monthly scan is served from the lake, not by compromising the primary.
+        - id: b
+          label: Relational storage cannot take twenty-eight million rows a day
+          correct: false
+          explain: >
+            A relational engine can be made to take the writes. It pays in index
+            maintenance and schema projects, which is a poor trade rather than an
+            impossibility. The read pattern is what decides.
+        - id: c
+          label: Latency this low always calls for an in-memory store
+          correct: false
+          explain: >
+            Memory answers the read and forfeits durability, which a system of
+            record cannot do. The requirement was speed and permanence together,
+            and the document store provides both.
     prompt: Where does the telemetry land?
     options:
       - id: a
@@ -93,6 +125,39 @@ encounters:
 
       Straits keep them on a file server with a folder structure that encodes the
       depot and the date.
+    hint: >
+      Match the price of keeping something to the frequency of reading it, and do
+      not throw away the only index anybody has. Ask what capability each choice
+      charges for, and whether these documents ever use it.
+    post_mortem:
+      question: >
+        Marek pulls up the price per gibibyte and says nothing for a moment.
+        "Fourteen terabytes, read four times a month. What was the test you
+        skipped?"
+      options:
+        - id: a
+          label: >
+            Storage is chosen by read pattern and paid capability, not by
+            resemblance to today
+          correct: true
+          explain: >
+            Documents nobody reads belong on the cheapest tier that can still
+            produce one the same day, with the folder path kept as the prefix.
+            Every other choice bills for a capability the manifests never exercise.
+        - id: b
+          label: The legal retrievals justified paying for performance
+          correct: false
+          explain: >
+            Four retrievals a month, needed the same day, is met by age-tiered
+            storage, since even a rehydration finishes inside a day. Performance
+            spending needs a workload that would notice it.
+        - id: c
+          label: The documents belong beside the data that references them
+          correct: false
+          explain: >
+            Proximity in a database costs every backup and restore fourteen
+            terabytes. Keep the reference in the database and the document in
+            object storage.
     prompt: Where do the manifests go?
     options:
       - id: a
@@ -150,6 +215,38 @@ encounters:
       "The sensor team want to know whether they can query telemetry by
       geographic area," says Grace. "Show me every trailer within twenty
       kilometers of Ipoh in the last hour. Once a minute, from the control room."
+    hint: >
+      Ask which access pattern runs constantly and which runs once a minute, and
+      remember a container is organized around exactly one of them. New questions
+      do not have to be answered by reorganizing the old store.
+    post_mortem:
+      question: >
+        Grace adds a circle around Ipoh to the sketch. "Two queries, one
+        container. What was the principle for serving the second one?"
+      options:
+        - id: a
+          label: >
+            A store is optimized for one access pattern; a second pattern earns a
+            second structure
+          correct: true
+          explain: >
+            The partition key already serves the constant read. Serving the radius
+            query from its own index or the analytical store answers the new
+            question without taxing the old one.
+        - id: b
+          label: The partition key was chosen wrongly in the first place
+          correct: false
+          explain: >
+            By trailer remains right, because the per-trailer read is the workload
+            that never stops. A key that favored geography would sacrifice the
+            constant query for the occasional one.
+        - id: c
+          label: Occasional queries are cheap enough to run as full scans
+          correct: false
+          explain: >
+            A fan-out across ten thousand partitions is charged accordingly, and
+            once a minute is not occasional. The control room would pay more for
+            that query than dispatch pays for everything else.
     prompt: How do you answer that?
     options:
       - id: a

@@ -33,6 +33,37 @@ encounters:
 
 
       "Tell me what happens if I deploy this with no parameter file at all."
+    hint: >
+      Read the parameters block the way validation reads it: which value has
+      something to fall back on, and which does not. The other keywords
+      restrict and order; neither of them ever supplies a value.
+    post_mortem:
+      question: >
+        Marek waits while you reread the fragment. "The file has not changed
+        since you answered. Tell me the rule you applied that it does not
+        actually contain."
+      options:
+        - id: a
+          label: Only a defaultValue makes a parameter optional; nothing else supplies a value
+          correct: true
+          explain: >
+            A parameter without a default is required, and the deployment fails
+            at validation without it. allowedValues only restricts what may be
+            passed and dependsOn only orders creation; neither fills a value in.
+        - id: b
+          label: The fragment is too incomplete to reason about without deploying it
+          correct: false
+          explain: >
+            Everything the question needed is on the screen: the parameters
+            block says which values may be omitted. Deploying to find out is
+            what the validation rules exist to spare you.
+        - id: c
+          label: Old templates behave unpredictably and this one needs rewriting first
+          correct: false
+          explain: >
+            The template is dated, not broken. It follows the same evaluation
+            rules as one written yesterday, and the reading, not the file,
+            produced the wrong answer.
     prompt: What does a deployment with no parameters do?
     options:
       - id: a
@@ -91,6 +122,38 @@ encounters:
 
       The template is the one you read this morning. The pipeline passes vmSize
       from a parameter file that now says Standard_E4s_v5.
+    hint: >
+      The rejection happened at validation, before Azure created anything.
+      Decide which part of the template is a control doing its job, and what
+      the smallest change is that permits the new value while keeping that
+      control in place.
+    post_mortem:
+      question: >
+        Dana looks at the rejected pipeline run rather than at you. "It said
+        no before Azure ever saw the request. What was it protecting,
+        exactly?"
+      options:
+        - id: a
+          label: The size list is the control; a legitimate new value extends it
+          correct: true
+          explain: >
+            allowedValues exists so only costed, agreed sizes can be deployed.
+            When the requirement changes, the list changes with it; the guard
+            rail keeps working and the template stays the source of truth.
+        - id: b
+          label: Nothing worth keeping; the pipeline is too strict for urgent changes
+          correct: false
+          explain: >
+            The strictness is the feature. Anything that skips or removes the
+            validation skips it for every future change too, and the next
+            surprise size lands in production instead of in a failed run.
+        - id: c
+          label: The estate from a size that is wrong for the workload
+          correct: false
+          explain: >
+            Marek sized the Standard_E4s_v5 from the workload. The requirement
+            is sound; the list is simply behind it, which is a maintenance
+            task, not a design error.
     prompt: What do you change?
     options:
       - id: a
@@ -147,6 +210,39 @@ encounters:
 
       Nothing else in the template changed, and the same template deployed cleanly
       into the non-production subscription an hour ago.
+    hint: >
+      Incremental mode decides which resources are sent, not which properties.
+      Ask what the full definition of an existing machine says about its
+      operating system disk, and what the platform is being asked to do about
+      a disk that already exists.
+    post_mortem:
+      question: >
+        Marek reads the failed attempt in the deployment history. "The
+        platform told you exactly what it refused to do. What does an
+        incremental deployment actually send?"
+      options:
+        - id: a
+          label: The full definition of every resource the template names
+          correct: true
+          explain: >
+            Incremental mode leaves out resources the template does not
+            mention, but the ones it does mention are submitted whole,
+            createOption included. FromImage on an existing machine therefore
+            asks for the operating system disk to be built again.
+        - id: b
+          label: Only the properties that differ from the current state
+          correct: false
+          explain: >
+            That is what the what-if view displays, not what the deployment
+            sends. The submission is the whole resource, which is why an
+            unchanged property can still cause a refusal.
+        - id: c
+          label: Whatever survived the last successful run of the same file
+          correct: false
+          explain: >
+            Deployment history records attempts; it does not shape them. Each
+            run is evaluated from the template and parameters alone, which is
+            why non-production, starting empty, accepted the same file.
     ticket:
       ref: INC-4620
       opened: "16:40"
@@ -200,6 +296,18 @@ encounters:
           ----------------  ----------------
           Standard_D2s_v5   vm-tms01-osdisk
         time_cost: 1
+    post_incident:
+      path: [a, c]
+      text: >
+        The deployment history already names the refusal: the platform will
+        not re-create vm-tms01-osdisk, so something in the submitted
+        definition must be asking it to. What-if closes the loop by showing
+        that the run sends the whole machine, createOption included, even
+        though only the size differs. Two commands, cause and then mechanism.
+        Validating the template only repeats the list of resources it names,
+        and showing the machine confirms what the ticket already said, that
+        it exists; neither explains why an incremental deployment would touch
+        a disk nobody changed.
     fixes:
       - id: a
         label: >

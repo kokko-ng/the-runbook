@@ -23,6 +23,36 @@ encounters:
       load balancer, writes straight to storage. In November we want four of them.
       In February one is plenty, and last February we were still paying for four
       because nobody switched them off."
+    hint: >
+      Two facts do the work: the service is stateless, and last February
+      proved that people forget. Ask which build scales out for the season
+      and back down again without anybody remembering a calendar.
+    post_mortem:
+      question: >
+        Marek waits for the second version. "Stateless service, seasonal
+        load. What are the two properties the right build has to have?"
+      options:
+        - id: a
+          label: It scales out for load, and the scaling runs itself
+          correct: true
+          explain: >
+            A scale set with autoscale rules adds instances when the queue
+            grows and removes them when it does not. Fixed counts,
+            switched-off machines and one big box each miss half of that.
+        - id: b
+          label: It has enough capacity for November from day one
+          correct: false
+          explain: >
+            November capacity all year round is exactly what last February
+            proved expensive. Buying capacity is easy; letting go of it is
+            the part that needs designing.
+        - id: c
+          label: It keeps the machines individually managed so operations change nothing
+          correct: false
+          explain: >
+            A stateless fleet is the one place identical, group-managed
+            machines cost operations nothing. Flexible orchestration keeps
+            per-machine control available where it is genuinely needed.
     prompt: How do you build it?
     options:
       - id: a
@@ -85,6 +115,38 @@ encounters:
       The intake instances read from a storage queue. During the morning rush the
       queue grows to several thousand messages while processor sits around fifty
       per cent.
+    hint: >
+      Dana already named the principle: scale on the thing the drivers feel.
+      Ask which measurement represents work waiting rather than machine
+      effort, and what stops a rule from adding and removing instances in a
+      loop.
+    post_mortem:
+      question: >
+        Dana looks at the morning-rush chart again. "Say the rule so I can
+        repeat it: what should decide when intake grows and shrinks?"
+      options:
+        - id: a
+          label: The work waiting per instance, in both directions, with a cool-down
+          correct: true
+          explain: >
+            Queue length per instance measures what the drivers feel;
+            processor at fifty per cent measures a machine waiting on
+            storage. Separate thresholds and a cool-down are what stop the
+            set oscillating.
+        - id: b
+          label: The machines' own effort, since exhaustion forces a scale out
+          correct: false
+          explain: >
+            A queue worker spends its life waiting on storage, so the queue
+            grows long before the processor does. Effort is the symptom
+            here, not the signal.
+        - id: c
+          label: The calendar, since peak season is when the load arrives
+          correct: false
+          explain: >
+            A schedule encodes a prediction, and April's promotion was not in
+            it. Schedules combine well with a metric rule; alone they only
+            handle the season somebody foresaw.
     prompt: What rule do you configure?
     options:
       - id: a
@@ -141,6 +203,38 @@ encounters:
 
 
       The scale set is running five instances. The model was updated on Tuesday.
+    hint: >
+      A scale set has a model and it has instances, and the two can disagree.
+      Ask when each running instance last took the model, and which operation
+      moves an instance forward rather than resetting it.
+    post_mortem:
+      question: >
+        Marek owns the Tuesday change without being asked. "The model was
+        right and the fleet was wrong. What does a model change actually do
+        under each upgrade policy?"
+      options:
+        - id: a
+          label: Under Manual, nothing, until each instance is explicitly upgraded
+          correct: true
+          explain: >
+            A model update touches new instances only; the running three kept
+            the old image, which is what latestModelApplied reports. A
+            rolling policy makes future changes flow out in health-gated
+            batches.
+        - id: b
+          label: It reaches every instance eventually, so the fix is to reset the guests
+          correct: false
+          explain: >
+            Reimage reapplies the model an instance already has, and the new
+            model never reached these three. Resetting a guest cures
+            corruption, not staleness.
+        - id: c
+          label: It applies everywhere at once, so the mixed behavior must be something else
+          correct: false
+          explain: >
+            Only an Automatic policy applies at once, and it does so with no
+            batching or health gate. This set is Manual, which is why
+            Wednesday's arrivals differ from Tuesday's survivors.
     ticket:
       ref: INC-4701
       opened: "09:30"
@@ -198,6 +292,18 @@ encounters:
             "timeStamp": "2026-08-24T09:15:00Z"
           }
         time_cost: 2
+    post_incident:
+      path: [a, b]
+      text: >
+        The policy reading gives the mechanism: Manual means a model change
+        waits for somebody to apply it. The instance listing gives the
+        proof: the same three machines Joana named report latestModelApplied
+        False, and Wednesday's two arrivals, built from the new model,
+        report True. Mechanism plus a matching roll call is the whole
+        diagnosis. The instance view saying provisioning succeeded and a
+        processor average of forty-one only confirm the fleet is healthy,
+        and healthy was never in dispute; the complaint was two behaviors,
+        split cleanly by instance age.
     fixes:
       - id: a
         label: >

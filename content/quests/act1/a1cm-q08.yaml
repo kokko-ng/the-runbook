@@ -29,6 +29,37 @@ encounters:
 
       Expected traffic is modest: a few hundred concurrent users during the day.
       The team also wants somewhere to run the same code for testing.
+    hint: >
+      Dana's sentence is a feature list: domain, certificate, zero-downtime
+      deploys. Find the first tier that carries every feature named, and
+      remember that apps sharing a plan share its instances too.
+    post_mortem:
+      question: >
+        Dana asks for the one-line justification finance will read. "Why
+        that tier, and why that many plans?"
+      options:
+        - id: a
+          label: The requirements pick the tier; isolation picks the plan count
+          correct: true
+          explain: >
+            Standard is the first tier with the domain, certificate, slot and
+            autoscale features on Dana's list, and a separate plan keeps test
+            load off customer instances. More is spend without a requirement;
+            less fails one.
+        - id: b
+          label: Start as small as possible and grow when it hurts
+          correct: false
+          explain: >
+            Free and Shared cannot bind the certificate at all, so the
+            growing happens two days before launch. Small is a fine instinct
+            below the requirement line, not across it.
+        - id: c
+          label: Buy the headroom now so nobody revisits the choice
+          correct: false
+          explain: >
+            Premium answers requirements nobody has stated, at four times the
+            estimate. A tier change later is routine; an invoice surprise
+            now is a meeting with Priya.
     prompt: What do you provision?
     options:
       - id: a
@@ -92,6 +123,37 @@ encounters:
 
 
       The plan is Standard, which supports up to ten instances.
+    hint: >
+      The load has two parts: a shape you can predict each morning and a
+      level only measurement can see. Ask which scaling direction adds
+      capacity without a restart, and which signals actually move when
+      customers arrive.
+    post_mortem:
+      question: >
+        Marek pulls up the morning traffic curve. "For a web workload with a
+        peak you can set your watch by, what does good scaling look like?"
+      options:
+        - id: a
+          label: Out, on a signal that moves with load, with the known peak scheduled
+          correct: true
+          explain: >
+            Adding instances behind the same front end absorbs load without a
+            restart, and a scheduled profile raises the floor for the peak
+            you can predict. A floor of two also survives losing an instance.
+        - id: b
+          label: Up, since bigger instances are simpler than more of them
+          correct: false
+          explain: >
+            Resizing the plan restarts every app on it, mid-peak if the
+            schedule is honest. Web traffic distributes; it is the textbook
+            scale-out shape.
+        - id: c
+          label: Whatever avoids paying for a second idle instance
+          correct: false
+          explain: >
+            The second instance is what lets a deployment recycle or an
+            instance fail without customers noticing. Its cost is the premium
+            for staying up, not waste.
     prompt: How do you scale it?
     options:
       - id: a
@@ -148,6 +210,10 @@ encounters:
       "One thing people get wrong in interviews," says Marek. "You have a Standard
       plan with three apps on it, and you scale the plan out to four instances.
       How many instances of each app are running?"
+    hint: >
+      Ask which object the instance count belongs to. Whatever owns the count
+      decides what runs on each instance, and the answer is the same for
+      every app the plan hosts.
     question: What happens to the apps when the plan scales out?
     options:
       - id: a

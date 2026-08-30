@@ -26,6 +26,38 @@ encounters:
 
       "The application has one connection string," says Grace. "I would prefer it
       stayed that way after a failover."
+    hint: >
+      Test each mechanism against all three constraints on the page: fifteen
+      minutes of data, one hour of downtime, and one connection string that
+      stays correct on its own.
+    post_mortem:
+      question: >
+        Grace writes the two numbers and the connection string on the board.
+        "Same question, asked properly this time: what does a mechanism have to
+        do to belong on this slide?"
+      options:
+        - id: a
+          label: Meet every stated constraint at once, the two numbers and the stable endpoint
+          correct: true
+          explain: >
+            Fifteen minutes rules out batch copies, an hour rules out restores
+            sized by the database, and the single connection string rules out
+            anything that makes consumers manage the switch. A mechanism that
+            fails any one of the three fails the design.
+        - id: b
+          label: Replicate synchronously, since fifteen minutes of loss is so strict
+          correct: false
+          explain: >
+            Asynchronous geo-replication lags by seconds, which is orders of
+            magnitude inside the window. The strictness of the number was never
+            the obstacle; the other constraints were.
+        - id: c
+          label: Leave the endpoint switch to the applications, which know their own retry logic
+          correct: false
+          explain: >
+            Every consumer implementing its own switch is the failure mode the
+            listener exists to remove, and two of those consumers have no
+            owner. The name has to stay correct on its own.
     sketch:
       caption: One name the application connects to, whichever region is primary
       nodes:
@@ -98,6 +130,38 @@ encounters:
       answer mine, which is what happens when somebody runs a delete without a
       where clause at four in the afternoon and it replicates perfectly to East
       Asia in under a second."
+    hint: >
+      Separate failures of the platform from failures of the data. Replication
+      answers the first and faithfully copies the second, so ask what can take
+      the database backwards in time, and how precisely.
+    post_mortem:
+      question: >
+        Wei Lin does not look up from the finding. "State the principle for the
+        record, please. What protects a database from its own writes?"
+      options:
+        - id: a
+          label: Only a restore to a point before the mistake; replication moves sideways, not backwards
+          correct: true
+          explain: >
+            A bad write is valid traffic to every mechanism that copies current
+            state, however fast or however far. The control is a backup that can
+            reconstruct the database as it stood the second before the delete,
+            with copies kept as long as the contract requires.
+        - id: b
+          label: A longer replication delay, so mistakes can be caught before they land
+          correct: false
+          explain: >
+            Deliberately lagging the secondary trades away the recovery point
+            the failover group exists to provide. Replication is designed to be
+            current; making it stale breaks the region answer without securing
+            the data one.
+        - id: c
+          label: Stricter permissions, so nobody can run a delete without a where clause
+          correct: false
+          explain: >
+            Fewer people able to make the mistake is good hygiene, and it does
+            not make the mistake impossible. Wei Lin's question is what happens
+            when it occurs, and prevention has no answer to that.
     prompt: What covers that?
     options:
       - id: a
@@ -157,6 +221,37 @@ encounters:
 
 
       Grace wants both explained before the design is signed off.
+    hint: >
+      Draw the failover group's boundary and ask what sits inside it: which
+      databases, and which connection strings address it. Both symptoms trace
+      back to something the group was never given.
+    post_mortem:
+      question: >
+        Marek reads the two findings back off the ticket. "One design principle
+        explains both of them. Name it before you touch anything else."
+      options:
+        - id: a
+          label: Everything that must fail over together, and everyone who connects, goes through the group
+          correct: true
+          explain: >
+            The group only moves the databases it contains, and the listener
+            only helps consumers that address it. Both failures are gaps in that
+            coverage, and the fix is to complete the coverage, not to avoid
+            failing over.
+        - id: b
+          label: Automatic failover is too aggressive for a database with this many consumers
+          correct: false
+          explain: >
+            The failover itself worked in forty seconds and dispatch followed
+            it. Slowing the policy down leaves both coverage gaps in place and
+            adds a waiting human to the recovery time.
+        - id: c
+          label: Cross-database references cannot survive a failover and the schema must be consolidated
+          correct: false
+          explain: >
+            The reference works whenever both databases sit on the same server,
+            which is exactly the property the group can preserve. Consolidation
+            is a design debate on its merits, not the lesson of this rehearsal.
     ticket:
       ref: DRV-1140
       opened: "15:20"
@@ -204,6 +299,16 @@ encounters:
           Login failed. Cannot open server 'sql-meridian-tms' requested by the login.
           The database 'transport' is not available on this server.
         time_cost: 1
+    post_incident:
+      path: [a, c]
+      text: >
+        The group listing settles the lookup half in one move: only the
+        transport database is a member, so the failover carried it to a server
+        the lookup database is not on, and the cross-database reference breaks.
+        The reporting trace settles the other half: the job logs into the old
+        server by name, which no listener can rescue. Listing where each
+        database now sits only confirms what those two already imply, because
+        membership plus addressing fully determine who follows a failover.
     fixes:
       - id: a
         label: >

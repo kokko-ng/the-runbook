@@ -30,6 +30,36 @@ encounters:
 
       The machine has a 128 gibibyte operating system disk and a 512 gibibyte data
       disk holding the extract files.
+    hint: >
+      Ask exactly which disk is broken and which point can be trusted, and let
+      the deadline argue for the smallest restore that fixes what is actually
+      wrong.
+    post_mortem:
+      question: >
+        Marek checks the clock instead of commenting. "It is not six yet. Before
+        the next attempt: what exactly is this restore supposed to give back?"
+      options:
+        - id: a
+          label: Only what is broken; the freshest data was already on the machine
+          correct: true
+          explain: >
+            One disk of two failed. The data disk holds extract files newer than
+            any recovery point, so the precise restore is the operating system
+            disk alone, from the point that was properly quiesced.
+        - id: b
+          label: The most recent recovery point, because newer means less loss
+          correct: false
+          explain: >
+            Newest is not best here twice over: the latest point completed with
+            warnings and was never quiesced, and any full-machine point drags the
+            data disk back to yesterday evening.
+        - id: c
+          label: A whole working machine, because a machine is what failed
+          correct: false
+          explain: >
+            The machine failed at the granularity of one disk. Restoring at
+            machine granularity replaces a healthy disk with an older one and
+            spends midnight hours the 06:00 close does not have.
     ticket:
       ref: INC-4841
       opened: "23:40"
@@ -86,6 +116,18 @@ encounters:
           (no results)
         note: No restore has ever been run in this vault, so nobody knows how long one takes.
         time_cost: 1
+    post_incident:
+      path: [a, b, c]
+      text: >
+        The point listing gives you the choice: a crash-consistent point from
+        last night and an application-consistent one a day older. The job history
+        explains the difference, because the newest backup completed with
+        warnings and never quiesced the application, which argues for the older
+        point. The disk view then scopes the restore: the disks are attached and
+        readable, and the data disk holds extracts newer than any backup, so only
+        the operating system disk needs to come back. The restore-history check
+        cannot move any of that; an empty list only says nobody has timed a
+        restore here, which is a finding for daylight, not for tonight.
     fixes:
       - id: a
         label: >
@@ -147,6 +189,36 @@ encounters:
 
       "That warning has been there for six days," says Dana. "How would anyone
       have known?"
+    hint: >
+      The signal existed for six days and reached no one. Ask which signal is the
+      direct one, and what carries a signal to a person without depending on
+      memory or luck.
+    post_mortem:
+      question: >
+        "Six days," Dana repeats. "Have another go, but answer this first: what
+        has to happen to a warning for it to count as seen?"
+      options:
+        - id: a
+          label: It has to be carried to a person by an alert on the job outcome itself
+          correct: true
+          explain: >
+            The job outcome is the direct signal, and job alerts routed to the
+            action group are what move it. Reports answer the questions asked
+            afterwards; the alert is what prevents the afterwards.
+        - id: b
+          label: Somebody has to own checking the vault regularly
+          correct: false
+          explain: >
+            A named checker is the manual review with one point of failure added.
+            It competes with every other Monday task and loses, which is how the
+            last manual check ended.
+        - id: c
+          label: The platform should have escalated it by default
+          correct: false
+          explain: >
+            The default notifications go to a classic configuration nobody has
+            looked at, and warnings are not in them. A signal that matters gets
+            configured deliberately and confirmed to fire.
     prompt: What do you put in place?
     options:
       - id: a
@@ -203,6 +275,35 @@ encounters:
       "You restored something at one in the morning and it worked," says Priya.
       "I would like the next board pack to say that we know it works, rather than
       that we found out."
+    hint: >
+      Priya is asking for proof, not reassurance. Ask what a backup job's success
+      actually proves, and what only a rehearsal can.
+    post_mortem:
+      question: >
+        "Think about what the board pack can actually say," says Priya. "What is
+        the only statement about recovery that counts as knowing?"
+      options:
+        - id: a
+          label: We restored it, somewhere safe, and it took this long against the objective
+          correct: true
+          explain: >
+            Only a real restore proves the points work, and only timing it turns
+            the four-hour objective from an assertion into a measurement. The
+            isolated resource group is what makes the proof free of risk.
+        - id: b
+          label: Every backup job succeeded, so recovery is implied
+          correct: false
+          explain: >
+            A green job proves data was written, not that it can become a running
+            system again. The gap between those two is where missing encryption
+            keys and untested assumptions live.
+        - id: c
+          label: The procedure is documented and would work if followed
+          correct: false
+          explain: >
+            A document asserts; it cannot discover the step that fails. The
+            rehearsal is cheap precisely so that the board pack never has to
+            contain the word "should".
     prompt: What do you commit to?
     options:
       - id: a

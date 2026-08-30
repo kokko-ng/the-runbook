@@ -30,6 +30,37 @@ encounters:
 
       "Somebody is going to ask you what this says. Not what to do about it. What
       it says."
+    hint: >
+      Do not read the loudest number first. Ask which of the four movements could
+      produce the other three as side effects; a bottleneck makes everything
+      around it look guilty.
+    post_mortem:
+      question: >
+        Marek pulls the chart back up without a word. "Try again in a second.
+        First: when a machine looks busy everywhere at once, what decides which
+        line you believe?"
+      options:
+        - id: a
+          label: The reading explained one line instead of making all four agree
+          correct: true
+          explain: >
+            The four movements are one story: with memory flat and the disk queue
+            climbing to forty, the processor spike and the traffic collapse are
+            effects. Any single line, read alone, supports a different wrong
+            diagnosis.
+        - id: b
+          label: The chart alone was too thin to diagnose from
+          correct: false
+          explain: >
+            The chart was sufficient. Four metrics over the same minutes carried
+            the whole diagnosis; the gap was in the reading, not in the data.
+        - id: c
+          label: The busiest number was given too little weight
+          correct: false
+          explain: >
+            The busiest number got exactly the weight that misleads. Processor at
+            ninety-eight per cent says the machine is struggling; it is the
+            quieter disk queue that says why.
     prompt: What is the metric telling you?
     options:
       - id: a
@@ -89,6 +120,37 @@ encounters:
 
       Meridian's on-call rotation is the Cebu NOC overnight and the platform team
       during the day.
+    hint: >
+      There are two failures in that inbox: where the alerts go and how many
+      deserve to exist. A fix that repairs only one of them rebuilds the same
+      inbox.
+    post_mortem:
+      question: >
+        "Before you send me a new design," says Dana, "name the principle it is
+        built on. What has to be true of every alert that survives?"
+      options:
+        - id: a
+          label: It reaches a person who will act, and it is worth acting on
+          correct: true
+          explain: >
+            Routing and volume are the two halves. An action group with a real
+            rotation answers the first; deleting the rules nobody acts on answers
+            the second. Fix one without the other and the it-alerts inbox
+            rebuilds itself.
+        - id: b
+          label: It goes to more people, so somebody is bound to read it
+          correct: false
+          explain: >
+            Four people already received every alert, and each assumed another
+            was reading. Widening the audience widens the assumption; ownership
+            comes from a named rotation, not from the number of recipients.
+        - id: c
+          label: It is visible somewhere the NOC can check when they choose
+          correct: false
+          explain: >
+            Visibility on demand already exists in the portal, and nobody checked
+            at 03:00. An alert is the platform reaching out; anything that waits
+            to be looked at is a report.
     prompt: How do you rebuild the alerting?
     options:
       - id: a
@@ -151,6 +213,36 @@ encounters:
       "Forty-two pages between one and four in the morning," says Joana. "My
       overnight shift acknowledged all of them because that is the rule, and now
       they do not trust the page."
+    hint: >
+      The alerts are telling the truth on a schedule everyone already knows. Ask
+      what can act on that knowledge every month without anyone touching the
+      rules or remembering anything.
+    post_mortem:
+      question: >
+        Joana adds the page count to the shift report. "Before the next window
+        comes around: what is the rule for noise everybody already expects?"
+      options:
+        - id: a
+          label: Silence the known window at the notification layer and leave detection alone
+          correct: true
+          explain: >
+            The alerts are correct and the schedule is known. A processing rule
+            mutes notifications for that scope and recurrence, keeps the record,
+            and leaves every rule at full sensitivity for the rest of the month.
+        - id: b
+          label: Loosen the rules themselves until patching fits under them
+          correct: false
+          explain: >
+            Any rule loose enough to sleep through a reboot is loose enough to
+            sleep through a failure. Detuning trades one quiet night a month for
+            a slower page every other night.
+        - id: c
+          label: Route the expected noise somewhere less disruptive
+          correct: false
+          explain: >
+            A quieter destination is still forty-two pages teaching somebody to
+            ignore pages. Notifications for a window everyone expects should not
+            reach anyone; the platform can hold the record instead.
     ticket:
       ref: INC-4780
       opened: "04:10"
@@ -198,6 +290,16 @@ encounters:
             "window": "PT5M"
           }
         time_cost: 1
+    post_incident:
+      path: [a, b]
+      text: >
+        Two listings settle it. The rules list shows three enabled, sensibly
+        scoped alerts covering rg-app, so the rules themselves are not the fault.
+        The processing-rule listing comes back empty, which means nothing stands
+        between a correct alert and a page at 01:00. A correct rule plus no
+        suppression is the whole diagnosis. The scope-and-window detail on the
+        heartbeat rule cannot move it, because Joana already confirmed the alerts
+        fire truthfully; how a true alert evaluates was never in question.
     fixes:
       - id: a
         label: >

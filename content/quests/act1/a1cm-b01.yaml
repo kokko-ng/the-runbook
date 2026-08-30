@@ -31,6 +31,37 @@ encounters:
 
 
       Four time units. The next scale-in event is in about twenty minutes.
+    hint: >
+      Nothing here is deleting messages; the clock and the visibility timeout
+      explain what the depots see. Ask what an instance would need in order
+      to finish or hand back its work before the platform takes the instance
+      away.
+    post_mortem:
+      question: >
+        Marek watches the twenty-minute clock with you. "The set is allowed
+        to take instances away. What has to be true for that to be safe?"
+      options:
+        - id: a
+          label: The instance gets warning enough to finish or release its work
+          correct: true
+          explain: >
+            Terminate notifications give a defined window, and a worker that
+            releases its message turns a five-minute disappearance into
+            nothing. Scale-in stays, the saving stays, the batch survives.
+        - id: b
+          label: Scale-in happens rarely enough that the losses stay acceptable
+          correct: false
+          explain: >
+            Frequency tuning shrinks the incident without ending it; the
+            instance still dies mid-message on the days it happens. Twice a
+            day or once, Joana files the same ticket.
+        - id: c
+          label: The queue re-delivers fast enough that nobody notices the gap
+          correct: false
+          explain: >
+            The timeout is not slack to trim; it must outlast the worst-case
+            processing time or healthy workers get messages handed out
+            twice. The gap was the symptom, not the setting.
     ticket:
       ref: INC-4760
       opened: "11:20"
@@ -88,6 +119,18 @@ encounters:
           38.4       2026-08-24T11:18:00Z
           41.9       2026-08-24T11:19:00Z
         time_cost: 1
+    post_incident:
+      path: [b, c]
+      text: >
+        The activity log ties the mechanism to the clock: scale set delete
+        operations at 09:41 and 11:02, the same minutes the batches vanish.
+        The scheduled events reading supplies the why: null, so no instance
+        ever hears that it is about to be removed, and a worker dies holding
+        a message that stays invisible for five minutes. Event times plus a
+        missing warning is the whole story. The autoscale profile only
+        restates thresholds the ticket already quoted, and a processor
+        average around forty says the fleet is comfortable, which was never
+        the complaint.
     fixes:
       - id: a
         label: >
@@ -144,6 +187,38 @@ encounters:
       identical: two of them need a larger size with more memory for the month-end
       run, and the team wants to be able to attach a data disk to one of them for
       a migration.
+    hint: >
+      List what the reporting workers actually need: two different sizes and
+      a disk on one instance. Ask which mode treats an instance as a full
+      virtual machine, and which one stamps copies from a single model.
+    post_mortem:
+      question: >
+        Marek adds the month-end sizes to the requirements sheet.
+        "Orchestration modes are not a style choice. What decides between
+        them?"
+      options:
+        - id: a
+          label: Whether the instances must be allowed to differ
+          correct: true
+          explain: >
+            Two larger machines and a one-off data disk are per-instance
+            differences, and flexible orchestration treats each instance as
+            a standard virtual machine. Uniform trades that away for
+            efficient scale from a single model.
+        - id: b
+          label: Which mode is newer, since defaults exist to be followed
+          correct: false
+          explain: >
+            Flexible is the current default, and that is not the argument.
+            The requirements decide; a fleet of thousands of identical
+            stateless workers would point the other way.
+        - id: c
+          label: Whether scale sets suit non-identical machines at all
+          correct: false
+          explain: >
+            Stepping back to hand-managed machines in an availability set
+            recreates exactly the shape flexible orchestration replaces, and
+            month end gets deployed by hand at 23:00.
     prompt: Which orchestration mode do you choose?
     options:
       - id: a
@@ -184,6 +259,10 @@ encounters:
       "Somebody asks you to move a production machine from a D-series to an
       E-series size, in the same region, same family generation. What do you tell
       them it costs in downtime, and what would make it worse?"
+    hint: >
+      Separate the guaranteed cost from the conditional one. Every resize
+      pays a restart; ask what has to happen when the current host cluster
+      cannot offer the target size, and what that extra step releases.
     question: What happens when you change a virtual machine's size?
     options:
       - id: a

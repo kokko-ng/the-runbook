@@ -29,6 +29,35 @@ encounters:
 
       "Do not tell me it depends," she says. "Tell me what each one costs and
       why."
+    hint: >
+      Give each data set its own answer, driven by when it is read. A tier is
+      priced on the assumption you will read rarely or often; the bill goes wrong
+      wherever the assumption and the pattern disagree.
+    post_mortem:
+      question: >
+        Priya writes three lines on her printout, one per data set. "Have another
+        look at the projections. What should each line have been priced against?"
+      options:
+        - id: a
+          label: Each data set is tiered by its own read pattern
+          correct: true
+          explain: >
+            Rarely read documents earn cool and then archive, a three-month
+            analytical window stays hot for the window, and a working policy stays
+            untouched. One rule per data set is the whole method.
+        - id: b
+          label: Data this cold belongs in archive across the board
+          correct: false
+          explain: >
+            Archive charges for reads and takes hours to produce data. A monthly
+            analytics run against three months of telemetry would pay that toll
+            twelve times a year.
+        - id: c
+          label: Shrinking the volume matters more than placing it in tiers
+          correct: false
+          explain: >
+            These formats barely compress, and smaller data in the wrong tier is
+            still mispriced. The lever that moves this bill is placement, not size.
     prompt: What do you recommend?
     options:
       - id: a
@@ -91,6 +120,38 @@ encounters:
 
       "The regulator's other question is whether a manifest can be altered after
       the fact."
+    hint: >
+      Let the consequence of losing each data set set its protection, and read the
+      regulator's question again: it is about change, not loss. Redundancy answers
+      one of those questions and something else answers the other.
+    post_mortem:
+      question: >
+        Wei Lin writes the finding before she says it. "Loss and alteration were
+        both on the table. Tell me what a correct answer owed each of them."
+      options:
+        - id: a
+          label: >
+            Protection is priced per data set, and alteration needs immutability,
+            which redundancy never provides
+          correct: true
+          explain: >
+            Contractual documents earn geo-redundancy, versioning and a locked
+            retention policy; reproducible telemetry earns none of that. Copies,
+            however many, do not stop an authorized write from changing history.
+        - id: b
+          label: The highest durability setting everywhere would have covered it
+          correct: false
+          explain: >
+            Maximum redundancy on reproducible telemetry is money spent on the
+            least valuable data, and it still leaves the alteration question open.
+            Durability is not tamper protection.
+        - id: c
+          label: Soft delete was the missing control
+          correct: false
+          explain: >
+            Soft delete restores what was deleted, within a window. It says nothing
+            about a manifest quietly overwritten or edited, which is what the
+            regulator asked about.
     prompt: What durability and protection do you recommend?
     options:
       - id: a
@@ -149,6 +210,10 @@ encounters:
       "Somebody in the review will ask whether a time-based retention policy can
       be shortened if we get it wrong," says Grace. "Know the answer before you
       propose it."
+    hint: >
+      Consider why a regulator accepts this control at all: what nobody can undo,
+      nobody can be pressured to undo. Whatever flexibility survives locking has
+      to point in only one direction.
     question: What can be changed about a locked time-based immutability policy?
     options:
       - id: a

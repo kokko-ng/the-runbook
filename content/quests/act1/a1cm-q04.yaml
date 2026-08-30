@@ -28,6 +28,37 @@ encounters:
       vm-tms01 has a 128 gibibyte premium data disk holding the application's
       working files and its local queue. The queue backs up when the database is
       slow, and the database has been slow all week.
+    hint: >
+      Two constraints govern everything here: no shipment may be lost, and no
+      hour may be spent. Ask which change adds space to the disk that is
+      actually full, in place, with the queue intact.
+    post_mortem:
+      question: >
+        Marek stays on the bridge call after Joana drops off. "Sev1, four in
+        the morning, undelivered work on the disk. What was the change that
+        restored writes without spending either?"
+      options:
+        - id: a
+          label: Growing the full disk in place, then asking why the queue backed up
+          correct: true
+          explain: >
+            A managed disk expands without deallocation on current types, and
+            the file system grows behind it. Nothing is deleted, nothing is
+            restructured, and the follow-up question waits for daylight.
+        - id: b
+          label: Making space by any means, because writes had to resume
+          correct: false
+          explain: >
+            The queue files are undelivered shipments; freeing space by
+            discarding them converts an outage into a data loss incident.
+            Speed never justifies deleting the work you exist to deliver.
+        - id: c
+          label: Adding capacity somewhere on the machine, wherever it is quickest
+          correct: false
+          explain: >
+            A second mount point and a bigger temporary disk both add space
+            the queue does not use, or cannot trust. Capacity has to land on
+            the disk that is actually full.
     ticket:
       ref: INC-4670
       opened: "04:20"
@@ -86,6 +117,18 @@ encounters:
           Filesystem      Size  Used Avail Use% Mounted on
           /dev/sda1        30G   11G   19G  37% /
         time_cost: 2
+    post_incident:
+      path: [a, b]
+      text: >
+        The attached-disk view names the suspect: one 128 gibibyte data disk
+        holding a queue Marek has already measured at ninety-one gigabytes.
+        The disk view adds the part that shapes the fix: Premium at 500 IOPS,
+        so expansion buys performance tier as well as space, and current disk
+        types grow without deallocating the machine. That is enough to choose
+        the in-place expansion. Checking the machine size only confirms
+        headroom a D2s_v5 was never short of at this scale, and the root file
+        system at thirty-seven per cent answers a question the application
+        log had already answered.
     fixes:
       - id: a
         label: >
@@ -147,6 +190,38 @@ encounters:
       restart. The reporting extract writes one large file a night and nobody
       cares if it is lost. And the operating system disk is a P4 doing nothing.
       Three disks, three answers."
+    hint: >
+      Marek gave you the workload in one sentence: small random writes, all
+      day, must survive a restart. Ask which disk type is built for exactly
+      that pattern, and remember that performance and size travel together
+      on it.
+    post_mortem:
+      question: >
+        Marek writes the three workloads on the whiteboard again. "Same
+        question for every disk in the estate: what decides the type?"
+      options:
+        - id: a
+          label: The write pattern and what happens to the data on a restart
+          correct: true
+          explain: >
+            Small random writes that must survive a restart are the premium
+            solid-state case, and premium performance scales with the size
+            you pick. Price and headline speed are outputs of that decision,
+            not inputs.
+        - id: b
+          label: The price per gibibyte, since capacity was the original problem
+          correct: false
+          explain: >
+            The cheapest storage suits data that is rarely touched. Under
+            small random writes it makes the queue slower than the incident
+            did, which is its own kind of expensive.
+        - id: c
+          label: The fastest option on the sheet, so the choice never comes back
+          correct: false
+          explain: >
+            Ephemeral disks vanish with the host, and ultra disks answer
+            requirements this queue does not have. Faster than the workload
+            needs is money; wrong for the workload is an outage.
     prompt: What do you propose for the queue disk?
     options:
       - id: a
@@ -203,6 +278,37 @@ encounters:
       The metrics for the last month: processor averages twenty-two per cent and
       peaks at forty, memory sits at ninety-one per cent all day, and the disk
       queue length is high during the morning rush.
+    hint: >
+      Read the three metrics and ask which resource is actually saturated.
+      That resource chooses the family; the number within the family is the
+      easy part; and a resize works in both directions when February comes.
+    post_mortem:
+      question: >
+        Priya keeps the metric printout between you. "I will sign a size
+        change once. Tell me what should choose it."
+      options:
+        - id: a
+          label: The saturated metric chooses the family; the season sets the review date
+          correct: true
+          explain: >
+            Ninety-one per cent memory with the processor at twenty-two says
+            the shape is wrong, not the size. A memory-optimized family fixes
+            the shape, and the same change record brings it back down in
+            February.
+        - id: b
+          label: Headroom on every metric, so the question never comes back
+          correct: false
+          explain: >
+            Buying headroom for a processor that idles at twenty-two per cent
+            pays for the wrong resource. The question comes back anyway, as a
+            line on the invoice.
+        - id: c
+          label: More machines rather than bigger ones, on principle
+          correct: false
+          explain: >
+            Scaling out serves stateless request handling, which the second
+            machine already covers. A single memory-bound process needs a
+            machine whose memory fits it.
     prompt: What do you ask for?
     options:
       - id: a

@@ -30,6 +30,37 @@ encounters:
 
       "I do not want another credential signed with the account key," says Wei
       Lin. "And I want to be able to see who issued a link if one is abused."
+    hint: >
+      Wei Lin set two tests: nothing signed with the account key, and every
+      issued link traceable to its issuer. Check what signs each signature type
+      before anything else.
+    post_mortem:
+      question: >
+        Wei Lin waits while you re-read her two conditions. "Every signature is
+        a promise signed by something. What did I ask about the signer?"
+      options:
+        - id: a
+          label: That it not be the account key, and that it name the issuer
+          correct: true
+          explain: >
+            A user delegation signature is signed with a key Entra issues to the
+            service's own identity, so no account key ships with the deployment and the
+            logs record who issued each link. Anything signed with an account key fails
+            the first test and blurs the second.
+        - id: b
+          label: That whatever is issued expire within minutes
+          correct: false
+          explain: >
+            Short lifetimes are good hygiene on every signature type, and nobody disputed
+            them. The signer was the requirement doing the eliminating, because it
+            decides both what ships with the service and what the logs can attribute.
+        - id: c
+          label: That a stored access policy sit behind every signature
+          correct: false
+          explain: >
+            The policy pattern was right for Northgate, whose systems have no identity in
+            the tenant. This service has a managed identity, and delegation keys carry
+            attribution and revocation without needing a policy at all.
     prompt: What kind of shared access signature do you use?
     options:
       - id: a
@@ -91,6 +122,36 @@ encounters:
       In circulation: Northgate's service signature under a stored access policy,
       Sriwijaya's ad hoc service signature with four months to run, and the
       internal service's user delegation signatures.
+    hint: >
+      It is late and you do not know which credential is gone. Rank each lever
+      by what it kills instantly and by what else it takes down with it.
+    post_mortem:
+      question: >
+        Marek stays on the line while you think. "Unknown credential, middle of
+        the night. What order do the levers go in, and why that order?"
+      options:
+        - id: a
+          label: Narrow and instant first, broad and destructive only once you know more
+          correct: true
+          explain: >
+            Deleting the stored access policy revokes one partner's signatures
+            immediately and touches nothing else, which is cheap insurance while the
+            facts are missing. The broad levers stay available and get pulled with
+            information rather than instead of it.
+        - id: b
+          label: The most complete revocation available, because the exposure is unknown
+          correct: false
+          explain: >
+            Rotating both keys does end the exposure, along with Sriwijaya's uploads and
+            several internal jobs. Completeness at 22:40 converts one possible breach
+            into one certain multi-party outage.
+        - id: c
+          label: No revocation at all until the partner confirms which credential it was
+          correct: false
+          explain: >
+            Confirmation might arrive at breakfast, and the policy deletion costs one
+            partner a quiet night of uploads. Acting narrowly now and precisely later
+            beats acting once, perfectly, too late.
     prompt: What do you do first?
     options:
       - id: a
@@ -148,6 +209,10 @@ encounters:
       signature for a container with read and list permissions, and the account
       firewall denies by default with one virtual network allowed. The signature
       holder is on a hotel network. What happens?"
+    hint: >
+      Keep the two controls separate in your head: a signature says what a
+      caller may do, and the firewall says where a caller may come from. Both
+      must say yes.
     question: What is the result of the request?
     options:
       - id: a

@@ -25,6 +25,38 @@ encounters:
       an incident. The auditor's question is not whether they are trustworthy. It
       is what an attacker gets when one of their laptops is compromised at two in
       the morning."
+    hint: >
+      Wei Lin's scenario starts after a successful sign-in. Ask what a stolen
+      session holds at that moment, and whether your design changes that answer
+      between incidents without slowing anyone during one.
+    post_mortem:
+      question: >
+        Wei Lin files the wrong answer where she files everything. "Once more.
+        The laptop is compromised at two in the morning, outside any incident.
+        What determines what the attacker holds?"
+      options:
+        - id: a
+          label: Whatever privilege stands assigned at that moment, which should be nothing
+          correct: true
+          explain: >
+            The exposure is standing privilege, and eligibility removes it
+            between activations without removing anyone's ability to respond.
+            Authentication strength, headcount and monitoring all matter, and
+            none of them changes what an idle session already holds.
+        - id: b
+          label: How strong the authentication in front of the account is
+          correct: false
+          explain: >
+            Strong authentication lowers the odds of compromise and does
+            nothing once a session exists. The scenario Wei Lin posed begins
+            after the sign-in succeeded.
+        - id: c
+          label: How few people hold the role
+          correct: false
+          explain: >
+            Three standing Contributors are a smaller target than eleven and
+            still a standing one. The count changes the odds, not what a
+            compromised laptop is worth.
     prompt: What do you recommend?
     options:
       - id: a
@@ -88,6 +120,40 @@ encounters:
 
 
       "I do not want a design where somebody at Meridian is expected to remember."
+    hint: >
+      Grace has already told you the failure mode: somebody expected to
+      remember. Test each idea against the day nobody remembers and Straits
+      says nothing. The design that still works then is the design.
+    post_mortem:
+      question: >
+        Grace draws a line from today to November. "Somewhere on this line your
+        design breaks. Walk it back for me: what does guest access need across
+        time, not just on the day it is granted?"
+      options:
+        - id: a
+          label: >
+            A governed lifecycle: a request path, an expiry, and a review that
+            runs on schedule
+          correct: true
+          explain: >
+            Entitlement management supplies the route in and back in, expiry
+            supplies the exit, and access reviews re-attest what remains. Take
+            away any one of the three and the design leans on diligence, which
+            is the thing Grace ruled out.
+        - id: b
+          label: A harder cutoff, so stale access cannot linger
+          correct: false
+          explain: >
+            Expiry without a request and renewal path converts staleness into
+            outages. The cutoff is only safe because the package gives people a
+            way back through the front door.
+        - id: c
+          label: A better notification agreement with Straits
+          correct: false
+          explain: >
+            Even a prompt and well-meaning Straits is a control Meridian cannot
+            evidence or enforce. The design has to produce the right outcome
+            when the notification never arrives.
     prompt: How do you handle guest access over time?
     options:
       - id: a
@@ -147,6 +213,38 @@ encounters:
       shipment database and the manifest storage account. Today it uses a
       connection string with a password and a storage account key, both in the
       pipeline."
+    hint: >
+      Marek's complaint is not where the credentials sit but that they exist.
+      Ask which designs still leave a secret to store, rotate and leak, and
+      which leaves nothing of the kind anywhere.
+    post_mortem:
+      question: >
+        Marek turns the pipeline definition around to face you. "Count with me.
+        Two secrets in it today. After your version ships, how many are left,
+        and whose job is rotation?"
+      options:
+        - id: a
+          label: None, because an identity the platform issues and rotates replaces them
+          correct: true
+          explain: >
+            A managed identity leaves no credential in code, pipeline or vault,
+            and Azure handles its rotation. Every alternative here keeps at
+            least one secret alive somewhere, with an owner and a failure mode
+            attached.
+        - id: b
+          label: The same secrets, but in a place built to hold them
+          correct: false
+          explain: >
+            A vault protects a secret; it does not retire it. Storage was never
+            the weakness Marek raised, existence was, and existence still
+            carries an expiry date and an owner.
+        - id: c
+          label: Rotated secrets, which is as good as no secrets
+          correct: false
+          explain: >
+            Rotation shrinks the window and adds automation that can fail
+            unnoticed at the worst hour. No credential at all has no window and
+            nothing to break.
     prompt: What do you recommend for the service's own access?
     options:
       - id: a

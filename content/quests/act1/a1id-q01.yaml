@@ -33,6 +33,38 @@ encounters:
 
       The developers deploy into rg-app and rg-data. They have never touched the
       hub.
+    hint: >
+      Two dials matter here: which role, and the scope where it is assigned. An
+      answer that turns only one of them, or neither, leaves the auditor's
+      question with the same answer. And Thursday's deployment still has to run.
+    post_mortem:
+      question: >
+        Dana slides the export back across the desk. "Walk me through it before
+        you try again. What did that answer get wrong about the finding?"
+      options:
+        - id: a
+          label: It did not match roles and scopes to who actually needs what
+          correct: true
+          explain: >
+            The finding is answered by assignment: each person's real work,
+            expressed as a role at a scope, changed in one planned pass. Any fix
+            that skips that mapping leaves the auditor's question with the same
+            eleven names.
+        - id: b
+          label: It failed to stop production resources being deleted at all
+          correct: false
+          explain: >
+            Deletion was never meant to become impossible. The developers and
+            the platform admins delete things legitimately inside their own
+            scopes; the finding was about who can act where, not about
+            forbidding an operation.
+        - id: c
+          label: It moved too fast for a subscription with a deployment due
+          correct: false
+          explain: >
+            Thursday survives a well-scoped change made today. Speed was not the
+            risk; changing access without first mapping who needs what is, and
+            no amount of waiting fixes that by itself.
     prompt: What do you take to the change board?
     options:
       - id: a
@@ -96,6 +128,38 @@ encounters:
 
       They are getting guest accounts in the tenant. You are deciding what those
       accounts can do once they are in.
+    hint: >
+      Read the requirement as three constraints: see configuration, change
+      nothing, see nothing beyond production. An assignment is a role and a
+      scope; test each candidate against all three constraints on both counts.
+    post_mortem:
+      question: >
+        Wei Lin reads the requirement back, all three clauses of it. "Before
+        your second attempt, tell me where the first one parted company with
+        what I wrote."
+      options:
+        - id: a
+          label: It granted the auditors more than the written requirement allows
+          correct: true
+          explain: >
+            Reader on the production subscription is the requirement translated
+            exactly. A wider scope inherits into non-production, a data-plane
+            role reaches contents, and a write role reaches change; each is a
+            clause of the finding handed away.
+        - id: b
+          label: It trusted an outside firm further than an auditor should be trusted
+          correct: false
+          explain: >
+            Trust is not the control in question. Guests hold exactly what they
+            are assigned, whatever anyone feels about them; the miss was in the
+            grant, not in the sentiment.
+        - id: c
+          label: Guest accounts were the wrong mechanism for people outside Meridian
+          correct: false
+          explain: >
+            Guests in the tenant are precisely how an outside firm signs in for
+            three weeks and is removed cleanly afterwards. The mechanism was
+            sound; the assignment attached to it was not.
     prompt: What do you assign them?
     options:
       - id: a
@@ -155,6 +219,37 @@ encounters:
       "It will not let me. The Add role assignment button is there, I fill it in,
       and it fails at the end with something about authorization. I am Contributor
       on that resource group, which I would have thought was enough."
+    hint: >
+      The error names one action. A role is a list of actions with subtractions;
+      read what Dana's role says about that particular action, then look for the
+      smallest built-in role that adds it back at the scope she needs.
+    post_mortem:
+      question: >
+        Dana clicks her pen closed. "Explain it to me once, properly, before
+        anyone touches that button again. What exactly was my account missing?"
+      options:
+        - id: a
+          label: One specific action, which the fix should add and nothing more
+          correct: true
+          explain: >
+            Contributor carries authorization writes in its NotActions, so
+            granting access is the one thing it cannot do at any scope. The
+            right fix adds exactly that action back, scoped to rg-app, and stops
+            there.
+        - id: b
+          label: A wide enough scope for the assignment she was attempting
+          correct: false
+          explain: >
+            The error mentions scope, which makes this tempting. But Contributor
+            cannot write role assignments anywhere; widening where Dana stands
+            changes the blast radius, not the outcome.
+        - id: c
+          label: Nothing; granting access was never a manager's job to hold
+          correct: false
+          explain: >
+            Delegation is what scoped roles are for. Handing Dana exactly the
+            missing permission on one resource group is smaller and safer than a
+            queue that runs through you.
     ticket:
       ref: INC-4402
       opened: "11:05"
@@ -212,6 +307,17 @@ encounters:
         output: |
           (no results)
         time_cost: 1
+    post_incident:
+      path: [a, b]
+      text: >
+        Two checks close this one. The assignment listing says Contributor on
+        rg-app and nothing stronger, and the role definition shows
+        Microsoft.Authorization write actions sitting in Contributor's
+        NotActions, which is the exact action named in her error. A role is its
+        Actions minus its NotActions; there is nothing else to consult. The
+        inherited listing only repeats the first answer with more flags, and the
+        hunt for deny assignments assumes an exotic block when the ordinary role
+        definition already refuses the action on its own.
     fixes:
       - id: a
         label: Assign Dana User Access Administrator on rg-app
@@ -264,6 +370,10 @@ encounters:
       "One question and then I want coffee," says Marek. "Somebody asks you in an
       interview what the difference is between Owner and Contributor. Do not say
       'Owner is more'."
+    hint: >
+      Do not reason from size. Reason from the definitions: one role is the
+      other plus a single family of actions. Name that family and you have
+      Marek's answer.
     question: What can Owner do that Contributor cannot?
     options:
       - id: a

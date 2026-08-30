@@ -28,6 +28,39 @@ encounters:
       "Policy has to differ between platform services and workloads. Sandboxes
       must be exempt from some of it. And the security team wants one place to see
       compliance for everything that is not a sandbox."
+    hint: >
+      A hierarchy earns its keep through inheritance: a level should exist
+      because some rule applies to everything below it and nothing beside it.
+      Take the three requirements Grace listed and ask which shape lets each be
+      said once.
+    post_mortem:
+      question: >
+        Grace erases your hierarchy but leaves the requirements. "The structure
+        was wrong before any box had a name. What should decide the shape of
+        this thing?"
+      options:
+        - id: a
+          label: How workloads are governed, so each policy is assigned once and inherited
+          correct: true
+          explain: >
+            Management groups exist to make inheritance do the work: platform
+            rules in one place, workload rules in another, sandboxes outside
+            both. An axis that does not map to a difference in policy produces
+            exceptions instead of structure.
+        - id: b
+          label: How the company is organized, so ownership is obvious
+          correct: false
+          explain: >
+            Ownership is real and it lives in role assignments and tags, which
+            move easily. The hierarchy moves badly, so it should follow the
+            thing that changes least, which is how workloads are governed.
+        - id: c
+          label: Where the resources physically run
+          correct: false
+          explain: >
+            Location is one policy among many, enforceable at any scope with an
+            allowed-locations rule. Most workloads span regions, so geography
+            makes a poor spine for the structure.
     prompt: What hierarchy do you recommend?
     options:
       - id: a
@@ -91,6 +124,38 @@ encounters:
       spelled two ways. Nobody can tell me what the difference is between owner
       and contact, and I still cannot answer the only question I ask, which is
       which part of the business a cost belongs to."
+    hint: >
+      Priya has one question she needs the estate to answer. Start from the
+      question a tag answers and who fills it in; a tag nobody can define will
+      be filled with something, which is worse than nothing.
+    post_mortem:
+      question: >
+        Priya turns the cost report toward you. "I ask one question of this
+        data every month. Before you revise: what makes a tagging scheme stay
+        accurate for a year?"
+      options:
+        - id: a
+          label: Few mandatory tags, each answering a real question, enforced and inherited by default
+          correct: true
+          explain: >
+            Accuracy survives when the platform applies most values through
+            inheritance and refuses the few that are missing, and when every
+            mandatory tag maps to a question somebody actually asks. Size and
+            voluntary effort are what kill schemes.
+        - id: b
+          label: More coverage, so every future question is already answered
+          correct: false
+          explain: >
+            A tag without a present-tense question gets filled with noise, and
+            noise spreads by inheritance as efficiently as truth. Coverage
+            nobody can define is debt, not data.
+        - id: c
+          label: Discipline from the teams who deploy
+          correct: false
+          explain: >
+            Nine tags spelled two ways is what discipline produces over a year
+            of busy weeks. The scheme has to survive people typing nothing,
+            which is a platform property, not a cultural one.
     prompt: What tagging strategy do you recommend?
     options:
       - id: a
@@ -150,6 +215,38 @@ encounters:
 
 
       Fourteen subscriptions are coming. She would like the answer to be a screen.
+    hint: >
+      Wei Lin wants an answer that is true on any day someone asks, across
+      subscriptions that do not exist yet. Ask which approach measures
+      continuously, inherits to newcomers, and separates measuring a control
+      from enforcing one.
+    post_mortem:
+      question: >
+        Wei Lin declines to add your answer to the questionnaire file. "From
+        the top. When a customer asks in March whether we comply, what has to
+        be true about how the answer is produced?"
+      options:
+        - id: a
+          label: The platform assesses the estate continuously, so the answer is current, not reconstructed
+          correct: true
+          explain: >
+            Continuous assessment against the standard, assigned where every
+            subscription inherits it, is what makes the compliance answer true
+            on an arbitrary Tuesday. Audits, exports and blanket denies each
+            produce a stale answer or a blocked platform.
+        - id: b
+          label: An authority outside Meridian has certified it recently
+          correct: false
+          explain: >
+            Certification is required and dated. The customer's question is
+            about now, and the gap between audit days is where estates drift.
+        - id: c
+          label: Every control in the standard is technically enforced
+          correct: false
+          explain: >
+            Many controls are procedural or detective and cannot be a deny
+            rule. Enforce the subset that is genuinely technical, and measure
+            the rest honestly.
     prompt: What do you recommend for compliance?
     options:
       - id: a

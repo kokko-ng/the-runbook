@@ -30,6 +30,37 @@ encounters:
       Scans cannot be written. Depot drivers are queuing uploads on their
       handhelds, which hold about six hours' worth. Dana is on a call with Priya
       and both of them have heard the phrase customer-initiated failover.
+    hint: >
+      Two questions are tangled on the bridge: how to keep scans flowing this
+      afternoon, and what to do about the degraded account. Answer the first
+      without spending anything irreversible on the second.
+    post_mortem:
+      question: >
+        The bridge goes quiet while the incident record is updated: with the
+        region still degraded, what should decide the next action taken?
+      options:
+        - id: a
+          label: Whether an action preserves data and stays reversible, not how decisive it sounds
+          correct: true
+          explain: >
+            Writing new scans to the healthy replica account keeps everything and commits
+            Meridian to nothing. Failover discards whatever had not replicated and
+            returns the account locally redundant, which is a permanent price for a
+            temporary outage.
+        - id: b
+          label: Whoever is most senior on the call, since the risk is theirs
+          correct: false
+          explain: >
+            Escalation assigns accountability; it does not improve the options. The job
+            at this desk is to put the reversible option on the table before somebody
+            senior reaches for the irreversible one.
+        - id: c
+          label: The six-hour handheld deadline, above every other consideration
+          correct: false
+          explain: >
+            The deadline is real and it is not yet close. That headroom is exactly what
+            made the careful option free, and urgency only spends it when no alternative
+            is left.
     ticket:
       ref: INC-4600
       opened: "13:05"
@@ -77,6 +108,18 @@ encounters:
         output: |
           (ServiceUnavailable) The server is busy. Please retry the request.
         time_cost: 1
+    post_incident:
+      path: [a, b]
+      text: >
+        Two account reads frame the whole decision. The primary shows
+        unavailable with a last sync eleven minutes before the incident began,
+        which is the price tag on failover: everything after 12:54 is discarded
+        and the account comes back locally redundant. The replica shows an
+        ordinary, available account in East Asia, which is the alternative:
+        point the intake writes at it and keep every scan. The probe upload
+        adds nothing, because the ticket and the status page had already
+        established that writes were failing; it only proves the outage a
+        second time.
     fixes:
       - id: a
         label: >
@@ -134,6 +177,38 @@ encounters:
       The region recovered at 18:20. Six hours of scans are in the East Asia
       account, everything older is in the primary, and Dana wants one place to
       look tomorrow morning.
+    hint: >
+      Ask which direction the standing replication flows, and what that means
+      for blobs born at the wrong end of it. The tidy ending has one
+      authoritative place to look.
+    post_mortem:
+      question: >
+        Dana wants one line for the morning report. "Six hours of scans went
+        somewhere unusual. What is the principle for putting things back
+        afterwards?"
+      options:
+        - id: a
+          label: Carry the exception back to the primary and restore one authoritative copy
+          correct: true
+          explain: >
+            Object replication is one-way from the primary, so blobs written directly to
+            the destination never travel home on their own. A single server-side copy of
+            the incident window ends the split while everyone still remembers why it
+            exists.
+        - id: b
+          label: Make the newest data the source, because it is the most current
+          correct: false
+          explain: >
+            Recency is a property of six hours of blobs, not of the container holding
+            them. Pointing replication the other way makes the smaller set authoritative
+            over two years it does not hold.
+        - id: c
+          label: Leave both copies untouched as a record of the incident
+          correct: false
+          explain: >
+            The activity logs and the incident ticket are the record. Leaving the data
+            itself split turns a one-off outage into a permanent rule about where to
+            look for a scan.
     prompt: How do you reconcile it?
     options:
       - id: a
@@ -178,6 +253,10 @@ encounters:
       their scans survive an entire availability zone failing, and whether they
       survive the region failing. Locally redundant, zone-redundant, geo-redundant,
       geo-zone-redundant. Which one answers yes to both?"
+    hint: >
+      Take the two failures one at a time and ask where each option physically
+      keeps its copies. Surviving both requires copies separated in two
+      different ways at once.
     question: Which redundancy option survives both a zone failure and a regional failure?
     options:
       - id: a

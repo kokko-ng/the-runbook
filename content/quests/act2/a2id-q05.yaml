@@ -29,6 +29,40 @@ encounters:
 
       "There is no single right answer here, which is why it is worth arguing
       about."
+    hint: >
+      Three forces pull at this design: retention, access and correlation. Map
+      each requirement to who queries the data and how long it must live, and
+      let the number of workspaces fall out of that.
+    post_mortem:
+      question: >
+        Grace lets the silence do the review. "Each of these streams has users,
+        a retention and a question it exists to answer. What should the
+        topology be drawn around?"
+      options:
+        - id: a
+          label: >
+            The differences that matter: who queries each stream, its
+            retention, and what must stay separable
+          correct: true
+          explain: >
+            Workspace boundaries set access, retention and cost together, so
+            draw them where those genuinely differ: platform security data in
+            one place, team telemetry with the team, Straits separable. Any
+            simpler rule forces one requirement to eat another.
+        - id: b
+          label: Simplicity, because one place to look beats many
+          correct: false
+          explain: >
+            One workspace is a real answer for a small estate, and here it
+            prices application debug logs at security retention and shows a
+            third party's data to everyone with access.
+        - id: c
+          label: Ownership, so each team's data follows its subscription
+          correct: false
+          explain: >
+            Ownership is served by resource-context access without cutting the
+            data into per-subscription fragments. The boundary that helps a
+            team should not break the correlation security depends on.
     prompt: What logging topology do you recommend?
     options:
       - id: a
@@ -93,6 +127,40 @@ encounters:
       Application telemetry from the dispatch service. And the customer's
       requirement that certain access records are retained for seven years and
       provided to their security operations center on request.
+    hint: >
+      Route by consumer, not by habit. For each stream ask who reads it, how,
+      and for how long, and remember that a single diagnostic setting can serve
+      several answers at once.
+    post_mortem:
+      question: >
+        Wei Lin numbers the four streams in the margin. "Take them one at a
+        time. What determines the right destination for a stream of log data?"
+      options:
+        - id: a
+          label: >
+            Its consumer: interactive queries want a workspace, long retention
+            wants storage, external systems want a feed
+          correct: true
+          explain: >
+            A diagnostic setting can send one stream to several destinations,
+            so nothing forces a single answer. Choosing per consumer keeps the
+            workspace bill proportional to what people query and turns the
+            customer's request into a standing feed.
+        - id: b
+          label: Centralization, so nothing is ever missing from an investigation
+          correct: false
+          explain: >
+            The platform workspace does hold what investigations need. Making
+            it hold everything for every purpose prices seven years of cold
+            records at interactive rates and leaves the customer waiting on
+            exports.
+        - id: c
+          label: Flexibility, so consumers can build whatever they need downstream
+          correct: false
+          explain: >
+            A raw feed defers every decision to a consumer you now have to
+            build and operate. The platform already provides storage, retention
+            and query; routing should use them, not reinvent them.
     prompt: How do you route them?
     options:
       - id: a
@@ -156,6 +224,40 @@ encounters:
       "Every dashboard we have is green while the depots tell me the dispatch
       screen is slow," says Dana. "I want to know what the depot experiences, not
       what the virtual machines think of themselves."
+    hint: >
+      Dana has told you the dashboards and the depots disagree. Ask what each
+      proposal actually measures, and whether that is the thing the depot feels
+      or a proxy for it. When proxy and experience disagree, only one of them
+      is the truth.
+    post_mortem:
+      question: >
+        Dana pulls the chair back around, which means the meeting is not over.
+        "The depots will phone again tomorrow morning. Before then, tell me
+        plainly: what should a monitoring design measure, and from whose side
+        of the screen?"
+      options:
+        - id: a
+          label: The experience users actually have, measured from where they have it
+          correct: true
+          explain: >
+            Real user telemetry and outside-in availability tests report what a
+            depot feels, split by region and hour. Host metrics and reports are
+            proxies, and this complaint exists because the proxies are green
+            while the experience is not.
+        - id: b
+          label: More of the estate, so nothing is unmonitored
+          correct: false
+          explain: >
+            Coverage of resources is necessary and was never the gap. Every
+            host can look unremarkable while the dispatch screen crawls at a
+            depot; breadth does not see that.
+        - id: c
+          label: The same things, reported more often
+          correct: false
+          explain: >
+            Frequency does not change what a metric can see. A proxy reported
+            hourly is still a proxy, and Dana's requirement is to know what the
+            depot experiences while it happens.
     prompt: What monitoring do you recommend?
     options:
       - id: a

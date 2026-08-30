@@ -28,6 +28,37 @@ encounters:
 
       The database is a single Azure SQL Database on the General Purpose tier,
       about 400 gibibytes and growing.
+    hint: >
+      Look at what the seventy per cent actually is before deciding where capacity
+      goes. Load that only reads, and tolerates being seconds old, does not have
+      to be served by the machine doing the writing.
+    post_mortem:
+      question: >
+        Grace draws the primary as one box and the load as arrows into it. "Most
+        of those arrows are reads. What should that have told you?"
+      options:
+        - id: a
+          label: >
+            Read-only load that tolerates staleness belongs on separate read
+            capacity, not on a bigger primary
+          correct: true
+          explain: >
+            Seventy per cent of the load neither writes nor needs the latest second.
+            Serving it from replicas empties the primary for dispatch, which scaling
+            the shared machine never does.
+        - id: b
+          label: The primary was simply undersized for peak season
+          correct: false
+          explain: >
+            A bigger primary still makes dispatch writes queue behind analytics
+            scans, at twice the price. Size was never the problem; contention was.
+        - id: c
+          label: The analytics extracts should have been kept out of peak season
+          correct: false
+          explain: >
+            The extracts are the business asking questions during the fortnight it
+            cares most. The design's job is to make them harmless, not to schedule
+            them away.
     prompt: What do you recommend?
     options:
       - id: a
@@ -84,6 +115,38 @@ encounters:
       rest encrypted with keys we control. Nobody in the platform team able to read
       shipment values in the customer columns. And a way to recover from somebody
       deleting a month of rows, which is not the same as a region failing."
+    hint: >
+      Count the requirements, then count the controls in your answer. Custody of
+      keys, unreadability to administrators and recovery from deletion are
+      different properties; no single mechanism provides more than one of them.
+    post_mortem:
+      question: >
+        Wei Lin slides the questionnaire back across the table. "Read the three
+        requirements again. Tell me the rule for matching controls to them."
+      options:
+        - id: a
+          label: >
+            Each requirement names a distinct property, and each needs the control
+            built for it
+          correct: true
+          explain: >
+            Key custody comes from a customer-managed key, unreadability from
+            encryption inside the engine, and recovery from restore points. A
+            control that satisfies one line of the questionnaire does not cover its
+            neighbors.
+        - id: b
+          label: Encryption at rest was the core requirement and the rest were refinements
+          correct: false
+          explain: >
+            The contracts weight all three equally, and the review circles whichever
+            one is missing. There is no core requirement here, only three.
+        - id: c
+          label: Hiding the sensitive columns from query results was sufficient
+          correct: false
+          explain: >
+            A presentation control depends on the privileges of whoever asks. The
+            requirement was that the platform team cannot read the values at all,
+            which only cryptography in the engine provides.
     prompt: What do you recommend?
     options:
       - id: a
@@ -146,6 +209,35 @@ encounters:
 
 
       Grace wants the cause named before the design goes to the review board.
+    hint: >
+      Two clients, one database, one failure. Compare what the failing client does
+      that the working one never does, and then ask where its connection is
+      actually landing. The error message is more literal than it looks.
+    post_mortem:
+      question: >
+        Marek reads your fix note back to you, once. "The design took nine million
+        reads off the primary. Say what the fix was supposed to preserve."
+      options:
+        - id: a
+          label: The read separation stays; only the write goes where writes are accepted
+          correct: true
+          explain: >
+            The replica exists to carry the heavy reads and refuses all writes by
+            design. Routing the twelve-byte watermark to the primary keeps both
+            facts true at once.
+        - id: b
+          label: Read-only routing is too fragile for scheduled jobs
+          correct: false
+          explain: >
+            The routing did exactly what it promises; the job simply included a
+            write. A pattern is not fragile because it enforces its contract.
+        - id: c
+          label: The watermark table was the flaw and belongs outside the database
+          correct: false
+          explain: >
+            Moving the watermark is a legitimate variant, not the lesson. The miss
+            was sending a write to an endpoint that can never accept one, wherever
+            the watermark lives.
     ticket:
       ref: DRV-1122
       opened: "10:30"
@@ -191,6 +283,17 @@ encounters:
           transport-nr01    Secondary  sql-meridian-tms-replica
         note: The extract's connection string sets ApplicationIntent to ReadOnly.
         time_cost: 1
+    post_incident:
+      path: [a, c]
+      text: >
+        The extract's own log settles half of it in one move: the failing statement
+        is an update to the watermark table, refused because the database it
+        reached is read-only. The replica listing, with the note that the
+        connection string asks for ReadOnly intent, settles the other half: the
+        extract is routed to the named replica, so its one write can never land.
+        The tier and read scale check cannot move the diagnosis, because that
+        configuration is identical for the portal that works and the extract that
+        fails; the difference between them was always the write.
     fixes:
       - id: a
         label: >

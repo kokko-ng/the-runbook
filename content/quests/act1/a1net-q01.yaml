@@ -31,6 +31,38 @@ encounters:
 
       "Whatever you pick has to peer to the hub and route back to Jurong. And
       before you ask, no, we are not renumbering Jurong."
+    hint: >
+      Write down every range this network will ever have to route to, including
+      the one Jurong advertises over the VPN. The right space is whatever is
+      left over; overlap anywhere, even by a subset, is a peering or routing
+      failure later.
+    post_mortem:
+      question: >
+        Dana takes the printout back. "Before this goes anywhere near a change
+        request: what rule did that range break?"
+      options:
+        - id: a
+          label: It overlapped a range this network has to route to
+          correct: true
+          explain: >
+            Peering and VPN routing both require distinct address spaces. The
+            hub, the application spoke and Jurong's 172.16.0.0/12 are all
+            reachable from Johor, so the new space has to be clear of every one
+            of them, subsets included.
+        - id: b
+          label: It made the network too small for the depot
+          correct: false
+          explain: >
+            Size was never the failure. A range can hold ten depots and still
+            collide with a space that already routes, and a collision fails
+            outright rather than filling up.
+        - id: c
+          label: It should have been checked against Azure's reserved ranges first
+          correct: false
+          explain: >
+            Azure reserves addresses inside each subnet, not whole private
+            ranges. The collision was with Meridian's own estate, and every
+            range that mattered was on the printout Dana brought over.
     prompt: What address space do you put in the change request?
     options:
       - id: a
@@ -89,6 +121,40 @@ encounters:
 
 
       He writes 10.30.0.0/16 on the whiteboard and waits.
+    hint: >
+      Azure takes five addresses out of every subnet, a subnet with resources
+      in it cannot shrink, and shared services belong where every spoke can
+      reach them. Carve for the depot you will have next year, not just the one
+      on the order form.
+    post_mortem:
+      question: >
+        Marek looks at the whiteboard, then at you. "One rule would have caught
+        that. Which one?"
+      options:
+        - id: a
+          label: Leave room when you carve, for reserved addresses, rules and growth
+          correct: true
+          explain: >
+            Azure takes five addresses from every subnet, a subnet with
+            resources in it cannot shrink, and unallocated space is what future
+            subnets are made of. Each failed carve spent room it did not need
+            to spend.
+        - id: b
+          label: Take a bigger address space so sizing stops mattering
+          correct: false
+          explain: >
+            The /16 already holds more than sixty-five thousand addresses. No
+            space is big enough to survive being allocated all at once or sized
+            exactly to the device count; the discipline is in the carving, not
+            the total.
+        - id: c
+          label: Every workload deserves its own dedicated subnet from day one
+          correct: false
+          explain: >
+            The scanners and the print server share a subnet perfectly well,
+            and rules can separate them later. The failures here were about
+            reserved addresses, shrinkability and placement, not about having
+            too few subnets.
     prompt: How do you carve up 10.30.0.0/16?
     options:
       - id: a
@@ -152,6 +218,38 @@ encounters:
       You are provisioning the public IP address for the intake load balancer this
       afternoon. Meridian runs in Southeast Asia, which has availability zones, and
       Hendrik has never once forgiven an address that moved.
+    hint: >
+      Hendrik's requirement is about what survives. The address has to outlive
+      a deallocation and outlive a bad afternoon in one part of the region, so
+      pick the configuration that promises both in writing rather than by
+      habit.
+    post_mortem:
+      question: >
+        Hendrik calls back. "Marek says the address I put on the whiteboard
+        could still let the depot down. In words I can repeat: how?"
+      options:
+        - id: a
+          label: It left the address a way to change or disappear
+          correct: true
+          explain: >
+            The firmware bakes the address in, so the standard is permanence.
+            Static allocation means a deallocation cannot release it, and zone
+            redundancy means one zone's bad afternoon cannot take it off the
+            air.
+        - id: b
+          label: It should have used a DNS name instead of an IP address
+          correct: false
+          explain: >
+            A name would suit a browser, and the handheld firmware does not
+            look one up. Hendrik said the address itself is baked in, so the
+            address itself has to be durable.
+        - id: c
+          label: It bought more availability than a depot endpoint is worth
+          correct: false
+          explain: >
+            Zone redundancy on a Standard public IP address costs next to
+            nothing. The expensive outcome is forty handhelds going quiet at
+            once and forty trips to reflash them.
     prompt: Which public IP address configuration do you create?
     options:
       - id: a
@@ -200,6 +298,10 @@ encounters:
 
       "You gave the scanners a /24. Somebody in a review is going to ask you how
       many addresses they actually get. What do you tell them?"
+    hint: >
+      Count what the platform keeps for itself before counting what you get.
+      Azure holds back more per subnet than a traditional network does, and it
+      does so at every subnet size, which is why small subnets surprise people.
     question: How many usable IP addresses does a /24 subnet give you in Azure?
     options:
       - id: a

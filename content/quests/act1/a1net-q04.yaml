@@ -31,6 +31,39 @@ encounters:
 
       Marek adds, without being asked: "Whatever you do, I am not installing an
       agent on the domain controller."
+    hint: >
+      The scan found a door. The requirement has two halves that must both
+      hold: nothing answering from the public internet, and administrators
+      still reaching every machine, including the one nobody may put an agent
+      on.
+    post_mortem:
+      question: >
+        Wei Lin returns the proposal unsigned. "Before you resubmit: state the
+        test any replacement for those three addresses has to pass."
+      options:
+        - id: a
+          label: No exposed surface left to find, and administrators still get in
+          correct: true
+          explain: >
+            Both halves are the test. Bastion passes because the machines keep
+            no public address at all and access arrives over TLS through a
+            managed host. Each failed answer dropped one half, or added a new
+            surface to patch and scan.
+        - id: b
+          label: The office address range has to be kept current from now on
+          correct: false
+          explain: >
+            A current list still leaves RDP on the internet for whoever shares
+            that range, and the list will drift again; March already showed who
+            updates it. The class of finding survives the housekeeping.
+        - id: c
+          label: Remote administration itself is the risk and should be phased out
+          correct: false
+          explain: >
+            Meridian's administrators are on call from home and one of them is
+            in Cebu, so removing remote access fails the stated requirement.
+            The risk was never administration; it was the listening port on a
+            public address.
     prompt: How do administrators reach these machines after the public addresses go?
     options:
       - id: a
@@ -99,6 +132,38 @@ encounters:
 
       The hub is 10.10.0.0/16. snet-shared is 10.10.1.0/24 and GatewaySubnet is
       10.10.0.0/27.
+    hint: >
+      Subnet, address, and where it sits. Each has exactly one acceptable
+      answer, and two of the three are the platform's requirements rather than
+      Meridian's preferences, so check the documented minimums before the blade
+      checks them for you.
+    post_mortem:
+      question: >
+        Marek pulls the whiteboard over. "Try again, slower. Of subnet, address
+        and placement, say which are the platform's rules and which are ours."
+      options:
+        - id: a
+          label: The name, the minimum size and the SKU were never negotiable
+          correct: true
+          explain: >
+            The subnet must be called AzureBastionSubnet and be at least a /26,
+            because Bastion scales host instances inside it, and the public
+            address must be Standard and static. Placement is the one genuine
+            choice, and the hub wins it.
+        - id: b
+          label: A bigger subnet would have absorbed every one of those mistakes
+          correct: false
+          explain: >
+            Size cures exactly one of the three. A /24 named anything else,
+            with a Basic address, still fails twice; the name and the SKU are
+            exact requirements that no amount of address space fixes.
+        - id: c
+          label: Bastion belongs next to the machines it serves
+          correct: false
+          explain: >
+            Proximity is the wrong instinct. Peering makes one hub host
+            reachable from every spoke, and per-spoke hosts multiply a per-hour
+            bill by the number of depots.
     prompt: What do you deploy?
     options:
       - id: a
@@ -159,6 +224,39 @@ encounters:
 
       The only other change in the window is Wei Lin's hardening baseline, which
       applies a standard security group to every subnet that does not have one.
+    hint: >
+      Everything failed at once the moment a generic control met a specific
+      service. Bastion publishes exactly what traffic it needs in order to
+      function; compare that list with what the baseline permits, direction by
+      direction.
+    post_mortem:
+      question: >
+        The ticket stays open and the cause field is still blank. One line, for
+        the record: what was killing every session?
+      options:
+        - id: a
+          label: The baseline denied the control plane traffic Bastion depends on
+          correct: true
+          explain: >
+            A security group on AzureBastionSubnet is allowed, but it must
+            carry the documented set, including 443 inbound from GatewayManager
+            and 3389 and 22 outbound to the targets. The baseline denied those,
+            so every session opened and then died.
+        - id: b
+          label: Bastion and network security groups are incompatible on that subnet
+          correct: false
+          explain: >
+            They coexist by design. The subnet simply has a published rule set
+            that any group applied to it must include, and removing the group
+            trades the incident for a finding.
+        - id: c
+          label: The hardening baseline was deployed to the wrong subnet
+          correct: false
+          explain: >
+            The baseline landed exactly where its rule says, on every subnet
+            without a group. The gap is that AzureBastionSubnet needs
+            allowances the standard does not carry, which is a rule problem,
+            not a targeting problem.
     ticket:
       ref: INC-4530
       opened: "14:40"
@@ -234,6 +332,18 @@ encounters:
           false
         note: Flow logs were never turned on for the hub, so there is nothing recorded to read.
         time_cost: 2
+    post_incident:
+      path: [a, b]
+      text: >
+        Two reads carry it. The subnet listing shows the only change in the
+        window: nsg-baseline is now on AzureBastionSubnet. Its rule list then
+        shows inbound 443 from the office range only and outbound 443 only,
+        with denies behind them. Bastion's control plane arrives from
+        GatewayManager and its sessions leave for 3389 and 22, so that group
+        kills the service in both directions. The host's own state reads
+        Succeeded because provisioning is not the data path, the flow test at
+        the target answers for a hop the traffic never reached, and flow logs
+        were never enabled, so there was nothing there to read.
     fixes:
       - id: a
         label: >

@@ -29,6 +29,40 @@ encounters:
       They need to see shipments assigned to their firm and nothing else. Their
       staff turn over often, and Meridian will not be told promptly when someone
       leaves.
+    hint: >
+      The awkward requirement is the last one: Meridian will not be told when
+      their people leave. Ask which design makes the partner's own leaver
+      process do the revoking, and keeps every sign-in attributable to one
+      person.
+    post_mortem:
+      question: >
+        Dana wants the recommendation redone by Wednesday. "One thing first.
+        Seventeen planners, two firms, staff we never hear about leaving. What
+        must any workable answer give us?"
+      options:
+        - id: a
+          label: Identities their employer manages, with per-person access Meridian controls
+          correct: true
+          explain: >
+            Guests authenticate against their home tenant, so the partner's
+            joiner and leaver process revokes for you, while the assignment in
+            your tenant stays per person and per firm. Both halves are required;
+            each wrong answer dropped one.
+        - id: b
+          label: Accounts Meridian fully owns, so nothing depends on the partners
+          correct: false
+          explain: >
+            Owning the accounts means owning credentials and leavers for staff
+            you cannot see, which is the exact liability described. Depending on
+            the partner's tenant for authentication is the feature, not the
+            risk.
+        - id: c
+          label: The least possible friction between a planner and the portal
+          correct: false
+          explain: >
+            Convenience is worth having and it is not the test. An access design
+            is judged first on who can be identified and revoked; friction is
+            negotiated afterwards.
     prompt: How do you give them access?
     options:
       - id: a
@@ -93,6 +127,38 @@ encounters:
 
       Depot staff sign in with accounts synced from the Jurong Active Directory.
       Office staff are cloud-only.
+    hint: >
+      Start from who raises the tickets: depot staff, on synced accounts. A fix
+      that does not reach synced accounts misses the load, and a fix that keeps
+      a human verifying callers keeps the ten minutes.
+    post_mortem:
+      question: >
+        Marek circles the number again. "Sixty-one per cent, mostly depots.
+        Before you rewrite the proposal, tell me what it has to do to actually
+        move that number."
+      options:
+        - id: a
+          label: Let the depot accounts reset themselves, with the change reaching on-premises
+          correct: true
+          explain: >
+            The volume is depot staff on synced accounts, so the fix is
+            self-service that proves identity with registered methods and writes
+            the new password back to Active Directory. Anything short of that
+            leaves the Monday queue where it was.
+        - id: b
+          label: Make passwords need changing less often across the company
+          correct: false
+          explain: >
+            The resets follow forgetting after a week off, not expiry.
+            Stretching expiry moves a different, smaller number, and current
+            guidance is retiring forced expiry anyway.
+        - id: c
+          label: Move the reset work closer to the depots that generate it
+          correct: false
+          explain: >
+            Relocating the human loop still leaves a human verifying identity
+            over the phone, now one less equipped to do it. The gain comes from
+            removing the loop, not repositioning it.
     prompt: What do you propose?
     options:
       - id: a
@@ -155,6 +221,38 @@ encounters:
       "Northgate say the portal link takes them to a sign-in page, they sign in
       with their own work account, and then it tells them they need a code from an
       email they never receive. Sriwijaya are fine."
+    hint: >
+      One partner works and one does not, so start with what differs between
+      them, on their side as much as yours. Then ask what that difference makes
+      the email code: an extra layer, or the sign-in itself.
+    post_mortem:
+      question: >
+        Joana adds a timestamp to the ticket and asks the useful question.
+        "Eleven guests still pending. What are we actually looking at: an
+        account problem, a policy problem, or something else?"
+      options:
+        - id: a
+          label: A mail delivery failure sitting in front of a sound setup
+          correct: true
+          explain: >
+            Guests without a tenant behind their address authenticate by emailed
+            one-time passcode, and the invitation must arrive the same way. The
+            accounts, groups and controls are all correct; Northgate's filter is
+            eating the messages.
+        - id: b
+          label: A guest configuration that cannot support this kind of partner
+          correct: false
+          explain: >
+            Email one-time passcode exists precisely for partners with no tenant
+            of their own. The pending state shows the flow working up to the
+            point where the mail stops arriving.
+        - id: c
+          label: An authentication requirement set one step too strict for guests
+          correct: false
+          explain: >
+            The code is not an extra requirement layered on top; it is how these
+            guests sign in at all. There is no control to relax that would make
+            the missing email unnecessary.
     ticket:
       ref: INC-4441
       opened: "14:02"
@@ -202,6 +300,16 @@ encounters:
           --------------------
           sg-partner-northgate
         time_cost: 1
+    post_incident:
+      path: [a, b]
+      text: >
+        The two guest listings, one per partner, hold the whole story: Northgate
+        sits at PendingAcceptance while Sriwijaya shows Accepted, and a pending
+        guest with no tenant behind the address is waiting on an email that
+        never arrived. Same invitation flow, different mail filters. The group
+        membership check cannot move the diagnosis, because a guest who has
+        never accepted an invitation is failing long before any group or role is
+        consulted.
     fixes:
       - id: a
         label: >

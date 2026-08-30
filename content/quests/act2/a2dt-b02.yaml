@@ -25,6 +25,38 @@ encounters:
       Asia," says Grace. "The dispatch screen must never show an older position
       after showing a newer one, and it can tolerate being a few seconds behind
       reality. Nobody needs the absolute latest value across regions."
+    hint: >
+      Turn the requirement into the guarantee it actually names: order for one
+      viewer, not freshness for the world. Then pick the weakest level that still
+      promises it, because every stronger promise is paid for in latency and
+      request units.
+    post_mortem:
+      question: >
+        Grace rereads the requirement aloud, slowly. "Never older after newer,
+        seconds of lag allowed. What was the method for turning that sentence into
+        a setting?"
+      options:
+        - id: a
+          label: Match the level to the guarantee the requirement states, and no stronger
+          correct: true
+          explain: >
+            The requirement names ordering within a viewer and tolerates lag, which
+            one level provides at default cost. Guarantees above that line are
+            real, priced, and unasked for.
+        - id: b
+          label: Consistency should be bought generously because stale reads are dangerous
+          correct: false
+          explain: >
+            The requirement explicitly tolerates staleness. Paying latency and
+            request units to prevent something the business accepts is not caution;
+            it is cost.
+        - id: c
+          label: Any level works when the lag is only a few seconds
+          correct: false
+          explain: >
+            The weakest level can reorder what a viewer sees, which is the one
+            behavior forbidden here. Lag tolerance and ordering are separate
+            properties, and only one of them was optional.
     prompt: Which consistency level do you recommend?
     options:
       - id: a
@@ -80,6 +112,37 @@ encounters:
       "The analytics read once a month is not. And the sensor team want a small
       container for device registrations that is queried perhaps a hundred times a
       day."
+    hint: >
+      Describe each container's traffic in one line before pricing anything:
+      steady and heavy, or tiny and occasional. Every billing model carries a
+      floor or a ceiling, and the mistake is paying one container's floor for
+      another container's traffic.
+    post_mortem:
+      question: >
+        Priya reads the two workloads back: constant writes on one side, a hundred
+        requests a day on the other. "What was the pricing question you should
+        have asked first?"
+      options:
+        - id: a
+          label: Which throughput model fits each container's own workload shape
+          correct: true
+          explain: >
+            Steady volume earns provisioned capacity with autoscale headroom; a
+            hundred requests a day earns per-request billing with no floor. One
+            model across both always overcharges one of them.
+        - id: b
+          label: Which model looks cheapest and can be applied everywhere
+          correct: false
+          explain: >
+            The cheapest-looking model has a ceiling the telemetry stream will hit
+            at peak. A price only means something next to a workload's shape.
+        - id: c
+          label: Which settings can be deferred and tuned after launch
+          correct: false
+          explain: >
+            The model decides the floor of the bill and the ceiling of the service
+            from day one. Tuning later adjusts numbers, not the shape of the
+            charge.
     prompt: How do you configure throughput?
     options:
       - id: a
@@ -133,6 +196,10 @@ encounters:
     intro: >
       "Say why the partition key matters more than anything else in this design,"
       says Grace, "and what it costs to get it wrong."
+    hint: >
+      Ask which decisions in this design can be revisited next quarter and which
+      one is poured in concrete, and what that permanent choice controls while it
+      stands.
     question: What makes the partition key decision so consequential?
     options:
       - id: a

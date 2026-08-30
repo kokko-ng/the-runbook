@@ -30,6 +30,40 @@ encounters:
 
       "Somebody will ask which of those is redundant," says Wei Lin. "I would
       rather you answered than me."
+    hint: >
+      Give each control one sentence: the traffic it sees and the question
+      it answers about that traffic. A control is redundant only if another
+      sees the same traffic and asks the same question.
+    post_mortem:
+      question: >
+        "The review board question stands," says Wei Lin. "For each control,
+        name the traffic only it examines. Where did the answer blur that
+        line?"
+      options:
+        - id: a
+          label: Each control covers traffic the others never see, at its own layer
+          correct: true
+          explain: >
+            The application firewall reads requests, the network firewall
+            inspects traffic routed between networks including outbound, and
+            security groups govern what never leaves a subnet or spoke.
+            Redundancy arguments always come from assuming one of them sees
+            traffic it does not.
+        - id: b
+          label: More layers of control is always safer
+          correct: false
+          explain: >
+            Layering is right at trust boundaries and wasteful past them.
+            Forcing internal service traffic through every control buys
+            throughput problems, not security.
+        - id: c
+          label: The strongest control should subsume the weaker ones
+          correct: false
+          explain: >
+            Strength is not the axis; visibility is. The network firewall
+            never sees intra-spoke traffic and the application firewall
+            never sees anything but HTTP, so neither can subsume the other
+            or the security groups.
     prompt: What is each control for?
     options:
       - id: a
@@ -84,6 +118,39 @@ encounters:
       workloads must resolve them to private addresses. So must the ERP in Port
       Klang, over the circuit. And Azure workloads still have to resolve
       straitsfreight.local."
+    hint: >
+      Draw the two worlds of names: what only Azure can answer, and what
+      only Port Klang can. Ask what carries queries across in each
+      direction without machines you must own.
+    post_mortem:
+      question: >
+        "Two sets of names, two sets of servers," says Marek. "Who answers
+        what, and how does a query cross the gap in each direction?"
+      options:
+        - id: a
+          label: Resolution must be bridged both ways, without owning forwarder machines
+          correct: true
+          explain: >
+            Private zone records only answer from linked networks, and the
+            local domain only answers on premises, so queries must be
+            forwarded across in both directions. The managed resolver does
+            it without machines; anything else either breaks a direction or
+            becomes infrastructure to run.
+        - id: b
+          label: One authoritative DNS should hold all the names
+          correct: false
+          explain: >
+            Neither side can hold the other's records: private zones live in
+            Azure and the legacy domain lives on its own controllers. The
+            design is a bridge, not a merger.
+        - id: c
+          label: DNS is simple enough to solve per server as needed
+          correct: false
+          explain: >
+            Per-server answers rot silently, and a private endpoint's
+            address changes on rebuild without telling anyone. Name
+            resolution is platform infrastructure precisely because it must
+            be right everywhere at once.
     prompt: What DNS design do you recommend?
     options:
       - id: a
@@ -139,6 +206,38 @@ encounters:
       the East Asia spoke cannot reach the data lake's private endpoint in
       Southeast Asia. Name resolution returns the correct private address, the
       security groups allow it, and the firewall shows no denied traffic.
+    hint: >
+      Nothing denies the traffic and nothing delivers it, which points at
+      routing rather than filtering. Walk the intended path hop by hop and
+      ask where each hop hands off next.
+    post_mortem:
+      question: >
+        "Nothing denied it and nothing carried it," says Grace. "Before your
+        next change: at which layer of this topology was something actually
+        missing?"
+      options:
+        - id: a
+          label: The path was missing between the hubs, so that is the layer to fix
+          correct: true
+          explain: >
+            Hubs do not connect to each other by default, and no spoke route
+            or endpoint approval can conjure the transit that is not there.
+            Fixing the topology where the gap is keeps every spoke's
+            configuration uniform.
+        - id: b
+          label: The routing tables in the spoke were the root cause
+          correct: false
+          explain: >
+            The default route already delivered traffic to the firewall; the
+            invalid peering route was a symptom. A route only names a next
+            hop, and the next hop had nowhere to send this traffic.
+        - id: c
+          label: Private endpoints are too fragile for cross-region use
+          correct: false
+          explain: >
+            The endpoint was approved and resolving correctly; it never saw
+            the traffic. The private path works across regions once the
+            regions are actually connected.
     ticket:
       ref: DRV-1181
       opened: "09:50"
@@ -196,6 +295,18 @@ encounters:
           conn-lz-analytics   vnet-lz-analytics
         note: The East Asia hub has no connection to the Southeast Asia hub.
         time_cost: 1
+    post_incident:
+      path: [a, d]
+      text: >
+        Effective routes first: the spoke hands everything to the East Asia
+        firewall, and the stale peering route is already marked invalid,
+        which puts the path beyond the hub in doubt. The hub connection
+        listing then closes it: the East Asia hub connects to its own spoke
+        and to nothing in the other region, and only a missing hub link
+        produces traffic that is allowed everywhere and delivered nowhere.
+        The firewall log and the endpoint approval cannot move the
+        diagnosis, because the ticket already said nothing was denied and
+        the name resolved to the right address.
     fixes:
       - id: a
         label: Connect the two hubs so traffic can transit between regions

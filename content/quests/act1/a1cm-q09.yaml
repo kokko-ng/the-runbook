@@ -30,6 +30,39 @@ encounters:
       The zone is hosted in Azure DNS. The app answers today on its default
       azurewebsites.net name. Customers will type the custom name and must not see
       a certificate warning.
+    hint: >
+      There is a dependency chain in this: something must be proved before
+      something can be added, and something must exist before a certificate
+      can be issued for it. Also ask which record survives the platform
+      changing an address.
+    post_mortem:
+      question: >
+        Marek looks over the launch plan before it goes back to Hendrik.
+        "Two tests for every step: what has to exist first, and what still
+        works next year?"
+      options:
+        - id: a
+          label: Prove ownership through the zone first, and prefer bindings that maintain themselves
+          correct: true
+          explain: >
+            The validation record is what lets the app accept the domain, and
+            a domain on the app is what a managed certificate can be issued
+            for. A CNAME follows the app, and the certificate renews itself,
+            so nothing expires on a date nobody wrote down.
+        - id: b
+          label: Certificates come first, since the padlock is the deliverable
+          correct: false
+          explain: >
+            A certificate can only be issued for a domain the app already
+            knows, and the app only accepts a domain the zone has vouched
+            for. The padlock is the last link in the chain, not the first.
+        - id: c
+          label: Fixed artifacts are safer, meaning a bought certificate and a stable address
+          correct: false
+          explain: >
+            The inbound address is not guaranteed permanent, and a bought
+            certificate expires in twelve months. Both work today, and each
+            plants a future incident.
     prompt: What do you do, in order?
     options:
       - id: a
@@ -90,6 +123,37 @@ encounters:
 
 
       The plan is Standard, which supports deployment slots.
+    hint: >
+      Dana's requirement is really two: no customer meets a starting
+      application, and any mistake must be reversible in seconds. Ask which
+      mechanism exchanges warmed content instantly, and which ones leave a
+      gap or a wait.
+    post_mortem:
+      question: >
+        Dana repeats the two facts, the email at nine and the deploy in the
+        morning. "What is the thing that makes those compatible?"
+      options:
+        - id: a
+          label: A warmed swap that changes routing instantly and reverses the same way
+          correct: true
+          explain: >
+            The slot is a separate app on the same plan; the swap happens
+            after warm-up, drops no requests, and swapping back is the
+            rollback. Thursday stops being a bet.
+        - id: b
+          label: Timing the deploy early enough that a restart goes unnoticed
+          correct: false
+          explain: >
+            An in-place deploy restarts the app, and the first customers of
+            the day meet it cold. The rollback is another deploy, which is
+            the wrong tool to reach for at 08:55.
+        - id: c
+          label: Keeping the new version somewhere separate until after launch
+          correct: false
+          explain: >
+            A version that stays in staging fixes nothing on Thursday, and
+            cutting over by DNS waits on caches you do not control. The
+            deliverable was the fix in production, safely.
     prompt: How do they deploy?
     options:
       - id: a
@@ -149,6 +213,37 @@ encounters:
       The database is sql-meridian-tms, which was closed to public access last
       month as part of the storage and data work. The portal reached it fine
       yesterday, from the staging slot.
+    hint: >
+      Ask what a swap actually moves and what stays with each slot. The
+      database only answers from inside the network, so the real question is
+      which of the two apps ever had a way in.
+    post_mortem:
+      question: >
+        Marek puts the two network readings side by side. "The code did not
+        change at 08:20. What does a swap move, and what does it leave
+        behind?"
+      options:
+        - id: a
+          label: Content moves; each slot keeps its own networking configuration
+          correct: true
+          explain: >
+            Virtual network integration is configured per app and per slot,
+            so staging kept the way in and production never had one. The
+            private endpoint only answers from inside the network.
+        - id: b
+          label: Everything moves, so the new build must have broken the connection
+          correct: false
+          explain: >
+            If the build were the fault, swapping back would fix it. The slot
+            and production differ in configuration, not content, which is why
+            both versions fail identically in production.
+        - id: c
+          label: Settings move unless pinned, so pinning the connection string was the fix
+          correct: false
+          explain: >
+            Slot settings govern app settings and connection strings, and the
+            string was never wrong. Networking integration is separate
+            configuration and is not swapped at all.
     ticket:
       ref: INC-4736
       opened: "08:26"
@@ -202,6 +297,18 @@ encounters:
           ---------------  -------------
           SQL_CONNECTION   False
         time_cost: 1
+    post_incident:
+      path: [a, b]
+      text: >
+        Two readings of the same property settle it: production shows
+        virtualNetworkSubnetId null, and the staging slot shows a subnet in
+        vnet-app. Wei Lin had already told you the database answers only
+        from inside that network, so the app that lost its shipment pages is
+        the one with no way in, and a swap never promised to carry
+        networking. The name lookup only proves DNS was never the problem,
+        which its private address already implies, and the slot-setting
+        listing explains what a swap does to settings, not to a route that
+        does not exist.
     fixes:
       - id: a
         label: Enable virtual network integration on the production app, to the same subnet as the slot
@@ -261,6 +368,38 @@ encounters:
       The code is in git. The configuration is in the app settings. There is a
       small amount of uploaded content, customer logos for delivery notes, stored
       on the app's file system.
+    hint: >
+      Priya named three kinds of state: code, configuration, uploads. Ask
+      which of the three a redeploy can actually rebuild, and what covers
+      the remainder before Thursday rather than after a sprint.
+    post_mortem:
+      question: >
+        Priya keeps the pen over the launch checklist. "When something is
+        deleted or corrupted, what exactly are we restoring, and from
+        where?"
+      options:
+        - id: a
+          label: The state a redeploy cannot rebuild, from a scheduled backup we own
+          correct: true
+          explain: >
+            Git restores code and nothing else. The scheduled App Service
+            backup snapshots content and configuration to a storage account,
+            which is precisely the uploaded logos and drifted settings a bad
+            day loses.
+        - id: b
+          label: The whole app, from source control, since everything important is code
+          correct: false
+          explain: >
+            Source control covers what is in source control. Two months of
+            uploaded customer logos and the settings that arrived with a bad
+            change are not.
+        - id: c
+          label: A better architecture before launch, so backup becomes unnecessary
+          correct: false
+          explain: >
+            Moving uploads to blob storage is the right long-term shape and a
+            sprint of work, and launch is on Thursday. A schedule that runs
+            Wednesday night answers the question that was asked.
     prompt: What do you configure?
     options:
       - id: a

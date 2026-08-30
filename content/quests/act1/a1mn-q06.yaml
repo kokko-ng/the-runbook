@@ -28,6 +28,39 @@ encounters:
       That is vm-tms01 and vm-tms02, the domain controller replica, and the
       scanner intake host. The database already replicates. The blob scans already
       replicate. Recovery time objective is four hours.
+    hint: >
+      Two things govern this design: the list the board gave and the four hours
+      it allowed. Ask which mechanism can meet that clock, for exactly those
+      machines, and what already protects itself.
+    post_mortem:
+      question: >
+        "The board will ask why these four and why this product," says Dana.
+        "Answer that before you redesign. What sets the scope and what sets the
+        mechanism?"
+      options:
+        - id: a
+          label: The business list sets the scope; the four-hour objective sets the mechanism
+          correct: true
+          explain: >
+            The board named what must keep dispatching, which scopes replication
+            to four machines and leaves self-replicating data services out. Four
+            hours rules out cold restores and hand-kept standbys; warm
+            replication with an ordered plan is what meets it.
+        - id: b
+          label: Completeness sets both; protect everything the same way
+          correct: false
+          explain: >
+            Uniform protection replicates test servers nobody asked to keep and
+            bills for the privilege. What is off the list is rebuilt from
+            templates and backups when there is time, which is its own valid
+            tier.
+        - id: c
+          label: The existing backups set the mechanism, extended across regions
+          correct: false
+          explain: >
+            Cross-region restore is a real path and it takes most of a day for
+            four machines, against four hours. Backups answer losing data; a lost
+            region on a clock needs a warm replica.
     prompt: What do you set up?
     options:
       - id: a
@@ -88,6 +121,37 @@ encounters:
       "I will not sign the continuity plan on the basis that it should work," says
       Wei Lin. "I want a rehearsal, and I want production untouched while it
       happens."
+    hint: >
+      Each failover type makes a different promise about the source machines. Ask
+      which promise is compatible with production staying untouched while the
+      rehearsal runs.
+    post_mortem:
+      question: >
+        Wei Lin has the pen ready and does not use it. "Convince me you know what
+        each kind of failover is for, and then choose again."
+      options:
+        - id: a
+          label: Each type has one purpose, and only a test failover leaves production untouched
+          correct: true
+          explain: >
+            Test failover brings replicas up in a network you nominate, without
+            stopping replication or touching the source. Planned failover is a
+            real move; unplanned is the emergency path. Rehearsal is what the
+            test type exists for.
+        - id: b
+          label: A rehearsal is only honest if production genuinely moves
+          correct: false
+          explain: >
+            The honesty a rehearsal needs is technical: do the replicas boot,
+            does the plan complete. Test failover proves both in isolation;
+            moving production adds consequences without adding proof.
+        - id: c
+          label: The plan review was rehearsal enough for a signature
+          correct: false
+          explain: >
+            Paper catches process gaps and cannot catch a machine that never
+            replicated or a network that does not exist. Wei Lin asked for a
+            rehearsal precisely because documents do not boot.
     prompt: How do you rehearse?
     options:
       - id: a
@@ -146,6 +210,38 @@ encounters:
 
       Replication for vm-scan01 shows as healthy, and its last recovery point is
       four minutes old.
+    hint: >
+      Replication was never the accused; it reported healthy and recent. Ask what
+      a machine needs at the far end that copying its disks does not create.
+    post_mortem:
+      question: >
+        "Replication was green the whole time," says Marek. "So say it precisely:
+        what did the failover need that the replication never promised?"
+      options:
+        - id: a
+          label: >
+            A landing place: target networks are built and mapped, not copied
+            with the machine
+          correct: true
+          explain: >
+            Site Recovery copies disks and machine configuration. Each replicated
+            interface still needs a target network and subnet mapped, and
+            vnet-depot had no counterpart in East Asia at all. That gap is
+            exactly what test failovers exist to find.
+        - id: b
+          label: Healthier replication, whatever the console claimed
+          correct: false
+          explain: >
+            The console told the truth: a four-minute recovery point and no
+            errors. Re-enabling replication buys a six-hour initial copy and
+            leaves the missing network exactly as missing.
+        - id: c
+          label: A simpler plan that avoids the machine that fails
+          correct: false
+          explain: >
+            The failing machine is the one that receives depot scanner uploads.
+            Trimming it makes the rehearsal pass and the disaster plan fail,
+            which inverts the point of rehearsing.
     ticket:
       ref: INC-4863
       opened: "14:52"
@@ -204,6 +300,18 @@ encounters:
             "type": "CrashConsistent"
           }
         time_cost: 1
+    post_incident:
+      path: [a, b, c]
+      text: >
+        Read the error, then walk it down. The failover job names the failure
+        precisely: no subnet for nic-scan01 in the selected network. The
+        protected item's mapping confirms it from the replication side, with a
+        target subnet of null. The network listing in rg-dr-eastasia explains why
+        nothing was ever mapped: only a copy of vnet-app exists there, and
+        vm-scan01 lives in vnet-depot, so its network has no counterpart at all.
+        The recovery point check cannot move the diagnosis; replication reported
+        healthy with a four-minute point, and a machine's data being current says
+        nothing about whether it has a network to land in.
     fixes:
       - id: a
         label: >

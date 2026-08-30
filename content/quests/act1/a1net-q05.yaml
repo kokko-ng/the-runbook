@@ -33,6 +33,38 @@ encounters:
 
       "I have read about service endpoints and about private endpoints and the
       documentation seems to think I already know which one I want."
+    hint: >
+      Read the list of who needs access again and notice which network each of
+      them sits on. The right control gives the account a place on Meridian's
+      network that every one of those paths can reach.
+    post_mortem:
+      question: >
+        Wei Lin annotates the proposal and sends it back. "Walk me through who
+        could still reach the scans, and who no longer could."
+      options:
+        - id: a
+          label: The control has to hold for every path, including the one from Jurong
+          correct: true
+          explain: >
+            The consumers span two virtual networks and a VPN from on-premises.
+            Only a private endpoint puts the account at a private address all
+            three paths reach; the alternatives either left the public door
+            open or closed it on the claims team.
+        - id: b
+          label: The storage firewall is the wrong layer for this requirement
+          correct: false
+          explain: >
+            The firewall is part of the answer either way, because public
+            network access gets disabled behind the private endpoint. The
+            failures were in what the rest of each design let in or shut out,
+            not in using the firewall at all.
+        - id: c
+          label: The contract wording should be renegotiated to allow keyed access
+          correct: false
+          explain: >
+            The contract says the scans are reachable only from Meridian's
+            network, and the customers who wrote it are the ones who sue over
+            scans. Engineering to the requirement is cheaper than reopening it.
     prompt: Which do you take to the change board?
     options:
       - id: a
@@ -105,6 +137,37 @@ encounters:
       changed. The connection string still points at
       stmeridianpod.blob.core.windows.net, which is what the documentation says it
       should do.
+    hint: >
+      The endpoint is healthy and the account still says no, so ask what the
+      client requested and what answered it. A private endpoint moves where the
+      service lives; something else has to move what the name means.
+    post_mortem:
+      question: >
+        The incident wants a mechanism on record before the next change goes
+        in: how is a client supposed to find the private path at all?
+      options:
+        - id: a
+          label: By name, and nothing ever redirected the name
+          correct: true
+          explain: >
+            The public host name is a CNAME into the privatelink zone, and that
+            zone only answers networks linked to it. With no links, every
+            client got the public record and met a firewall that now says Deny;
+            the private address sat unused.
+        - id: b
+          label: The private endpoint deployment was incomplete and had to be rebuilt
+          correct: false
+          explain: >
+            The endpoint itself was finished: Succeeded, Approved and holding
+            10.20.3.4. Re-creating it spends another approval and another
+            disconnection to arrive at the same unlinked zone.
+        - id: c
+          label: Public access was disabled too early, before a soak period
+          correct: false
+          explain: >
+            A soak period only postpones the same failure. The order of
+            operations was fine; the missing piece was DNS, and it would still
+            have been missing whenever the firewall closed.
     ticket:
       ref: INC-4566
       opened: "11:26"
@@ -183,6 +246,17 @@ encounters:
           target host name '10.20.3.4'
         note: Something answered on the private address, so the private path is up. TLS fails because the certificate is issued for the storage host name.
         time_cost: 2
+    post_incident:
+      path: [a, c]
+      text: >
+        Resolution first: from inside the spoke, the name still comes back with
+        a public address, so no client is even attempting the private path. The
+        zone listing then closes it: privatelink.blob.core.windows.net exists,
+        holds its records, and is linked to zero virtual networks, which is the
+        entire fault in one column. The endpoint's state and the account's
+        network rules only confirm what the change record already said, and
+        connecting to 10.20.3.4 by hand proves a path that clients will never
+        take by themselves. Two commands, and the fix is a link, not a rebuild.
     fixes:
       - id: a
         label: >
@@ -251,6 +325,38 @@ encounters:
       The domain's zone is hosted in Azure DNS. The portal is an App Service with
       the default host name app-meridian-portal.azurewebsites.net, which can and
       does change address.
+    hint: >
+      Two constraints have to hold at once: what DNS permits at the top of a
+      zone, and what stays correct when the platform moves the application.
+      Look for the record type built for exactly that pair.
+    post_mortem:
+      question: >
+        Hendrik phones back with marketing on hold. "Give me the version I can
+        repeat: what has to be true of whatever we put on the bare name?"
+      options:
+        - id: a
+          label: It must be legal at the apex and must follow the app
+          correct: true
+          explain: >
+            A zone apex cannot hold a CNAME, and App Service inbound addresses
+            are not promised to stay put. An alias record set satisfies both at
+            once: an A record at the apex that tracks the Azure resource
+            wherever it moves.
+        - id: b
+          label: The App Service needs a reserved address before DNS can point at it
+          correct: false
+          explain: >
+            Nothing in App Service hands out a permanent inbound address to
+            reserve, which is exactly why hard-coding one fails quietly later.
+            The record has to do the following, because the address will not
+            stand still.
+        - id: c
+          label: Marketing should be redirected to www, where a CNAME is allowed
+          correct: false
+          explain: >
+            It would be easier, and it is not what was asked. The requirement
+            is the bare name, and Azure DNS has a supported answer at the apex,
+            so the requirement does not need negotiating down.
     prompt: What record do you create at the zone apex?
     options:
       - id: a

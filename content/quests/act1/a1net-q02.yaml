@@ -31,6 +31,36 @@ encounters:
 
       The Johor spoke was peered to the hub last week and has been fine since.
       Overnight, the platform team ran maintenance on vnet-hub.
+    hint: >
+      The depot can reach the internet and not the hub, so filtering is an odd
+      first suspect. Connectivity between two virtual networks is declared on
+      both of them; ask each side what it thinks exists.
+    post_mortem:
+      question: >
+        Joana keeps the line open and the incident clock running. "For the
+        handover note: what did that attempt get wrong about the evidence?"
+      options:
+        - id: a
+          label: It treated a missing path as a blocking or guest problem
+          correct: true
+          explain: >
+            The flow test said Allow and the route table showed no route to the
+            hub at all. Together those mean nothing is filtering and nothing is
+            connected, and only the absent half of the peering explains both.
+        - id: b
+          label: It trusted the change record over the platform's own state
+          correct: false
+          explain: >
+            The record was wrong, and distrusting it is not a fix. CHG-2210
+            told you where to look; the miss was in what the attempt did once
+            the platform had shown its state.
+        - id: c
+          label: It should have rolled back CHG-2210 and rerun the maintenance
+          correct: false
+          explain: >
+            The rollback plan was the word "revert" with no detail, and the hub
+            side that survived is healthy. Creating the missing spoke object is
+            smaller, faster and touches nothing that works.
     ticket:
       ref: INC-4471
       opened: "09:12"
@@ -113,6 +143,16 @@ encounters:
           Default   Active    0.0.0.0/0        Internet
         note: There is no route to 10.10.0.0/16 at all, which is what a missing peering looks like from the guest.
         time_cost: 1
+    post_incident:
+      path: [a, b]
+      text: >
+        Ask the hub, then ask the spoke. The hub answers Initiated, which is a
+        peering waiting for its partner; the spoke answers with nothing at all.
+        That pair of states has exactly one explanation, a far object that was
+        never re-created, and the diagnosis is finished in two reads. The
+        security listing and the IP flow test cannot move it, because nothing
+        ever suggested traffic was being blocked, and the effective route table
+        only reports the consequence: a hub prefix with nothing to route to.
     fixes:
       - id: a
         label: Create the depot-to-hub peering on vnet-depot to match the hub side
@@ -179,6 +219,38 @@ encounters:
 
       Marek does not look up from his screen, which is his way of telling you the
       question is a test.
+    hint: >
+      Before you answer, ask what would carry the packet across the hub.
+      Peering is an agreement between exactly two networks; whether anything in
+      the middle forwards is a separate question with a separate mechanism.
+    post_mortem:
+      question: >
+        Dana stops you in the corridor later. "The firmware push is
+        rescheduled. Tell me plainly: what did we get wrong about the hub?"
+      options:
+        - id: a
+          label: Two peerings to a hub do not add up to a path
+          correct: true
+          explain: >
+            Peering is never transitive. Spoke to spoke needs its own
+            mechanism, either a direct peering or an appliance in the hub with
+            routes pointing at it, and the hub's existing peerings contribute
+            nothing on their own.
+        - id: b
+          label: The hub is missing a feature that should be enabled
+          correct: false
+          explain: >
+            No peering setting turns a hub into a router. Allow forwarded
+            traffic only lets a network accept forwarded packets once something
+            is doing the forwarding, and enabling settings does not create the
+            forwarder.
+        - id: c
+          label: The depot network was built without room for the application spoke
+          correct: false
+          explain: >
+            The address plan is fine. 10.20.0.0/16 and 10.30.0.0/16 do not
+            overlap and could be peered tomorrow; addressing decides whether a
+            path is possible, not whether one exists.
     sketch:
       caption: What Dana is picturing, and the link she assumes comes free
       nodes:
@@ -242,6 +314,38 @@ encounters:
 
 
       "I am not building a second gateway. What do you configure?"
+    hint: >
+      One network owns the gateway and one wants to borrow it, and the peering
+      settings exist to say which is which. Settings that describe different
+      roles are not set the same way on both ends.
+    post_mortem:
+      question: >
+        Marek picks the sketch back up. "Same question, once more. Two
+        networks, one gateway. What does the configuration have to say, and
+        which side says it?"
+      options:
+        - id: a
+          label: That one side offers the gateway and the other consumes it
+          correct: true
+          explain: >
+            Gateway transit is a pairing of roles. The hub, which has the
+            gateway, sets Allow gateway transit; the spoke sets Use remote
+            gateways; and a spoke with a gateway of its own cannot borrow one
+            at all.
+        - id: b
+          label: That every spoke eventually needs a gateway of its own
+          correct: false
+          explain: >
+            The opposite is the point. Sharing the hub's gateway is much of the
+            reason hub-and-spoke exists, and a second gateway doubles cost and
+            tunnels to solve what two peering settings solve for nothing.
+        - id: c
+          label: That peering settings must match on both sides to validate
+          correct: false
+          explain: >
+            Symmetry is the wrong instinct here. The two sides of this pair
+            carry deliberately different settings because the networks play
+            different parts, and making them match is what fails validation.
     prompt: How do you get the depot spoke onto the existing VPN gateway?
     options:
       - id: a

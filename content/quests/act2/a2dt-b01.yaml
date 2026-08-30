@@ -25,6 +25,37 @@ encounters:
       "Straits own SQL Server licenses with Software Assurance," says Priya. "The
       quote you gave me assumes we are paying for the database engine again. Is
       that right?"
+    hint: >
+      Priya's question is about paying twice. Treat what Straits already owns as
+      an input to the design, and check what the pay-as-you-go price actually
+      includes before assuming all of it is unavoidable.
+    post_mortem:
+      question: >
+        Priya keeps the quote flat on the table. "The company already owns
+        something relevant here. What should that have meant for the number?"
+      options:
+        - id: a
+          label: >
+            Existing licenses with Software Assurance offset the engine cost, on
+            managed services included
+          correct: true
+          explain: >
+            The hybrid benefit strips the license component from the managed
+            instance price, leaving compute and storage. On an acquisition that
+            arrives owning licenses, it belongs in the first version of any quote.
+        - id: b
+          label: Owned licenses only matter if the design stays on virtual machines
+          correct: false
+          explain: >
+            The benefit covers managed instance and the virtual core tiers of Azure
+            SQL Database as well. Bending the design toward infrastructure to keep
+            a discount would be backwards, and unnecessary.
+        - id: c
+          label: License costs are fixed, so the savings had to come from sizing
+          correct: false
+          explain: >
+            Sizing has its own savings, and the license line is not fixed; it is
+            removable. Roughly forty per cent of this quote was optional.
     prompt: What do you tell her?
     options:
       - id: a
@@ -70,6 +101,35 @@ encounters:
       hours," says Marek. "During those six hours the instance is at ninety-five
       per cent and everything else queues. The other twenty-eight days it sits at
       forty."
+    hint: >
+      Put the six hours next to the seven hundred that surround them each month. A
+      peak this predictable can be met when it arrives instead of being paid for
+      all month; just know what a scale operation costs in time.
+    post_mortem:
+      question: >
+        Marek circles the two numbers: ninety-five for six hours, forty for the
+        rest. "What is the shape of that problem, and what does the shape buy
+        you?"
+      options:
+        - id: a
+          label: A predictable scheduled peak is provisioned for its window, not for the month
+          correct: true
+          explain: >
+            Because the reconciliation runs on a calendar, capacity can be raised
+            before it and lowered after it, scripted into the job. Permanent sizing
+            is for peaks that cannot be foreseen.
+        - id: b
+          label: Capacity should always cover the worst hour of the month
+          correct: false
+          explain: >
+            That rule is right when the worst hour is a surprise. This one arrives
+            by appointment, which is exactly the case the rule is not for.
+        - id: c
+          label: The reconciliation itself was the flaw and should be moved elsewhere
+          correct: false
+          explain: >
+            The job writes across all four databases, which is why it lives where
+            the databases live together. Moving it breaks more than it saves.
     prompt: What do you recommend?
     options:
       - id: a
@@ -122,6 +182,10 @@ encounters:
     intro: >
       "The board will ask what General Purpose gives up compared with Business
       Critical," says Grace. "Two sentences, no hedging."
+    hint: >
+      Locate the difference in the storage, not in a feature list: where it sits
+      relative to the compute, and what that placement means for latency, failover
+      and spare copies.
     question: What is the main difference between the two managed instance tiers?
     options:
       - id: a

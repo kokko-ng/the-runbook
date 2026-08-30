@@ -28,6 +28,38 @@ encounters:
 
       "Somebody has proposed one cluster for all of it, on the grounds that we
       would only have one thing to operate."
+    hint: >
+      Count what each workload actually asks of its platform. One of them
+      needs the primitives; the others need almost nothing. Operating cost
+      follows the platform, not the workload count.
+    post_mortem:
+      question: >
+        Grace draws three boxes on the whiteboard, one per workload. "Try
+        once more. What question decides each of these boxes on its own?"
+      options:
+        - id: a
+          label: Each workload buys its platform on its own requirements
+          correct: true
+          explain: >
+            Dispatch needs Kubernetes primitives; the tracking API needs an
+            ingress and revisions; the nightly job needs eleven minutes of
+            compute. Placing each by its own needs is what stops the
+            platform driving the workloads.
+        - id: b
+          label: The number of platforms should have been minimized above all
+          correct: false
+          explain: >
+            Fewer platforms is a real good, and it is a tiebreaker, not a
+            trump. Forcing three shapes into one platform trades small
+            operational savings for coupling and rewrites.
+        - id: c
+          label: Kubernetes should be avoided until the team is larger
+          correct: false
+          explain: >
+            The dispatch team of six has run Kubernetes before, and the
+            workload needs its primitives. The caution belongs to the
+            workloads that do not, which is where the cluster was being
+            overapplied.
     prompt: What do you recommend?
     options:
       - id: a
@@ -86,6 +118,38 @@ encounters:
       times a day, unpredictably, and the handler writes a row and sends a message.
       It has to respond in under five seconds or they retry, and they treat a retry
       storm as our fault."
+    hint: >
+      Eleven short runs a day is a scale shape; five seconds is a latency
+      requirement. The right home satisfies both, and they are answered in
+      that order.
+    post_mortem:
+      question: >
+        "Read the requirement back," says Marek. "Eleven a day, five seconds
+        or they retry. Which half of that did the design answer, and which
+        half did it ignore?"
+      options:
+        - id: a
+          label: The scale shape says serverless and the latency requirement picks the warm plan
+          correct: true
+          explain: >
+            Milliseconds of work a few times a day should not pay for idle
+            capacity, which rules out anything always on. The five-second
+            ceiling then rules out cold starts, which is precisely what the
+            warm serverless plans exist to remove.
+        - id: b
+          label: The cheapest cost per invocation should decide between the plans
+          correct: false
+          explain: >
+            The cheapest plan wins that comparison and loses the requirement.
+            Between plans, the deciding number here is the first call's
+            latency, not the invoice.
+        - id: c
+          label: Anything customer-facing is too important for serverless
+          correct: false
+          explain: >
+            The retry storm was an argument for a warm serverless plan, not
+            against serverless. Importance sets the latency requirement; it
+            does not change the scale shape.
     prompt: What do you run it on?
     options:
       - id: a
@@ -141,6 +205,10 @@ encounters:
     intro: >
       "The review board will ask what makes something a serverless candidate,"
       says Grace. "One sentence, and it is not that it is cheap."
+    hint: >
+      Think about what serverless billing charges for, and what kind of work
+      makes that model cheap. The answer is a shape: how it starts, how long
+      it runs, what it keeps.
     question: What characterizes a workload that suits serverless compute?
     options:
       - id: a

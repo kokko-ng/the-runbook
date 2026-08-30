@@ -32,6 +32,38 @@ encounters:
 
       Northgate need to upload customs documents into one container, and nothing
       else, indefinitely.
+    hint: >
+      Judge every credential on two axes: how little it grants, and how you
+      take it back on the day it leaks. An option that fails either axis fails
+      the finding.
+    post_mortem:
+      question: >
+        Wei Lin keeps the finding open on her screen. "Assume whatever we hand
+        Northgate leaks eventually, like the last one did. What property did
+        this credential have to have?"
+      options:
+        - id: a
+          label: Scoped to one container and revocable without touching anything else
+          correct: true
+          explain: >
+            A service signature under a stored access policy grants only the named
+            container, and deleting the policy kills it instantly with no collateral.
+            Every alternative either grants the whole account or can only be revoked by
+            breaking other integrations.
+        - id: b
+          label: Short-lived enough that a leak expires on its own
+          correct: false
+          explain: >
+            Expiry narrows the window, and the partner needs access indefinitely, so
+            something long-lived exists under any scheme. Revocation works at the moment
+            you learn of the leak; expiry works on a schedule the thief can read.
+        - id: c
+          label: Owned by an identity rather than being a bearer token at all
+          correct: false
+          explain: >
+            Entra authorization is the strongest choice for callers you control. Northgate
+            is another company's server, and creating a Meridian account for it would
+            re-create the unmanaged credential problem the finding describes.
     prompt: What do you move them to?
     options:
       - id: a
@@ -91,6 +123,36 @@ encounters:
 
 
       Sriwijaya, who are still on the old arrangement, are uploading normally.
+    hint: >
+      The error names a time frame, so interrogate every time field involved.
+      Ask which clock the service reads those fields against, and which clock
+      wrote them.
+    post_mortem:
+      question: >
+        Joana reads the error back over the phone. "Not valid in the specified
+        time frame. What is the lesson that goes in the handover?"
+      options:
+        - id: a
+          label: Signature times are UTC, and a local clock wrote one in the future
+          correct: true
+          explain: >
+            A start time taken from a Singapore clock at 16:00 became 16:00 UTC, eight
+            hours ahead. Every time field in a signature is read as UTC, which is why
+            omitting the start or backdating it a few minutes is standard practice.
+        - id: b
+          label: The policy and the signature carried conflicting time windows
+          correct: false
+          explain: >
+            The policy's window was already open; the signature added its own future start
+            on top. When both carry times the most restrictive combination applies, and
+            the restrictive one here was a typed field, not the design.
+        - id: c
+          label: Moving Northgate off the account key was rushed into production
+          correct: false
+          explain: >
+            The design survived the incident untouched and the finding stayed closed. A
+            twenty-minute clock mistake is not an argument against taking a two-year-old
+            account key out of a partner's configuration file.
     ticket:
       ref: INC-4488
       opened: "16:20"
@@ -150,6 +212,17 @@ encounters:
           <Error><Code>AuthenticationFailed</Code><Message>Signature not valid in the specified
           time frame.</Message></Error>
         time_cost: 2
+    post_incident:
+      path: [a, b]
+      text: >
+        Two reads settle it. The policy on the container starts at 08:00 UTC,
+        which is 16:00 in Singapore and already past, so the policy is not the
+        blocker. The signature itself carries a start of 16:00 UTC, eight hours
+        in the future, and when a signature and its policy both carry times the
+        most restrictive combination wins. The account settings cannot move the
+        diagnosis, because a 403 about a time frame is neither a key nor a
+        transport problem, and running the upload yourself only reproduces what
+        Northgate's log already said.
     fixes:
       - id: a
         label: >
@@ -208,6 +281,35 @@ encounters:
 
       The two internal services read their configuration from the key vault, which
       holds a copy of key1.
+    hint: >
+      Two keys exist so that rotation can be a sequence instead of an event.
+      Ask which order leaves every consumer holding a valid key at every
+      moment.
+    post_mortem:
+      question: >
+        Marek looks at the reminder that is finally going to change color.
+        "Rotation is routine when it is done properly. What makes it routine?"
+      options:
+        - id: a
+          label: Staging it so one valid key is always in every consumer's hands
+          correct: true
+          explain: >
+            The second key exists so consumers can move before anything is regenerated. In
+            that order rotation is invisible; in any other order it is an outage exactly
+            as long as your slowest configuration update.
+        - id: b
+          label: Scheduling the disruptive part out of hours
+          correct: false
+          explain: >
+            Out of hours is where you put risk you cannot remove. This risk is removable:
+            the staged sequence takes the outage to zero at any hour of the day.
+        - id: c
+          label: Only rotating keys when there is evidence of compromise
+          correct: false
+          explain: >
+            A key shared outside the company two years ago is the evidence. Waiting for
+            more of it inverts the point of rotation, which is to make yesterday's
+            exposure worthless today.
     prompt: How do you rotate it?
     options:
       - id: a

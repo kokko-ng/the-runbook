@@ -27,6 +27,38 @@ encounters:
 
       The overnight tidy-up job removes containers whose names match a pattern and
       which have not been written to for thirty days. It ran at 02:00.
+    hint: >
+      ContainerNotFound is a precise statement, and recovery works at the level
+      of the thing that was deleted. Ask what this account retains after a
+      deletion, and for how long.
+    post_mortem:
+      question: >
+        Joana types the handover note while you talk. "For the next shift,
+        then: when something vanishes from a storage account, what is the first
+        question to settle?"
+      options:
+        - id: a
+          label: Whether the platform still retains it, before rebuilding or resending anything
+          correct: true
+          explain: >
+            Container soft delete held customs-2026 and all of its blobs for seven days.
+            The deleted list is checked first because acting before that check, even by
+            re-creating an empty container with the same name, can block the restore that
+            would have worked.
+        - id: b
+          label: Which job or person caused it, so it cannot happen again
+          correct: false
+          explain: >
+            The tidy-up job matters, and it is the second question. Root cause work does
+            not bring the paperwork back; the retention window does, and the window is
+            the thing that expires.
+        - id: c
+          label: Whether the senders can be asked to supply the data again
+          correct: false
+          explain: >
+            Resending depends on every partner keeping copies, and one of them cannot.
+            The platform's own retention is complete and immediate, which is why it is
+            checked before anyone outside is asked for anything.
     ticket:
       ref: INC-4544
       opened: "07:55"
@@ -85,6 +117,18 @@ encounters:
           -----------------------------------  ------------------------
           sp-storage-tidyup                    2026-08-24T02:03:51Z
         time_cost: 1
+    post_incident:
+      path: [a, d]
+      text: >
+        One listing with the deleted flag settles it: customs-2026 appears,
+        marked deleted, with six days of retention remaining, which explains
+        ContainerNotFound and offers the undelete in the same table. The
+        activity log then names sp-storage-tidyup at 02:03, which is the
+        durable half of the fix, because a job that matched one live container
+        will match another in thirty days. Reading the soft delete policy adds
+        nothing the listing's retention column has not already shown, and
+        browsing edi-inbound proves nothing new, because the error had already
+        named exactly which container was gone.
     fixes:
       - id: a
         label: >
@@ -145,6 +189,38 @@ encounters:
 
       "Not the portal," says Marek. "I have watched somebody try to move nine
       hundred gigabytes through a browser before."
+    hint: >
+      Nine hundred gigabytes is a routing question before it is a tooling one.
+      Trace the path the bytes take in each option, and ask what happens when
+      the machine driving it stops.
+    post_mortem:
+      question: >
+        Marek pulls his chair over. "Never mind which tool you like. What
+        separates a transfer that finishes overnight from one that dies at
+        eleven?"
+      options:
+        - id: a
+          label: Whether the copy runs server side, with no client in the path
+          correct: true
+          explain: >
+            A server-to-server copy moves at service speed, keeps the data inside Azure,
+            and does not care if the issuing machine sleeps. Every failing variant here
+            put a laptop, a browser tab, or a round trip in the middle of nine hundred
+            gigabytes.
+        - id: b
+          label: Whether the tool has a graphical interface you can watch
+          correct: false
+          explain: >
+            Storage Explorer is genuinely useful and drives the same engine underneath.
+            The interface was never the risk; the path the data takes and the machine the
+            transfer depends on are.
+        - id: c
+          label: Whether the copy is scheduled for a quiet time of day
+          correct: false
+          explain: >
+            Scheduling hides slowness rather than removing it. A transfer streaming
+            through a client is still slower, still fragile, and still paying for a round
+            trip, at any hour you pick.
     prompt: How do you move it?
     options:
       - id: a
@@ -198,6 +274,9 @@ encounters:
       "Three settings with almost the same name," says Marek. "Somebody deletes a
       single blob by accident, in a container that is otherwise fine. Which one
       saves you?"
+    hint: >
+      Match the feature to the scope of the loss: one blob, one container, one
+      share. Each of the three settings guards exactly one of those objects.
     question: Which feature recovers a single deleted blob?
     options:
       - id: a

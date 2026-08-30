@@ -30,6 +30,37 @@ encounters:
 
       He writes the options on the whiteboard, then draws a line under the ones he
       thinks are traps.
+    hint: >
+      Go back to the numbers in front of you: how often a scan is written, how
+      often it is read, and how long it must be kept. The right account is
+      priced for exactly that pattern.
+    post_mortem:
+      question: >
+        Marek taps the whiteboard. "Forget the product names for a minute. What
+        actually decides which kind of account a workload gets?"
+      options:
+        - id: a
+          label: The workload's access pattern and retention, not any single headline feature
+          correct: true
+          explain: >
+            General-purpose v2 with standard performance fits a write-once, read-rarely
+            archive: it is the only kind with the full set of access tiers and lifecycle
+            management, at prices matched to small, steady writes. Each alternative
+            optimizes for a property this workload does not have.
+        - id: b
+          label: The cost estimate should have been agreed with Priya first
+          correct: false
+          explain: >
+            A cost review catches an expensive account after it exists. The workload's own
+            numbers named the right account before any invoice could, which is the cheaper
+            place to be correct.
+        - id: c
+          label: Standard performance is simply the safe choice for every account
+          correct: false
+          explain: >
+            Standard is the default because most workloads look like this one, not because
+            premium is never right. A workload with high transaction rates and tight
+            latency earns premium; eleven thousand small daily writes do not.
     prompt: What do you create?
     options:
       - id: a
@@ -99,6 +130,36 @@ encounters:
       Meridian runs in Southeast Asia. The secondary region on the paper
       architecture is East Asia. There is no requirement to read the scans from
       the second region, only to still have them.
+    hint: >
+      Each option is the answer to a different failure. Name the failure the
+      contract actually cares about, then buy exactly that, and be suspicious
+      of anything extra.
+    post_mortem:
+      question: >
+        Priya slides the paper back across the desk. "Walk me through it again.
+        What exactly was this line on the invoice supposed to buy?"
+      options:
+        - id: a
+          label: Protection against the one failure the contract names, a lost region
+          correct: true
+          explain: >
+            Redundancy is bought against a named risk, and the contract requires the scans
+            to survive losing a region. A copy in a second region is exactly that; zone
+            spread and readable secondaries answer questions nobody asked.
+        - id: b
+          label: The most durable option, because the scans are legally critical
+          correct: false
+          explain: >
+            Maximum durability overshoots the same way minimum cost undershoots. Importance
+            does not change the requirement; it is still one failure to survive, and the
+            right buy covers exactly that for the least money.
+        - id: c
+          label: Whichever option keeps the storage line on the invoice lowest
+          correct: false
+          explain: >
+            Priya asked what each option protects against, not for the smallest number. A
+            cheap copy that cannot survive a regional event fails the contract, which is
+            the most expensive outcome on the table.
     prompt: Which redundancy do you recommend?
     options:
       - id: a
@@ -161,6 +222,37 @@ encounters:
 
 
       Meridian has a key vault. Nobody has yet had to rotate anything in it.
+    hint: >
+      Separate the two questions the questionnaire runs together: whether the
+      data is encrypted, and who can make it unreadable. Only one of those
+      still needs anything from you.
+    post_mortem:
+      question: >
+        Wei Lin reads the questionnaire again. "Two customers asked for
+        something specific. Which requirement was this configuration actually
+        meant to satisfy?"
+      options:
+        - id: a
+          label: Independent control of the keys, since encryption itself is already on
+          correct: true
+          explain: >
+            Every storage account is encrypted at rest with platform-managed keys and it
+            cannot be turned off. The open requirement was revocation, and customer-managed
+            keys in the vault are what put that decision in Meridian's hands.
+        - id: b
+          label: Stronger encryption than the platform applies by default
+          correct: false
+          explain: >
+            No option in front of you changes the cipher; the data is 256-bit AES encrypted
+            on every path. The choices differ in who holds the keys, not in how strong the
+            encryption is.
+        - id: c
+          label: An answer the customer's auditor cannot ask follow-up questions about
+          correct: false
+          explain: >
+            Auditors always have follow-up questions, and a good configuration survives
+            them. The two-sentence answer works because the mechanism behind it is right,
+            not the other way around.
     prompt: What do you configure and what do you tell her?
     options:
       - id: a

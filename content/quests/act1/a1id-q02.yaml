@@ -28,6 +28,38 @@ encounters:
       He can see the virtual machine in the portal. He can read its configuration.
       The start button is grayed out with a tooltip he has photographed and sent
       you, slightly out of focus.
+    hint: >
+      Two grants, and he can still only look. Ask where each assignment
+      attaches, and where the machine answers from now. An assignment does not
+      travel with a resource; it stays at its scope.
+    post_mortem:
+      question: >
+        Hendrik phones back from the depot floor, forklift and all. "Explain it
+        so I can explain it to my drivers. Why could I see the machine and not
+        start it?"
+      options:
+        - id: a
+          label: His working role stayed at a scope the machine had left
+          correct: true
+          explain: >
+            Role assignments attach to a scope, not to a resource. When CHG-2251
+            moved vm-scan01 to rg-app, only the subscription-wide Reader still
+            covered it, and Reader is exactly seeing without touching.
+        - id: b
+          label: Two overlapping assignments canceled each other out
+          correct: false
+          explain: >
+            Assignments never cancel; they add up wherever they apply. The
+            Reader and the Virtual Machine Contributor simply applied in
+            different places, and only Reader applied where the machine now
+            lives.
+        - id: c
+          label: The role he was given was too weak to start a machine
+          correct: false
+          explain: >
+            Virtual Machine Contributor starts machines comfortably. The role
+            was strong enough on the day it was assigned; it was the machine's
+            address that changed underneath it.
     ticket:
       ref: INC-4418
       opened: "06:20"
@@ -94,6 +126,16 @@ encounters:
           Provisioning succeeded
           VM deallocated
         time_cost: 1
+    post_incident:
+      path: [a, b]
+      text: >
+        The full assignment listing against one vm show settles it in two moves:
+        his working role attaches to rg-depot, and the machine now answers from
+        rg-app, so only the subscription Reader reaches it. Seeing without
+        starting is what Reader looks like. The scoped listing on the machine
+        itself restates that same pair, the deny hunt chases an override nothing
+        hinted at, and the instance view checks machine state when the error
+        already said permission.
     fixes:
       - id: a
         label: >
@@ -157,6 +199,39 @@ encounters:
 
       "Their question is whether this identity can delete a storage account in
       rg-data. I would like to answer it correctly the first time."
+    hint: >
+      Work it the way the platform does, in two passes: first add up every role
+      that reaches the scope, and nothing in that pass subtracts. Then, and only
+      then, ask whether anything forbids the action outright.
+    post_mortem:
+      question: >
+        Wei Lin holds the reply unsent. "The firm will ask how the platform
+        evaluates this, not merely what we concluded. So: in what order is the
+        decision actually made?"
+      options:
+        - id: a
+          label: Roles combine as a union first, then deny assignments override the total
+          correct: true
+          explain: >
+            Every assignment at or above the scope is added up, and nothing in
+            that pass subtracts. Deny assignments are evaluated afterwards and
+            beat whatever the union says, which is the only override in the
+            model.
+        - id: b
+          label: The assignment closest to the resource decides the outcome
+          correct: false
+          explain: >
+            Proximity carries no weight. A role granted at a management group
+            reaches a resource several levels down exactly as strongly as one
+            granted on the resource itself.
+        - id: c
+          label: The most restrictive role wins wherever assignments overlap
+          correct: false
+          explain: >
+            Roles do not conflict; they accumulate. Reader held alongside
+            Contributor is simply Contributor. Restriction enters the
+            calculation only through a deny assignment, never through a narrower
+            role.
     prompt: What is the answer?
     options:
       - id: a
@@ -200,6 +275,10 @@ encounters:
       "Three scopes," says Marek. "Management group, subscription, resource group,
       resource. Fine, four. Somebody has Reader at the subscription and Contributor
       on one resource group inside it. What do they have?"
+    hint: >
+      Inheritance flows one way. Nothing at a lower scope pushes back up, and
+      nothing cancels what came down. Add each assignment where it applies and
+      read off the total.
     question: What is the effective access?
     options:
       - id: a

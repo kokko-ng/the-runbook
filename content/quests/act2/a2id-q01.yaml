@@ -32,6 +32,37 @@ encounters:
       "Every architect I have watched answer this reaches for a tenant migration.
       Tell me what you would do for the fortnight, and be honest about what it
       costs later."
+    hint: >
+      There are two clocks in the room: a fortnight and eighteen months. Ask
+      which mechanism serves the short clock without deciding the long one, and
+      leaves each person exactly one authoritative identity.
+    post_mortem:
+      question: >
+        Grace looks at the whiteboard instead of at you. "You will have a second
+        attempt. First: two circles, one arrow. What did the arrow need to be?"
+      options:
+        - id: a
+          label: Access across the boundary, with every identity staying where it lives
+          correct: true
+          explain: >
+            Business-to-business collaboration grants access while each person
+            keeps one authoritative identity and lifecycle in their home tenant.
+            Anything that moves, copies or re-plumbs identities decides more
+            than the fortnight asks.
+        - id: b
+          label: A faster route to one merged tenant
+          correct: false
+          explain: >
+            Consolidation may well be the end state, and it belongs to the
+            merger program on the merger's clock. The fortnight asked for
+            access, not for the decision.
+        - id: c
+          label: A stronger trust than the two tenants have today
+          correct: false
+          explain: >
+            Cross-tenant access settings already express exactly as much trust
+            as Meridian chooses. The gap was the mechanism for granting access,
+            not a shortage of trust.
     prompt: What do you recommend for the immediate need?
     options:
       - id: a
@@ -99,6 +130,39 @@ encounters:
 
       Those staff will need Meridian's dispatch application, which is
       cloud-hosted, within the year. Straits IT is two people and a contractor.
+    hint: >
+      Start from the failure Marek named: a link that drops daily and an IT
+      team of two. Ask where each design makes the sign-in decision, and what
+      has to be alive for it to happen.
+    post_mortem:
+      question: >
+        Marek pulls the requirement back up. "Same question, slower. Those
+        staff already have one identity and one bad link. What was your design
+        supposed to add to that, and what was it supposed to leave alone?"
+      options:
+        - id: a
+          label: Cloud sign-in for the identity they already have, with nothing new to run on site
+          correct: true
+          explain: >
+            Password hash synchronization extends the existing local accounts
+            into Entra and moves the authentication decision to the cloud. The
+            link and the two-person team stay out of the sign-in path, and
+            nobody gets a second identity.
+        - id: b
+          label: Better infrastructure at Port Klang, so authentication can stay local
+          correct: false
+          explain: >
+            Hardening the site turns servers, redundancy and the link itself
+            into things two people must keep alive. The requirement allows
+            authentication to leave the site entirely, which fails less and
+            costs less.
+        - id: c
+          label: A clean break from the local domain before anything syncs
+          correct: false
+          explain: >
+            The domain keeps signing staff in to Windows at the site for years
+            yet. The design has to work with it, not around it; retiring it is
+            a later program.
     prompt: What authentication design do you recommend for those users?
     options:
       - id: a
@@ -161,6 +225,40 @@ encounters:
 
       Straits already enforce multi-factor with the Microsoft Authenticator app
       for those administrators.
+    hint: >
+      Separate two questions Wei Lin is holding together: what Meridian
+      requires of anyone touching its dispatch data, and what proof it accepts.
+      The requirement is yours to set; the proof can come from more than one
+      place.
+    post_mortem:
+      question: >
+        Wei Lin adds a line to a finding that does not exist yet. "For the
+        record, then. Whose policy governs a guest's access to Meridian's data,
+        and what should that policy do about a factor already satisfied
+        elsewhere?"
+      options:
+        - id: a
+          label: Meridian enforces its own requirement and trusts a compliant home tenant's claim
+          correct: true
+          explain: >
+            Access to Meridian's data is governed by Meridian's Conditional
+            Access, whatever the guest's home policy says. Trusting the home
+            tenant's multi-factor claim spares compliant users a second
+            registration without lowering the bar for anyone.
+        - id: b
+          label: Guests sit outside Meridian's policy reach until the tenants merge
+          correct: false
+          explain: >
+            A guest identity in your tenant is subject to your Conditional
+            Access on every access to your resources. Reach was never the
+            problem; the settings were.
+        - id: c
+          label: Security and usability had to be traded against each other here
+          correct: false
+          explain: >
+            Double prompting is not extra security; it is the same factor
+            proved twice. The trust setting removes the friction while the
+            requirement stays exactly as strict.
     prompt: How do you handle multi-factor for the guests?
     options:
       - id: a
@@ -219,6 +317,10 @@ encounters:
       "One thing before you write this up," says Grace. "Somebody in the steering
       meeting will ask why we are not just migrating the tenant. Give me the
       shortest honest answer."
+    hint: >
+      The steering meeting does not care which design is cleverer. Give the
+      answer an executive can act on: what the business keeps open by moving in
+      this order, and what it would spend by moving in the other.
     question: What is the strongest argument for collaboration before consolidation?
     options:
       - id: a

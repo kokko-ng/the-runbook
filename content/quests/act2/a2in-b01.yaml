@@ -25,6 +25,37 @@ encounters:
       monitoring agents, and the analytics team's occasional Spark job," says
       Grace. "Somebody has proposed one node pool with autoscaling and letting the
       scheduler sort it out."
+    hint: >
+      Sort the cluster's tenants by shape: what serves requests, what runs
+      the platform, what arrives hungry once in a while. Ask which mechanism
+      keeps unlike shapes from competing for the same nodes.
+    post_mortem:
+      question: >
+        "Same cluster, four kinds of tenant," says Grace. "What actually
+        keeps unlike workloads from hurting each other on shared nodes?"
+      options:
+        - id: a
+          label: Different workload shapes get different pools; requests and limits are not isolation
+          correct: true
+          explain: >
+            Pools separate scaling behavior, resource shape and interruption
+            tolerance at the node boundary, and a system pool keeps the
+            platform itself out of the contest. Scheduler hints depend on
+            every team setting them right, which is not a boundary.
+        - id: b
+          label: Isolation requires separate clusters
+          correct: false
+          explain: >
+            A second control plane is the strongest wall and the highest
+            rent. Pools provide most of the separation inside one cluster,
+            which is why they exist.
+        - id: c
+          label: The autoscaler should simply be tuned to react faster
+          correct: false
+          explain: >
+            Faster scaling still scales one pool on the wrong dimension when
+            the Spark job lands. The problem is what shares nodes, not how
+            quickly more nodes arrive.
     prompt: What do you recommend?
     options:
       - id: a
@@ -84,6 +115,39 @@ encounters:
 
       The cluster runs the dispatch services, the nightly routing batch and the
       analytics job.
+    hint: >
+      Priya's discount has one string attached: the platform can take the
+      capacity back at any moment. Ask which of the three workloads can
+      shrug that off and which cannot, ever.
+    post_mortem:
+      question: >
+        Priya circles the spot price. "The discount exists for a reason.
+        What is the platform buying from us at that price, and which
+        workloads can sell it?"
+      options:
+        - id: a
+          label: The discount buys evictability, and only restartable work can sell it
+          correct: true
+          explain: >
+            Spot nodes can be reclaimed at short notice with no promise of
+            return, which batch and analytics absorb by retrying. A
+            request-serving commitment cannot, at any hour, and no replica
+            count changes the arithmetic.
+        - id: b
+          label: The eviction risk can be engineered away with redundancy
+          correct: false
+          explain: >
+            Evictions can take many nodes at once, and replacements are not
+            guaranteed while capacity is tight. Redundancy on capacity that
+            can vanish together is not redundancy.
+        - id: c
+          label: The saving is not worth engaging with at all
+          correct: false
+          explain: >
+            For the batch and analytics pools the saving is large and the
+            risk is designed in, since the work already retries. Declining
+            it everywhere pays full price for interruption tolerance nobody
+            needed.
     prompt: What goes on interruptible capacity?
     options:
       - id: a
@@ -133,6 +197,10 @@ encounters:
     intro: >
       "One sentence," says Grace. "What does a managed Kubernetes service manage,
       and what is still yours?"
+    hint: >
+      Split the cluster into the part you never log into and the parts you
+      patch, size and upgrade. The word managed applies to exactly one of
+      those.
     question: What remains your responsibility on managed Kubernetes?
     options:
       - id: a

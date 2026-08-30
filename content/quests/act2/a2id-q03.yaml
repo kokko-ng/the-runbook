@@ -28,6 +28,38 @@ encounters:
 
       Migrating it is on the roadmap for next year. This is about the next twelve
       months.
+    hint: >
+      Weigh what each design actually grants: one application to named users,
+      or a network to devices, or a session to a server. The requirement is
+      twenty people and one web application, nothing wider.
+    post_mortem:
+      question: >
+        Grace circles the words "cannot be published to the internet" on the
+        requirement. "Take it again from there. What is the smallest thing this
+        design needs to grant, and to whom?"
+      options:
+        - id: a
+          label: One application, to twenty authenticated users, with no inbound door
+          correct: true
+          explain: >
+            Application proxy publishes exactly the application through an
+            outbound connector, and Conditional Access decides who walks in.
+            Granting a network, a public listener or a remote desktop session
+            hands over more than the requirement names.
+        - id: b
+          label: Remote access, which means getting users onto the Port Klang network
+          correct: false
+          explain: >
+            That equation is the habit this design breaks. Network reach brings
+            every neighboring system with it; publishing brings one application
+            and nothing else.
+        - id: c
+          label: A faster migration, so the legacy application stops mattering
+          correct: false
+          explain: >
+            The migration is next year's roadmap either way. The next twelve
+            months still have to be safe, which is a publishing problem, not a
+            scheduling one.
     prompt: What do you recommend?
     options:
       - id: a
@@ -92,6 +124,38 @@ encounters:
 
       One customer contract requires keys in hardware that Meridian alone
       controls, with a compliance attestation. The rest are ordinary.
+    hint: >
+      One requirement in that pile is contractual and hardware-shaped; the rest
+      are ordinary. Sort the material by what each piece actually requires, and
+      price the special handling only for the piece that requires it.
+    post_mortem:
+      question: >
+        Wei Lin sets the customer contract next to your proposal. "Read them
+        together and tell me the principle. What decides where a key, a secret
+        or a certificate belongs?"
+      options:
+        - id: a
+          label: The strictest requirement that actually applies to that piece of material
+          correct: true
+          explain: >
+            The contractual keys need single-tenant, validated hardware, which
+            is Managed HSM and its price. Everything else needs Key Vault's
+            lifecycle and nothing more. One answer for all of it either fails
+            the contract or overpays for the ordinary.
+        - id: b
+          label: Consolidation, because one store is easier to audit than two
+          correct: false
+          explain: >
+            One place to look is worth something, and it cannot override what
+            the services store. Managed HSM holds keys only, so a single store
+            fails either the ordinary material or the contract.
+        - id: c
+          label: Cost, because most of this material is low value
+          correct: false
+          explain: >
+            Cost breaks ties; it does not settle requirements. The contractual
+            keys are expensive to hold properly and more expensive to hold
+            wrongly.
     prompt: What do you recommend?
     options:
       - id: a
@@ -159,6 +223,37 @@ encounters:
 
       This is a design review, so the artifacts are configuration rather than an
       outage, and Grace wants the cause named before the write-up.
+    hint: >
+      Eighteen work, two do not, and the two share a history. Ask what the
+      sign-on process must produce for each user, and what it needs on the
+      other side to produce it.
+    post_mortem:
+      question: >
+        Marek starts the write-up and leaves the cause line blank. "Fill this
+        in properly. What did the two failing users lack, and which of our
+        settings could have supplied it?"
+      options:
+        - id: a
+          label: An on-premises account to delegate for, which no setting can supply
+          correct: true
+          explain: >
+            Kerberos constrained delegation impersonates a real domain account,
+            and a cloud-only user has none. Mappings, connectors and sign-on
+            modes all assume that account exists; none of them can create it.
+        - id: b
+          label: A correct attribute mapping between their cloud and domain names
+          correct: false
+          explain: >
+            The mapping translates between two identifiers when both exist. For
+            these two users there is nothing on the domain side to translate
+            to, which is a different class of problem.
+        - id: c
+          label: A healthier path between the connector and the domain controller
+          correct: false
+          explain: >
+            The same connectors mint tickets for eighteen colleagues all day.
+            Plumbing that works per application does not fail per user along a
+            joining date.
     ticket:
       ref: DRV-1104
       opened: "14:00"
@@ -224,6 +319,19 @@ encounters:
             "value": [ { "name": "Port Klang", "connectorCount": 2, "status": "active" } ]
           }
         time_cost: 1
+    post_incident:
+      path: [b, c]
+      text: >
+        Two user lookups settle this. The failing account shows no on-premises
+        identity and no sync; the working one shows both. Kerberos constrained
+        delegation can only impersonate an account that exists in the domain,
+        so that pair of outputs is the whole diagnosis. The application
+        configuration cannot move it, because the sign-on settings are
+        identical for all twenty users and eighteen of them work. Connector
+        health cannot move it either; infrastructure shared by the working
+        eighteen does not selectively fail two accounts by joining date. When a
+        fault splits users into two populations, diff the populations before
+        you touch the plumbing.
     fixes:
       - id: a
         label: >

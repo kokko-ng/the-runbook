@@ -27,6 +27,37 @@ encounters:
 
 
       Nobody has opened Insights for anything.
+    hint: >
+      Before building anything, ask what the platform already draws for free from
+      the data that is flowing. The fastest first move eliminates half the
+      suspects without new work.
+    post_mortem:
+      question: >
+        Marek does not turn round. "One more go. When something is slow and you
+        have not measured anything yet, what is the first move?"
+      options:
+        - id: a
+          label: Open the curated views the platform already draws before building anything
+          correct: true
+          explain: >
+            Virtual machine, storage and network insights sit over data the
+            estate already emits. Ten minutes in them eliminated storage
+            entirely; work you build or buy comes after the free views run out of
+            answers.
+        - id: b
+          label: Get purpose-built tooling in place before trusting any view
+          correct: false
+          explain: >
+            The data was already flowing; nothing new had to be installed to read
+            it. Tooling bought before the built-in views are exhausted duplicates
+            a chart somebody already drew.
+        - id: c
+          label: Go straight to the component the complaint names
+          correct: false
+          explain: >
+            The complaint names uploads, which touch a machine, an account and a
+            network. Digging into one of them first is a coin toss; the insights
+            views rule suspects out faster than a dig rules one in.
     prompt: Where do you start?
     options:
       - id: a
@@ -82,6 +113,38 @@ encounters:
       "I need to be able to say, in the operations meeting, what the loss and
       latency were between the Johor depot and the hub at nine o'clock last
       Tuesday," says Dana. "Every Tuesday. Without anybody being awake for it."
+    hint: >
+      Dana's question has a place, a path and a time in it. Ask which measurement
+      watches exactly that path, all the time, and writes its answers where a
+      query can reach them.
+    post_mortem:
+      question: >
+        "Try that again," says Dana, "and this time start from my Tuesday
+        question. What does a measurement need before it can settle an argument
+        like this one?"
+      options:
+        - id: a
+          label: The disputed path itself, measured continuously, with results a query can reach
+          correct: true
+          explain: >
+            The argument is about loss and latency between the depot and the hub.
+            Only a continuous synthetic check on exactly that path, stored
+            centrally, can answer for nine o'clock last Tuesday without anybody
+            being awake.
+        - id: b
+          label: More data from the machines at either end
+          correct: false
+          explain: >
+            Endpoint measurements describe the machines, not the link between
+            them, and data stored on an affected machine cannot be correlated
+            with anything. The path is the subject; measure the path.
+        - id: c
+          label: A test run at the moment somebody complains
+          correct: false
+          explain: >
+            A one-off test measures a different moment on possibly a different
+            route. The fortnight of argument happened precisely because every
+            measurement so far was an anecdote with a timestamp.
     prompt: What do you set up?
     options:
       - id: a
@@ -140,6 +203,36 @@ encounters:
       The connection monitor has been running for a week. This morning it went
       red for eleven minutes at 08:52 and recovered on its own. The NOC wants to
       know whether it was real, because nobody complained.
+    hint: >
+      The monitor recorded more than a red light. Ask what the results say about
+      where along the path the time went, and let that hop answer for itself.
+    post_mortem:
+      question: >
+        "For the handover," says Joana, "what is the discipline when a monitor
+        reports something real that fixed itself?"
+      options:
+        - id: a
+          label: Diagnose it from the evidence while it is cheap; never dismiss, detune or bypass
+          correct: true
+          explain: >
+            The monitor named the window, the path result named the hop, and the
+            appliance's processor confirmed the cause. Eleven minutes of history
+            is what makes the next occurrence a ninety-second alert instead of a
+            mystery.
+        - id: b
+          label: Wait for a user complaint before spending time on it
+          correct: false
+          explain: >
+            Nobody complained because retries absorbed the damage, which is luck,
+            not health. The busiest morning of the month will not be so
+            forgiving, and by then the history would be gone.
+        - id: c
+          label: Treat short self-recovering events as monitor oversensitivity
+          correct: false
+          explain: >
+            Sixty per cent loss for eleven minutes is a real degradation,
+            corroborated by the appliance's own metrics. Tuning the monitor until
+            it agrees with the quiet is how monitoring becomes decorative.
     ticket:
       ref: INC-4820
       opened: "09:20"
@@ -208,6 +301,18 @@ encounters:
           2026-08-24T08:55:00Z  41
           2026-08-24T09:00:00Z  39
         time_cost: 2
+    post_incident:
+      path: [a, b, c]
+      text: >
+        Three checks, each narrowing. The test results prove the event was real:
+        sixty per cent failures and round trips fifty times normal for eleven
+        minutes. The path result turns that into an address, because the failing
+        hops run through 10.10.1.4, which is the inspection appliance. The
+        appliance's own processor metric closes it: pinned near ninety-eight per
+        cent for exactly the failure window. The storage query cannot move the
+        diagnosis; blob traffic does not route through the appliance, so its flat
+        latency only confirms what the path already said about where the problem
+        lives.
     fixes:
       - id: a
         label: >

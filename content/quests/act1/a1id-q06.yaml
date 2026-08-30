@@ -34,6 +34,37 @@ encounters:
 
       Meridian has one Azure agreement, and creating subscriptions under it is
       not a problem.
+    hint: >
+      List what actually separates at a subscription and nowhere else: the
+      invoice line, quotas, some limits and policy scope. Then cut along the
+      seam where the interference is, and no finer.
+    post_mortem:
+      question: >
+        Priya files the printout and takes out a clean sheet. "Recommendation
+        number two, then. First convince me you know what a subscription
+        boundary is actually for."
+      options:
+        - id: a
+          label: Separating environments that must not share bills, quotas or rules
+          correct: true
+          explain: >
+            A subscription is a billing line, a quota pool, a policy scope and a
+            blast radius at once. Split exactly where those must differ, between
+            production and everything rehearsing against it, and stop there.
+        - id: b
+          label: Giving every part of the business its own invoice line
+          correct: false
+          explain: >
+            Chargeback by site or team is a tagging question. Twenty-two
+            subscriptions would answer it at the price of twenty-two sets of
+            assignments and a hub with no home.
+        - id: c
+          label: Putting risky workloads as far from production as possible
+          correct: false
+          explain: >
+            Distance beyond the tenant boundary costs governance: outside it
+            there is no shared policy, role assignment or monitoring. Separation
+            inside the tenant is what the hierarchy is for.
     prompt: What do you recommend?
     options:
       - id: a
@@ -98,6 +129,39 @@ encounters:
       Today both policies are assigned directly to the production subscription.
       There will be a third subscription eventually, for the acquisition everyone
       is pretending is a secret.
+    hint: >
+      Wei Lin's real requirement is the subscription that does not exist yet.
+      Ask at which level an assignment covers arrivals automatically, and then
+      how much of the tenant that level should be allowed to reach.
+    post_mortem:
+      question: >
+        Wei Lin annotates the proposal in the margin and sends it back. "Second
+        draft, please. What property must the arrangement have for a
+        subscription nobody told me about?"
+      options:
+        - id: a
+          label: New subscriptions inherit the rules by landing under them
+          correct: true
+          explain: >
+            An assignment on a management group flows down to everything beneath
+            it, so governance becomes a property of where a subscription sits
+            rather than of somebody remembering. That is the whole difference
+            between a rule and a habit.
+        - id: b
+          label: The policies apply to every subscription the tenant will ever hold
+          correct: false
+          explain: >
+            Absolutely everything is too much: the root group also covers
+            sandboxes and training subscriptions that should be exempt, and
+            assignments there need elevated access to manage. Govern the estate,
+            not the tenant.
+        - id: c
+          label: Each subscription carries its own copy of the assignments
+          correct: false
+          explain: >
+            Copies drift, and the third subscription arrives before anyone
+            assigns its copy. Duplication is the failure mode here, not the
+            mechanism.
     prompt: How do you arrange it?
     options:
       - id: a
@@ -163,6 +227,38 @@ encounters:
 
       Production runs about forty thousand dollars a month. Non-production, once
       split out, will be nearer six.
+    hint: >
+      Priya asked for two things: to know while it is happening, and the
+      platform's own opinion on waste. Match each to a tool that really does it,
+      and promise nothing a budget does not do.
+    post_mortem:
+      question: >
+        Priya writes nineteen per cent at the top of a fresh page. "Once more.
+        What am I actually buying with whatever you set up: control,
+        information, or something in between?"
+      options:
+        - id: a
+          label: Timely information, from alerts on spend and the platform's recommendations
+          correct: true
+          explain: >
+            Budgets watch actual and forecast spend and notify at thresholds
+            while the month is still running, and Advisor names the idle and
+            oversized resources. What she gains is knowing in time to act; the
+            acting is still a decision.
+        - id: b
+          label: Control, because the platform can hold spending to a number
+          correct: false
+          explain: >
+            A budget never blocks or stops anything on its own. Promising the
+            CFO a cap that the first overrun disproves costs more trust than the
+            overrun.
+        - id: c
+          label: Savings, locked in before the month is out
+          correct: false
+          explain: >
+            Commitment discounts are real and they reward understood, stable
+            workloads. Signed against an estate still being reshaped, they
+            become payment for capacity nobody uses.
     prompt: What do you set up?
     options:
       - id: a
@@ -221,6 +317,10 @@ encounters:
     intro: >
       "Priya will ask you this in six months and you had better not hedge," says
       Marek. "The budget alert fires at one hundred per cent. What happens next?"
+    hint: >
+      Separate what the platform does from what automation you build might do.
+      Marek is asking about the budget itself, with nothing wired to it. Answer
+      for the bare mechanism.
     question: What does Azure do when spending passes a budget threshold?
     options:
       - id: a

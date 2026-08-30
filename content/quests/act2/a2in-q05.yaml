@@ -24,6 +24,37 @@ encounters:
       Sriwijaya and the customs broker. Each team has invented its own key
       handling, two of them log request bodies, and nobody can tell a partner what
       their rate limit is because there is not one."
+    hint: >
+      List what partners are missing: one address, keys, limits,
+      documentation. Ask where those concerns can be enforced without
+      touching nine code bases, and which calls actually need them.
+    post_mortem:
+      question: >
+        "Northgate ask what their rate limit is," says Grace. "Where in the
+        design does the answer live, and why there?"
+      options:
+        - id: a
+          label: Cross-cutting concerns live in front of the services, at the boundary with consumers
+          correct: true
+          explain: >
+            Authentication, limits, versioning and documentation have to be
+            uniform across services and enforceable per consumer, which only
+            a gateway in the path provides. Applying it where the external
+            consumers are keeps internal calls out of the toll booth.
+        - id: b
+          label: Every API should get the same treatment for consistency
+          correct: false
+          explain: >
+            Uniformity is attractive, and it prices every internal call with
+            a hop and a dependency that buy nothing. The boundary that has
+            external consumers is where the requirement lives.
+        - id: c
+          label: The teams should have been made to standardize their own key handling
+          correct: false
+          explain: >
+            Nine teams converging by agreement is the situation Grace
+            described, two years in. Policy enforced in front of the
+            services does not depend on every team upgrading.
     prompt: What do you recommend?
     options:
       - id: a
@@ -83,6 +114,37 @@ encounters:
       normally and East Asia during a failover," says Marek. "Traffic arrives from
       the public internet. We want the web application firewall in the path, and we
       want failover in seconds rather than in whatever a resolver has cached."
+    hint: >
+      Two requirements do the choosing: failover that does not wait on
+      resolver caches, and a firewall that reads the request. Ask which
+      routing layers actually see the HTTP traffic.
+    post_mortem:
+      question: >
+        "Requirements again," says Marek. "Failover in seconds, firewall in
+        the path. What does the routing layer have to do to deliver both?"
+      options:
+        - id: a
+          label: Both requirements demand a global layer that terminates the request itself
+          correct: true
+          explain: >
+            Anything DNS-based inherits resolver caching, and anything at
+            layer four never reads the request, so no web application
+            firewall. A global edge that terminates HTTP can probe origins,
+            shift traffic immediately and inspect payloads in one place.
+        - id: b
+          label: Failover speed was a tuning problem on time to live
+          correct: false
+          explain: >
+            Short time-to-live values help, and resolvers do not promise to
+            honor them. A failover requirement measured in seconds cannot
+            rest on client-side caching behavior.
+        - id: c
+          label: The firewall could be attached at the regional gateways instead
+          correct: false
+          explain: >
+            Regional inspection is real, and it leaves the global routing
+            question unanswered: something still has to decide which region
+            gets the request, in seconds, on health.
     prompt: What routing layer do you recommend?
     options:
       - id: a
@@ -141,6 +203,38 @@ encounters:
       The proof of concept is up. Requests through Front Door reach the portal.
       Partner API calls through the gateway fail with a 403 from the origin, but
       only when they come through Front Door; going straight to the origin works.
+    hint: >
+      The origin misbehaves only when the edge is in the path. Ask what an
+      edge proxy changes about a request it forwards, and what a careful
+      origin might check about what it receives.
+    post_mortem:
+      question: >
+        "I will keep the ticket open," says Joana. "Before the next change:
+        the origin rejected something about the request. Whose configuration
+        was wrong, theirs or ours?"
+      options:
+        - id: a
+          label: The new layer should be configured to satisfy the origin's checks
+          correct: true
+          explain: >
+            The origin validated the host header correctly; Front Door
+            simply was not sending the expected one. Setting the origin host
+            header fixes the request without loosening validation or
+            coupling the gateway to an edge name.
+        - id: b
+          label: The origin's host validation was too strict for a modern edge
+          correct: false
+          explain: >
+            Host validation is part of what keeps the origin from being
+            addressed directly. A control that catches a misconfiguration is
+            doing its job, not obstructing the design.
+        - id: c
+          label: Adding the edge introduced more risk than it removed
+          correct: false
+          explain: >
+            The edge brought the web application firewall and the regional
+            failover; the 403 was one unset property. Judging a layer by its
+            first misconfiguration would remove most of the estate.
     ticket:
       ref: DRV-1160
       opened: "11:40"
@@ -196,6 +290,17 @@ encounters:
           ----------  --------
           Allowed     1841
         time_cost: 1
+    post_incident:
+      path: [a, b]
+      text: >
+        The gateway's own log answers the first question in one line: the
+        host it received was the edge's generated name, and the 403 was its
+        verdict on that name. The Front Door origin configuration then
+        supplies the cause, an origin host header left unset, which is why
+        the edge forwarded its own. The direct call only repeats what the
+        ticket already said, and the firewall log cannot move the diagnosis,
+        because the request was allowed through the edge and rejected at the
+        origin.
     fixes:
       - id: a
         label: Set the origin host header to the gateway's own host name

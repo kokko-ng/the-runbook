@@ -24,6 +24,40 @@ encounters:
       "The failover group covers losing Southeast Asia," says Wei Lin. "What
       covers losing one data center inside Southeast Asia, which is a much more
       likely event, without failing over to another country?"
+    hint: >
+      Match the size of the response to the size of the failure. A data center
+      inside the region should be absorbed in place, by replicas whose
+      placement is guaranteed, without a decision, a data loss window, or a
+      trip abroad.
+    post_mortem:
+      question: >
+        Wei Lin adds the zone event to the risk register before replying.
+        "State the rule, please. How should the scope of a failure map to the
+        mechanism that answers it?"
+      options:
+        - id: a
+          label: Each failure scope gets its own mechanism, layered rather than substituted
+          correct: true
+          explain: >
+            Zone-redundant replicas ride out the likely event in place, with no
+            decision and no loss window, while the failover group stays for the
+            rare one. The mechanisms are complementary; one scope cannot borrow
+            another's tool.
+        - id: b
+          label: One strong mechanism should be trusted to handle every failure size
+          correct: false
+          explain: >
+            The strong mechanism is calibrated for the rare event, so invoking
+            it for the common one moves the primary to another country and
+            opens a data loss window. Coverage is not the same as fit.
+        - id: c
+          label: More copies of the database is what matters, wherever they sit
+          correct: false
+          explain: >
+            A copy in the wrong place fails with the original, and a backup is
+            a copy that provides no availability at all. Placement across
+            zones, not the count of copies, is the property that survives a
+            data center.
     prompt: What do you recommend?
     options:
       - id: a
@@ -74,6 +108,39 @@ encounters:
       A junior engineer's design proposes serving the tracking portal from the
       geo-replicated secondary in East Asia to reduce load on the primary, and
       counting that as the disaster recovery plan as well.
+    hint: >
+      Separate what the platform actually does from what the proposal assumes
+      it does. There is a supported pattern in here and an unexamined one, and
+      the review's job is to name what still has to be designed.
+    post_mortem:
+      question: >
+        Grace crosses the objection out without comment. "You will review
+        juniors for the rest of your career. What separates a fair objection
+        from a false one?"
+      options:
+        - id: a
+          label: A fair objection names a consequence to design for, not a capability to deny
+          correct: true
+          explain: >
+            The secondary is readable and reads do not disturb replication;
+            those are checkable facts. The genuine gaps are cross-region
+            latency, the replica becoming primary during a failover, and the
+            reads in flight while it happens, and a review is judged on
+            finding those.
+        - id: b
+          label: Serving production traffic from a standby is inherently bad practice
+          correct: false
+          explain: >
+            Reading from the geo-secondary is a supported pattern and a real
+            way to offload the primary. The objection cannot be to the pattern;
+            it has to be to the parts of it left undesigned.
+        - id: c
+          label: A disaster recovery replica must be kept idle so it stays ready
+          correct: false
+          explain: >
+            Idleness is not readiness; a rehearsed failover is. The one real
+            caution is sizing, because the reads consume the secondary's
+            compute, and that argues for design, not for idleness.
     prompt: What is wrong with it?
     options:
       - id: a
@@ -111,6 +178,10 @@ encounters:
     intro: >
       "Last one," says Grace. "Somebody says a workload is highly available, so it
       does not need disaster recovery. What is the shortest correct answer?"
+    hint: >
+      Ask what boundary each mechanism lives inside, and what happens when that
+      whole boundary is lost. Anything that shares the failure cannot be the
+      answer to it.
     question: Why does high availability not replace disaster recovery?
     options:
       - id: a
