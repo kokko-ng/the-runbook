@@ -33,6 +33,38 @@ encounters:
 
 
       "Same product, two shapes," he says. "Tell me the shapes."
+    hint: >
+      Decide each service's exposure with the shape of the resource, not with a
+      rule bolted on afterward. Then ask what takes a dead instance out of
+      rotation, and how quickly.
+    post_mortem:
+      question: >
+        Marek crosses out the design and hands the pen back. "One principle
+        would have stopped that. Name it."
+      options:
+        - id: a
+          label: Reachability comes from the frontend, and health comes from the probe
+          correct: true
+          explain: >
+            An internal load balancer has no public frontend, which is a
+            stronger guarantee than any rule, and Standard is the SKU that
+            carries zones and Standard addresses. Probes on the application
+            port are what make the balancing health-aware.
+        - id: b
+          label: A security group would have been enough to separate the two
+          correct: false
+          explain: >
+            A rule is one edit away from wrong, and the scans keep finding
+            those edits. Not exposing the API is a property of the internal
+            frontend, not something filtered in afterward.
+        - id: c
+          label: The load balancer choice barely matters while the application is healthy
+          correct: false
+          explain: >
+            The whole value of the design is the day an instance is not
+            healthy. Retired SKUs, absent probes and DNS caching all fail on
+            exactly that day, which is why the answer is chosen for the bad
+            afternoon.
     prompt: What do you propose?
     options:
       - id: a
@@ -103,6 +135,38 @@ encounters:
       The intake endpoint is lb-pod-intake, a public Standard Load Balancer, in
       front of a four-instance scale set. Its health probe was configured during
       the scale-out project last month by someone who has since left.
+    hint: >
+      A probe only means what it measures. Ask what this one actually tests,
+      and whether passing that test proves the thing the scanners need is
+      alive. Then ask what the image upgrade changed about each instance.
+    post_mortem:
+      question: >
+        Joana timestamps the failed attempt. "The pattern has not changed: half
+        fail, never the same half, retries pass. What is the system telling
+        us?"
+      options:
+        - id: a
+          label: The probe passes while measuring the wrong thing entirely
+          correct: true
+          explain: >
+            A TCP check on port 22 proves the operating system accepts
+            connections and nothing more, so instances whose service never
+            started after the upgrade stayed in rotation and took their share
+            of traffic. A probe has to test what serves the traffic.
+        - id: b
+          label: The platform's health metric went stale after the image upgrade
+          correct: false
+          explain: >
+            The metric was current and honest; it reported exactly what the
+            probe asked it to report. Calling it stale leaves a check in place
+            that will wave the next dead fleet through too.
+        - id: c
+          label: Fifty per cent failure means the fleet is undersized by half
+          correct: false
+          explain: >
+            The arithmetic points the other way. Two of four instances were
+            dead and still in rotation, so half of the traffic found them;
+            capacity was never short, the rotation was wrong.
     ticket:
       ref: INC-4611
       opened: "06:40"
@@ -195,6 +259,17 @@ encounters:
           AllowLbProbe      200       Inbound    Allow   AzureLoadBalancer          *
           AllowIntake       210       Inbound    Allow   Internet                   8443
         time_cost: 1
+    post_incident:
+      path: [a, d]
+      text: >
+        The probe definition and one direct question to the backends carry the
+        whole diagnosis. The probe tests TCP on port 22 while the service lives
+        on 8443, so the check can pass on a machine doing nothing useful, and
+        asking each instance for its health page shows exactly which ones
+        stopped serving after the image upgrade. The availability metric cannot
+        move the diagnosis, because it reports the flawed probe's own opinion
+        back to you, and the pool membership, the rule and the security group
+        were all correct to begin with.
     fixes:
       - id: a
         label: >
@@ -259,6 +334,37 @@ encounters:
 
       Today snet-depot has the default routes only: the local virtual network
       prefix, and 0.0.0.0/0 pointing straight at the internet.
+    hint: >
+      Moving traffic somewhere takes a route, and being allowed to pass it on
+      is a separate setting on the thing in the middle. A design needs both
+      halves, and filtering has never steered a packet anywhere.
+    post_mortem:
+      question: >
+        Wei Lin has the appliance logs open and they are still empty. "Write
+        down, precisely, what carries a depot packet into this appliance."
+      options:
+        - id: a
+          label: A route to the appliance, plus permission for it to forward
+          correct: true
+          explain: >
+            A user-defined route on the subnet overrides the default route for
+            its prefix, and the platform still drops forwarded packets unless
+            IP forwarding is enabled on the appliance's interface. The control
+            exists only when both are in place.
+        - id: b
+          label: The appliance should advertise itself so routes are not needed
+          correct: false
+          explain: >
+            Whatever the vendor means by transparent, a virtual machine in
+            Azure attracts no traffic by itself. Packets go where the subnet's
+            route table sends them, and nowhere else.
+        - id: c
+          label: Outbound access had to be blocked before it could be redirected
+          correct: false
+          explain: >
+            Blocking is a filter, and filters do not create paths. A deny rule
+            removes internet access without sending a single packet toward the
+            appliance; the route table alone decides the next hop.
     prompt: What do you configure?
     options:
       - id: a

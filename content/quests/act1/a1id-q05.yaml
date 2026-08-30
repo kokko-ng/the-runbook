@@ -30,6 +30,40 @@ encounters:
       "Twelve resources," says Marek. "A storage account, a small database, some
       automation. All in one group, all gone. Nobody has admitted to anything
       yet, which in my experience means nobody has read their email."
+    hint: >
+      Ask two questions in order: what puts the reporting service back before
+      finance needs it, and what stops the same Friday happening twice. A
+      complete fix answers both; anything that answers only one is half an
+      answer.
+    post_mortem:
+      question: >
+        Marek grunts at the still-empty resource group. "Try again, and this
+        time tell me first what the incident actually needs from you, and in
+        what order."
+      options:
+        - id: a
+          label: Restore the service from what is reproducible, then make deletion refusable
+          correct: true
+          explain: >
+            Nothing brings a resource group back as a unit, and here the data
+            rebuilds itself overnight once the resources exist. So the work is
+            rebuild first, and then the lock, because a fix that can recur is
+            not finished.
+        - id: b
+          label: Establish who did it before anything else is touched
+          correct: false
+          explain: >
+            The activity log already names the caller, and the naming restores
+            nothing. Attribution matters, and it comes after finance can report
+            again, not instead of it.
+        - id: c
+          label: Recover the deleted resources through the platform's retention windows
+          correct: false
+          explain: >
+            Recovery windows belong to individual resource types, and the ones
+            that mattered here are closed or never applied. Waiting on a
+            platform undelete for a resource group is waiting for a feature that
+            does not exist.
     ticket:
       ref: INC-4460
       opened: "08:10"
@@ -98,6 +132,16 @@ encounters:
           ----------------  -------------------  ------------------
           vm-tms01          Microsoft.Compute    Completed
         time_cost: 2
+    post_incident:
+      path: [a, b, e]
+      text: >
+        Three checks settle both questions. The activity log names the caller
+        and the minute, the group lookup fails in a way that confirms there is
+        no group-level undelete, and the vault listing shows nothing from
+        rg-reporting was ever protected. At that point rebuild-and-repopulate is
+        the only road, and the lock is the lesson. The contractor's role only
+        explains how it was possible, and the lock listing what was missing;
+        neither moves the recovery decision.
     fixes:
       - id: a
         label: >
@@ -157,6 +201,39 @@ encounters:
       to say no. Production data groups must not be deletable by accident. The
       developers still need to deploy and delete their own test resources in
       rg-app all day long."
+    hint: >
+      Dana has stated both halves: the platform must refuse the disaster, and
+      the developers must not notice. Weigh each control by exactly which
+      operations it blocks, and remember that a guard rail people have to remove
+      is not one.
+    post_mortem:
+      question: >
+        Dana is unimpressed but patient. "Same requirement, second try. What
+        makes a guard rail one that actually survives contact with the
+        developers?"
+      options:
+        - id: a
+          label: It blocks only the operation that is genuinely unacceptable
+          correct: true
+          explain: >
+            CanNotDelete refuses exactly the disaster, for everyone including
+            Owners, and leaves reads, writes and deployments alone. A control
+            that also blocks daily work gets removed within a day, and a removed
+            control protects nothing.
+        - id: b
+          label: It blocks as much as possible, since stricter is safer
+          correct: false
+          explain: >
+            Stricter is only safer while it stays in place. A control that
+            breaks backups and configuration writes is taken off in the first
+            week, which leaves less protection than the narrow one.
+        - id: c
+          label: It keeps the people who might delete things away from them
+          correct: false
+          explain: >
+            Access this narrow fights the daily deploy-and-delete work Dana
+            explicitly protected, and process that fights daily work gets routed
+            around. Locks exist so access does not have to carry this burden.
     prompt: What do you put in place?
     options:
       - id: a
@@ -207,6 +284,39 @@ encounters:
 
       Meridian has agreed on three tags: costcenter, owner, and environment.
       About half the estate carries them.
+    hint: >
+      Priya needs two things at once: the estate attributed with real values,
+      and no way for the next resource to arrive without one. Check every option
+      against both, and be suspicious of any answer that fills the field without
+      answering her question.
+    post_mortem:
+      question: >
+        Priya turns the printout face down. "Try once more. When the next
+        invoice arrives, what will decide whether I can finally attribute that
+        forty-one per cent?"
+      options:
+        - id: a
+          label: Whether real values are on the estate and enforced at creation
+          correct: true
+          explain: >
+            Attribution needs the existing resources tagged with true cost
+            centers and a deny that stops the next untagged arrival. Backfill
+            without enforcement drifts; enforcement without true values just
+            decorates the invoice.
+        - id: b
+          label: Whether every resource carries some value in the tag field
+          correct: false
+          explain: >
+            A filled field is not an answer. Forty-one per cent attributed to a
+            department called unknown is the same conversation Priya is already
+            having, with better formatting.
+        - id: c
+          label: Whether the billing structure separates departments from each other
+          correct: false
+          explain: >
+            Subscriptions do separate billing, and it is six weeks of migration
+            for a question tags answer this week. The size of the mechanism
+            should match the size of the problem.
     prompt: How do you get to full coverage?
     options:
       - id: a

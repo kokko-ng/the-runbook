@@ -30,6 +30,39 @@ encounters:
       "Two questions from the review," says Wei Lin. "What happens if the policy
       itself is misconfigured at two in the morning, and what happens to the
       service accounts that still use basic authentication against Exchange?"
+    hint: >
+      Wei Lin's two questions are the design: the way back in when the policy
+      itself fails, and the way forward for what cannot comply yet. A sound
+      baseline answers both without leaving either open forever.
+    post_mortem:
+      question: >
+        Wei Lin reads the review questions out a second time, verbatim. "They
+        were not rhetorical. What must be true of an enforcement policy before
+        it is safe to turn on?"
+      options:
+        - id: a
+          label: It cannot lock out its own recovery, and its exceptions are known, watched and temporary
+          correct: true
+          explain: >
+            Emergency accounts outside every policy, alerted on use, keep the
+            way back in. Report-only mode and the sign-in logs reveal what
+            still depends on legacy authentication before the block turns it
+            into an outage.
+        - id: b
+          label: It should start with the riskiest accounts and expand outward
+          correct: false
+          explain: >
+            Scoping to administrators feels prudent and leaves the four hundred
+            ordinary accounts, where compromise usually begins, unprotected the
+            longest. Report-only mode widens confidence without narrowing
+            coverage.
+        - id: c
+          label: It should carry as few moving parts as the platform allows
+          correct: false
+          explain: >
+            Simplicity is why security defaults exist, and this design has
+            requirements they cannot express. The answer to complexity is a
+            staged rollout, not a baseline that cannot state the policy.
     prompt: What do you add to the design?
     options:
       - id: a
@@ -93,6 +126,38 @@ encounters:
 
       "Somebody will ask you in the review whether Privileged Identity Management
       covers both, and what the difference is in practice."
+    hint: >
+      Two privilege systems share one governance product. The review question
+      is really about configuration surfaces: whether each kind of role brings
+      its own, and what that means somebody has to go and set.
+    post_mortem:
+      question: >
+        Grace gives you the review-board version. "An architect who says one
+        word too many or too few here ships the wrong design. What is the
+        precise scope of the tool, in one sentence?"
+      options:
+        - id: a
+          label: Both role systems and groups, each governed under its own settings
+          correct: true
+          explain: >
+            Privileged Identity Management covers Microsoft Entra roles, Azure
+            resource roles and privileged access groups, and each assignment
+            carries its own activation, approval and expiry configuration.
+            Coverage is broad; uniformity is a choice made per scope.
+        - id: b
+          label: One directory product, so directory roles are its natural limit
+          correct: false
+          explain: >
+            The name suggests it and the limit is imaginary. Azure resource
+            roles carry their own eligibility and activation settings per
+            scope, and a parallel workflow duplicates the platform.
+        - id: c
+          label: One governance model, so one configuration protects everything
+          correct: false
+          explain: >
+            The model is shared; the settings are not. Treating them as one is
+            how production Owner inherits an activation window sized for a
+            read-only role.
     prompt: What do you tell them?
     options:
       - id: a
@@ -136,6 +201,10 @@ encounters:
       "Last one," says Grace. "Access reviews can be assigned to the users
       themselves, to a manager, or to a named reviewer. For thirty-one guests from
       a company we do not manage, who reviews?"
+    hint: >
+      Ask who actually holds the context to say whether the access is still
+      needed, and what the review should do when that person says nothing. A
+      review that defaults to keeping everything reviews nothing.
     question: Who should review guest access here?
     options:
       - id: a

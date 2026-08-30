@@ -28,6 +28,38 @@ encounters:
 
 
       "Describe the mechanism, not the wish."
+    hint: >
+      Grace asked for a mechanism, so test each answer for moving parts made
+      of people. Then ask what happens in March when somebody turns a setting
+      off: does your mechanism notice, or has it already finished?
+    post_mortem:
+      question: >
+        Grace underlines the word mechanism twice. "The wish was fourteen
+        governed subscriptions. Say what separates a mechanism from a wish, in
+        terms this platform can execute."
+      options:
+        - id: a
+          label: A mechanism runs without a person and keeps evaluating after the first day
+          correct: true
+          explain: >
+            Inheritance assigns the rules to any subscription placed in the
+            group, and deploy-if-not-exists notices what is missing and
+            deploys it, on day one and again in March. Anything executed by
+            people or run once is a wish with a checklist attached.
+        - id: b
+          label: A mechanism is a documented process with an owner
+          correct: false
+          explain: >
+            Ownership and documentation make a process auditable, not
+            self-executing. Subscription nine still arrives during somebody's
+            busy week.
+        - id: c
+          label: A mechanism is automation triggered at creation time
+          correct: false
+          explain: >
+            Creation-time automation covers the first day and then goes silent.
+            Governance is a state to maintain, so the mechanism has to keep
+            evaluating, which is what policy does and scripts do not.
     prompt: How does a new subscription arrive already governed?
     options:
       - id: a
@@ -81,6 +113,38 @@ encounters:
       The analytics team need a virtual machine size that the allowed-sizes policy
       forbids, for a nine-week proof of concept with a named business sponsor and
       a budget.
+    hint: >
+      Hold the blast radius still and look at it: one team, one resource
+      group, nine weeks. The right control changes exactly that much and no
+      more, ends by itself, and stays visible while it lasts.
+    post_mortem:
+      question: >
+        Wei Lin quotes your proposal back with the dates added, which is her
+        way of disagreeing. "The need is one resource group for nine weeks.
+        What is the governing rule for granting an exception?"
+      options:
+        - id: a
+          label: Change nothing for anyone except the scope that asked, and give it an end date
+          correct: true
+          explain: >
+            An exemption is the only control here that is scoped, expiring and
+            still visible in compliance reporting. Editing the policy,
+            weakening the effect or relocating the workload each changes the
+            rule for far more than the nine weeks asked for.
+        - id: b
+          label: Approved business need outranks the technical policy
+          correct: false
+          explain: >
+            The need justifies an exception; it does not choose the mechanism.
+            A sponsor and a budget do not make an estate-wide change
+            proportionate to a nine-week test.
+        - id: c
+          label: Exceptions should be kept out of the compliance numbers
+          correct: false
+          explain: >
+            The opposite: a waiver that shows as an exemption is evidence of
+            governance working. An exception hidden by editing the rule is
+            invisible precisely where the auditor looks.
     prompt: How do you handle it?
     options:
       - id: a
@@ -130,6 +194,11 @@ encounters:
     intro: >
       "Somebody in the review will ask why we are assigning an initiative rather
       than thirty policies," says Grace. "Answer in one sentence, then in three."
+    hint: >
+      Think about what changes at assignment time and reporting time when
+      thirty rules travel together: how many assignments, how many parameter
+      sets, how many compliance answers. The grouping is administrative, not
+      magical.
     question: What does grouping policies into an initiative give you?
     options:
       - id: a

@@ -28,6 +28,38 @@ encounters:
       They only read. Writes all happen at the depots in the south. The account is
       geo-redundant already, but the secondary is not readable and the team needs
       the last two years, not everything.
+    hint: >
+      Write down what Hong Kong actually needs: reads that are local, a chosen
+      slice of the data, and freshness measured in minutes. Then ask which
+      option delivers all three at once.
+    post_mortem:
+      question: >
+        Dana forwards the complaint thread without comment, which is a comment.
+        "They are still waiting. What did the right answer have to give Hong
+        Kong?"
+      options:
+        - id: a
+          label: A current, local, readable copy of exactly the data the team uses
+          correct: true
+          explain: >
+            Object replication continuously copies the chosen subset into an ordinary
+            East Asia account the claims team reads directly. Each alternative drops a
+            requirement: the secondary endpoint is stale and whole-account, a nightly
+            copy is a day behind, and a cache puts contract data at public edges.
+        - id: b
+          label: A faster network path between Hong Kong and Southeast Asia
+          correct: false
+          explain: >
+            The wait is distance, and the region link is not yours to shorten. Moving the
+            data next to its readers is the only version of faster that storage can
+            deliver.
+        - id: c
+          label: Reuse of the secondary copy the account already pays for
+          correct: false
+          explain: >
+            The geo-redundant secondary is real, and it is read-only, eventually
+            consistent, whole-account, and behind a second endpoint name. It exists to
+            answer disaster questions, not to serve a daily reading workload.
     prompt: What do you put in place?
     options:
       - id: a
@@ -93,6 +125,38 @@ encounters:
       Who needs in: the intake service in vnet-app, the depot scanners in
       vnet-depot, the claims team in Jurong over the VPN, and object replication
       to East Asia. Marek also needs to run AzCopy from his laptop occasionally.
+    hint: >
+      Start from the full list of everyone who legitimately needs in, and
+      notice that not all of them arrive from networks you own. The right
+      configuration refuses everyone else.
+    post_mortem:
+      question: >
+        Wei Lin files the contract clause next to the finding. "Saying no to
+        everything is one setting. What is the actual work in closing an
+        account?"
+      options:
+        - id: a
+          label: Enumerating every legitimate caller first, including the ones that are not yours
+          correct: true
+          explain: >
+            A deny-by-default firewall is only as good as its exceptions: the two virtual
+            networks, a known office range, and the trusted services bypass for platform
+            features that arrive from Azure itself. The caller you forget is the outage
+            you schedule.
+        - id: b
+          label: Choosing the strictest rule set the account will accept
+          correct: false
+          explain: >
+            Strictest is one radio button. A configuration that blocks replication or
+            locks out the administrators is not stricter, it is broken, and broken
+            controls get rolled back.
+        - id: c
+          label: Making internal traffic private so the public endpoint stops mattering
+          correct: false
+          explain: >
+            Private connectivity changes how internal clients arrive; it does not close
+            the public door by itself. The firewall's default action is what does the
+            closing, and the contract is about the door.
     prompt: How do you configure the account's networking?
     options:
       - id: a
@@ -157,6 +221,38 @@ encounters:
 
       Everything else is fine: the intake service writes, the depots upload, the
       claims team reads.
+    hint: >
+      One direction broke and the other kept working, so compare the two ends
+      of the same flow. Ask where replication traffic is actually coming from
+      when it knocks.
+    post_mortem:
+      question: >
+        Marek annotates CHG-2280 before it closes. "The change touched both
+        accounts and broke exactly one direction. What is the asymmetry telling
+        you?"
+      options:
+        - id: a
+          label: Replication arrives from the platform, not from any subnet you can allow
+          correct: true
+          explain: >
+            The storage service writes to the destination from Azure's own
+            infrastructure, and only the trusted services bypass admits that. The source
+            carried the bypass and the destination did not, which is exactly why one
+            direction failed the moment the firewall went on.
+        - id: b
+          label: A change that breaks anything should be rolled back on the spot
+          correct: false
+          explain: >
+            Rolling back restores replication by reopening the account, which surrenders
+            the contract requirement the change existed to meet. The change was one
+            exception short, not wrong, and the repair is smaller than the rollback.
+        - id: c
+          label: Paired accounts must always carry identical network rules
+          correct: false
+          explain: >
+            Symmetry here is coincidence, not principle. Each account needs the
+            exceptions its own callers require; the destination failed because its list
+            was missing one, not because the two lists differed.
     ticket:
       ref: INC-4561
       opened: "15:30"
@@ -213,6 +309,17 @@ encounters:
         output: |
           pod-scans
         time_cost: 1
+    post_incident:
+      path: [a, b]
+      text: >
+        Read the two firewalls side by side and the incident is over. The
+        destination shows default Deny with bypass None; the source shows the
+        same Deny with bypass AzureServices; and the only difference between
+        the direction that works and the direction that fails is that bypass.
+        The replication policy listing rules nothing in or out, because
+        CHG-2280 never touched the policy, and confirming that the destination
+        container exists answers a question nobody asked: the source was
+        reporting failures, which is a delivery problem, not a missing target.
     fixes:
       - id: a
         label: >

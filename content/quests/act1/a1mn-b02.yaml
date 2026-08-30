@@ -29,6 +29,42 @@ encounters:
 
       The recovery plan is written and rehearsed. Dana is asking you to make the
       call, and you have four time units before she makes it herself.
+    hint: >
+      Start from what the source region can still do for you, and price each
+      recovery point in shipment records rather than minutes. The plan was
+      rehearsed so this call could be quick.
+    post_mortem:
+      question: >
+        Dana keeps her eyes on the clock. "You still have time to be right. What
+        decides the call when a whole region stops answering?"
+      options:
+        - id: a
+          label: >
+            What the dead region can no longer offer, and what each recovery
+            point costs in records
+          correct: true
+          explain: >
+            A region that cannot be reached cannot be shut down cleanly or waited
+            out on a promise, so the emergency path is the real choice. Between
+            the points, six minutes of re-keyed records against thirty-six is a
+            business trade, and the fresher point wins it.
+        - id: b
+          label: >
+            Data safety first: take the cleanest point however old
+          correct: false
+          explain: >
+            Application consistency matters where in-flight state matters, and
+            the database is replicating separately to within seconds. For these
+            machines the older point just loses thirty more minutes of shipment
+            records.
+        - id: c
+          label: >
+            The objective's deadline: use the time the board allowed
+          correct: false
+          explain: >
+            Four hours is a ceiling, not a budget to spend. With no estimate from
+            the provider, every minute of waiting is hope, and the rehearsed plan
+            exists so the call can be made at seventy minutes.
     ticket:
       ref: INC-4901
       opened: "09:10"
@@ -77,6 +113,18 @@ encounters:
             "lastRun": "2026-08-11T06:40:00Z"
           }
         time_cost: 1
+    post_incident:
+      path: [b, a]
+      text: >
+        Two checks make the call. The instance view proves the source region is
+        really unreachable, which removes every option that needs to touch it:
+        nothing there can be shut down cleanly, so a planned move cannot run. The
+        replication listing then prices the decision: four healthy protected
+        items with recovery points from 09:04, six minutes behind the outage, so
+        acting now costs six minutes of records and waiting buys nothing better.
+        The recovery plan check is prudence rather than diagnosis; three groups
+        and a rehearsal date confirm the plan can run, and change nothing about
+        which failover to run or when.
     fixes:
       - id: a
         label: >
@@ -141,6 +189,38 @@ encounters:
 
       "There is a button called failback," says Marek, "and it does not do what
       people think it does."
+    hint: >
+      Ask where the truth lives now, and in which direction the replication is
+      running. Nothing moves home safely until both answers are the ones you
+      want.
+    post_mortem:
+      question: >
+        "The button is still there," says Marek. "Before you press anything:
+        after a committed failover, where is the truth, and what is
+        replicating?"
+      options:
+        - id: a
+          label: Truth is in East Asia, and nothing replicates until reprotect builds the reverse path
+          correct: true
+          explain: >
+            The failed-over machines are the source of truth, and the original
+            replication relationship ended at commit. Reprotect establishes
+            replication back toward Southeast Asia, and only a healthy reverse
+            copy makes a planned failover home safe.
+        - id: b
+          label: Truth is still in Southeast Asia, where the original machines wait
+          correct: false
+          explain: >
+            The originals froze at the moment of failover on Friday morning.
+            Three days of shipment records exist only in East Asia, and treating
+            the originals as current discards all of them.
+        - id: c
+          label: Truth is in both regions, so either direction works
+          correct: false
+          explain: >
+            Nothing has synchronized the two regions since Friday; they agree on
+            nothing after that moment. Symmetry is exactly the assumption the
+            button's name invites, and it is wrong.
     prompt: How do you get back to Southeast Asia?
     options:
       - id: a
@@ -194,6 +274,9 @@ encounters:
     intro: >
       "One more," says Marek. "After an unplanned failover, the portal offers
       commit, and it is not obvious what it means. What are you agreeing to?"
+    hint: >
+      Commit closes a choice you already made. Ask which choice, and be careful
+      not to credit it with anything that happens before or after.
     question: What does committing a failover do?
     options:
       - id: a

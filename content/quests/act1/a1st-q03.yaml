@@ -29,6 +29,38 @@ encounters:
 
       The depots are on Windows machines that mount the current share over SMB.
       Two of them are on a satellite link and complain about latency already.
+    hint: >
+      Twenty-two print servers mount a drive letter at boot, and that habit is
+      the requirement. Weigh what each option asks the depots to change, and
+      what it charges for changing nothing.
+    post_mortem:
+      question: >
+        Hendrik calls back from the depot floor, half forklift as usual. "All I
+        asked was that nobody out here notices. What was the right way to give
+        me that?"
+      options:
+        - id: a
+          label: A managed share speaking the same protocol the depots already mount
+          correct: true
+          explain: >
+            Azure Files serves SMB natively at a standard tier priced for forty gigabytes
+            of templates, so the mount pattern survives and the Jurong server still
+            retires. The options that fail either change the protocol, buy speed the link
+            eats, or keep a server.
+        - id: b
+          label: The fastest storage available, for the depots that already complain
+          correct: false
+          explain: >
+            The satellite depots' latency lives on the link, and no storage tier reaches
+            it. Paying premium prices for the wrong bottleneck triples the bill without
+            ending a single complaint.
+        - id: c
+          label: Anything that avoids revisiting how the share is accessed
+          correct: false
+          explain: >
+            Continuity of the mount matters; continuity of every decision from 2019 does
+            not. Azure Files carries the identity model forward anyway, so keeping a
+            server just to avoid change buys nothing.
     prompt: What do you provision?
     options:
       - id: a
@@ -94,6 +126,36 @@ encounters:
       Depot staff sign in with accounts from the Jurong Active Directory, which
       syncs to Microsoft Entra ID. The template authors are a small group in head
       office; everyone else reads.
+    hint: >
+      Wei Lin's complaint has two halves: what the credential can reach, and
+      who the audit trail names when something changes. A fix that answers one
+      half is half a fix.
+    post_mortem:
+      question: >
+        Wei Lin appends a line to the finding before closing it. "Read my
+        complaint once more. What did it actually ask you to change?"
+      options:
+        - id: a
+          label: Who the access belongs to, so grants narrow and actions have names
+          correct: true
+          explain: >
+            Identity-based access puts a user or computer behind every mount, share-level
+            roles set the ceiling, and the permissions inside do the rest. Anything still
+            built on a shared secret leaves the audit trail saying the storage account
+            did it.
+        - id: b
+          label: Where the credential is kept, so scripts cannot expose it
+          correct: false
+          explain: >
+            A vaulted account key is a better-hidden master key. Protecting it changes
+            who can steal it, not what it grants or who the logs blame afterwards.
+        - id: c
+          label: How long each credential lives before someone renews it
+          correct: false
+          explain: >
+            Expiry limits exposure while multiplying renewals across twenty-two sites,
+            and an in-date signature still attributes nothing to a person. Lifetime was
+            never the half of the finding that mattered.
     prompt: How do you authenticate the mounts?
     options:
       - id: a
@@ -157,6 +219,37 @@ encounters:
 
       The share was migrated three weeks ago. Nobody has configured backup for it
       yet.
+    hint: >
+      The file was overwritten inside a share that is otherwise fine. Ask which
+      file service features can return yesterday's contents, and which only
+      ever guard against deletion.
+    post_mortem:
+      question: >
+        Hendrik is still on the line. "You said I could do this myself next
+        time. What does next time actually need to exist?"
+      options:
+        - id: a
+          label: A snapshot schedule, because nothing else recovers an overwrite on a share
+          correct: true
+          explain: >
+            Share soft delete guards the deleted share object and versioning belongs to
+            the blob service, so a share without snapshots has no recovery point for a
+            changed file. The print server cache was luck; the schedule is what replaces
+            luck.
+        - id: b
+          label: More of the account's protection features switched on, to be safe
+          correct: false
+          explain: >
+            The account already had protections on, and they were the wrong shape for
+            this event. Recovery is designed against the specific loss you fear, not by
+            enabling everything with delete in its name.
+        - id: c
+          label: Tighter write permissions, so fewer people can overwrite a template
+          correct: false
+          explain: >
+            The template authors legitimately overwrite files all day, and access control
+            cannot tell a wanted overwrite from a mistake. A recovery point can undo
+            either, which is why it comes first.
     ticket:
       ref: INC-4510
       opened: "09:45"
@@ -203,6 +296,17 @@ encounters:
         output: |
           (no results)
         time_cost: 1
+    post_incident:
+      path: [a, c]
+      text: >
+        Two listings close every door inside the platform. The share has no
+        snapshots, so there is no point-in-time copy of the file, and the vault
+        holds no backup item for it, so nothing else has been quietly taking
+        copies. That is the diagnosis: no recovery point exists in Azure, and
+        the file has to come from a client that still holds one. Reading the
+        soft delete policy would not have changed anything, because share soft
+        delete applies to a deleted share, and this share is alive with the
+        wrong bytes in it.
     fixes:
       - id: a
         label: >

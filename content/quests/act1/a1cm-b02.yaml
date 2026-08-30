@@ -28,6 +28,37 @@ encounters:
 
       The plan is Standard. Meridian's own certificate is a managed certificate on
       track.meridianlogistics.com.
+    hint: >
+      Two constraints do the work: the certificate a browser sees must match
+      the name it typed, and one application should stay one application.
+      Ask how a single address can present several certificates correctly.
+    post_mortem:
+      question: >
+        Wei Lin wants the partner note to be precise. "What is the rule that
+        any arrangement for a second name has to satisfy?"
+      options:
+        - id: a
+          label: The certificate presented must match the requested name, without splitting the app
+          correct: true
+          explain: >
+            One app carries many domains, each with its own name-based
+            binding, and server name indication picks the right certificate
+            per request. Ownership is still proved through a record in their
+            zone.
+        - id: b
+          label: Each certificate needs its own inbound address to be served
+          correct: false
+          explain: >
+            Address-based bindings exist for clients too old for server name
+            indication, and they cost a dedicated, billed address. Name-based
+            bindings are how one address serves several certificates now.
+        - id: c
+          label: One certificate should cover everything, however customers arrive
+          correct: false
+          explain: >
+            A browser that typed northgate.example warns on a certificate for
+            meridianlogistics.com, whatever the DNS did on the way. Matching
+            the typed name is the requirement, not minimizing certificates.
     prompt: How do you add the second name?
     options:
       - id: a
@@ -91,6 +122,39 @@ encounters:
 
 
       "People mix these two up constantly," says Marek. "Say which is which."
+    hint: >
+      Sort every feature by the direction it governs: how the app reaches
+      out, or how traffic reaches the app. Then check whether the
+      requirement asks for the public path to be filtered or to be gone.
+    post_mortem:
+      question: >
+        Marek draws two arrows through the app, one in, one out. "Which
+        direction does each feature govern, and which one was the
+        requirement?"
+      options:
+        - id: a
+          label: Integration is outbound; a private endpoint is the inbound answer
+          correct: true
+          explain: >
+            Integration lets the app reach into the network, which the
+            database path already uses. A private endpoint gives the app a
+            private address, and with public access disabled it is the only
+            way in.
+        - id: b
+          label: Filtering the public front end is the same as removing it
+          correct: false
+          explain: >
+            Access restrictions are a reasonable filter, and the app stays
+            resolvable and reachable on its public name for anything the
+            list allows. Unreachable from the internet is a different state.
+        - id: c
+          label: Stronger authentication makes network exposure irrelevant
+          correct: false
+          explain: >
+            Client certificates are a strong machine-to-machine control and
+            no kind of network isolation, and they break a browser-facing
+            portal. The review asked where traffic can go, not who can log
+            in.
     prompt: What do you configure for the inbound requirement?
     options:
       - id: a
@@ -141,6 +205,10 @@ encounters:
       "Last one," says Marek. "You swap staging into production. Which of these
       follows the code across: an app setting marked as a slot setting, an app
       setting not marked, and the virtual network integration?"
+    hint: >
+      Split the inventory into three piles: what swaps by default, what a
+      mark keeps in place, and what the platform never swaps. The launch-day
+      incident already told you something belongs in the third pile.
     question: What moves during a slot swap?
     options:
       - id: a

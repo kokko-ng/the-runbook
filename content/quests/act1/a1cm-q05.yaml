@@ -27,6 +27,38 @@ encounters:
 
       The reporting machines write large intermediate files to the temporary disk
       because it is fast and free.
+    hint: >
+      The auditor named a location, not a technology: data that leaves the
+      managed disk and sits on the physical host. Ask which control encrypts
+      exactly that location, rather than answering a different question about
+      keys or the guest.
+    post_mortem:
+      question: >
+        Wei Lin files the auditor's wording under the finding. "The
+        requirement names a location. What is the test any proposed control
+        has to pass?"
+      options:
+        - id: a
+          label: It has to encrypt the place the requirement names
+          correct: true
+          explain: >
+            The temporary disk and the caches live on the physical host, and
+            encryption at host is the setting that covers exactly them, end
+            to end. Every other proposal answered a different question.
+        - id: b
+          label: It has to strengthen key custody, which is what encryption findings mean
+          correct: false
+          explain: >
+            Customer-managed keys change who holds the key for data already
+            encrypted at rest on the disk. The auditor accepted that layer;
+            her question was about data that leaves it.
+        - id: c
+          label: It has to remove the data from the location in question
+          correct: false
+          explain: >
+            Moving the workload off the temporary disk trades a platform
+            setting for a job that takes four times as long, and the host
+            cache stays in scope regardless.
     prompt: What do you enable?
     options:
       - id: a
@@ -86,6 +118,37 @@ encounters:
       The machines are in rg-app with the transport application, use disks in the
       same resource group, sit on a subnet in vnet-app, and one of them has a
       public IP address for a partner feed.
+    hint: >
+      The phrase right-click operation hides a dependency set. Ask what a
+      machine cannot leave behind when it changes subscription, and which of
+      its dependencies cannot follow it at all.
+    post_mortem:
+      question: >
+        Dana crosses out the words right-click on her note. "Give me the
+        sentence I take back to finance about what a move really is."
+      options:
+        - id: a
+          label: A validated move of the whole dependency set, with the network as the boundary
+          correct: true
+          explain: >
+            Disks, interfaces and public addresses travel with the machine in
+            one operation, and Resource Manager validates the set before
+            touching anything. A virtual network stays put while other groups
+            use its subnets, which is why the network side needs the planning.
+        - id: b
+          label: A property change the portal exposes somewhere less obvious
+          correct: false
+          explain: >
+            Subscription is not a property to edit; it is where the resource
+            lives. The operation is a resource move with its own validation,
+            window and rollback plan.
+        - id: c
+          label: A rebuild in disguise, so the originals should simply be deleted
+          correct: false
+          explain: >
+            Rebuilding is sometimes the pragmatic route, but identities and
+            addresses change with it, and a partner allow-lists one of those.
+            That cost has to be planned, not stumbled into.
     prompt: What do you tell her about the move?
     options:
       - id: a
@@ -144,6 +207,39 @@ encounters:
 
 
       The change window closes at midnight and Dana is still awake.
+    hint: >
+      Move validation fails before anything moves, and the message names what
+      is holding on. Ask how to release that hold without destroying its
+      history, and whether the destination is ready to receive everything
+      that follows.
+    post_mortem:
+      question: >
+        Marek reads the validation message aloud, slowly. "The platform told
+        you what was holding the machines. What was the way to let go of
+        them without losing anything?"
+      options:
+        - id: a
+          label: Stop protection keeping the recovery points, and satisfy the destination too
+          correct: true
+          explain: >
+            Stopping protection with retained data releases the vault's
+            reference and keeps the history. The move also needs the
+            destination's providers registered; the fix is complete only when
+            both are true.
+        - id: b
+          label: Take the vault along, since machines and their backups belong together
+          correct: false
+          explain: >
+            Vault moves carry their own restrictions while protected items
+            exist, and nothing required the vault to travel. The machines
+            needed releasing, not the vault relocating.
+        - id: c
+          label: Clear the protection data outright, since backups can be recreated
+          correct: false
+          explain: >
+            Future backups can be recreated; the seven days of recovery
+            points cannot, and it is the night before month end. Retention
+            was available without deletion.
     ticket:
       ref: INC-4688
       opened: "22:06"
@@ -202,6 +298,17 @@ encounters:
         output: |
           (no results)
         time_cost: 1
+    post_incident:
+      path: [a, c]
+      text: >
+        The validation result is the diagnosis: vm-report01 is held by Azure
+        Backup, and nothing moves while a vault holds a reference to it. The
+        provider listing earns its place because it catches the second
+        failure before you meet it: the destination cannot receive recovery
+        services objects with the provider unregistered. One command for the
+        hold, one for where the machines are going. Listing the backup items
+        only restates what the validation message already named, and the
+        empty lock listing rules out a cause the error never pointed at.
     fixes:
       - id: a
         label: >

@@ -32,6 +32,38 @@ encounters:
       There are forty-one scanner virtual machines today and there will be more.
       They already carry a common tag, and they all live in snet-depot alongside a
       print relay that must not be allowed to talk to the hub at all.
+    hint: >
+      Wei Lin's finding has two halves: only the scanner fleet, and no
+      revisiting when the fleet grows. Write the rule against something
+      scanners join and the relay does not, rather than against numbers
+      somebody has to maintain.
+    post_mortem:
+      question: >
+        Wei Lin returns the change request annotated in red. "Before the second
+        draft: state the property the first one lacked."
+      options:
+        - id: a
+          label: The rule should name a membership, not addresses or copies of itself
+          correct: true
+          explain: >
+            An application security group makes the fleet a first-class thing.
+            One rule, scanners join at deployment, and the relay stays out by
+            never joining. Address lists drift, subnet prefixes overreach, and
+            forty-one copies of anything eventually disagree.
+        - id: b
+          label: The subnet should have been split so scanners live alone
+          correct: false
+          explain: >
+            Moving forty-one virtual machines to segregate one relay is a heavy
+            answer to a rule-writing problem. Grouping by membership gets the
+            same precision without a migration.
+        - id: c
+          label: The rule needed a stricter port list, not a stricter source
+          correct: false
+          explain: >
+            The ports were never the finding. NET-14 is about who may reach
+            them, and each failed draft got the who wrong: too many hosts, or
+            the right hosts maintained by hand.
     prompt: How do you write the rule?
     options:
       - id: a
@@ -99,6 +131,37 @@ encounters:
 
       Your change touched two things: a new subnet security group on snet-depot,
       and the existing NIC-level group on the relay that predates you.
+    hint: >
+      Two rule sets stand between the laptop and the console, and traffic has
+      to satisfy every set, in the order the platform applies them. Find which
+      set, and which line, says no before changing anything.
+    post_mortem:
+      question: >
+        Joana appends the failed attempt to the timeline. "The supervisor is
+        still locked out. What decides whether her traffic gets through?"
+      options:
+        - id: a
+          label: Both groups must allow it, and the subnet group is read first
+          correct: true
+          explain: >
+            For inbound traffic Azure evaluates the subnet security group
+            before the interface one, by priority, lowest number first, first
+            match wins. The flow test named the denying rule; the fix is a
+            scoped allow that outranks it in that group.
+        - id: b
+          label: Two security groups on one path is itself the defect
+          correct: false
+          explain: >
+            Layering a subnet group over an interface group is supported and
+            common. The defect was one missing allow in the new layer, not the
+            existence of two layers.
+        - id: c
+          label: The deny rule was too broad and should be removed
+          correct: false
+          explain: >
+            The custom deny is the control the finding asked for, and the audit
+            position depends on it. A scoped allow above it lets the console
+            through without reopening NET-14.
     ticket:
       ref: INC-4502
       opened: "18:20"
@@ -177,6 +240,16 @@ encounters:
         output: |
           (no results)
         time_cost: 2
+    post_incident:
+      path: [a, b]
+      text: >
+        The effective view puts both groups on the table, and the flow test
+        then names the culprit outright: the custom deny in nsg-depot, at the
+        subnet layer, matched before the legacy allow was ever consulted. That
+        is the whole diagnosis in two reads. Probing the port from the laptop
+        only restates the symptom, listing the subnet group's rules repeats
+        what the effective view already showed, and the activity log was never
+        going to explain a deny your own change introduced on purpose.
     fixes:
       - id: a
         label: >
@@ -237,6 +310,10 @@ encounters:
       "You said the deny at 4000 stopped it. Fine. Suppose you had never added a
       deny at all. Two virtual machines in the same subnet, no custom rules
       anywhere. Does the supervisor reach the console?"
+    hint: >
+      Every security group ships with rules nobody wrote, and they have an
+      order. Walk the defaults from the lowest number upward and stop at the
+      first one this traffic matches.
     question: With no custom rules at all, what happens to traffic between two VMs in the same virtual network?
     options:
       - id: a

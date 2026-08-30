@@ -24,6 +24,37 @@ encounters:
       Kubernetes and the label generator is a container instance and the ERP is on
       virtual machines. I want the reasoning written down once, so the twelfth
       workload places itself."
+    hint: >
+      Grace asked for reasoning that places the twelfth workload by itself.
+      Ask which question must be answered before any comparison of platforms
+      means anything at all, and what order the remaining questions come in.
+    post_mortem:
+      question: >
+        Grace turns to the whiteboard. "The twelfth workload still cannot
+        place itself with that. What does a decision framework have to do
+        that a preference does not?"
+      options:
+        - id: a
+          label: It offered a single preference where an ordering of questions was needed
+          correct: true
+          explain: >
+            Cost, managed-service defaults and team familiarity are all real
+            inputs. A framework orders them: hard constraints on the host
+            first, then the operational model and scale shape, with the rest
+            discriminating only between options that survive.
+        - id: b
+          label: It should have standardized on one compute platform for everything
+          correct: false
+          explain: >
+            Fewer platforms is worth something, and a single one is not the
+            goal. The framework exists because the workloads differ; it
+            orders the questions rather than forcing one answer.
+        - id: c
+          label: It needed more precise cost figures before deciding
+          correct: false
+          explain: >
+            Better numbers do not fix the ordering. A precise price for an
+            option the application cannot run on is precise and useless.
     prompt: What drives the compute choice?
     options:
       - id: a
@@ -82,6 +113,37 @@ encounters:
       version, an installer that writes to the registry and a license dongle
       emulator," says Marek. "The vendor is gone. It is four servers today and the
       load is flat."
+    hint: >
+      Two questions hide in here: what the application demands of its host,
+      and how the hosts themselves should be run. Answer both; neither one
+      alone settles it.
+    post_mortem:
+      question: >
+        Marek waits, marker still capped. "What did that get wrong about an
+        application nobody can change?"
+      options:
+        - id: a
+          label: An application that cannot change still deserves infrastructure that can
+          correct: true
+          explain: >
+            The registry writes and the dongle emulator fix the service
+            choice; they do not fix the operating model. Machines built from
+            an image and replaced rather than patched modernize everything
+            around an application nobody can touch.
+        - id: b
+          label: The application should have been rewritten before migrating
+          correct: false
+          explain: >
+            There is no vendor and no source of change; a rewrite is a
+            project the migration cannot wait for. The framework sends
+            unchangeable applications to infrastructure on purpose.
+        - id: c
+          label: Any Windows workload belongs on a platform service
+          correct: false
+          explain: >
+            App Service and containers both require the application to meet
+            the platform partway. Installers, machine state and device
+            emulation are exactly the requirements they do not meet.
     prompt: How do you run it in Azure?
     options:
       - id: a
@@ -137,6 +199,38 @@ encounters:
       "You have asked for four instances of a size I have not seen before," says
       Priya. "The last time somebody sized a migration here, they doubled
       everything on-premises and we paid for it for two years."
+    hint: >
+      Priya's complaint is about paying for a guess. Ask what evidence
+      exists about what these servers actually use, and when a long
+      commitment stops being a guess.
+    post_mortem:
+      question: >
+        Priya taps the assessment printout. "Before you quote me another
+        number: what decides a size here, and what earns a three-year
+        commitment?"
+      options:
+        - id: a
+          label: Measured utilization sets the size; a settled workload earns the commitment
+          correct: true
+          explain: >
+            The assessment already holds the real processor, memory and disk
+            numbers, which beat any specification or instinct. Committing
+            money for years is only safe once the workload has run and the
+            review has confirmed the shape.
+        - id: b
+          label: Cloud sizing should always start below the estimate to save money
+          correct: false
+          explain: >
+            Starting under the measured peak schedules the first incident
+            for the first busy day. Headroom above the measurement is not
+            waste; it is the difference between a review and an outage.
+        - id: c
+          label: Reservations are too risky to use at all
+          correct: false
+          explain: >
+            Reservations are how a steady workload gets cheaper, and Priya
+            wants them. The risk is only in buying them before the
+            ninety-day review has shown what steady looks like.
     prompt: How do you justify the size?
     options:
       - id: a

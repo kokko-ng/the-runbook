@@ -23,6 +23,37 @@ encounters:
       integrations, and the Kubernetes cluster," says Grace. "The cluster is
       rebuilt from the pipeline, so leave it out. The other two need an answer that
       is not a screenshot of the portal."
+    hint: >
+      Two different failures are on the table: losing data and losing the
+      region. One tool answers each, and only workloads with a tight recovery
+      time justify paying for the second. Sort the machines by their numbers.
+    post_mortem:
+      question: >
+        Grace turns the portal screenshot face down. "Before the redraft: which
+        principle was the proposal missing?"
+      options:
+        - id: a
+          label: Data loss and region loss are separate questions, each priced by the workload's objective
+          correct: true
+          explain: >
+            Backup gives every machine a catalog of points to go back to;
+            replication gives the one workload with a tight recovery time
+            somewhere to run. Neither substitutes for the other, and
+            availability features substitute for neither.
+        - id: b
+          label: The stronger mechanism should cover everything, so nothing is left behind
+          correct: false
+          explain: >
+            Replication is not a stronger backup; it is a different tool.
+            Eleven replicas cannot restore last Tuesday, and the cost lands on
+            machines whose objectives never asked for it.
+        - id: c
+          label: Platform resilience already covers most of this, so protection can be minimal
+          correct: false
+          explain: >
+            Zone spread and managed platforms keep instances running through
+            infrastructure failure. They propagate corruption just as reliably,
+            and nothing about them can restore a machine to before a bad patch.
     prompt: What do you recommend for the virtual machines and the scale set?
     options:
       - id: a
@@ -82,6 +113,37 @@ encounters:
       controller and the print server until the depots finish moving," says Marek.
       "Both sites are being decommissioned within eighteen months, so I do not want
       to build anything permanent."
+    hint: >
+      Two constraints have to hold at once: the servers need genuine backup for
+      as long as they exist, and nothing bought for them should outlive the
+      sites. Check every answer against both.
+    post_mortem:
+      question: >
+        Marek pulls the decommission dates up next to the proposal. "What is
+        the rule for protecting an estate that is already leaving?"
+      options:
+        - id: a
+          label: Real backup for as long as the servers live, with nothing that outlives the sites
+          correct: true
+          explain: >
+            The workloads still need consistency, system state, retention and a
+            tested restore for every month they exist. The vault delivers that
+            with no hardware and no contract, and it stops costing anything
+            when the last server goes.
+        - id: b
+          label: Spending on a closing site is waste, so protection should be minimal
+          correct: false
+          explain: >
+            The servers carry the warehouse and the depots until the day they
+            stop. The end date changes the shape of the spend, not the need for
+            protection.
+        - id: c
+          label: A leaving estate should be replicated rather than backed up
+          correct: false
+          explain: >
+            Replication answers the site being lost, and it is worth having
+            here. It cannot bring back the file deleted three weeks ago, so it
+            does not remove the backup requirement.
     prompt: What do you recommend for the remaining on-premises compute?
     options:
       - id: a
@@ -139,6 +201,10 @@ encounters:
       "You will be asked this in every design review for the rest of your career,"
       says Grace. "Backup and disaster recovery. Both protect things. What is the
       distinction that actually matters?"
+    hint: >
+      Grace is asking for the question each one answers, not a comparison of
+      features. Imagine the two phone calls: something is gone, and somewhere
+      is gone. Which tool picks up which call?
     question: What separates backup from disaster recovery?
     options:
       - id: a

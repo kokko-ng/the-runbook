@@ -25,6 +25,37 @@ encounters:
 
       "One hour recovery time," says Grace. "Start with the cheapest failure to
       survive and work outwards."
+    hint: >
+      Work out which failure domain each change protects against, and buy the
+      cheapest one first. Inside a region, surviving a failure is a placement
+      property: where the nodes sit matters before how many there are.
+    post_mortem:
+      question: >
+        Grace waits for the whiteboard to be wiped. "From the failure outwards
+        this time: what decides whether a workload survives losing a zone?"
+      options:
+        - id: a
+          label: Placement across failure domains, addressed in order from cheapest to most expensive
+          correct: true
+          explain: >
+            A workload survives a domain by having capacity outside it. Spreading
+            nodes and pods across zones buys that survival almost for free, which
+            is why it comes before any answer that adds count, automation, or a
+            second region.
+        - id: b
+          label: The cluster needed more headroom to absorb a failure
+          correct: false
+          explain: >
+            Headroom absorbs load, not domain loss. Six nodes in one zone go
+            down together exactly as three do; what matters is where the nodes
+            sit, not how many there are.
+        - id: c
+          label: Continuity work should start from the worst failure and work down
+          correct: false
+          explain: >
+            Grace's instruction ran the other way for a reason. The zone event
+            is the common case and nearly free to survive; buying the regional
+            answer first spends the budget before the likely failure is covered.
     prompt: What do you change first?
     options:
       - id: a
@@ -82,6 +113,38 @@ encounters:
       "The board's question is what happens if Southeast Asia is unavailable for a
       day," says Dana. "Dispatch has an hour. I need to know what we are proposing
       and what it costs, not a diagram with two clouds on it."
+    hint: >
+      Weigh two clocks: the hour after the region fails, and every month the
+      bill arrives before it does. The mechanism has to satisfy the first
+      without ignoring the second, and a cluster is recovered by deploying it,
+      not by copying machines.
+    post_mortem:
+      question: >
+        Dana pulls the cost line back up. "Try it again as a rule I can repeat
+        upstairs: what decides how much of a second region we keep running?"
+      options:
+        - id: a
+          label: The recovery time objective sets it, warm enough to make the hour and no warmer
+          correct: true
+          explain: >
+            An hour rules out anything rebuilt or copied into existence after
+            the failure, and it does not require a full duplicate. A
+            pipeline-current cluster at minimal capacity, scaled on activation,
+            is exactly the amount of second region the number buys.
+        - id: b
+          label: The primary sets it, so the standby should mirror the primary exactly
+          correct: false
+          explain: >
+            A mirror doubles the bill and drags the data tier into a
+            multi-region design the objective never asked for. The standby
+            exists to meet the number, not to flatter the primary.
+        - id: c
+          label: The platform sets it, since managed services keep their own spare region
+          correct: false
+          explain: >
+            Managed services are regional unless the design makes them
+            otherwise. Any capacity in East Asia exists because Meridian built
+            it, deploys to it, and pays for it.
     prompt: What do you propose for regional failure?
     options:
       - id: a
@@ -143,6 +206,10 @@ encounters:
       "You have proposed a global load balancer in front of two regions," says
       Grace. "Somebody will ask why not Traffic Manager, or why not a regional load
       balancer. Be precise."
+    hint: >
+      Sort them on two axes: where the routing decision is made, in DNS or at
+      the edge, and what the service can see, packets or requests. Each product
+      sits at one place on each axis.
     question: What distinguishes these load balancing choices?
     options:
       - id: a

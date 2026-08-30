@@ -32,6 +32,44 @@ encounters:
 
 
       "Two of those are one kind of alert and one is another," says Marek.
+    hint: >
+      Ask where each condition's data lives before asking anything else. A number
+      the platform already emits and a pattern that must be computed from records
+      are different problems.
+    post_mortem:
+      question: >
+        "Wrong layer," says Marek. "Before you pick again: what property of a
+        condition tells you which alert type it wants?"
+      options:
+        - id: a
+          label: >
+            Where its data lives: existing metrics take metric alerts, computed
+            conditions take log queries
+          correct: true
+          explain: >
+            The processor and the queue length are metrics the platform already
+            emits, so the near-real-time metric pipeline evaluates them cheaply.
+            Counting failed sign-ins by address is an aggregation over log
+            records, which is a scheduled query's job.
+        - id: b
+          label: >
+            How the team prefers to manage rules: one type keeps configuration
+            consistent
+          correct: false
+          explain: >
+            Consistency buys ingestion delay and query cost on conditions the
+            metric pipeline answers immediately. The alert types are not
+            interchangeable styles; they are different pipelines with different
+            latencies.
+        - id: c
+          label: >
+            How security-flavored the signal is: sign-ins belong to the activity
+            log
+          correct: false
+          explain: >
+            The activity log records control-plane operations on resources: who
+            created, changed or deleted what. Sign-ins live in their own logs,
+            and no amount of flavor moves them into a source they are not in.
     prompt: Which alert types do you use?
     options:
       - id: a
@@ -87,6 +125,39 @@ encounters:
       "Eleven machines need the processor rule," says Dana. "I do not want eleven
       rules, I want to know which machine fired, and next month there will be
       twelve machines."
+    hint: >
+      Count what Dana actually asked for: one thing to maintain, a machine's name
+      in every page, and no work when the fleet grows. Ask what kind of rule can
+      promise all three.
+    post_mortem:
+      question: >
+        "Closer," says Dana, "but hold my three requirements up against it first:
+        one rule, a name on the page, twelve machines next month. What delivers
+        all three?"
+      options:
+        - id: a
+          label: >
+            A wider scope with a dimension split: one rule, per-machine alerts,
+            automatic coverage
+          correct: true
+          explain: >
+            Scoping the rule to the resource group covers the twelfth machine the
+            day it deploys, and splitting by the resource dimension raises a
+            separate, named alert per machine while staying one rule to maintain.
+        - id: b
+          label: Automation that stamps out a rule per machine
+          correct: false
+          explain: >
+            Templated duplication is better than clicked duplication and is still
+            eleven rules that drift the first time somebody tunes one. The
+            platform's multi-resource scoping makes the copies unnecessary.
+        - id: c
+          label: A broad rule now, with the detail added when somebody asks
+          correct: false
+          explain: >
+            Without the dimension split, the page cannot name the machine at
+            03:00, which is when the name matters most. The detail is not a
+            refinement; it is half of what Dana asked for.
     prompt: How do you configure it?
     options:
       - id: a
@@ -141,6 +212,9 @@ encounters:
       "The intake queue is normally under fifty and spikes to eight hundred every
       morning for ten minutes, legitimately," says Marek. "Static threshold at
       five hundred pages the NOC every single day. What would you use instead?"
+    hint: >
+      The queue's normal value depends on the hour of day. Ask what kind of
+      threshold can know that, and what any fixed number must trade away.
     question: What fits a metric with a strong daily pattern?
     options:
       - id: a

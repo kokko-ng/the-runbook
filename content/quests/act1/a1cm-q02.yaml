@@ -29,6 +29,38 @@ encounters:
       There are four templates in the repository. There is also the depot
       environment, which was built in the portal by hand two years ago and is
       described nowhere.
+    hint: >
+      Two facts matter: conversion is mechanical when a description already
+      exists, and one environment has no description at all. Ask what the
+      tooling can generate for each, at which scope, and what still needs a
+      human pass afterward.
+    post_mortem:
+      question: >
+        Dana pushes the repository list back across the desk. "Three weeks of
+        retyping was the thing you were meant to avoid. What does the tooling
+        actually give you?"
+      options:
+        - id: a
+          label: A generated starting point, at the scope you intend to manage
+          correct: true
+          explain: >
+            Decompilation converts the four templates in seconds, and exporting
+            the depot resource group captures the one environment nothing
+            describes. Both outputs need cleaning; neither needs retyping.
+        - id: b
+          label: A guarantee that the converted files are ready to publish
+          correct: false
+          explain: >
+            Neither decompiled nor exported output is publishable as it stands.
+            The tooling saves the transcription, not the review; the cleaning
+            is still yours.
+        - id: c
+          label: A reason to leave the hand-built depot environment alone
+          correct: false
+          explain: >
+            The depot is the part that most needs a description, precisely
+            because it was clicked into existence. Leaving it alone leaves the
+            biggest risk exactly where it was.
     prompt: How do you approach it?
     options:
       - id: a
@@ -96,6 +128,38 @@ encounters:
 
       "Two things in there are worth changing before anyone else reads it," says
       Marek.
+    hint: >
+      The complaint was readability, not correctness. For each candidate
+      change, ask whether it removes something the decompiler left behind or
+      adds a layer a reader must climb over. Bicep can infer more than the
+      generated file admits.
+    post_mortem:
+      question: >
+        Marek scrolls the decompiled file to the top again. "Before you touch
+        it a second time: what is a cleanup pass actually for?"
+      options:
+        - id: a
+          label: Removing what the decompiler left, not adding structure the file has not earned
+          correct: true
+          explain: >
+            A symbolic reference lets Bicep infer the dependency, so the
+            dependsOn line and its stale-prone resourceId string simply go.
+            Pinned regions, wholesale variables and premature modules all move
+            the file the other way.
+        - id: b
+          label: Making deployments deterministic by pinning every value
+          correct: false
+          explain: >
+            Pinning the location costs the template its reuse for East Asia,
+            and determinism was never the complaint. The file already deploys;
+            it just looks like a machine wrote it.
+        - id: c
+          label: Restructuring the file so it looks like a larger project
+          correct: false
+          explain: >
+            Modules and variable blocks earn their place when a pattern repeats
+            or a boundary is real. Twenty names and twenty files make a
+            one-machine template harder to read, not easier.
     prompt: What do you clean up?
     options:
       - id: a
@@ -154,6 +218,38 @@ encounters:
 
       The same file deploys fine from Marek's laptop into his own sandbox
       resource group.
+    hint: >
+      An authorization failure names an action and a scope. Before changing
+      anybody's rights, ask whether the request itself should exist: which
+      subnet should a non-production deployment be joining, and where did
+      that reference come from?
+    post_mortem:
+      question: >
+        Marek closes the role assignment view. "The platform denied a
+        request. What should you have asked about the request before touching
+        anybody's access?"
+      options:
+        - id: a
+          label: Whether the request was right to make at all
+          correct: true
+          explain: >
+            The pipeline was asking to join production's hub subnet because a
+            parameter file was copied. When a deny is doing its job, the fix
+            is the request, not the rights.
+        - id: b
+          label: Which role grants the missing subnet action fastest
+          correct: false
+          explain: >
+            Granting join is the right pattern when a workload genuinely needs
+            a shared subnet. Speed of grant was never the question; whether
+            the workload should be there was.
+        - id: c
+          label: Who can approve an emergency exception to the denial
+          correct: false
+          explain: >
+            There was no emergency and no exception to approve. Non-production
+            has its own subnet; the error pointed at a wrong reference, not at
+            a missing privilege.
     ticket:
       ref: INC-4638
       opened: "10:14"
@@ -213,6 +309,17 @@ encounters:
         output: |
           https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#
         time_cost: 1
+    post_incident:
+      path: [a, c]
+      text: >
+        The error names the action and the scope: a join on the hub subnet,
+        from a pipeline that should never touch the hub. Building the file and
+        reading the subnet id shows where that request comes from, and the
+        copied parameter file confesses. Two moves: what was denied, then who
+        asked for it. Listing the role assignments only confirms the identity
+        is scoped the way it was designed to be, which is not a fault, and
+        proving the file compiles proves nothing about a deployment that
+        already ran for ninety seconds.
     fixes:
       - id: a
         label: >

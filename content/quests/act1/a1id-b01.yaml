@@ -30,6 +30,39 @@ encounters:
       You check the built-in roles. Virtual Machine Contributor manages virtual
       machines fully. Reader sees and does nothing. There is nothing between them
       that stops at restart.
+    hint: >
+      The requirement is written in actions: restart, and the reads needed to
+      find the machine. When the built-in catalog offers nothing that stops
+      where the requirement stops, the catalog is not the boundary. Grant
+      exactly what is written, where the machines are.
+    post_mortem:
+      question: >
+        Wei Lin files your first answer under attempts. "The requirement says
+        restart only, in writing. When the built-in roles do not stop there,
+        what is the correct response?"
+      options:
+        - id: a
+          label: Define a role that grants exactly the written actions
+          correct: true
+          explain: >
+            Custom roles exist for requirements the catalog does not match: the
+            restart action plus the reads to find a machine, assigned to the
+            group at the scopes that hold the eleven. The requirement stays the
+            boundary, not the catalog.
+        - id: b
+          label: Take the nearest built-in role and accept the difference
+          correct: false
+          explain: >
+            The nearest built-in role manages machines fully, and the difference
+            is precisely the resize and delete the requirement forbids at three
+            in the morning. Close is not compliance for a control written down.
+        - id: c
+          label: Route the operation through an identity that already may do it
+          correct: false
+          explain: >
+            Indirection relocates the permission to an automation identity and
+            adds a layer to audit; anyone who can run the job holds the power.
+            It earns its keep when an approval step is wanted, and none was.
     prompt: What do you do?
     options:
       - id: a
@@ -94,6 +127,38 @@ encounters:
 
 
       You have three time units, because it is 03:20 and the machine is down.
+    hint: >
+      Marek has ruled out the role, twice, so believe him and ask what else can
+      refuse an authorized caller. Whatever it is, decide whether more
+      permission can ever beat it, or only standing somewhere else.
+    post_mortem:
+      question: >
+        Marek reads the error once more, flatly. "It said disallowed by deny
+        assignment, and it meant it. What is the only kind of move that gets
+        past one?"
+      options:
+        - id: a
+          label: Leaving its scope or being added to its exclusions
+          correct: true
+          explain: >
+            A deny assignment is evaluated after every role and wins against all
+            of them. The two exits are the ones it defines itself: the resource
+            outside its scope, or the principal in its exclusion list. Nothing
+            you grant changes either.
+        - id: b
+          label: A role high enough to outrank the deny
+          correct: false
+          explain: >
+            There is no rank that helps; Owner loses to a deny assignment
+            exactly as the custom role does. Escalating at a deny is the reflex
+            the error exists to interrupt.
+        - id: c
+          label: A role definition broad enough to include the blocked action
+          correct: false
+          explain: >
+            The custom role already includes the restart action; that is why the
+            error says the client has permission. Broadening the definition
+            feeds a wider grant to the same wall.
     ticket:
       ref: INC-4471
       opened: "03:20"
@@ -146,6 +211,17 @@ encounters:
           Provisioning succeeded
           VM running
         time_cost: 1
+    post_incident:
+      path: [b, a]
+      text: >
+        Two listings in the right order settle it. The role assignment check
+        proves the grant is present and correct, which moves suspicion off
+        everything you built; the deny assignment listing then shows a managed
+        application denying the compute actions with only the vendor's identity
+        excluded. Permission present plus request refused equals an override,
+        and this is the only override in the model. The instance view adds
+        nothing: the machine's state was never in doubt, only the right to act
+        on it.
     fixes:
       - id: a
         label: >
@@ -188,6 +264,10 @@ encounters:
       "Say it back to me," says Marek, "so you have it at three in the morning
       when it matters. Somebody has a role assignment, a deny assignment, and a
       resource lock all pointing at the same resource."
+    hint: >
+      Take the three mechanisms one at a time and ask what each can refuse, and
+      to whom. Two of them apply to everyone without exception, and no role
+      changes that.
     question: In what order does Azure decide whether the action goes through?
     options:
       - id: a

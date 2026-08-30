@@ -25,6 +25,37 @@ encounters:
       accurate in 2023," says Grace. "The board wants dates. I want to know what
       is actually running, what talks to what, and what it costs to run in Azure
       before I give them any."
+    hint: >
+      Grace refuses to give dates before three facts: what runs, what talks
+      to what, what it costs. Ask which single activity produces all three,
+      and what depends on them.
+    post_mortem:
+      question: >
+        "The board still wants dates," says Grace. "What do you have to know
+        before a date means anything, and how do you come to know it?"
+      options:
+        - id: a
+          label: Migration plans rest on measured discovery, not on commitments made first
+          correct: true
+          explain: >
+            Readiness, sizing, cost and dependencies all come from the
+            assessment, and the dependencies are what group servers into
+            waves. Any plan made before the measurement is a plan the
+            measurement will rewrite.
+        - id: b
+          label: The inventory spreadsheet needed to be updated first
+          correct: false
+          explain: >
+            A refreshed spreadsheet is still self-reported and still silent
+            on dependencies and utilization. The assessment measures the
+            estate rather than asking it.
+        - id: c
+          label: Momentum matters most, so something should move early to show progress
+          correct: false
+          explain: >
+            Early motion without discovery produces the wave-two surprise,
+            where a dependency points at a server scheduled months later.
+            Six weeks of assessment is what makes the later speed real.
     prompt: What do you do first?
     options:
       - id: a
@@ -83,6 +114,38 @@ encounters:
       active vendor and a supported platform version. Six internal web
       applications are .NET on Windows with no special requirements. Fourteen
       servers are running nothing anyone can identify.
+    hint: >
+      Dana gave you four groups, and each sentence about them contains its
+      constraint. Match the cheapest adequate strategy to each group instead
+      of choosing one verb for all eighty-one servers.
+    post_mortem:
+      question: >
+        "Read me the four groups again," says Dana. "Then tell me what rule
+        turns eighty-one servers into a number the board can approve."
+      options:
+        - id: a
+          label: Every workload gets the cheapest strategy its constraints permit
+          correct: true
+          explain: >
+            The ERP cannot change, so it rehosts; supported standard
+            applications replatform for days of effort; whatever nobody uses
+            retires. Uniform strategies fail in both directions, overspending
+            on some workloads and underserving others.
+        - id: b
+          label: The strategies should minimize total migration time above all
+          correct: false
+          explain: >
+            Speed is what rehosting everything optimizes, and it carries
+            every operational cost across and defers modernization to a
+            phase that never comes. Adequacy per workload, not elapsed time,
+            is the test.
+        - id: c
+          label: Modern platforms should be the target wherever technically possible
+          correct: false
+          explain: >
+            Possible is not the bar; justified is. Refactoring is the most
+            expensive strategy in the framework, and applied uniformly it
+            consumes the runway on a handful of applications.
     prompt: What target do you recommend for each group?
     options:
       - id: a
@@ -137,6 +200,37 @@ encounters:
       "Give me a first wave," says Grace. "It has to prove the landing zone, the
       network path and the cutover process, and it cannot stop trucks if it goes
       wrong."
+    hint: >
+      Grace listed what wave one must prove and what it must not risk. Ask
+      what a wave has to include to rehearse every step, cutover included,
+      and still survive a bad day.
+    post_mortem:
+      question: >
+        "Wave one is the only wave that teaches," says Grace. "What is it
+        actually for, and what does that purpose require of it?"
+      options:
+        - id: a
+          label: Wave one rehearses the whole process at stakes the program can survive
+          correct: true
+          explain: >
+            Landing zone, connectivity, identity, cutover, validation and
+            rollback all get their first real test, so the workload must be
+            real and dependent enough to exercise them. Small keeps a
+            failure a lesson instead of a headline.
+        - id: b
+          label: Wave one should carry no risk at all
+          correct: false
+          explain: >
+            A wave with nothing real in it proves what nobody doubted and
+            leaves every hard question for wave two. The risk is not
+            removed; it is deferred and enlarged.
+        - id: c
+          label: Wave one should tackle the biggest risk first to retire it early
+          correct: false
+          explain: >
+            Retiring the biggest risk needs a team that has done a cutover
+            before. Sequencing hardest first spends the program's
+            credibility on its least practiced attempt.
     prompt: What goes in wave one?
     options:
       - id: a

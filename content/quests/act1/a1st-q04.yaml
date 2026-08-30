@@ -31,6 +31,36 @@ encounters:
 
 
       The account is general-purpose v2. Everything is in hot.
+    hint: >
+      The statistics are the design. Match each tier's storage price, read
+      price, and retrieval delay against what actually happens to a scan at
+      that age.
+    post_mortem:
+      question: >
+        Priya slides the statistics back across the desk. "You sent me these
+        for a reason. What is a tier actually trading?"
+      options:
+        - id: a
+          label: Storage price against read price and retrieval delay, at every age
+          correct: true
+          explain: >
+            Cheaper tiers store for less and charge more, or take hours, to read, with
+            minimum retention periods underneath. The access statistics say when each
+            trade turns profitable, which is why the ladder steps down as reads thin out.
+        - id: b
+          label: Capacity for a discount, if you commit to keeping it
+          correct: false
+          explain: >
+            Reservations discount capacity you know you will keep; they do not change
+            which tier it sits in. A discount on the most expensive tier still loses to
+            correct tiering, and the two are not rivals anyway.
+        - id: c
+          label: New data against old, with one line where cheap begins
+          correct: false
+          explain: >
+            One cliff cannot price three reading patterns. Thirty-day claims work,
+            one-year lookbacks, and multi-year legal requests each tolerate a different
+            read cost and delay, which is what the intermediate steps are for.
     prompt: What tiering do you propose?
     options:
       - id: a
@@ -89,6 +119,36 @@ encounters:
       "Agreed shape," says Marek. "Now the mechanism. Eleven thousand blobs a day,
       indefinitely. I do not want a runbook that tiers them, and I do not want a
       function app somebody has to maintain."
+    hint: >
+      Marek ruled out anything that has to be maintained. Ask which mechanism
+      can see how old a blob is and act on it with none of your code running.
+    post_mortem:
+      question: >
+        Marek uncaps the marker again. "Eleven thousand a day, indefinitely.
+        What test did any mechanism have to pass before I would sign off?"
+      options:
+        - id: a
+          label: It had to act on age, at scale, with nothing of ours to operate
+          correct: true
+          explain: >
+            Only lifecycle management passes all three parts: rules that read a blob's
+            age, applied daily across millions of blobs, with no code, schedule, or
+            listing charges of yours. Scripts fail the scale test and upload-time logic
+            cannot see age at all.
+        - id: b
+          label: It had to be the cheapest mechanism to build
+          correct: false
+          explain: >
+            Everything here is cheap to build; the runbook is an afternoon. The cost that
+            matters is operating it against four million blobs in year three, and that is
+            where built-in wins.
+        - id: c
+          label: It had to put each blob in the right tier at upload
+          correct: false
+          explain: >
+            Upload is the one moment a scan's tier is obvious: hot. The whole problem is
+            what happens later, as the blob ages, and upload-time logic never comes back
+            to check.
     prompt: How do you implement the tiering?
     options:
       - id: a
@@ -153,6 +213,37 @@ encounters:
 
       The bug is fixed. The scans are gone, and the drivers cannot re-scan a
       delivery that has already happened.
+    hint: >
+      Settle what actually happened to each blob before reaching for a
+      recovery: gone is one event and replaced is another, and the account's
+      protections divide cleanly between the two.
+    post_mortem:
+      question: >
+        The incident review has one question left before INC-4529 closes: with
+        several protections enabled on the same account, what decides which one
+        recovers a given loss?
+      options:
+        - id: a
+          label: The kind of event, since overwrites and deletions are kept by different features
+          correct: true
+          explain: >
+            Versioning records the previous state of an overwritten or deleted blob; soft
+            delete retains blobs that were deleted. An overwrite never enters the deleted
+            list, so the version list was always the recovery path here.
+        - id: b
+          label: The severity, since a sev1 justifies the largest recovery available
+          correct: false
+          explain: >
+            Severity sets urgency, not mechanism. The largest lever on the account was a
+            regional failover, and pulling it for four hundred blobs would have discarded
+            data the account still held.
+        - id: c
+          label: Whether the business can regenerate the data on its own
+          correct: false
+          explain: >
+            Sometimes that is the honest last resort. Asking it first skips the cheaper
+            truth that the platform had already kept every original, one promotion away
+            from current.
     ticket:
       ref: INC-4529
       opened: "10:02"
@@ -205,6 +296,18 @@ encounters:
         output: |
           (ImmutabilityPolicyNotFound) No immutability policy found on this container.
         time_cost: 1
+    post_incident:
+      path: [a, b]
+      text: >
+        Confirm the protections, then look at one victim. The account
+        properties show versioning on, and the version list for a single
+        affected blob shows Tuesday's original at four hundred kilobytes
+        sitting beneath a smaller current version. That one screen is the
+        diagnosis and the recovery plan, repeated four hundred and six times.
+        The deleted-blob listing has nothing to add, because an overwrite under
+        versioning creates a version rather than a soft-deleted blob, and the
+        immutability check only tells you what would have prevented the fault,
+        never what recovers it.
     fixes:
       - id: a
         label: >

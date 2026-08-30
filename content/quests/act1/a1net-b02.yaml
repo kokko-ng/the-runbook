@@ -34,6 +34,39 @@ encounters:
 
 
       The instances have no public IP addresses of their own. They never did.
+    hint: >
+      Inbound and outbound are separate contracts. Ask what, exactly, grants
+      these instances a way out to the internet now that the platform no longer
+      improvises one for them.
+    post_mortem:
+      question: >
+        The bridge stays open at 22:00 and the incident record wants one line:
+        why did the rebuilt fleet lose its way out?
+      options:
+        - id: a
+          label: Outbound was implicit before, and the Standard rebuild withdrew it
+          correct: true
+          explain: >
+            Basic Load Balancer granted implicit outbound access, and Standard
+            provides none on its own. Outbound has to be configured
+            deliberately, through a NAT gateway, an outbound rule or
+            per-instance public addresses, and a NAT gateway is the current
+            recommendation.
+        - id: b
+          label: A security rule began blocking outbound after the rebuild
+          correct: false
+          explain: >
+            The effective rules allow outbound on 443 three different ways, and
+            a blocked flow fails differently from an absent path. Nothing
+            refused the traffic; there was no source address to send it from.
+        - id: c
+          label: The rebuild should have kept a public address on each instance
+          correct: false
+          explain: >
+            Per-instance addresses restore outbound by reintroducing the
+            exposure the design removed. Outbound should come from something
+            that is not also an inbound door, which is what a NAT gateway is
+            for.
     ticket:
       ref: INC-4744
       opened: "21:40"
@@ -107,6 +140,17 @@ encounters:
           }
         note: Exit code 28 is a curl timeout. Nothing came back at all.
         time_cost: 2
+    post_incident:
+      path: [a, b, c]
+      text: >
+        Three reads close it. No outbound rules on the load balancer, no NAT
+        gateway on the subnet, and a route table that leaves the default route
+        alone: behind a Standard Load Balancer, with no public addresses on the
+        instances, that combination means there is no outbound source address
+        at all, so connections never begin rather than fail. The security rules
+        had already been vouched for and the effective view agrees, and asking
+        an instance for its egress address only restates the symptom the ticket
+        opened with. The timeout was never a block; it was an absence.
     fixes:
       - id: a
         label: >
@@ -170,6 +214,39 @@ encounters:
 
       He is testing whether you know how Azure picks a route, not whether you know
       what a NAT gateway is.
+    hint: >
+      This is a routing question wearing an outbound costume. Recall how Azure
+      chooses exactly one next hop for a prefix, and which sources of routes
+      outrank which when the prefixes tie.
+    post_mortem:
+      question: >
+        Marek does not let it go. "At three in the morning, with traffic
+        quietly bypassing the appliance, what fact about route selection do you
+        need?"
+      options:
+        - id: a
+          label: One route wins per prefix, and user-defined routes outrank system routes
+          correct: true
+          explain: >
+            Selection is longest prefix first, and on a tie the order is
+            user-defined, then BGP, then system. A 0.0.0.0/0 user route
+            therefore takes the traffic the NAT gateway's system default would
+            have handled, every time, for every packet.
+        - id: b
+          label: Whichever feature was configured most recently takes precedence
+          correct: false
+          explain: >
+            Configuration order leaves no trace in the data path. Precedence is
+            a fixed property of a route's source, which is why the outcome is
+            predictable on a whiteboard before anything is deployed.
+        - id: c
+          label: The NAT gateway and the appliance negotiate the overlap
+          correct: false
+          explain: >
+            Nothing negotiates. The route table decides, the loser never sees
+            the packet, and the NAT gateway silently stops mattering for that
+            prefix, which is exactly how inspection gets bypassed without an
+            error anywhere.
     prompt: What happens to that packet?
     options:
       - id: a
@@ -213,6 +290,38 @@ encounters:
       "Last thing before you go home," says Dana. "Legal want the customs status
       feed on its own address, separate from scanner intake, but it is the same
       four instances behind it. Do we need another load balancer?"
+    hint: >
+      Before pricing a second resource, check what the existing one can hold
+      more of. The real question is which parts of a load balancer are lists,
+      and which combination is required to stay unique.
+    post_mortem:
+      question: >
+        Dana pauses at the door. "Priya will ask why we nearly bought two of
+        these. What was the wrong assumption?"
+      options:
+        - id: a
+          label: That a load balancer holds one frontend and one rule
+          correct: true
+          explain: >
+            Frontends and rules are lists over a shared backend pool, and only
+            the combination of frontend, protocol and port must stay unique.
+            The customs feed is a second entry on the resource Meridian already
+            runs, not a second resource.
+        - id: b
+          label: That separate audiences require separate resources by policy
+          correct: false
+          explain: >
+            Legal asked for a separate address, not separate infrastructure.
+            The address is the isolation the request needed, and duplicating
+            resources adds drift between two configurations probing the same
+            instances.
+        - id: c
+          label: That the four instances could not serve two workloads
+          correct: false
+          explain: >
+            The instances serve whatever arrives on the ports the rules define.
+            Capacity was never the question; the question was whether the
+            frontend list had room, and it did.
     prompt: What do you tell her?
     options:
       - id: a

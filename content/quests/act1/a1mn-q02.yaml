@@ -27,6 +27,39 @@ encounters:
 
       There is one Log Analytics workspace, created for a proof of concept, with a
       thirty-day retention and nothing sending to it.
+    hint: >
+      Retention, agents and exports all act on data that has already arrived. Ask
+      what makes platform logs arrive anywhere in the first place.
+    post_mortem:
+      question: >
+        Wei Lin annotates the finding before you retry. "State the dependency for
+        me. Which step does everything else in this requirement wait on?"
+      options:
+        - id: a
+          label: >
+            Collection: nothing exists to keep until a diagnostic setting sends
+            it somewhere
+          correct: true
+          explain: >
+            Platform logs are not gathered by default. Retention, queries and
+            audits all operate on data that arrived, and data arrives only when a
+            diagnostic setting names the categories and a destination.
+        - id: b
+          label: >
+            Capacity: the workspace was too small for six months of logs
+          correct: false
+          explain: >
+            Workspace retention is a setting, not a size, and lengthening it
+            changes nothing while nothing is sent. An empty workspace with
+            two-year retention holds two years of nothing.
+        - id: c
+          label: >
+            Coverage: the machines were not being watched closely enough
+          correct: false
+          explain: >
+            The auditor named storage, key vault and the activity log, which are
+            platform sources. Agents watch the inside of machines, which is a
+            different layer from the one in the finding.
     prompt: What do you configure?
     options:
       - id: a
@@ -92,6 +125,38 @@ encounters:
       The audit needs six months. The NOC investigates incidents up to about two
       weeks old. Storage read operations are by far the highest volume category
       and are not part of what the auditor asked for.
+    hint: >
+      Two groups need this data for two different lengths of time, and one
+      category dwarfs the rest. Ask what each requirement actually names before
+      deciding what to keep.
+    post_mortem:
+      question: >
+        Priya waits with the printout. "Try once more, but first tell me: when
+        two teams need the same data differently, what decides what we keep and
+        for how long?"
+      options:
+        - id: a
+          label: The named requirements decide, and the longest period among them governs retention
+          correct: true
+          explain: >
+            The audit needs six months, the NOC a fortnight, and nobody asked for
+            the read operations at all. Categories come from what somebody named;
+            retention covers the longest ask; the tail sits in cheaper long-term
+            retention.
+        - id: b
+          label: Cost decides, and six months of logs is too expensive to keep
+          correct: false
+          explain: >
+            The expense lives almost entirely in one high-volume category nobody
+            asked for. Leave that out and six months of what the auditor named
+            costs close to the incident budget.
+        - id: c
+          label: The audit decides, and operational needs wait their turn
+          correct: false
+          explain: >
+            Both requirements fit in one design: an interactive period serves the
+            NOC at full query speed, and long-term retention serves the auditor.
+            Ranking them was never necessary; naming them was.
     prompt: What do you propose?
     options:
       - id: a
@@ -152,6 +217,37 @@ encounters:
 
       The data is in the workspace. Wei Lin has opened the query editor and would
       like it to be someone else's problem.
+    hint: >
+      The auditor asked a precise question with four columns in it. Ask what
+      shape the answer should take, and what an honest answer says about its own
+      edges.
+    post_mortem:
+      question: >
+        "The auditor is still waiting," says Wei Lin. "Before your next attempt:
+        what makes an answer to an audit question defensible?"
+      options:
+        - id: a
+          label: It matches the question's shape and states plainly where the data begins
+          correct: true
+          explain: >
+            She asked for reads by identity, address and day, which is a small
+            table, and the week she named is fully covered. Declaring that
+            collection began on 2 August is what separates a gap from a
+            misrepresentation.
+        - id: b
+          label: It hands over everything so nothing looks withheld
+          correct: false
+          explain: >
+            Four million raw rows conceal the answer rather than proving it.
+            Transparency is the summarized table plus the offer of the underlying
+            data, not the export of it.
+        - id: c
+          label: It declines to answer when the record has any gap at all
+          correct: false
+          explain: >
+            The gap sits outside the week she asked about. Withholding an answer
+            that exists turns a disclosed limitation into a harsher finding;
+            auditors handle gaps better than silence.
     ticket:
       ref: INC-4802
       opened: "11:00"
@@ -212,6 +308,18 @@ encounters:
           --------------------  --------------------
           2026-08-02T09:14:00Z  2026-08-24T10:58:00Z
         time_cost: 1
+    post_incident:
+      path: [a, d, c]
+      text: >
+        Three moves in order. The table census settles Marek's warning first: the
+        data is in StorageBlobLogs, so the resource-specific mode is in use and
+        the legacy table would answer nothing. The earliest-and-latest check
+        bounds what any answer can claim, which is where the 2 August disclosure
+        comes from. Then the summarize query is the answer itself: operation,
+        container and week filtered, grouped by the columns the auditor named.
+        The single-row shape check does not move the diagnosis; the fields it
+        confirms are standard on the resource-specific table, and the census had
+        already proved which table that is.
     fixes:
       - id: a
         label: >

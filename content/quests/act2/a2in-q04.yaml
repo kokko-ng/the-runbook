@@ -28,6 +28,37 @@ encounters:
       Label generation can happen minutes later. Pricing must complete before the
       booking is confirmed. Customs must happen exactly once per shipment and must
       not be lost.
+    hint: >
+      Sort the three calls by one test: does the booking's answer to the
+      user depend on this result? That test, not speed, decides what waits
+      and what queues.
+    post_mortem:
+      question: >
+        "Three downstream calls, one booking," says Grace. "There is a
+        single test that sorts them. What is it?"
+      options:
+        - id: a
+          label: Work stays synchronous only when the response depends on its result
+          correct: true
+          explain: >
+            Pricing decides what the customer is told, so it must finish in
+            the request. Customs and labels change nothing about the
+            confirmation, so they can queue, which is what detaches the
+            booking from their availability.
+        - id: b
+          label: Everything should be asynchronous for resilience
+          correct: false
+          explain: >
+            Decoupling is not free: it changes what the user is told and
+            when. A booking confirmed before pricing is a promise made with
+            no number behind it.
+        - id: c
+          label: The customs service was the problem and should be made faster
+          correct: false
+          explain: >
+            Making a dependency faster is always welcome and never a design.
+            Dispatch has to survive the day customs is slow again, which
+            only decoupling provides.
     prompt: What do you recommend?
     options:
       - id: a
@@ -87,6 +118,37 @@ encounters:
       "Billing, the customer notification service, analytics, and now the Straits
       warehouse system. Today dispatch calls each of them, and adding the fifth
       means changing dispatch again."
+    hint: >
+      Dispatch keeps learning who cares about deliveries, and it should not
+      have to. Ask which pattern lets a new listener arrive without the
+      announcer changing, and how heavy the guarantees need to be.
+    post_mortem:
+      question: >
+        "A fifth consumer arrives next month," says Marek. "What does the
+        design owe it, and what does it owe dispatch?"
+      options:
+        - id: a
+          label: Publish the fact once; consumers subscribe, and the producer never changes
+          correct: true
+          explain: >
+            Publish and subscribe inverts the dependency, which is the
+            requirement. Between the services that can do it, the delivery
+            guarantees the events need decide, and simple discrete facts fit
+            the lighter one.
+        - id: b
+          label: One shared channel is enough if every service reads it
+          correct: false
+          explain: >
+            A queue hands each message to exactly one consumer; the second
+            reader changes the semantics for the first. Broadcast needs
+            subscriptions, not a shared queue.
+        - id: c
+          label: Consumers should discover changes themselves rather than being told
+          correct: false
+          explain: >
+            Polling couples every consumer to the producer's data store and
+            buys latency with constant load. The event exists at the moment
+            of delivery; the design should hand it over then.
     prompt: What do you recommend?
     options:
       - id: a
@@ -144,6 +206,37 @@ encounters:
       "One customs message has failed nineteen thousand times since Tuesday," says
       Wei Lin. "The handler throws, the message returns to the queue, and it tries
       again. Nobody noticed until the metrics did."
+    hint: >
+      Nineteen thousand attempts have established one fact about this
+      failure. Ask what kind of failure that is, and what a design owes a
+      message it can neither process nor lose.
+    post_mortem:
+      question: >
+        Wei Lin adds a line to the finding. "Try again. What distinguishes
+        this failure from the ones a retry policy exists for?"
+      options:
+        - id: a
+          label: Permanent failures need an exit, an owner and the evidence kept
+          correct: true
+          explain: >
+            Retry is for failures that time fixes; nineteen thousand
+            attempts prove time will not. Moving the message aside after a
+            delivery limit keeps the queue flowing, preserves the message
+            and gives the alert something to fire on.
+        - id: b
+          label: The retry policy was tuned wrong
+          correct: false
+          explain: >
+            No interval turns a permanent failure into a transient one.
+            Tuning changes how often it fails; the requirement is that
+            somebody finds out and the message survives.
+        - id: c
+          label: The handler should be fixed so messages never poison
+          correct: false
+          explain: >
+            The handler bug gets fixed, and the next one is a matter of
+            time. The design question is what happens to the message that
+            finds it, which retries alone answer badly.
     prompt: What does the design need?
     options:
       - id: a

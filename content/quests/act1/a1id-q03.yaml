@@ -30,6 +30,39 @@ encounters:
       Every account carries a department attribute set from the HR export, and the
       depot access groups already exist. Last year this was done one account at a
       time in the portal, and two people were still active in April.
+    hint: >
+      Dana named three requirements: volume now, another batch soon, and clean
+      leavers in February. The account data already carries a department
+      attribute. Ask which design turns membership into a rule instead of a task
+      somebody must remember.
+    post_mortem:
+      question: >
+        Dana drops a chair next to your desk, which is how she asks for things.
+        "Second attempt. First tell me what separates a design that survives
+        February from one that does not."
+      options:
+        - id: a
+          label: Whether each person's membership follows a rule nobody has to remember
+          correct: true
+          explain: >
+            Every account carries the department attribute, so membership can be
+            a rule: the same one admits the next batch and drops February's
+            leavers, per person, with a record. Designs that hand any of that to
+            memory repeat last April.
+        - id: b
+          label: Whether the drivers get individual accounts at all
+          correct: false
+          explain: >
+            Individual accounts are necessary and not sufficient. They give
+            attribution and per-person removal, and a static list of them still
+            leaves February's cleanup on whoever remembers it.
+        - id: c
+          label: Whether the work is done in bulk or one account at a time
+          correct: false
+          explain: >
+            Bulk creation saves an afternoon and changes nothing about the
+            lifecycle. Fourteen accounts created quickly and removed by hand age
+            exactly as badly as fourteen created slowly.
     prompt: How do you handle joiners this year?
     options:
       - id: a
@@ -94,6 +127,38 @@ encounters:
       and their record kept for the audit trail. Not deleted, not reusable. And I
       want to be able to tell a seasonal account from a permanent one by looking
       at it."
+    hint: >
+      Wei Lin's requirement has two halves that pull apart: access must end the
+      same day, and the record must survive for the audit. Judge each option by
+      whether it delivers both, and remember the two are not in conflict.
+    post_mortem:
+      question: >
+        Wei Lin replies with a single line and a read receipt. "State the
+        principle for me: what happens to an account on the day its owner stops
+        driving for us?"
+      options:
+        - id: a
+          label: Sign-in ends immediately while the object and its history remain
+          correct: true
+          explain: >
+            Disabling the account cuts access at once and preserves the object,
+            the memberships, and the sign-in history an audit will ask about.
+            Ending access and keeping the record are separate outcomes, and the
+            design must deliver both.
+        - id: b
+          label: The account is removed so it can never be used again
+          correct: false
+          explain: >
+            Removal does stop access, and after the recycle bin window it takes
+            the audit trail with it. Wei Lin asked for not deleted in the same
+            breath as gone the same day.
+        - id: c
+          label: The credentials are changed so nobody can sign in with them
+          correct: false
+          explain: >
+            A credential change is not an account boundary. An enabled account
+            keeps its memberships, can keep valid tokens for a while, and still
+            counts as active in every review that matters.
     prompt: How do you handle a driver finishing?
     options:
       - id: a
@@ -142,6 +207,37 @@ encounters:
 
       The other twelve are fine. All fourteen were created by the same bulk
       import, and all fourteen are in sg-depot-drivers.
+    hint: >
+      Twelve worked and two did not, from one import and one group, so compare a
+      failing account with a working one field by field. A license has a
+      requirement of its own that has nothing to do with the group.
+    post_mortem:
+      question: >
+        The ticket stays open, and the morning run will not wait. Before the
+        next attempt, what was actually blocking the two licenses?
+      options:
+        - id: a
+          label: A required field on the two accounts, not the licensing pipeline
+          correct: true
+          explain: >
+            A license cannot be assigned to a user with no usage location,
+            because availability is decided per country. The group, the SKU
+            count and the pipeline were all healthy; two accounts were missing
+            one field.
+        - id: b
+          label: Group-based licensing proving unreliable at the tail of a bulk import
+          correct: false
+          explain: >
+            Group licensing did exactly what it does: it applied the license to
+            twelve eligible users and reported a per-user error for the two who
+            were not. The mechanism worked; the input did not.
+        - id: c
+          label: License capacity running short for the last accounts created
+          correct: false
+          explain: >
+            The tenant showed 94 of 120 seats consumed, with fourteen new users
+            already counted. Shortage would have failed the last accounts by
+            number, not the two missing the same attribute.
     ticket:
       ref: INC-4425
       opened: "08:15"
@@ -198,6 +294,16 @@ encounters:
             ]
           }
         time_cost: 1
+    post_incident:
+      path: [b, c]
+      text: >
+        Two user lookups, one failing and one working, carry the whole
+        diagnosis: the accounts differ in exactly one field, and the empty usage
+        location is the one condition a license assignment refuses outright. The
+        group query only confirms what has worked for years, and the subscribed
+        SKU count answers a shortage nobody's error message claimed; neither can
+        explain why twelve succeeded and two did not, which the side-by-side
+        comparison already has.
     fixes:
       - id: a
         label: Set the usage location on the two accounts and let group licensing reapply

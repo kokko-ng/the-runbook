@@ -28,6 +28,37 @@ encounters:
 
       "The application vendor is out of business," she says. "Nothing in that list
       is negotiable."
+    hint: >
+      Start from the list Grace read out, not from the service you like. Every
+      item on it must survive the move unchanged, and the platform should carry as
+      much of the operating burden as that list allows.
+    post_mortem:
+      question: >
+        Grace turns from the whiteboard. "Try it again, and this time tell me what
+        the deciding test was."
+      options:
+        - id: a
+          label: >
+            Pick the most managed service whose feature support covers the whole
+            non-negotiable list
+          correct: true
+          explain: >
+            The list is the requirement. The destination is whatever clears every
+            item with the least operating burden left over, which is why
+            compatibility, not preference, is the deciding test.
+        - id: b
+          label: Managed platforms are too restrictive for legacy applications
+          correct: false
+          explain: >
+            One managed offering fails the list and another clears it entirely. The
+            lesson is to check the list against each service, not to write off the
+            category.
+        - id: c
+          label: The safest destination is the one closest to the current setup
+          correct: false
+          explain: >
+            A virtual machine reproduces the current setup and its operating burden
+            with it. Familiarity is a cost here, not a safety margin.
     prompt: Where does this database go?
     options:
       - id: a
@@ -90,6 +121,37 @@ encounters:
 
 
       "The number I sign is annual," says Priya. "Tell me what drives it."
+    hint: >
+      Priya asked what drives the number. Let the measured peaks drive the cores
+      and the tier, and let a commitment wait until the measurements have proven
+      the shape. Anything bought beyond the metrics needs a metric to justify it.
+    post_mortem:
+      question: >
+        Priya circles the annual figure. "Have another run at it. When you size
+        something I sign for a year, what should the number come from?"
+      options:
+        - id: a
+          label: >
+            Size from the measured peak with headroom, and buy tier features only
+            against a measured need
+          correct: true
+          explain: >
+            The metrics already say what the workload does: nine hundred operations
+            a second and six cores at peak. Headroom above that is sizing; anything
+            further is spending without a driver.
+        - id: b
+          label: When in doubt, the bigger tier is the safer recommendation
+          correct: false
+          explain: >
+            The higher tier buys latency and a readable replica at roughly double
+            the price, and nothing in the metrics asks for either. Safety against a
+            measured peak is headroom, not a tier jump.
+        - id: c
+          label: The sizing cannot be settled until the workload runs in production
+          correct: false
+          explain: >
+            The assessment already measured the workload. Deferring the decision
+            wastes the data on the table and guarantees either waste or an incident.
     prompt: What tier and size do you recommend?
     options:
       - id: a
@@ -144,6 +206,37 @@ encounters:
       "Two hundred and forty gigabytes over a link that manages about eighty
       megabits on a good day," says Marek. "Straits runs six days a week. The
       dispatch window they can give us is Sunday, six hours."
+    hint: >
+      Measure the copy against the link, then measure it against the window. When
+      they do not fit, the trick is not to move faster; it is to make the window
+      contain only the tail of the move.
+    post_mortem:
+      question: >
+        Marek taps the whiteboard. "A six-hour window and a copy that does not fit
+        inside it. Name the rule that reconciles those."
+      options:
+        - id: a
+          label: >
+            Seed outside the window, then continuously replay changes with a method
+            that covers every table
+          correct: true
+          explain: >
+            The outage only has to hold the final catch-up, and the catch-up
+            mechanism has to work for the schema as it stands, primary keys or not.
+            The migration service does both without bespoke work.
+        - id: b
+          label: The window was too short and should have been renegotiated
+          correct: false
+          explain: >
+            Straits runs six days a week; the window is a business fact. Designs
+            adapt to windows more easily than windows adapt to designs.
+        - id: c
+          label: Eighty megabits means the data had to travel on physical media
+          correct: false
+          explain: >
+            Physical transfer suits archives, and it delivers a stale copy of a live
+            system. The link was slow enough to rule out a naive copy inside the
+            window, not slow enough to rule out seeding over days.
     prompt: How do you move the data?
     options:
       - id: a

@@ -32,6 +32,37 @@ encounters:
 
 
       You have four time units, because the change window closes at 10:00.
+    hint: >
+      Routes say where a packet should go next; they do not oblige the
+      receiving network to take it. When traffic originates in a third network,
+      acceptance is a property of the peering itself.
+    post_mortem:
+      question: >
+        Joana watches the clock on the change window. "Ten minutes gone. Say
+        what the evidence had already ruled out before that fix went in."
+      options:
+        - id: a
+          label: Everything on the path except what the peerings will accept
+          correct: true
+          explain: >
+            Routes were active, rules allowed, IP forwarding was on, and the
+            appliance counters never moved, so the packets died between spoke
+            and hub. The one gate left on that stretch is the peering, which
+            drops forwarded traffic unless told to accept it.
+        - id: b
+          label: The appliance was dropping the flows silently
+          correct: false
+          explain: >
+            Its interface counters never move for spoke-to-spoke traffic,
+            which clears it. A device cannot drop what never arrives; the
+            discard happens upstream of its network interface.
+        - id: c
+          label: The design needs fewer moving parts, not another setting
+          correct: false
+          explain: >
+            Peering the spokes directly delivers the packets and defeats the
+            inspection requirement the design exists to satisfy. The control
+            stands, and the two checkboxes are the price of it.
     ticket:
       ref: INC-4703
       opened: "08:05"
@@ -103,6 +134,18 @@ encounters:
             "nextHopType": "VnetPeering"
           }
         time_cost: 1
+    post_incident:
+      path: [a, b]
+      text: >
+        Verify the claim before hunting: the effective route table shows the
+        user route active, so packets really do leave for 10.10.1.4. The
+        peering listing then ends it: Allow forwarded traffic is False on both
+        hub peerings, and a peering discards arriving traffic that originated
+        elsewhere before any hub route or appliance is consulted. That pair of
+        reads is the whole case. The flow test re-proves what the rules already
+        allowed, the IP forwarding check confirms a fact the ticket had
+        attested, and asking the platform for a next hop describes intent, not
+        what a peering will accept.
     fixes:
       - id: a
         label: Enable Allow forwarded traffic on both hub peerings
@@ -163,6 +206,39 @@ encounters:
 
       He is not asking for a recital. He wants to know which one you would check
       first next time.
+    hint: >
+      Read each setting as a statement by one network about what it will accept
+      or share, never as an instruction to the peering to do work on its own.
+      Peerings connect; they do not act.
+    post_mortem:
+      question: >
+        Marek taps the peering blade. "You will meet these four again in an
+        interview. What is the reading that keeps them straight?"
+      options:
+        - id: a
+          label: Each setting states what one network accepts or offers, nothing more
+          correct: true
+          explain: >
+            Virtual network access admits the peer's address space, forwarded
+            traffic admits packets that started elsewhere, gateway transit
+            offers a gateway, and use remote gateways consumes one. None of
+            them makes the peering carry or relay anything itself.
+        - id: b
+          label: The settings are safe to enable everywhere by default
+          correct: false
+          explain: >
+            Most estates do leave them alone, and that is not the same as
+            harmless. Use remote gateways changes routing outright, and
+            enabling options nobody can explain is how designs grow settings
+            nobody owns.
+        - id: c
+          label: The four settings only matter when an appliance is involved
+          correct: false
+          explain: >
+            Gateway transit has nothing to do with appliances, and virtual
+            network access matters on every peering that exists. Forwarded
+            traffic is merely the one that ambushes appliance designs in
+            particular.
     prompt: Which statement is accurate?
     options:
       - id: a
@@ -214,6 +290,38 @@ encounters:
 
       The hub is in Southeast Asia and holds the VPN gateway. The new network will
       be small and will not have a gateway of its own.
+    hint: >
+      Distance does not change what peering is or how a spoke borrows a
+      gateway. Ask which mechanisms the platform supports across regions before
+      buying hardware or writing routes by hand.
+    post_mortem:
+      question: >
+        Dana keeps the meeting invite open. "One line for the steering note:
+        what did the first version misunderstand about connecting the new
+        region?"
+      options:
+        - id: a
+          label: Global peering with gateway transit already covers both requirements
+          correct: true
+          explain: >
+            Peering across regions is configured like peering across a
+            corridor, and gateway transit hands the remote network the hub's
+            VPN gateway with it. Reaching the hub and reaching Jurong both fall
+            out of one peering pair.
+        - id: b
+          label: Cross-region traffic needs a gateway or it leaves Microsoft's network
+          correct: false
+          explain: >
+            Global peering rides the Microsoft backbone with no gateway in the
+            path. The only gateway question here is Jurong, and the hub already
+            owns that answer.
+        - id: c
+          label: Routing to Jurong from another region has to be written by hand
+          correct: false
+          explain: >
+            A user-defined route cannot point at a VPN gateway in another
+            virtual network; the platform will not deliver to it. Use remote
+            gateways is the supported spelling of that intent.
     prompt: How do you connect the new region?
     options:
       - id: a

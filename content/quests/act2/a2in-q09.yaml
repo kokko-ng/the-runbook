@@ -26,6 +26,39 @@ encounters:
       indefinitely, and the ERP will be talking to Azure constantly once it
       moves," says Grace. "Today there is one site-to-site tunnel to Jurong, built
       by somebody who has left, and nothing to Port Klang."
+    hint: >
+      Two data centers with a chatty ERP, twenty-two depots with scanner
+      uploads. Ask what each class of site actually demands, predictability
+      or price, and what backs up what.
+    post_mortem:
+      question: >
+        "Twenty-four sites are not one question," says Grace. "What does
+        each class of site ask of its connection, and what follows from
+        that?"
+      options:
+        - id: a
+          label: Each site's traffic picks its connection; predictable loads get the circuit
+          correct: true
+          explain: >
+            The ERP will talk to Azure constantly, so it needs the private
+            path with a commitment; depots need affordable reach, which the
+            VPN provides and which also backs up the circuit. One
+            connectivity answer for both classes fails one of them.
+        - id: b
+          label: Private circuits are always the professional choice
+          correct: false
+          explain: >
+            A circuit per depot is an order of magnitude more money than
+            depot traffic justifies. Professional is matching cost to need,
+            not maximizing the link.
+        - id: c
+          label: Encryption makes the transport underneath irrelevant
+          correct: false
+          explain: >
+            A tunnel changes who can read the packets, not where they travel
+            or how variably. Predictable throughput and an availability
+            commitment come from the path, and internal traffic belongs on a
+            private one.
     prompt: What connectivity do you recommend?
     options:
       - id: a
@@ -90,6 +123,40 @@ encounters:
 
       "Everything outbound has to be inspected, and the security team want one
       place to write the rules."
+    hint: >
+      Marek gave two requirements: inspect everything outbound, write the
+      rules once. Add the unstated one: a region should not need the other
+      to reach the world. Test each design against all three.
+    post_mortem:
+      question: >
+        "Two regions, one policy, no dependence," says Marek. "Score
+        whatever you proposed against those three. Where does it lose?"
+      options:
+        - id: a
+          label: A hub and firewall per region, with inherited policy, keeps regions independent and identical
+          correct: true
+          explain: >
+            Regional independence rules out routing one region through the
+            other, and one place to write rules is delivered by policy
+            inheritance, not by hand-copied appliance configurations. The
+            managed hub also removes the peering and routing work as spokes
+            multiply.
+        - id: b
+          label: Fewer hubs always means less to operate
+          correct: false
+          explain: >
+            One hub is less to run, and it makes the second region's
+            connectivity depend on the first, which defeats the reason the
+            second region exists. Some duplication is the availability
+            design.
+        - id: c
+          label: The existing appliance should be kept because it already works
+          correct: false
+          explain: >
+            The appliance works today, at the cost of sizing, patching,
+            licensing and a twin whose rules drift. Keep third-party
+            appliances for capabilities that require them, and this design
+            needs none.
     sketch:
       caption: Two regions, and the question of what sits in the middle of each
       nodes:
@@ -170,6 +237,38 @@ encounters:
 
       Cebu's traffic goes over the internet to the public intake endpoint. Johor's
       goes over the VPN to the hub.
+    hint: >
+      Hendrik measured a path, not an application. Ask which part of the
+      journey from Cebu is slow, who controls each leg, and what shortens
+      the leg nobody optimizes.
+    post_mortem:
+      question: >
+        "The handhelds are still slow," says Hendrik, from what sounds like
+        the loading bay. "Whatever you try next, what part of the journey
+        are you actually shortening?"
+      options:
+        - id: a
+          label: Shorten the internet leg; the rest of the path is already somebody's job
+          correct: true
+          explain: >
+            Most of Cebu's delay is distance traveled on the public
+            internet. Terminating at a nearby edge moves the journey onto an
+            optimized backbone, costs the depot nothing and changes no
+            firmware.
+        - id: b
+          label: The depot's uploads needed a private tunnel
+          correct: false
+          explain: >
+            A tunnel changes privacy and routing, not the roads the packets
+            take. The same internet path with encryption overhead is not
+            faster, and speed was the complaint.
+        - id: c
+          label: The data itself was too heavy for the link
+          correct: false
+          explain: >
+            The payload is the product; the claims process needs the scan
+            quality. When the path can be halved without touching the data,
+            degrade nothing.
     prompt: What do you recommend for the Cebu path?
     options:
       - id: a
@@ -224,6 +323,40 @@ encounters:
       "Everything outbound goes through the firewall, which I want," says Wei Lin.
       "The data platform also copies about two terabytes a night from the lake to
       the analytics workspace, and last night that went through the firewall too."
+    hint: >
+      Ask what the firewall exists to see. Then ask whether a nightly copy
+      between two platform services crosses that line, and what path serves
+      it without leaving the estate.
+    post_mortem:
+      question: >
+        "The control stays," says Wei Lin. "So state the principle: which
+        traffic must pass the firewall, and what is owed to the traffic that
+        need not?"
+      options:
+        - id: a
+          label: Inspect trust boundary crossings; give internal bulk a private path of its own
+          correct: true
+          explain: >
+            The firewall's budget is for traffic entering or leaving the
+            estate. Service-to-service copies stay correct and private on
+            private endpoints, off the internet and out of the inspection
+            path, which neither a bigger firewall nor a bare route exclusion
+            achieves.
+        - id: b
+          label: Security controls must never be routed around, whatever the cost
+          correct: false
+          explain: >
+            The principle is right for boundary traffic and misapplied here.
+            Traffic that never crosses a trust boundary was not the
+            control's business; giving it a private path is design, not
+            evasion.
+        - id: c
+          label: The nightly copy is the problem and should be shrunk
+          correct: false
+          explain: >
+            The copy is the data platform doing its job, and two terabytes
+            is what the job weighs. The design question was the path, not
+            the payload.
     prompt: How do you handle the high-volume internal traffic?
     options:
       - id: a

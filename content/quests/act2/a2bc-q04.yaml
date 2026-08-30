@@ -27,6 +27,39 @@ encounters:
 
       Scans are in a geo-redundant account today. Manifests are in a separate
       geo-redundant account.
+    hint: >
+      Ask what each data set must do during the outage itself, and let the
+      requirement price each one separately. Continuity for storage is about
+      who can read a current copy, not about copies in general.
+    post_mortem:
+      question: >
+        Grace lets the consequence land before she speaks. "Strip it back to
+        the requirement. What does the portal actually need from storage during
+        a regional incident?"
+      options:
+        - id: a
+          label: A current, readable copy for the portal, and no spend where nothing reads
+          correct: true
+          explain: >
+            Read access on the existing geo-replication is precisely that:
+            continuous, current, and readable at a secondary endpoint. Anything
+            staler, cached, or bought uniformly misses one half of the
+            requirement or overpays the other.
+        - id: b
+          label: Both accounts brought up to the same, stronger redundancy standard
+          correct: false
+          explain: >
+            One standard for two workloads with nothing in common operationally
+            is tidiness, not design. The manifests gain nothing from secondary
+            reads that legal makes four times a month.
+        - id: c
+          label: A copy of the scans that the portal owns and controls itself
+          correct: false
+          explain: >
+            The platform already replicates the account continuously; a copy
+            the portal owned would be a day behind and one more thing to
+            reconcile. The gap was reachability of the existing copy, not
+            ownership of a new one.
     prompt: What do you change?
     options:
       - id: a
@@ -84,6 +117,38 @@ encounters:
       "Redundancy copies whatever we do, including deleting things," says Wei Lin.
       "Soft delete gives us a window. What covers a mistake that is noticed in
       month four, or somebody with access deleting the account itself?"
+    hint: >
+      Play the failure all the way through: the account itself is gone and the
+      mistake is four months old. What survives that needs recovery points
+      outside the account, under separate control, with real retention.
+    post_mortem:
+      question: >
+        Wei Lin files the consequence under the finding. "Then say it as a
+        control statement. What must be true of a copy before I call it a
+        backup?"
+      options:
+        - id: a
+          label: It lives outside what it protects, under separate control, with retention and a restore path
+          correct: true
+          explain: >
+            Windows inside the account die with the account, replicas copy the
+            present rather than keep the past, and hand-built jobs have no
+            catalog. A backup is defined by surviving the failure of the thing
+            it protects.
+        - id: b
+          label: It sits as close to the data as possible, so restores are fast
+          correct: false
+          explain: >
+            Proximity is what operational backup already offers, and it is
+            exactly the property that fails when the account itself goes. Speed
+            is worth having; independence is the requirement.
+        - id: c
+          label: It is a second live copy, so nothing ever has to be restored
+          correct: false
+          explain: >
+            A live copy faithfully carries mistakes forward and holds no
+            history to reach back into. Month four is answered by retention,
+            not by liveness.
     prompt: What do you recommend?
     options:
       - id: a
@@ -141,6 +206,40 @@ encounters:
       "Trailer telemetry is in Cosmos DB in Southeast Asia," says Marek. "If the
       region goes, the dispatch screen has no positions at all, which is the screen
       the control room stares at during exactly that kind of event."
+    hint: >
+      The requirement is a screen that stays readable through the event, fed by
+      a complete and durable copy. Take exactly as much failover machinery as a
+      single-writer workload needs, and no more.
+    post_mortem:
+      question: >
+        Marek watches the rehearsal timer rather than you. "Forget the products
+        for a second. What keeps a screen like that alive when its region is
+        not?"
+      options:
+        - id: a
+          label: Replication sized for the reads, with the write topology sized to where writes come from
+          correct: true
+          explain: >
+            The screen survives because a second region already holds a
+            complete, durable copy to read, promoted for writes by the platform
+            when needed. Every write comes from one place, so anything beyond a
+            single write region buys conflict resolution with nothing to spend
+            it on.
+        - id: b
+          label: Every region the workload touches accepting writes, for symmetry
+          correct: false
+          explain: >
+            Symmetry is a cost here, not a virtue. With one writer per trailer
+            there are no regional write sources to serve, and multi-region
+            writes bring conflict handling the workload cannot use.
+        - id: c
+          label: Making the control room screen independent of the database entirely
+          correct: false
+          explain: >
+            Removing the dependency just moves it into a cache or a copy with
+            weaker guarantees. The screen needs completeness and durability
+            during the event, which is what the database's own replication
+            provides.
     prompt: What do you recommend?
     options:
       - id: a

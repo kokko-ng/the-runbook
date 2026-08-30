@@ -24,6 +24,37 @@ encounters:
       "The warehouse system's database is 40 gigabytes and can be down for a
       weekend. There is also a MySQL database behind the driver app, 12 gigabytes,
       that the vendor says must not be down for more than an hour."
+    hint: >
+      Marek gave you three windows and three sizes. Do the arithmetic per
+      database: which copies fit inside their window over this link, and
+      which need replication to shrink the outage to a cutover.
+    post_mortem:
+      question: >
+        "Three databases, three windows," says Marek. "One rule assigns the
+        method to each. Say the rule."
+      options:
+        - id: a
+          label: The window decides the method, and the simplest method that fits it wins
+          correct: true
+          explain: >
+            Online replication shrinks the outage to the cutover, which is
+            what tight windows buy with its setup cost. Where a weekend is
+            available, a restore does the job with nothing extra to
+            configure or go wrong.
+        - id: b
+          label: The most capable method should be used everywhere for safety
+          correct: false
+          explain: >
+            Online migration everywhere is capability paid for where a
+            restore already fit. Extra machinery is extra prerequisites and
+            extra ways to fail, not extra safety.
+        - id: c
+          label: Database size alone determines the migration method
+          correct: false
+          explain: >
+            Size matters only against the window and the link. Forty
+            gigabytes with a weekend is easy by any method; two hundred and
+            forty with six hours forces the choice.
     prompt: How do you move them?
     options:
       - id: a
@@ -80,6 +111,38 @@ encounters:
       eighty megabits when nothing else is using it," says Grace. "That is
       somewhere north of two weeks of continuous transfer, and the site still has
       to work during the day."
+    hint: >
+      Grace already did the division for you. When size over bandwidth
+      misses the schedule, ask what does not have to travel over the wire,
+      and what still must at the end.
+    post_mortem:
+      question: >
+        "Fourteen terabytes, eighty megabits," says Grace. "The division is
+        on the whiteboard. What does that number tell you the link can and
+        cannot be asked to do?"
+      options:
+        - id: a
+          label: The link carries only what physics allows, the delta rather than the bulk
+          correct: true
+          explain: >
+            Sixteen days of saturated transfer fits neither a working site's
+            link nor the schedule, so the bulk goes by appliance. The link's
+            real job is the final incremental copy, which is what keeps the
+            cutover short.
+        - id: b
+          label: The transfer needed better scheduling around business hours
+          correct: false
+          explain: >
+            Scheduling shrinks the contention, not the byte count. Off-hours
+            bandwidth stretches sixteen days toward six weeks; the
+            arithmetic, not the calendar, is the constraint.
+        - id: c
+          label: The data should have been made smaller before it moved
+          correct: false
+          explain: >
+            Scanned documents are already compressed, so the reduction is a
+            few per cent for real processing cost. The savings that matter
+            come from not sending the bulk over the wire at all.
     prompt: How do you move the documents?
     options:
       - id: a
@@ -135,6 +198,10 @@ encounters:
       "This is the calculation that decides half of all data migration questions,"
       says Grace. "Fourteen terabytes, eighty megabits per second, and you may
       assume perfect efficiency. Roughly how long?"
+    hint: >
+      Convert bits to bytes before anything else, then work out one day's
+      throughput and divide. The common error is a factor of eight, in
+      either direction.
     question: Roughly how long does fourteen terabytes take over eighty megabits per second?
     options:
       - id: a

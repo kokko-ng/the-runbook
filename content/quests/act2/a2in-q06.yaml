@@ -25,6 +25,39 @@ encounters:
       flags are in a database table one service reads and the others do not," says
       Marek. "Changing a flag means a deployment. Changing it consistently means
       four."
+    hint: >
+      Marek's complaint is that a flag change is a deployment. Ask where
+      settings could live so a change is one operation, visible to all
+      eleven services, with secrets kept apart.
+    post_mortem:
+      question: >
+        Marek pulls up the three places the flag lives today. "Which
+        requirement decides where configuration goes, and where do secrets
+        fit in that answer?"
+      options:
+        - id: a
+          label: Configuration needs its own store, changed without a release, with secrets referenced
+          correct: true
+          explain: >
+            The requirement is change without deployment, consistently, for
+            eleven services, which is a configuration service's whole job.
+            Secrets stay in the vault and are referenced from it, so neither
+            store does the other one's work.
+        - id: b
+          label: Any centralized store would have served equally well
+          correct: false
+          explain: >
+            Centralizing in a secret store buys throughput limits and access
+            ceremony for values that are not secret; centralizing in a
+            database couples start-up to an operational system. The store's
+            design matters as much as its location.
+        - id: c
+          label: The flags should be removed rather than housed properly
+          correct: false
+          explain: >
+            Feature flags are how progressive delivery works at all. The
+            problem was never their existence; it was that they lived in
+            three places and changed by deployment.
     prompt: What do you recommend?
     options:
       - id: a
@@ -85,6 +118,38 @@ encounters:
       "There is no way to reverse one except deploying the previous commit, and
       the last rollback took forty minutes because the database migration had
       already run."
+    hint: >
+      Grace named two failures: a person watching, and a rollback that takes
+      an evening. Ask what would notice a bad release, and what would
+      reverse it, when no one is looking.
+    post_mortem:
+      question: >
+        "A release degrades at two in the morning on a Saturday," says
+        Grace. "Trace your design's response, minute by minute. Who or what
+        acts?"
+      options:
+        - id: a
+          label: The pipeline itself must detect degradation and reverse it, unattended
+          correct: true
+          explain: >
+            Gates, gradual exposure and health signals give the pipeline the
+            evidence, and automatic rollback gives it the authority. Any
+            design that ends with a person judging inherits the person's
+            hours and attention.
+        - id: b
+          label: Releases need more careful human verification before proceeding
+          correct: false
+          explain: >
+            Human verification is exactly the step that does not scale to
+            every release and every hour. The design goal is evidence the
+            pipeline can read, not more watching.
+        - id: c
+          label: Rollback should be avoided by releasing less often
+          correct: false
+          explain: >
+            Batching releases makes each one larger and its failures harder
+            to attribute. Frequent small releases with automatic reversal
+            are what make any single failure survivable.
     prompt: What deployment approach do you recommend?
     options:
       - id: a
@@ -143,6 +208,37 @@ encounters:
       "You have said rollback is automatic," says Wei Lin. "The last incident
       could not be rolled back because the release included a schema change that
       dropped a column. What does the design say about that?"
+    hint: >
+      Automatic rollback is a promise about every release. Ask what a schema
+      change must preserve for that promise to hold while two versions of
+      the code are running.
+    post_mortem:
+      question: >
+        "The finding stands until the answer does," says Wei Lin. "What
+        property must every single release keep for your automatic rollback
+        to be true?"
+      options:
+        - id: a
+          label: Every release stays reversible, so schema changes cannot strand the old version
+          correct: true
+          explain: >
+            Expand first, deploy code that works with both shapes, contract
+            later once nothing old is running. That ordering is what keeps
+            rollback a routine action instead of a data recovery exercise.
+        - id: b
+          label: Databases make automated deployment impossible
+          correct: false
+          explain: >
+            They make it conditional, not impossible. The condition is
+            compatibility between adjacent releases, which the expand and
+            contract pattern provides on purpose.
+        - id: c
+          label: Schema changes should be batched into rare, well-rehearsed releases
+          correct: false
+          explain: >
+            Batching makes each schema release larger and its rollback
+            window worse. Small compatible steps are what keep any one of
+            them reversible.
     prompt: How do you handle database changes in an automated deployment?
     options:
       - id: a

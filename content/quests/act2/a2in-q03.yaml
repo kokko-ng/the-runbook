@@ -28,6 +28,37 @@ encounters:
 
       Peak season doubles the volume. The machine is idle for the other eighteen
       hours.
+    hint: >
+      Ten million independent units, a shared data set and a deadline. Ask
+      what shape of compute matches that: how it scales, what it costs
+      between runs, and who schedules the pieces.
+    post_mortem:
+      question: >
+        "The run is still the same ten million pieces," says Marek. "What is
+        the shape of this work, and what does that shape ask for?"
+      options:
+        - id: a
+          label: Independent scheduled work wants a scheduler with capacity that exists only for the run
+          correct: true
+          explain: >
+            The work is parallel across machines, so it scales out, and it
+            runs for a fraction of the day, so the capacity should vanish
+            afterwards. A batch scheduler provides both, plus the retries
+            and task management nobody should hand-build.
+        - id: b
+          label: The problem was raw compute power
+          correct: false
+          explain: >
+            Any single machine, however large, keeps the idle hours and hits
+            a ceiling. The run divides cleanly across machines, which is the
+            property to exploit.
+        - id: c
+          label: Parallel work should be spread over whatever compute already exists
+          correct: false
+          explain: >
+            Borrowed capacity couples two schedules that have nothing to do
+            with each other. Work this large deserves its own pool precisely
+            because the pool can be free when the work is.
     prompt: How do you run it?
     options:
       - id: a
@@ -88,6 +119,36 @@ encounters:
       Grace. "So does the dispatch screen, about four hundred times a second during
       the day. It is two hundred megabytes, it changes when a depot moves, which is
       twice a year, and it currently lives in the transport database."
+    hint: >
+      Write down three numbers: how often it is read, how often it changes,
+      and how many things read it. The right store falls out of those three.
+    post_mortem:
+      question: >
+        "Four hundred reads a second, two changes a year," says Grace. "Say
+        what those two numbers ask for, and then place the matrix again."
+      options:
+        - id: a
+          label: Constant reads of rarely changing shared data belong in one shared cache
+          correct: true
+          explain: >
+            The read rate rules out anything with per-request latency or
+            per-query cost, and the change rate makes invalidation a known
+            event rather than a hard problem. One shared copy serves every
+            consumer at memory speed.
+        - id: b
+          label: The matrix was too large to move out of the database
+          correct: false
+          explain: >
+            Two hundred megabytes is small for a cache and enormous as a
+            repeated query load. Size was never the constraint; read rate
+            was.
+        - id: c
+          label: The database should have been scaled to absorb the reads
+          correct: false
+          explain: >
+            The database can be made to carry it, at database prices,
+            forever. A cache answers the same reads at a fraction of the
+            latency and cost, which is the whole trade.
     prompt: What do you recommend?
     options:
       - id: a
@@ -147,6 +208,38 @@ encounters:
       "You are putting a cache in the path of the dispatch screen," says Wei Lin.
       "What happens at three in the morning when the cache is patched, or full, or
       simply not answering?"
+    hint: >
+      Wei Lin is asking what the component is for. If it exists to make
+      things faster, its absence should cost speed, not correctness. Design
+      for the absence.
+    post_mortem:
+      question: >
+        "Write it into the design note," says Wei Lin. "At three in the
+        morning the cache is gone. What property must the design still hold,
+        whatever else you buy?"
+      options:
+        - id: a
+          label: Correctness must survive the cache; only speed may go with it
+          correct: true
+          explain: >
+            The source of truth is a database sitting right there, so the
+            fallback path is the design, and the timeout and circuit breaker
+            keep a slow cache from being worse than none. Anything else
+            turns an optimization into a dependency.
+        - id: b
+          label: The cache needed higher availability
+          correct: false
+          explain: >
+            Redundancy shrinks the window and cannot close it. Wei Lin's
+            question was about the case that remains, and frequency does not
+            answer a question about existence.
+        - id: c
+          label: The dispatch screen should not use cached data at all
+          correct: false
+          explain: >
+            The screen does not depend on the cache; that is the point of
+            the fallback. Removing the cache gives up the latency win the
+            read rate demanded in the first place.
     prompt: How does the design handle a cache failure?
     options:
       - id: a

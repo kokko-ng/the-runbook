@@ -27,6 +27,39 @@ encounters:
 
       Southeast Asia has availability zones. Both machines will use premium solid
       state disks and need to reach the same virtual network.
+    hint: >
+      Ask what each choice actually protects against: a host, a rack, a data
+      center, a region. Then match the mechanism to the largest failure the
+      business needs this application to survive.
+    post_mortem:
+      question: >
+        Marek taps the sketch of the three zones. "Forget the product names
+        for a second. What decides how much availability two machines
+        actually have?"
+      options:
+        - id: a
+          label: Where they sit relative to the failure you need to survive
+          correct: true
+          explain: >
+            Zones are separate locations with their own power, cooling and
+            network, so spreading across them survives a data center loss as
+            well as host maintenance. A set stops at the rack, and a balancer
+            only routes to whatever health the placement provides.
+        - id: b
+          label: How quickly the load balancer removes an unhealthy machine
+          correct: false
+          explain: >
+            Detection speed matters only while something healthy remains. A
+            load balancer distributes availability; it cannot create what the
+            placement does not provide.
+        - id: c
+          label: How far apart the machines are, with farther always better
+          correct: false
+          explain: >
+            Distance past the failure domain buys latency, not resilience. One
+            region's zones already give separate power and cooling; a second
+            region is a different design with a global entry point in front,
+            and it is not this ticket.
     sketch:
       caption: One region, three zones, and two machines to place in them
       nodes:
@@ -106,6 +139,38 @@ encounters:
 
       The existing machine was built by hand in 2023, and there is now a Bicep
       file that describes it.
+    hint: >
+      The requirement is a peer, not a copy. Ask which method produces a
+      second machine from a description, and which methods carry the first
+      machine's history, identity or by-hand mistakes along with it.
+    post_mortem:
+      question: >
+        Dana wants the change note to say why Thursday evening is safe.
+        "When you need a second one of something, where should it come
+        from?"
+      options:
+        - id: a
+          label: From the description that exists, with the differences as parameters
+          correct: true
+          explain: >
+            The Bicep file already states the shape; a name and a zone are the
+            only differences worth having. Both machines stay described by the
+            same code, and Thursday takes four minutes.
+        - id: b
+          label: From the running machine, because reality beats any description
+          correct: false
+          explain: >
+            Copies of a live machine carry its identity, and capturing an
+            image means generalizing it, which takes production down. Reality
+            is the thing that drifts; the description is the thing you
+            control.
+        - id: c
+          label: From the portal, so a human checks each setting on the way through
+          correct: false
+          explain: >
+            Hand-building the second of anything is where the two diverge, one
+            missed setting at a time. The check that matters happened when the
+            template was reviewed.
     prompt: How do you create vm-tms02?
     options:
       - id: a
@@ -164,6 +229,37 @@ encounters:
 
 
       vm-tms01, in zone 1, is healthy and taking everything.
+    hint: >
+      The machine answers locally, so its own health is not the question. Ask
+      what makes a load balancer send anything to a machine in the first
+      place, and whether anything ever did that for the new one.
+    post_mortem:
+      question: >
+        Marek looks at the balancer configuration rather than at the machine.
+        "The service was up and the port was open. What does a load balancer
+        need before health even enters into it?"
+      options:
+        - id: a
+          label: Explicit membership; nothing joins a backend pool by itself
+          correct: true
+          explain: >
+            A backend pool is a list of network interface configurations, and
+            the newer template default did not add the interface. A machine
+            can be perfectly healthy and completely idle until it is a member.
+        - id: b
+          label: A probe tuned loosely enough for a new machine to pass
+          correct: false
+          explain: >
+            The probe never had the chance to fail; it had nothing to measure.
+            Loosening it only blunts the check that catches a machine that is
+            up but not serving.
+        - id: c
+          label: Matching placement, with both machines in the same zone
+          correct: false
+          explain: >
+            The zone was the deliberate part of the design, and a standard
+            load balancer serves members across zones without complaint.
+            Nothing in the symptom pointed at placement.
     ticket:
       ref: INC-4655
       opened: "20:35"
@@ -217,6 +313,17 @@ encounters:
           ---------------  --------  ----------  ---------------------
           AllowLbProbe     Allow     200         AzureLoadBalancer
         time_cost: 1
+    post_incident:
+      path: [a]
+      text: >
+        One listing settles it: the pool holds vm-tms01 and nothing else, and
+        a machine that is not a member cannot receive a probe, let alone
+        traffic. The ticket already gave you the local 200, so health was
+        never in question. The probe configuration is the same one that marks
+        the old machine healthy, the zone reading shows exactly what the
+        deployment intended, and the effective rules already admit the
+        AzureLoadBalancer tag; none of those three can explain a machine the
+        balancer has never been told about.
     fixes:
       - id: a
         label: Add vm-tms02's network interface to the load balancer's backend pool

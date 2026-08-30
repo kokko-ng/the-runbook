@@ -29,6 +29,36 @@ encounters:
 
       Wei Lin has one requirement: images must not be pullable anonymously, and
       whatever pulls them must not use a password stored in a pipeline variable.
+    hint: >
+      Wei Lin gave you two constraints: nothing anonymous, and no password
+      sitting in a variable. Ask which arrangement lets the pipeline and the
+      runtimes prove who they are without any credential existing to store.
+    post_mortem:
+      question: >
+        Marek reads Wei Lin's requirement back off the ticket. "Nothing
+        anonymous, no stored password. What does that actually leave?"
+      options:
+        - id: a
+          label: Roles granted to identities the platform manages, on a private registry
+          correct: true
+          explain: >
+            AcrPush for the pipeline and AcrPull for the runtimes, held by
+            managed identities, means access exists while no credential does.
+            The registry's admin account stays disabled.
+        - id: b
+          label: A registry password, kept somewhere more careful than a pipeline variable
+          correct: false
+          explain: >
+            The admin account is one shared credential with full access,
+            wherever it is stored. Every use of it is a rotation job waiting;
+            the requirement was that no such thing exists.
+        - id: c
+          label: Public images, since these two contain nothing sensitive
+          correct: false
+          explain: >
+            Images carry more context than anyone intends: configuration,
+            paths, internal names. The requirement was explicit before the
+            layers were even inspected.
     prompt: What do you set up?
     options:
       - id: a
@@ -88,6 +118,39 @@ encounters:
 
 
       Nobody at Meridian has run Kubernetes and nobody wants to be the first.
+    hint: >
+      Describe each workload in one clause: one starts, runs eleven minutes
+      and stops; one must keep answering while new versions ship. Ask which
+      runtime is built for each shape, rather than which single platform
+      could hold both.
+    post_mortem:
+      question: >
+        Dana wants the reasoning written into the sprint notes. "Two
+        containers. Two runtimes or one. What should make that call?"
+      options:
+        - id: a
+          label: The shape of each workload, not the count of platforms
+          correct: true
+          explain: >
+            A job that runs and stops wants per-second billing and nothing
+            resident; a service that must keep answering wants revisions,
+            ingress and scaling. Forcing them onto one platform shortchanges
+            one of them.
+        - id: b
+          label: Operational simplicity, which means one platform holding both
+          correct: false
+          explain: >
+            One platform for both either leaves the API without scaling and
+            revisions or buys a cluster for an eleven-minute job. The
+            simplicity is spent, not saved.
+        - id: c
+          label: The industry default, which is a Kubernetes cluster
+          correct: false
+          explain: >
+            Kubernetes earns its keep at a scale and complexity these two
+            containers do not have, and Meridian would be learning it in
+            production. Managed runtimes exist for exactly this size of
+            problem.
     prompt: Where do you run them?
     options:
       - id: a
@@ -152,6 +215,38 @@ encounters:
 
 
       The depots start their shift at 06:45.
+    hint: >
+      Line up three numbers: replicas overnight, seconds before a new replica
+      can answer, and minutes the ramp takes. The failures live where those
+      numbers overlap. Ask what keeps capacity ready before the first request
+      arrives.
+    post_mortem:
+      question: >
+        Marek circles the 06:45 line on the replica chart. "The errors keep
+        office hours. What is the arithmetic that produces them?"
+      options:
+        - id: a
+          label: Zero warm replicas against a ramp faster than a cold start
+          correct: true
+          explain: >
+            From zero, every early request waits on a twenty-second route
+            table load, and the depots arrive faster than replicas become
+            ready. A minimum replica count is the knob that changes the
+            arithmetic.
+        - id: b
+          label: A replica ceiling set too low for the morning peak
+          correct: false
+          explain: >
+            The chart settles at five of a possible ten, so the ceiling was
+            never touched. Headroom above an unused limit changes nothing
+            about the first two minutes.
+        - id: c
+          label: Underpowered containers failing beneath the morning load
+          correct: false
+          explain: >
+            The logs show clean starts, and the failures stop once replicas
+            exist. Bigger containers start slightly faster and still start
+            cold; warmth, not size, was missing.
     ticket:
       ref: INC-4718
       opened: "07:15"
@@ -216,6 +311,18 @@ encounters:
           route table loaded in 22.9s
           listening on :8080
         time_cost: 1
+    post_incident:
+      path: [a, c]
+      text: >
+        The scale block says the service is allowed to sleep: minReplicas
+        zero. The replica chart says it was asleep at 06:35 and still
+        climbing through the whole failure window, and Marek had already
+        supplied the missing constant, twenty seconds before a replica
+        answers. Zero warm capacity, a two-minute ramp, a twenty-second
+        start: the 502s fall out of that arithmetic. Reading the container's
+        resources cannot move the diagnosis, because size does not remove a
+        cold start, and the logs only re-measure the start-up time the
+        investigation had already given you.
     fixes:
       - id: a
         label: >

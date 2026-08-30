@@ -31,6 +31,38 @@ encounters:
 
 
       Priya wants attribution on the next invoice. Dana wants Thursday to happen.
+    hint: >
+      Separate the end state from the opening move. The estate is not compliant
+      yet and a release is queued, so ask which effect turns the gap into a
+      worklist today and still lets you hold the line later.
+    post_mortem:
+      question: >
+        Wei Lin sends the compliance view as a PDF, because of course she does.
+        "Ninety resources, one queued release. Walk me through how a policy
+        lands without breaking anything."
+      options:
+        - id: a
+          label: Observe first, fix what it finds, and enforce only when compliance is real
+          correct: true
+          explain: >
+            Audit turns the policy into a worklist while nothing blocks; once
+            the ninety and the template are fixed, the same definition switches
+            to deny with nothing left for it to break. Sequencing is the whole
+            craft.
+        - id: b
+          label: Enforce from the start, since an agreed requirement should not wait
+          correct: false
+          explain: >
+            Agreement does not make the estate compliant. A deny meets
+            Thursday's template at resource nineteen of thirty, and the wreckage
+            buys the policy a reputation it does not deserve.
+        - id: c
+          label: Enforce, and carve out exceptions for whatever is in flight
+          correct: false
+          explain: >
+            Exemptions are for risks the business has accepted in writing, with
+            an expiry. Spent on a rollout you control, they linger, and the
+            exception quietly becomes the norm.
     prompt: What do you assign, and when?
     options:
       - id: a
@@ -91,6 +123,38 @@ encounters:
 
       "I know what did it," says Marek. "I want to know what you would put back
       instead, and I want the reason, not the answer."
+    hint: >
+      Marek wants the reason, so start from the risk: what was rg-data actually
+      in danger of? Then take each control at its word about what it refuses,
+      and to whom, and notice that a lock has no idea who you are.
+    post_mortem:
+      question: >
+        Marek waits, marker in hand. "Reason, not answer. When a control breaks
+        three services in two days, what does that tell you about how it was
+        chosen?"
+      options:
+        - id: a
+          label: It was set wider than the risk it was meant to stop
+          correct: true
+          explain: >
+            The danger was deletion, and ReadOnly refuses every write, including
+            the ones backup, lifecycle and key rotation perform on your behalf.
+            A guard rail sized to the actual risk blocks the disaster and
+            nothing else.
+        - id: b
+          label: It needed exceptions for the services it broke
+          correct: false
+          explain: >
+            Locks carry no principal list to except anyone from; applying to
+            every identity is what makes them locks. A control that needs
+            exceptions to be livable is the wrong control.
+        - id: c
+          label: It was the wrong kind of control for the problem entirely
+          correct: false
+          explain: >
+            A lock was the right instrument; rg-reporting proved access reviews
+            alone do not stop an accidental delete. The miss was the level
+            chosen, not the mechanism.
     prompt: What replaces the ReadOnly lock?
     options:
       - id: a
@@ -139,6 +203,39 @@ encounters:
       "Every resource in rg-depot-johor belongs to the Johor cost center. Every
       one. I do not want to type it on each resource, and I do not want it wrong
       when somebody deploys at eleven at night."
+    hint: >
+      Every resource in that group has the same right answer, and the platform
+      already knows it. Priya's constraints are three: no typing, no wrong
+      values at night, and the existing estate covered too. Let the
+      requirements pick the effect.
+    post_mortem:
+      question: >
+        Priya circles the four per cent that is still unattributed. "Explain the
+        principle before the next attempt: when the platform already knows the
+        right value, whose job is the tag?"
+      options:
+        - id: a
+          label: The platform's, written automatically and correctable for what exists
+          correct: true
+          explain: >
+            When the correct value is derivable from the resource group, the
+            policy should write it at creation and update, and a remediation
+            task should fix the backlog. Deriving beats demanding wherever a
+            right answer already exists.
+        - id: b
+          label: The deployer's, with the platform refusing anything untagged
+          correct: false
+          explain: >
+            Deny makes a human retype at eleven at night what the group already
+            states, and the depot deploys at eleven at night. Enforcement earns
+            its place where the value cannot be derived.
+        - id: c
+          label: The platform's at creation, with updates left to take care of themselves
+          correct: false
+          explain: >
+            A tag added only at creation can vanish on the next update that
+            omits it, and nothing goes back for the existing estate.
+            Half-automatic is another rota for somebody.
     prompt: How do you cover the remainder?
     options:
       - id: a

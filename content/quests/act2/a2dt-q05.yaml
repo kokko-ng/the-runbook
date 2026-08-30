@@ -27,6 +27,39 @@ encounters:
 
       Finance need yesterday's data by 07:00. The data team have written SQL for
       fifteen years and no Spark.
+    hint: >
+      Weigh the work and the team before the tools: four copies, nightly, to a
+      deadline, run by people who write SQL. Most of the value here is
+      orchestration, retries and knowing by 07:00 whether last night worked.
+    post_mortem:
+      question: >
+        Grace reads the four sources back down the list. "Before you redraw it:
+        describe the work itself, and say what that work deserved."
+      options:
+        - id: a
+          label: >
+            Scheduled movement deserves a managed integration service, sized to the
+            team that operates it
+          correct: true
+          explain: >
+            The job is nightly copying with a deadline, owned by SQL writers.
+            Connectors, scheduling, retries, monitoring and lineage are the
+            product; anything heavier or more handmade misfits either the work or
+            the team.
+        - id: b
+          label: Moving data nightly is simple enough not to need a platform
+          correct: false
+          explain: >
+            The copy is simple; the operating is not. Retries, alerting and one
+            place to see whether last night ran are what separate a pipeline from
+            four scripts and a mystery.
+        - id: c
+          label: The dashboard should read the source systems live instead
+          correct: false
+          explain: >
+            Live reads put analytical scans on production systems during business
+            hours. Landing the data in a lake exists precisely to keep those
+            workloads apart.
     prompt: How do you move the data?
     options:
       - id: a
@@ -87,6 +120,37 @@ encounters:
       ask questions like revenue per lane per month against trailer utilization.
       Roughly four hundred gigabytes of curated data, growing slowly. Nobody is
       doing machine learning and nobody is asking to."
+    hint: >
+      Hold the scale in view: six people, a few hundred gigabytes, questions asked
+      in SQL. The right layer charges in proportion to that usage, and keeps
+      interactive readers on data prepared for reading.
+    post_mortem:
+      question: >
+        Priya underlines six analysts and four hundred gigabytes. "Price your
+        proposal against those two numbers and tell me what the rule should have
+        been."
+      options:
+        - id: a
+          label: The analytics layer is sized and billed to match the actual usage
+          correct: true
+          explain: >
+            Six analysts over a few hundred gigabytes is per-query territory, with
+            curated tables keeping the dashboards quick. Capacity should appear on
+            the bill in proportion to questions asked.
+        - id: b
+          label: A proper warehouse is the professional default for finance reporting
+          correct: false
+          explain: >
+            Dedicated capacity earns its cost at terabyte scale with sustained
+            concurrency. Bought for this workload it runs mostly idle, which is a
+            default nobody should pay for.
+        - id: c
+          label: The lake alone was the analytics layer
+          correct: false
+          explain: >
+            A lake stores; it does not serve dashboards well. Interactive reading
+            needs a curated, query-shaped layer on top, which is the half the
+            design cannot skip.
     prompt: What analytics layer do you recommend?
     options:
       - id: a
@@ -144,6 +208,39 @@ encounters:
       says Wei Lin. "Six analysts, two of whom are contractors. Somebody will ask
       me at the next review who can see driver data, and I want a better answer
       than a list of people."
+    hint: >
+      Wei Lin wants an answer that is true of the platform, not of the people.
+      Decide where each class of data lives and which layer people query, so the
+      answer about driver data is structural rather than a list.
+    post_mortem:
+      question: >
+        Wei Lin drafts her review answer with a blank where yours should go.
+        "Somebody asks who can see driver data. What kind of answer was I asking
+        you to make true?"
+      options:
+        - id: a
+          label: >
+            One built into the platform's structure, with sensitive data absent
+            from the layer people query
+          correct: true
+          explain: >
+            Zones with different access, a published layer without driver
+            identifiers, and a catalog make the answer a property of the design.
+            Anything else makes it a property of behavior, which audits poorly.
+        - id: b
+          label: Stricter permissions on the existing lake would have sufficed
+          correct: false
+          explain: >
+            Permissions on an undivided lake still put personal data one grant away
+            from every analyst. Structure first, then permissions on the structure,
+            is the order that holds.
+        - id: c
+          label: The contractors were the problem and should be excluded
+          correct: false
+          explain: >
+            Contractors with a scoped view of curated data are fine. The exposure
+            came from the lake's shape, and it would apply to employees just the
+            same.
     prompt: How do you handle access in the data platform?
     options:
       - id: a

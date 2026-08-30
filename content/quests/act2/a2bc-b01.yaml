@@ -28,6 +28,38 @@ encounters:
       It also depends on the licensing service that runs on a virtual machine in
       the hub, on private DNS zones linked to the hub network, and on a key vault
       in Southeast Asia that holds the certificate its ingress uses.
+    hint: >
+      Follow the failover minute by minute and ask what dispatch needs already
+      working at each step. An objective is met end to end or not at all, and
+      every dependency with its own recovery time claims a place in the
+      sequence.
+    post_mortem:
+      question: >
+        Grace circles the licensing service, the DNS zones and the vault. "What
+        does a one-hour objective actually bind: the workload, or something
+        larger?"
+      options:
+        - id: a
+          label: The whole chain, so every dependency is planned, ordered and rehearsed
+          correct: true
+          explain: >
+            A service is recovered when everything it needs is. Anything left
+            as an assumption, replicated without a sequence, or excused by a
+            softer number leaves the end-to-end hour unmet.
+        - id: b
+          label: The hub, which was the real single point of failure all along
+          correct: false
+          explain: >
+            The hub hosts several of the dependencies, and replicating it can
+            be right for shared services. Even then something must come up
+            first, so naming the hub does not replace naming the order.
+        - id: c
+          label: A number that was never realistic for a service with this many dependencies
+          correct: false
+          explain: >
+            The number came from the business, and the dependencies are an
+            engineering problem. Bending the requirement to fit the design is
+            exactly what this review exists to catch.
     prompt: What does the design have to add?
     options:
       - id: a
@@ -80,6 +112,39 @@ encounters:
     intro: >
       "Someone will ask why East Asia rather than Australia East," says Marek.
       "Give the reasons that matter and be honest about which ones are habit."
+    hint: >
+      Ask what makes a region eligible before asking what makes it attractive:
+      can it run the services, is the data allowed there, and does the distance
+      fit the recovery point. Everything else ranks after eligibility.
+    post_mortem:
+      question: >
+        Marek writes the two region names either side of a line. "Try the
+        principle instead of the answer. What earns a region the right to be
+        our secondary?"
+      options:
+        - id: a
+          label: Being able to run the workload inside the objectives; preference comes after
+          correct: true
+          explain: >
+            Service availability, residency and replication latency decide
+            whether a region is eligible at all. Pairing shapes specific
+            platform behaviors and price ranks the survivors; neither can
+            rescue a region that fails the first test.
+        - id: b
+          label: Being the platform's designated pair, which failover requires
+          correct: false
+          explain: >
+            Pairing governs particular behaviors, notably where geo-redundant
+            storage replicates and how platform updates are sequenced. Most
+            services replicate wherever you point them, so the pair is an
+            input, not a rule.
+        - id: c
+          label: Costing the least while it sits idle, since it is idle most of the time
+          correct: false
+          explain: >
+            Price is a real input and it is the last one. A cheap region that
+            misses the recovery point objective is not a discount; it is a
+            failed requirement at a lower price.
     prompt: What decides the secondary region?
     options:
       - id: a
@@ -118,6 +183,10 @@ encounters:
       "The board will ask when the clock starts on a one-hour recovery time
       objective," says Grace. "Get this right, because it changes what we have to
       build."
+    hint: >
+      Measure the outage the way the business experiences it. The clock waits
+      for nobody to notice and nobody to decide; ask which interval a customer
+      standing at a dead dispatch screen would name.
     question: When does the recovery time clock start and stop?
     options:
       - id: a

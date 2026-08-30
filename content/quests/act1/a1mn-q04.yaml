@@ -28,6 +28,37 @@ encounters:
 
       "Two products with similar names," says Marek. "Recovery Services vault and
       Backup vault. Put each of these in the right one, and be able to say why."
+    hint: >
+      Ask which workloads each vault type accepts, and whether anything on the
+      list already protects itself. Product coverage is a fact to recall, not a
+      preference to argue.
+    post_mortem:
+      question: >
+        Marek waits with the list. "Again, and reason it this time. What decides
+        which vault a workload goes in?"
+      options:
+        - id: a
+          label: The workload type decides; each vault supports a fixed set and neither is a superset
+          correct: true
+          explain: >
+            Recovery Services vaults hold virtual machines, Azure Files, SQL in a
+            virtual machine and on-premises agents; Backup vaults hold blobs,
+            disks and the newer set. The split is a product fact, not a
+            preference.
+        - id: b
+          label: Age decides; the newer vault should absorb everything over time
+          correct: false
+          explain: >
+            Newer does not mean superset. Virtual machine and file share backup
+            live in the Recovery Services vault today, and no setting moves them
+            into the newer product.
+        - id: c
+          label: Simplicity decides; one vault for everything is the cleaner design
+          correct: false
+          explain: >
+            Cleaner is not available: no single vault accepts all four workloads.
+            Two vaults chosen deliberately is the simple design; one vault is the
+            one that gets redone.
     prompt: How do you split them?
     options:
       - id: a
@@ -96,6 +127,38 @@ encounters:
       shipment records, must be back within four hours, and financial records have
       to be produceable for seven years. The depot file share can lose a day and
       nobody would notice by lunchtime.
+    hint: >
+      The business gave you numbers: an hour, four hours, seven years, a day. A
+      policy is those numbers translated into frequency and retention; nothing in
+      it should lack a number behind it.
+    post_mortem:
+      question: >
+        Priya has not signed yet. "Once more. When I read a backup schedule, what
+        should every number in it trace back to?"
+      options:
+        - id: a
+          label: >
+            A stated business objective: frequency from acceptable loss,
+            retention from how far back records must reach
+          correct: true
+          explain: >
+            The business said an hour of loss and seven years of reach. Multiple
+            backups a day answers the hour; monthly long-term points answer the
+            seven years without keeping every daily point forever.
+        - id: b
+          label: The platform's defaults, which exist because they suit most workloads
+          correct: false
+          explain: >
+            The default daily schedule loses up to a day against a stated hour,
+            and nobody discovers that until the loss happens. A default nobody
+            has tested against the requirement is the thing being replaced.
+        - id: c
+          label: The maximum the platform can do, to be safe
+          correct: false
+          explain: >
+            Backing up hourly and keeping every point makes tens of thousands of
+            recovery points and an indefensible bill. Safety is meeting the
+            stated numbers, not exceeding all of them at any cost.
     prompt: What do you configure for the transport application machines?
     options:
       - id: a
@@ -157,6 +220,10 @@ encounters:
       "Priya will use these two terms in front of the board and you have to be
       sure which is which," says Marek. "Recovery point objective and recovery
       time objective. Backup frequency sets one of them. Which?"
+    hint: >
+      Separate the two clocks. One runs backward from the failure to the last
+      copy; the other runs forward until the service answers again. Ask which one
+      a schedule can move.
     question: Which objective does backup frequency determine?
     options:
       - id: a

@@ -27,6 +27,37 @@ encounters:
       Dispatch stops trucks when it is down. The tracking portal is
       customer-facing but read-only. The analytics platform is used by six people
       during office hours. The Straits ERP posts invoices.
+    hint: >
+      Ask who owns the consequence of an hour of downtime for each system. A
+      recovery objective is a business decision with a cost attached, and it is
+      only defensible if the people who pay for it agreed to it.
+    post_mortem:
+      question: >
+        Grace looks at the slide for a while. "Before you redraft it: what is
+        the actual flaw in how those numbers were arrived at?"
+      options:
+        - id: a
+          label: The objectives were set without weighing business impact against cost
+          correct: true
+          explain: >
+            A recovery objective is a trade between what downtime costs and what
+            protection costs. Any process that skips that weighing, whether it
+            guesses, copies, or defers, produces numbers nobody can defend to
+            the board.
+        - id: b
+          label: The objectives were not strict enough for a freight company
+          correct: false
+          explain: >
+            Strictness is not the measure. Analytics can wait a day at Meridian
+            without harm; the flaw is setting numbers without asking what each
+            workload's downtime costs, not setting them too loose.
+        - id: c
+          label: IT should never be involved in setting recovery objectives
+          correct: false
+          explain: >
+            IT belongs in the room, because somebody has to say what each tier
+            costs to deliver. The flaw is IT deciding alone, not IT
+            participating.
     prompt: How do you establish the objectives?
     options:
       - id: a
@@ -86,6 +117,37 @@ encounters:
 
       "Same continuity plan, two very different systems," says Marek. "Say what
       each one gets."
+    hint: >
+      Test each mechanism against both numbers. A backup can meet a data loss
+      objective and still fail the time objective; something already running
+      costs more and answers faster. Match the spend to the number, per system.
+    post_mortem:
+      question: >
+        Marek taps the two numbers on the whiteboard. "Fifteen minutes and one
+        hour. A day and a day. Which rule did the recommendation break?"
+      options:
+        - id: a
+          label: The mechanism has to satisfy both objectives for each workload, at that workload's price
+          correct: true
+          explain: >
+            A one-hour recovery time rules out restore-and-rebuild for dispatch,
+            and a twenty-four hour window makes warm capacity for analytics
+            wasted money. Each system's mechanism is dictated by its own two
+            numbers, not by the other system's.
+        - id: b
+          label: Every workload in one plan should share one recovery mechanism
+          correct: false
+          explain: >
+            Uniformity is the mistake this exercise exists to remove. One
+            mechanism either over-protects the cheap tier or under-protects the
+            expensive one; the plan is allowed to differ per tier.
+        - id: c
+          label: Replication should always be preferred over backup when the budget allows
+          correct: false
+          explain: >
+            Replication is not a superior grade of backup; it serves the time
+            objective, not thrift. Where a day is acceptable, backup plus
+            templates meets the numbers at a fraction of the cost.
     prompt: What do you recommend for each?
     options:
       - id: a
@@ -142,6 +204,39 @@ encounters:
       at least a year," says Wei Lin. "It is on two physical servers. Their
       continuity plan is a tape drive and a contract with a company that no longer
       answers the phone."
+    hint: >
+      A recovery time objective is measured against somewhere to run, not
+      against owning a copy. Ask which answers give these servers a place to
+      come up that is not in the same building, during the year they still
+      exist.
+    post_mortem:
+      question: >
+        Wei Lin adds a line to the finding before she closes the laptop. "For
+        the record: what does a continuity plan for this site actually have to
+        provide?"
+      options:
+        - id: a
+          label: A recovery destination outside the site, available for the whole interim year
+          correct: true
+          explain: >
+            Copies address media loss; a recovery time objective is met by
+            somewhere to run. The plan must protect the servers as they exist
+            today, to a destination that does not share the site's fate, for
+            every month until they retire.
+        - id: b
+          label: A faster migration, so the risky year gets shorter
+          correct: false
+          explain: >
+            The migration timeline is set by the ERP and the business, not by
+            the continuity plan. Compressing it trades one risk for another and
+            still leaves the servers bare while the work runs.
+        - id: c
+          label: More backup copies, kept further from Port Klang
+          correct: false
+          explain: >
+            Extra copies harden the backup, which was already the weakest habit
+            here, but a tape in a safer place still restores onto hardware the
+            plan does not have. Media is not the gap; a destination is.
     prompt: What do you recommend for the hybrid part of the estate?
     options:
       - id: a
