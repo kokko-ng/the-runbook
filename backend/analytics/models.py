@@ -18,6 +18,9 @@ class AnalyticsEvent(models.Model):
         ("pip", "Reputation hit zero"),
         ("perk_buy", "Perk purchased"),
         ("act_opened", "Act opened without finishing the one before"),
+        ("post_mortem", "Post-mortem answered"),
+        ("review_start", "Review drill started"),
+        ("review_complete", "Review drill completed"),
     ]
 
     anonymous_id = models.CharField(max_length=64, blank=True, db_index=True)

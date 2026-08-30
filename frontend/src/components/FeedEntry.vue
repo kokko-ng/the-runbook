@@ -83,6 +83,63 @@ defineProps<{ entry: LogEntry }>()
       {{ entry.text }}
     </p>
 
+    <!-- The mentor's nudge, bought with the hint perk. -->
+    <div v-else-if="entry.kind === 'hint'" class="card border-l-4 border-l-signal-500 p-3 sm:p-4">
+      <p class="text-xs uppercase tracking-wide text-ink-500 dark:text-ink-400">Hint</p>
+      <p class="prose-beat mt-1">{{ entry.text }}</p>
+    </div>
+
+    <!-- The post-mortem question that follows a first wrong turn. -->
+    <div v-else-if="entry.kind === 'post_mortem_ask'" class="border-l-2 border-degraded pl-3">
+      <p class="text-xs uppercase tracking-wide text-ink-500 dark:text-ink-400">
+        {{ entry.speaker ? `${entry.speaker} · post-mortem` : 'Post-mortem' }}
+      </p>
+      <p class="prose-beat mt-1 whitespace-pre-line">{{ entry.question }}</p>
+    </div>
+
+    <!-- How the post-mortem answer landed. -->
+    <div
+      v-else-if="entry.kind === 'post_mortem'"
+      class="card border-l-4 p-3 sm:p-4"
+      :class="entry.correct ? 'border-l-healthy' : 'border-l-degraded'"
+    >
+      <p class="flex items-center gap-2 text-sm font-semibold">
+        <span :class="entry.correct ? 'text-healthy' : 'text-degraded'">
+          {{ entry.correct ? 'That is the lesson.' : 'Not quite the lesson.' }}
+        </span>
+        <span v-if="entry.rep_delta" class="font-mono text-xs text-healthy">
+          +{{ entry.rep_delta }} rep back
+        </span>
+      </p>
+      <p class="prose-beat mt-2">{{ entry.explain }}</p>
+    </div>
+
+    <!-- The diagnostic path a senior would have run, after the fix lands. -->
+    <div v-else-if="entry.kind === 'post_incident'" class="card border-l-4 border-l-signal-500 p-3 sm:p-4">
+      <p class="text-xs uppercase tracking-wide text-ink-500 dark:text-ink-400">
+        Post-incident review
+      </p>
+      <p class="prose-beat mt-1">{{ entry.text }}</p>
+      <ol class="mt-2 space-y-1">
+        <li
+          v-for="(step, position) in entry.steps"
+          :key="position"
+          class="flex min-w-0 items-baseline gap-2 text-xs"
+        >
+          <span
+            class="shrink-0 font-mono"
+            :class="step.ran ? 'text-healthy' : 'text-ink-400 dark:text-ink-500'"
+            :title="step.ran ? 'You ran this' : 'You did not run this'"
+          >
+            {{ step.ran ? '[ran]' : '[missed]' }}
+          </span>
+          <code class="min-w-0 overflow-x-auto font-mono text-ink-600 dark:text-ink-300">
+            {{ step.cmd }}
+          </code>
+        </li>
+      </ol>
+    </div>
+
     <p v-else class="text-xs uppercase tracking-wide text-signal-500">{{ entry.text }}</p>
   </li>
 </template>

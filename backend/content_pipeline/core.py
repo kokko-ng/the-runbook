@@ -422,6 +422,13 @@ MAX_BEAT_WORDS = 250
 CORRECT_REP = (2, 10)
 WRONG_REP = (-15, -5)
 CHAPTER_CORE_QUESTS = (5, 10)
+# A hint is a nudge, not a second explanation.
+MAX_HINT_WORDS = 45
+MAX_POST_MORTEM_QUESTION_WORDS = 60
+MAX_POST_MORTEM_LABEL_WORDS = 30
+# Three candidate lessons: the real one and two plausible misreadings.
+POST_MORTEM_OPTION_COUNT = 3
+MAX_POST_INCIDENT_WORDS = 120
 
 
 def validate(
@@ -668,6 +675,18 @@ def _validate_encounters(
             if encounter.get(field_name):
                 problems += check_prose(encounter[field_name], f"{spot}.{field_name}")
 
+        hint = encounter.get("hint")
+        if hint:
+            problems += check_prose(hint, f"{spot}.hint")
+            if word_count(hint) > MAX_HINT_WORDS:
+                problems.append(
+                    Problem(
+                        spot,
+                        f"hint is {word_count(hint)} words; the limit is {MAX_HINT_WORDS}",
+                    )
+                )
+        problems += _validate_post_mortem(encounter.get("post_mortem"), spot, speakers)
+
         speaker = encounter.get("speaker")
         if speaker and speaker not in speakers:
             problems.append(Problem(spot, f"speaker {speaker!r} is not in the cast"))
@@ -691,6 +710,96 @@ def _validate_encounters(
         elif etype == "troubleshoot":
             problems += _validate_options(encounter.get("fixes", []), nodes, edges, spot, "fixes")
             problems += _validate_troubleshoot(encounter, spot, speakers)
+            problems += _validate_post_incident(encounter, spot)
+    return problems
+
+
+def _validate_post_mortem(
+    post_mortem: dict[str, Any] | None, spot: str, speakers: set[str]
+) -> list[Problem]:
+    """The follow-up after a wrong answer has to teach, not merely quiz."""
+    if not post_mortem:
+        return []
+    problems: list[Problem] = []
+    question = post_mortem.get("question", "")
+    problems += check_prose(question, f"{spot}.post_mortem.question")
+    if word_count(question) > MAX_POST_MORTEM_QUESTION_WORDS:
+        problems.append(
+            Problem(
+                spot,
+                f"post_mortem question is {word_count(question)} words; "
+                f"the limit is {MAX_POST_MORTEM_QUESTION_WORDS}",
+            )
+        )
+    speaker = post_mortem.get("speaker")
+    if speaker and speaker not in speakers:
+        problems.append(Problem(spot, f"post_mortem speaker {speaker!r} is not in the cast"))
+
+    options = post_mortem.get("options", [])
+    if len(options) != POST_MORTEM_OPTION_COUNT:
+        problems.append(
+            Problem(
+                spot,
+                f"a post-mortem deals exactly {POST_MORTEM_OPTION_COUNT} answers, "
+                f"found {len(options)}",
+            )
+        )
+    correct = [o for o in options if o.get("correct")]
+    if len(correct) != 1:
+        problems.append(
+            Problem(spot, f"post_mortem must hold exactly one correct answer, found {len(correct)}")
+        )
+    ids = [o.get("id") for o in options]
+    if len(set(ids)) != len(ids):
+        problems.append(Problem(spot, "duplicate option id in post_mortem"))
+    for option in options:
+        oid = option.get("id", "?")
+        label = option.get("label", "")
+        if word_count(label) > MAX_POST_MORTEM_LABEL_WORDS:
+            problems.append(
+                Problem(
+                    spot,
+                    f"post_mortem/{oid}: label is {word_count(label)} words; "
+                    f"the limit is {MAX_POST_MORTEM_LABEL_WORDS}",
+                )
+            )
+        if not option.get("explain"):
+            problems.append(
+                Problem(spot, f"post_mortem/{oid}: every answer needs a teaching explanation")
+            )
+        for field_name in ("label", "explain"):
+            if option.get(field_name):
+                problems += check_prose(
+                    option[field_name], f"{spot}.post_mortem/{oid}.{field_name}"
+                )
+    return problems
+
+
+def _validate_post_incident(encounter: dict[str, Any], spot: str) -> list[Problem]:
+    """The senior's diagnostic path may only name checks the incident offers."""
+    post = encounter.get("post_incident")
+    if not post:
+        return []
+    problems: list[Problem] = []
+    command_ids = {c.get("id") for c in encounter.get("commands", [])}
+    path = post.get("path", [])
+    if len(set(path)) != len(path):
+        problems.append(Problem(spot, "post_incident.path repeats a command"))
+    for command_id in path:
+        if command_id not in command_ids:
+            problems.append(
+                Problem(spot, f"post_incident.path names unknown command {command_id!r}")
+            )
+    text = post.get("text", "")
+    problems += check_prose(text, f"{spot}.post_incident.text")
+    if word_count(text) > MAX_POST_INCIDENT_WORDS:
+        problems.append(
+            Problem(
+                spot,
+                f"post_incident text is {word_count(text)} words; "
+                f"the limit is {MAX_POST_INCIDENT_WORDS}",
+            )
+        )
     return problems
 
 
@@ -933,6 +1042,12 @@ def deal_answers(quest: Quest) -> dict[str, Any]:
                 continue
             order = _dealt_order(f"{quest.id}/{encounter['id']}/{field_name}", len(choices))
             encounter[field_name] = [choices[index] for index in order]
+        # Post-mortem answers are authored correct-first too.
+        post_mortem = encounter.get("post_mortem")
+        if post_mortem and post_mortem.get("options"):
+            choices = post_mortem["options"]
+            order = _dealt_order(f"{quest.id}/{encounter['id']}/post_mortem", len(choices))
+            post_mortem["options"] = [choices[index] for index in order]
     return data
 
 
@@ -965,6 +1080,18 @@ def build_bundle(library: Library, out_dir: Path | None = None) -> dict[str, Any
                         "estimated_minutes": q.data.get("estimated_minutes", 12),
                         "encounter_count": len(q.encounters),
                         "encounter_types": sorted({e["type"] for e in q.encounters}),
+                        # One entry per encounter with its effective objectives,
+                        # so the engine can map an objective to the cleared
+                        # encounters that cover it without loading every quest:
+                        # review drills and save migration both lean on it.
+                        "encounters": [
+                            {
+                                "id": e["id"],
+                                "type": e["type"],
+                                "objectives": e.get("objectives", q.objectives),
+                            }
+                            for e in q.encounters
+                        ],
                     }
                     for q in quests
                 ],

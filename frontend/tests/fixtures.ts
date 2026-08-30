@@ -17,6 +17,24 @@ export const design: Quest = {
       prompt: 'What do you take to the change board?',
       objectives: ['AZ104-4.1.2'],
       resolution: 'Marek grunts, which is how he says yes.',
+      hint: 'Think about what a peering needs on each side before it connects.',
+      post_mortem: {
+        question: 'What did that change actually get wrong?',
+        options: [
+          {
+            id: 'a',
+            label: 'It treated a routing gap as a security problem',
+            correct: true,
+            explain: 'The traffic was allowed; it had no path.',
+          },
+          {
+            id: 'b',
+            label: 'It used the wrong port range',
+            correct: false,
+            explain: 'Ports were never the issue.',
+          },
+        ],
+      },
       options: [
         {
           id: 'a',
@@ -85,6 +103,11 @@ export const incident: Quest = {
         severity: 'sev2',
       },
       time_budget: 4,
+      hint: 'A peering that shows Initiated is waiting for its other half.',
+      post_incident: {
+        path: ['a', 'd'],
+        text: 'Two peering listings, one from each side, settle it. The NSG and IP flow checks cannot tell you anything the symptom did not already say.',
+      },
       investigate: [
         { id: 'a', action: 'Ask the NOC what changed overnight', reveals: 'A peering was recreated.' },
         { id: 'b', action: 'Read the change record', reveals: 'Only the hub side was recreated.', time_cost: 1 },
@@ -169,9 +192,27 @@ export const index: ContentIndex = {
       rank: 'junior-cloud-admin',
       blurb: '',
       quests: [
-        { id: 'q-design', title: design.title, summary: '', variant: 'core', bonus_of: null, objectives: design.objectives, estimated_minutes: 10, encounter_count: 2, encounter_types: ['design', 'knowledge'] },
-        { id: 'q-incident', title: incident.title, summary: '', variant: 'core', bonus_of: null, objectives: incident.objectives, estimated_minutes: 10, encounter_count: 1, encounter_types: ['troubleshoot'] },
-        { id: 'q-bonus', title: bonus.title, summary: '', variant: 'bonus', bonus_of: 'q-incident', objectives: incident.objectives, estimated_minutes: 10, encounter_count: 1, encounter_types: ['troubleshoot'] },
+        {
+          id: 'q-design', title: design.title, summary: '', variant: 'core', bonus_of: null,
+          objectives: design.objectives, estimated_minutes: 10, encounter_count: 2,
+          encounter_types: ['design', 'knowledge'],
+          encounters: [
+            { id: 'a', type: 'design', objectives: ['AZ104-4.1.2'] },
+            { id: 'b', type: 'knowledge', objectives: ['AZ104-4.1.4'] },
+          ],
+        },
+        {
+          id: 'q-incident', title: incident.title, summary: '', variant: 'core', bonus_of: null,
+          objectives: incident.objectives, estimated_minutes: 10, encounter_count: 1,
+          encounter_types: ['troubleshoot'],
+          encounters: [{ id: 'a', type: 'troubleshoot', objectives: ['AZ104-4.1.5'] }],
+        },
+        {
+          id: 'q-bonus', title: bonus.title, summary: '', variant: 'bonus', bonus_of: 'q-incident',
+          objectives: incident.objectives, estimated_minutes: 10, encounter_count: 1,
+          encounter_types: ['troubleshoot'],
+          encounters: [{ id: 'a', type: 'troubleshoot', objectives: ['AZ104-4.1.5'] }],
+        },
       ],
     },
     {

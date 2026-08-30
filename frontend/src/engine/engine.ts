@@ -8,17 +8,21 @@
  */
 
 import { applyOps, initialDiagram } from './diagram'
+import { selectActDrill, selectDueDrill } from './review'
 import {
   DEFAULT_COMMAND_TIME_COST,
   PERKS,
   REP_AFTER_PIP,
-  REP_BONUS_UNLOCK,
   REP_FIRST_TRY_BONUS,
   REP_START,
   REP_UNDER_BUDGET_BONUS,
+  REVIEW_FIRST_TRY_POINT,
+  REVIEW_INTERVALS_DAYS,
   WRONG_FIX_TIME_COST,
   applyShield,
   clampRep,
+  clawback,
+  nextDue,
 } from './rules'
 import {
   SAVE_SCHEMA_VERSION,
@@ -66,12 +70,27 @@ export function createSave(index: ContentIndex, now: string): SaveState {
       encounters_cleared: [],
       first_try: [],
       objectives: [],
+      mastered: [],
       chapter_checkpoints: {},
       acts_opened: [],
     },
+    review: {},
+    review_session: null,
     history: [],
-    stats: { pips: 0, correct: 0, wrong: 0, quests: 0 },
+    stats: { pips: 0, correct: 0, wrong: 0, quests: 0, drills: 0 },
   }
+}
+
+/** The objectives each cleared encounter covers, looked up from the index alone. */
+function summaryObjectives(index: ContentIndex, ref: string): string[] {
+  const [questId, encounterId] = ref.split('/')
+  for (const chapter of index.chapters) {
+    const quest = chapter.quests.find((entry) => entry.id === questId)
+    if (!quest) continue
+    const encounter = (quest.encounters ?? []).find((entry) => entry.id === encounterId)
+    return encounter?.objectives ?? quest.objectives
+  }
+  return []
 }
 
 /**
@@ -91,11 +110,46 @@ export function migrateSave(save: SaveState, index: ContentIndex, now: string): 
     perks: { ...base.perks, ...(save.perks ?? {}) },
     perks_bought: { ...base.perks_bought, ...(save.perks_bought ?? {}) },
     progress: { ...base.progress, ...(save.progress ?? {}) },
+    review: save.review ?? {},
+    review_session: save.review_session ?? null,
     stats: { ...base.stats, ...(save.stats ?? {}) },
     diagram: {
       nodes: { ...base.diagram.nodes, ...(save.diagram?.nodes ?? {}) },
       edges: { ...base.diagram.edges, ...(save.diagram?.edges ?? {}) },
     },
+  }
+
+  // A save from before mastery was tracked has earned it retroactively: an
+  // objective is solid if some first-try clear covered it.
+  if (!save.progress?.mastered) {
+    const lit = new Set(merged.progress.objectives)
+    const solid = new Set<string>()
+    for (const ref of merged.progress.first_try) {
+      for (const objective of summaryObjectives(index, ref)) {
+        if (lit.has(objective)) solid.add(objective)
+      }
+    }
+    merged.progress.mastered = [...solid]
+  }
+
+  // Everything already lit joins the review ladder: solid objectives get the
+  // longer first rest, shaky ones come due tomorrow.
+  const mastered = new Set(merged.progress.mastered)
+  for (const objective of merged.progress.objectives) {
+    if (merged.review[objective]) continue
+    const interval = mastered.has(objective) ? 1 : 0
+    merged.review[objective] = { interval, due: nextDue(now, interval), last: now }
+  }
+
+  // A run captured mid-encounter on an older build resumes with the new
+  // run-level fields defaulted rather than undefined.
+  if (merged.active) {
+    merged.active = {
+      ...merged.active,
+      review: merged.active.review ?? false,
+      hint_used: merged.active.hint_used ?? false,
+      post_mortem: merged.active.post_mortem ?? null,
+    }
   }
   return merged
 }
@@ -155,13 +209,11 @@ export function questAvailability(
   if (!chapterUnlocked(state, index, chapter.id)) {
     return { unlocked: false, reason: 'Finish the previous chapter first.' }
   }
+  // Exam-hard variants are practice, and practice belongs to whoever wants it:
+  // clearing the original ticket is the only key. Gating them on a high
+  // reputation kept the extra reps away from exactly the players who needed
+  // them most.
   if (quest.variant === 'bonus') {
-    if (state.rep < REP_BONUS_UNLOCK) {
-      return {
-        unlocked: false,
-        reason: `Exam-hard scenarios open up at ${REP_BONUS_UNLOCK} reputation.`,
-      }
-    }
     if (quest.bonus_of && !state.progress.quests_completed.includes(quest.bonus_of)) {
       return { unlocked: false, reason: 'Clear the original ticket before the hard variant.' }
     }
@@ -193,7 +245,7 @@ function push(run: EncounterRun, entry: LogEntryInput): void {
   run.log.push({ ...entry, seq: run.seq })
 }
 
-function beginRun(encounter: Encounter, quest: Quest, index: number): EncounterRun {
+function beginRun(encounter: Encounter, quest: Quest, index: number, review = false): EncounterRun {
   const budget = encounter.type === 'troubleshoot' ? encounter.time_budget : 0
   const run: EncounterRun = {
     quest_id: quest.id,
@@ -209,8 +261,17 @@ function beginRun(encounter: Encounter, quest: Quest, index: number): EncounterR
     shield: false,
     resolved: false,
     outcome: null,
+    review,
+    hint_used: false,
+    post_mortem: null,
     log: [],
     seq: 0,
+  }
+  if (review) {
+    push(run, {
+      kind: 'system',
+      text: `Runbook drill: you pull the closed file on "${quest.title}" and walk it again.`,
+    })
   }
   if (encounter.type === 'troubleshoot') {
     push(run, { kind: 'ticket', ticket: encounter.ticket })
@@ -234,8 +295,69 @@ function reject(state: SaveState, reason: string): EngineResult {
 }
 
 export function currentEncounter(quest: Quest, state: SaveState): Encounter | undefined {
+  // The active run knows exactly which encounter it is. Review drills rely on
+  // this: they run encounters from anywhere without moving the story position.
+  if (state.active && state.active.quest_id === quest.id) {
+    const active = state.active
+    return quest.encounters.find((entry) => entry.id === active.encounter_id)
+  }
   if (!state.position) return undefined
   return quest.encounters[state.position.encounter_index]
+}
+
+/**
+ * The quest an in-run action applies to, or null when the caller's quest is
+ * not the one the run belongs to. A drill can hold a run from any quest, so
+ * every mid-run handler checks its context against the run rather than trust
+ * the view that dispatched it.
+ */
+function runQuest(state: SaveState, ctx: EngineContext): Quest | null {
+  const quest = ctx.quest
+  if (!quest || !state.active || state.active.quest_id !== quest.id) return null
+  return quest
+}
+
+// --------------------------------------------------------------------------
+// the review ladder
+// --------------------------------------------------------------------------
+
+function seedReview(save: SaveState, objective: string, firstTry: boolean, now: string): void {
+  if (save.review[objective]) {
+    // Already on the ladder; a clean retrieval moves it up a rung.
+    if (firstTry) bumpReview(save, objective, now)
+    return
+  }
+  const interval = firstTry ? 1 : 0
+  save.review[objective] = { interval, due: nextDue(now, interval), last: now }
+}
+
+function bumpReview(save: SaveState, objective: string, now: string): void {
+  const current = save.review[objective]
+  if (current && now < current.due) {
+    // Recall before the date proves nothing about the longer gap: retrieving
+    // something three times in one sitting is still massed practice. The
+    // ladder holds and the date stands.
+    save.review[objective] = { ...current, last: now }
+    return
+  }
+  const interval = Math.min((current?.interval ?? 0) + 1, REVIEW_INTERVALS_DAYS.length - 1)
+  save.review[objective] = { interval, due: nextDue(now, interval), last: now }
+}
+
+function lapseReview(save: SaveState, objective: string, now: string): void {
+  if (!save.review[objective]) return
+  save.review[objective] = { interval: 0, due: nextDue(now, 0), last: now }
+}
+
+/** Take shaken objectives out of mastered; returns the ones that fell. */
+function demote(save: SaveState, objectives: string[]): string[] {
+  const lapsed = objectives.filter((objective) => save.progress.mastered.includes(objective))
+  if (lapsed.length) {
+    save.progress.mastered = save.progress.mastered.filter(
+      (objective) => !lapsed.includes(objective),
+    )
+  }
+  return lapsed
 }
 
 // --------------------------------------------------------------------------
@@ -252,6 +374,8 @@ export function reduce(state: SaveState, action: Action, ctx: EngineContext): En
       return runCommand(state, action.id, ctx)
     case 'choose':
       return choose(state, action.option_id, ctx)
+    case 'post_mortem':
+      return answerPostMortem(state, action.option_id, ctx)
     case 'advance':
       return advance(state, ctx)
     case 'abandon':
@@ -264,6 +388,10 @@ export function reduce(state: SaveState, action: Action, ctx: EngineContext): En
       return restartCheckpoint(state, ctx)
     case 'open_act':
       return openAct(state, action.act, ctx)
+    case 'start_review':
+      return startReview(state, action, ctx)
+    case 'review_next':
+      return reviewNext(state, ctx)
   }
 }
 
@@ -294,6 +422,9 @@ function startQuest(state: SaveState, questId: string, ctx: EngineContext): Engi
   if (!availability.unlocked) return reject(state, availability.reason ?? 'Locked.')
 
   const next = copy(state)
+  // Walking back to the queue closes any drill that was open. Nothing is lost:
+  // objectives still due stay due.
+  next.review_session = null
   next.position = { chapter_id: quest.chapter, quest_id: quest.id, encounter_index: 0 }
   // The checkpoint is the quest boundary you are standing on: a performance
   // improvement plan rewinds the chapter to here, never further back.
@@ -306,7 +437,7 @@ function startQuest(state: SaveState, questId: string, ctx: EngineContext): Engi
 }
 
 function investigate(state: SaveState, id: string, ctx: EngineContext): EngineResult {
-  const quest = ctx.quest
+  const quest = runQuest(state, ctx)
   if (!quest || !state.active || state.active.resolved) return reject(state, 'Nothing to investigate.')
   const encounter = currentEncounter(quest, state)
   if (!encounter || encounter.type !== 'troubleshoot') return reject(state, 'Not an incident.')
@@ -331,7 +462,7 @@ function investigate(state: SaveState, id: string, ctx: EngineContext): EngineRe
 }
 
 function runCommand(state: SaveState, id: string, ctx: EngineContext): EngineResult {
-  const quest = ctx.quest
+  const quest = runQuest(state, ctx)
   if (!quest || !state.active || state.active.resolved) return reject(state, 'No console open.')
   const encounter = currentEncounter(quest, state)
   if (!encounter || encounter.type !== 'troubleshoot') return reject(state, 'Not an incident.')
@@ -360,8 +491,11 @@ function runCommand(state: SaveState, id: string, ctx: EngineContext): EngineRes
 }
 
 function choose(state: SaveState, optionId: string, ctx: EngineContext): EngineResult {
-  const quest = ctx.quest
+  const quest = runQuest(state, ctx)
   if (!quest || !state.active || state.active.resolved) return reject(state, 'Nothing to answer.')
+  if (state.active.post_mortem?.pending) {
+    return reject(state, 'Walk the post-mortem first, then have another go.')
+  }
   const encounter = currentEncounter(quest, state)
   if (!encounter) return reject(state, 'Nothing to answer.')
   const option = optionsOf(encounter).find((entry) => entry.id === optionId)
@@ -371,8 +505,10 @@ function choose(state: SaveState, optionId: string, ctx: EngineContext): EngineR
   const next = copy(state)
   const run = next.active as EncounterRun
   const events: GameEvent[] = []
-  const replay = next.progress.quests_completed.includes(quest.id)
+  const review = run.review
+  const replay = !review && next.progress.quests_completed.includes(quest.id)
   const firstTry = run.attempts === 0
+  const objectives = encounterObjectives(encounter, quest)
 
   run.attempts += 1
   push(run, { kind: 'choice', option_id: option.id, label: option.label, correct: option.correct })
@@ -389,13 +525,15 @@ function choose(state: SaveState, optionId: string, ctx: EngineContext): EngineR
     let delta = option.rep
     if (firstTry) delta += REP_FIRST_TRY_BONUS
     if (underBudget) delta += REP_UNDER_BUDGET_BONUS
-    if (replay) delta = 0
+    // Drills and replays are practice: the story already paid out once.
+    if (replay || review) delta = 0
 
     next.rep = clampRep(next.rep + delta)
     next.stats.correct += 1
     run.resolved = true
     run.outcome = firstTry ? 'first_try' : 'recovered'
-    next.diagram = applyOps(next.diagram, option.diagram)
+    // A drill replays a closed ticket; the estate does not change twice.
+    if (!review) next.diagram = applyOps(next.diagram, option.diagram)
 
     push(run, {
       kind: 'feedback',
@@ -405,18 +543,64 @@ function choose(state: SaveState, optionId: string, ctx: EngineContext): EngineR
       ...(option.consequence ? { consequence: option.consequence } : {}),
     })
     if (encounter.resolution) push(run, { kind: 'resolution', text: encounter.resolution })
+    // What the senior would have run, laid next to what the player did run.
+    if (encounter.type === 'troubleshoot' && encounter.post_incident) {
+      push(run, {
+        kind: 'post_incident',
+        text: encounter.post_incident.text,
+        steps: encounter.post_incident.path.flatMap((id) => {
+          const command = encounter.commands.find((entry) => entry.id === id)
+          if (!command) return []
+          return [
+            {
+              cmd: command.cmd,
+              ...(command.label ? { label: command.label } : {}),
+              ran: run.ran.includes(id),
+            },
+          ]
+        }),
+      })
+    }
 
-    if (!replay) {
+    if (review) {
+      const session = next.review_session
+      if (session) {
+        if (firstTry) session.correct += 1
+        else session.wrong += 1
+      }
+      if (firstTry) {
+        // A clean recall: the ladder stretches, the objective firms up.
+        next.skill_points += REVIEW_FIRST_TRY_POINT
+        const promoted = objectives.filter(
+          (objective) =>
+            next.progress.objectives.includes(objective) &&
+            !next.progress.mastered.includes(objective),
+        )
+        next.progress.mastered.push(...promoted)
+        if (promoted.length) events.push({ type: 'mastered', ids: promoted })
+        for (const objective of objectives) bumpReview(next, objective, ctx.now)
+      }
+      // A recovered drill already took its lapse on the wrong pick.
+    } else if (!replay) {
       const earned = (firstTry ? 1 : 0) + (underBudget ? 1 : 0)
       next.skill_points += earned
       const ref = `${quest.id}/${encounter.id}`
       if (!next.progress.encounters_cleared.includes(ref)) next.progress.encounters_cleared.push(ref)
       if (firstTry && !next.progress.first_try.includes(ref)) next.progress.first_try.push(ref)
-      const lit = encounterObjectives(encounter, quest).filter(
-        (objective) => !next.progress.objectives.includes(objective),
-      )
+      const lit = objectives.filter((objective) => !next.progress.objectives.includes(objective))
       next.progress.objectives.push(...lit)
       if (lit.length) events.push({ type: 'objectives', ids: lit })
+      if (firstTry) {
+        const promoted = objectives.filter(
+          (objective) => !next.progress.mastered.includes(objective),
+        )
+        next.progress.mastered.push(...promoted)
+        // Freshly lit objectives are announced once, as objectives. Only an
+        // already-covered one earning its way up is worth a second word.
+        const relit = promoted.filter((objective) => !lit.includes(objective))
+        if (relit.length) events.push({ type: 'mastered', ids: relit })
+      }
+      for (const objective of objectives) seedReview(next, objective, firstTry, ctx.now)
     }
     events.push({
       type: 'encounter_resolve',
@@ -425,7 +609,7 @@ function choose(state: SaveState, optionId: string, ctx: EngineContext): EngineR
       outcome: run.outcome,
     })
   } else {
-    const delta = replay ? 0 : applyShield(option.rep, run.shield)
+    const delta = replay || review ? 0 : applyShield(option.rep, run.shield)
     if (run.shield) run.shield = false
     next.rep = clampRep(next.rep + delta)
     next.stats.wrong += 1
@@ -433,7 +617,7 @@ function choose(state: SaveState, optionId: string, ctx: EngineContext): EngineR
     if (encounter.type === 'troubleshoot') {
       run.time_left = Math.max(0, run.time_left - WRONG_FIX_TIME_COST)
     }
-    next.diagram = applyOps(next.diagram, option.diagram)
+    if (!review) next.diagram = applyOps(next.diagram, option.diagram)
     push(run, {
       kind: 'feedback',
       correct: false,
@@ -441,6 +625,26 @@ function choose(state: SaveState, optionId: string, ctx: EngineContext): EngineR
       rep_delta: delta,
       ...(option.consequence ? { consequence: option.consequence } : {}),
     })
+
+    if (!replay) {
+      // Wrong on a covering encounter is evidence, wherever it happens: an
+      // objective that was mastered is not any more, and its review date
+      // pulls back in.
+      demote(next, objectives)
+      for (const objective of objectives) lapseReview(next, objective, ctx.now)
+    }
+    // The first wrong turn in the story opens a post-mortem: say what actually
+    // went wrong before going again, and earn back some standing.
+    if (!replay && !review && firstTry && encounter.post_mortem && !run.post_mortem) {
+      run.post_mortem = { pending: true, loss: delta }
+      push(run, {
+        kind: 'post_mortem_ask',
+        question: encounter.post_mortem.question,
+        ...(encounter.post_mortem.speaker ?? encounter.speaker
+          ? { speaker: encounter.post_mortem.speaker ?? encounter.speaker }
+          : {}),
+      })
+    }
   }
 
   next.history.push({
@@ -458,6 +662,46 @@ function choose(state: SaveState, optionId: string, ctx: EngineContext): EngineR
     return pip(next, ctx, events)
   }
   return { state: next, events }
+}
+
+/**
+ * The post-mortem answer. Naming the real failure earns back half of what the
+ * wrong turn cost; either way the explanation lands and the encounter reopens.
+ */
+function answerPostMortem(state: SaveState, optionId: string, ctx: EngineContext): EngineResult {
+  const quest = runQuest(state, ctx)
+  if (!quest || !state.active || state.active.resolved) return reject(state, 'No post-mortem open.')
+  if (!state.active.post_mortem?.pending) return reject(state, 'No post-mortem open.')
+  const encounter = currentEncounter(quest, state)
+  if (!encounter?.post_mortem) return reject(state, 'No post-mortem open.')
+  const option = encounter.post_mortem.options.find((entry) => entry.id === optionId)
+  if (!option) return reject(state, 'Unknown option.')
+
+  const next = copy(state)
+  const run = next.active as EncounterRun
+  const pending = run.post_mortem as { pending: boolean; loss: number }
+  pending.pending = false
+  const restored = option.correct ? clawback(pending.loss) : 0
+  next.rep = clampRep(next.rep + restored)
+  push(run, {
+    kind: 'post_mortem',
+    correct: option.correct,
+    label: option.label,
+    explain: option.explain,
+    rep_delta: restored,
+  })
+  next.updated_at = ctx.now
+  return {
+    state: next,
+    events: [
+      {
+        type: 'post_mortem',
+        quest_id: quest.id,
+        encounter_id: encounter.id,
+        correct: option.correct,
+      },
+    ],
+  }
 }
 
 /**
@@ -483,10 +727,12 @@ function pip(state: SaveState, ctx: EngineContext, events: GameEvent[]): EngineR
 }
 
 function advance(state: SaveState, ctx: EngineContext): EngineResult {
-  const quest = ctx.quest
-  if (!quest || !state.active?.resolved || !state.position) {
+  const quest = runQuest(state, ctx)
+  if (!quest || !state.active?.resolved) {
     return reject(state, 'Finish this one first.')
   }
+  if (state.active.review) return advanceDrill(state, ctx)
+  if (!state.position) return reject(state, 'Finish this one first.')
   const next = copy(state)
   const nextIndex = state.position.encounter_index + 1
   if (nextIndex < quest.encounters.length) {
@@ -511,10 +757,40 @@ function advance(state: SaveState, ctx: EngineContext): EngineResult {
   }
 }
 
+/** The drill moves to its next closed file, or hands in its numbers and ends. */
+function advanceDrill(state: SaveState, ctx: EngineContext): EngineResult {
+  const next = copy(state)
+  const session = next.review_session
+  next.active = null
+  next.updated_at = ctx.now
+  if (!session) return { state: next, events: [] }
+  session.index += 1
+  const upcoming = session.items[session.index]
+  if (upcoming) {
+    return { state: next, events: [{ type: 'review_advance', quest_id: upcoming.quest_id }] }
+  }
+  next.stats.drills += 1
+  next.review_session = null
+  return {
+    state: next,
+    events: [
+      {
+        type: 'review_complete',
+        mode: session.mode,
+        correct: session.correct,
+        wrong: session.wrong,
+      },
+    ],
+  }
+}
+
 function abandon(state: SaveState, ctx: EngineContext): EngineResult {
   const next = copy(state)
+  // Walking out of a drill leaves the story exactly where it stood.
+  const closingDrill = Boolean(state.review_session || state.active?.review)
   next.active = null
-  next.position = null
+  next.review_session = null
+  if (!closingDrill) next.position = null
   next.updated_at = ctx.now
   return { state: next, events: [] }
 }
@@ -534,7 +810,7 @@ function buyPerk(state: SaveState, perk: PerkId, ctx: EngineContext): EngineResu
 }
 
 function usePerk(state: SaveState, perk: PerkId, ctx: EngineContext): EngineResult {
-  const quest = ctx.quest
+  const quest = runQuest(state, ctx)
   if (!state.perks[perk]) return reject(state, 'You do not have that perk.')
   if (!quest || !state.active || state.active.resolved) return reject(state, 'Nothing to use it on.')
   const encounter = currentEncounter(quest, state)
@@ -544,18 +820,19 @@ function usePerk(state: SaveState, perk: PerkId, ctx: EngineContext): EngineResu
   const run = next.active as EncounterRun
 
   if (perk === 'hint') {
-    const target = optionsOf(encounter).find(
-      (option) => !option.correct && !run.eliminated.includes(option.id),
-    )
-    if (!target) return reject(state, 'There is nothing left to rule out.')
-    run.eliminated.push(target.id)
-    push(run, { kind: 'system', text: `Ruled out: ${target.label}` })
+    // A hint points at the governing principle. It never crosses anything off:
+    // telling the options apart is the work the encounter exists to exercise.
+    if (!encounter.hint) return reject(state, 'Nobody has a hint for this one.')
+    if (run.hint_used) return reject(state, 'You already got the nudge.')
+    run.hint_used = true
+    push(run, { kind: 'hint', text: encounter.hint })
   } else if (perk === 'overtime') {
     if (encounter.type !== 'troubleshoot') return reject(state, 'Overtime only helps on an incident.')
     run.time_left += 1
     run.time_budget += 1
     push(run, { kind: 'system', text: 'You buy yourself one more time unit.' })
   } else {
+    if (run.review) return reject(state, 'Reputation never moves in a drill. Save it.')
     if (run.shield) return reject(state, 'A shield is already up.')
     run.shield = true
     push(run, { kind: 'system', text: 'Rep Shield armed: the next hit lands at half strength.' })
@@ -564,6 +841,72 @@ function usePerk(state: SaveState, perk: PerkId, ctx: EngineContext): EngineResu
   next.perks[perk] -= 1
   next.updated_at = ctx.now
   return { state: next, events: [{ type: 'perk_use', perk }] }
+}
+
+/**
+ * Open a drill. Due mode works through the follow-up queue; act mode deals one
+ * closed encounter per chapter of a finished act, domains shuffled together
+ * the way the exam deals them.
+ */
+function startReview(
+  state: SaveState,
+  action: { mode: 'due' } | { mode: 'act'; act: string },
+  ctx: EngineContext,
+): EngineResult {
+  // A live story ticket blocks a drill; a replay of a closed quest does not,
+  // because a replay has nothing at stake and can be put down mid-scene.
+  const busy =
+    state.active &&
+    !state.active.review &&
+    !state.progress.quests_completed.includes(state.active.quest_id)
+  if (busy) {
+    return reject(state, 'Finish the ticket in front of you first.')
+  }
+  const items =
+    action.mode === 'due'
+      ? selectDueDrill(ctx.index, state, ctx.now)
+      : selectActDrill(ctx.index, state, action.act)
+  if (!items.length) {
+    return reject(
+      state,
+      action.mode === 'due'
+        ? 'Nothing on the follow-up list is due yet.'
+        : 'The on-call rotation opens when the act is finished.',
+    )
+  }
+  const next = copy(state)
+  next.active = null
+  next.review_session = {
+    mode: action.mode,
+    ...(action.mode === 'act' ? { act: action.act } : {}),
+    items,
+    index: 0,
+    correct: 0,
+    wrong: 0,
+  }
+  next.updated_at = ctx.now
+  return {
+    state: next,
+    events: [{ type: 'review_start', mode: action.mode, quest_id: items[0].quest_id }],
+  }
+}
+
+/** Begin the run for the drill's current item; the caller loads its quest first. */
+function reviewNext(state: SaveState, ctx: EngineContext): EngineResult {
+  const session = state.review_session
+  if (!session) return reject(state, 'No drill open.')
+  if (state.active && !state.active.resolved) return reject(state, 'Finish this one first.')
+  const item = session.items[session.index]
+  if (!item) return reject(state, 'The drill is over.')
+  const quest = ctx.quest
+  if (!quest || quest.id !== item.quest_id) return reject(state, 'That quest has not loaded yet.')
+  const position = quest.encounters.findIndex((entry) => entry.id === item.encounter_id)
+  if (position < 0) return reject(state, 'That encounter is not in this build.')
+
+  const next = copy(state)
+  next.active = beginRun(quest.encounters[position], quest, position, true)
+  next.updated_at = ctx.now
+  return { state: next, events: [] }
 }
 
 function restartCheckpoint(state: SaveState, ctx: EngineContext): EngineResult {

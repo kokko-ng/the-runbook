@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import { REP_BONUS_UNLOCK } from '@/engine'
+import { REP_BAR_STRONG } from '@/engine'
 import { useGameStore } from '@/stores/game'
 
 const game = useGameStore()
 
 const rep = computed(() => game.save?.rep ?? 0)
 const tone = computed(() =>
-  rep.value >= REP_BONUS_UNLOCK ? 'bg-healthy' : rep.value >= 35 ? 'bg-signal-500' : 'bg-broken',
+  rep.value >= REP_BAR_STRONG ? 'bg-healthy' : rep.value >= 35 ? 'bg-signal-500' : 'bg-broken',
 )
 </script>
 

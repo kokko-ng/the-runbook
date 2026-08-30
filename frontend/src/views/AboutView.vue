@@ -41,7 +41,10 @@ const totals = computed(() => {
           early is worth something.
         </li>
         <li>
-          The skill tree lights itself as you clear encounters, so it doubles as a readiness view.
+          The skill tree lights itself as you clear encounters, in two shades: solid for
+          objectives cleared without a wrong turn, amber for ones you recovered on a later try.
+          The review queue re-runs closed tickets on an expanding schedule to turn amber solid
+          and keep solid from fading.
         </li>
         <li>
           There is no language model behind any of this. Every scenario is written by hand and

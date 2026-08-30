@@ -11,27 +11,40 @@ const game = useGameStore()
     <header class="space-y-1">
       <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Skills</h1>
       <p class="text-sm text-ink-600 dark:text-ink-300">
-        One tree per exam domain. Nodes light up on their own as you clear the encounters that
-        cover them, so what is still dark is what you have not been tested on.
+        One tree per exam domain, and it tells the truth in two shades. An objective cleared
+        without a wrong turn is solid; one you recovered on a later attempt is only covered, and
+        covered means it deserves another pass. Dark is what you have not been tested on. The
+        <RouterLink to="/review" class="text-signal-600 underline dark:text-signal-400"
+          >review queue</RouterLink
+        >
+        is how covered becomes solid.
       </p>
     </header>
 
     <section class="card p-4">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <p class="text-sm font-semibold">
-          {{ game.examReadiness.covered }} of {{ game.examReadiness.total }} objectives cleared
+          {{ game.examReadiness.mastered }} solid, {{ game.examReadiness.covered }} of
+          {{ game.examReadiness.total }} covered
         </p>
         <ul class="flex flex-wrap gap-4 text-xs text-ink-500 dark:text-ink-400">
           <li v-for="exam in game.examReadiness.byExam" :key="exam.exam">
-            {{ exam.exam }} {{ exam.covered }}/{{ exam.total }} ({{ exam.percent }}%)
+            {{ exam.exam }} {{ exam.mastered }} solid / {{ exam.covered }}/{{ exam.total }}
+            ({{ exam.solid_percent }}%)
           </li>
         </ul>
       </div>
       <div class="mt-3 h-2 overflow-hidden rounded-full bg-ink-200 dark:bg-ink-800">
-        <div
-          class="h-full rounded-full bg-signal-500 transition-[width] duration-500"
-          :style="{ width: `${game.examReadiness.percent}%` }"
-        />
+        <div class="flex h-full">
+          <div
+            class="h-full bg-healthy transition-[width] duration-500"
+            :style="{ width: `${game.examReadiness.solid_percent}%` }"
+          />
+          <div
+            class="h-full bg-degraded transition-[width] duration-500"
+            :style="{ width: `${game.examReadiness.percent - game.examReadiness.solid_percent}%` }"
+          />
+        </div>
       </div>
     </section>
 

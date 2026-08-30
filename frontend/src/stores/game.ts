@@ -10,10 +10,12 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 
 import {
+  actDrillReady,
   buildTrees,
   chapterUnlocked,
   createSave,
   currentEncounter,
+  dueObjectives,
   migrateSave,
   questAvailability,
   readiness,
@@ -53,8 +55,10 @@ export const useGameStore = defineStore('game', () => {
     if (save.value) return
     const stored = loadSave()
     save.value = stored ? migrateSave(stored, index, now()) : createSave(index, now())
-    if (save.value.position?.quest_id) {
-      activeQuest.value = await content.loadQuest(save.value.position.quest_id)
+    // A run in flight names its own quest; a drill's may differ from position.
+    const standing = save.value.active?.quest_id ?? save.value.position?.quest_id
+    if (standing) {
+      activeQuest.value = await content.loadQuest(standing)
     }
   }
 
@@ -138,9 +142,75 @@ export const useGameStore = defineStore('game', () => {
           'good',
         )
         break
+      case 'mastered':
+        ui.toast(
+          event.ids.length === 1
+            ? 'Skill tree updated: 1 objective marked solid.'
+            : `Skill tree updated: ${event.ids.length} objectives marked solid.`,
+          'good',
+        )
+        break
+      case 'post_mortem':
+        track('post_mortem', {
+          quest_id: event.quest_id,
+          encounter_id: event.encounter_id,
+          outcome: event.correct ? 'correct' : 'wrong',
+        })
+        break
+      case 'review_start':
+        track('review_start', { outcome: event.mode })
+        void continueReview(event.quest_id)
+        break
+      case 'review_advance':
+        void continueReview(event.quest_id)
+        break
+      case 'review_complete':
+        ui.toast(
+          event.wrong === 0
+            ? 'Drill closed: everything held.'
+            : `Drill closed: ${event.correct} held, ${event.wrong} wobbled.`,
+          event.wrong === 0 ? 'good' : 'bad',
+        )
+        track('review_complete', {
+          outcome: event.mode,
+          meta: { correct: event.correct, wrong: event.wrong },
+        })
+        break
       default:
         break
     }
+  }
+
+  /** Drills hop between quests; load the next file and open its encounter. */
+  async function continueReview(questId: string): Promise<void> {
+    const quest = await content.loadQuest(questId)
+    if (!quest) return
+    activeQuest.value = quest
+    dispatch({ type: 'review_next' })
+  }
+
+  /**
+   * Reopen a drill that was mid-flight when the page reloaded: the session
+   * remembers where it stood, the run just needs its quest back in memory.
+   */
+  async function resumeReview(): Promise<void> {
+    await boot()
+    if (!save.value?.review_session) return
+    if (save.value.active) return
+    const item = save.value.review_session.items[save.value.review_session.index]
+    if (item) await continueReview(item.quest_id)
+  }
+
+  /** Objectives due for a drill right now. Recomputed on every call. */
+  function reviewDue(): string[] {
+    if (!save.value || !content.index) return []
+    return dueObjectives(content.index, save.value, now())
+  }
+
+  /** Acts whose on-call rotation drill is open. */
+  function drillReady(actId: string): boolean {
+    if (!save.value || !content.index) return false
+    return actDrillReady(content.index, save.value, actId)
   }
 
   async function startQuest(questId: string): Promise<boolean> {
@@ -173,7 +243,7 @@ export const useGameStore = defineStore('game', () => {
   const examReadiness = computed(() =>
     save.value && content.index
       ? readiness(content.index, save.value)
-      : { covered: 0, total: 0, percent: 0, byExam: [] },
+      : { covered: 0, mastered: 0, total: 0, percent: 0, solid_percent: 0, byExam: [] },
   )
 
   const rank = computed(() => {
@@ -226,6 +296,9 @@ export const useGameStore = defineStore('game', () => {
     dispatch,
     startQuest,
     resume,
+    resumeReview,
+    reviewDue,
+    drillReady,
     restart,
     adopt,
     persist,
