@@ -40,9 +40,9 @@ const PORTS = [
 
 <template>
   <!-- Vue Flow sets pointer-events: none inline on nodes that aren't draggable or
-       selectable, which also blocks the title tooltips below unless overridden here. -->
+       selectable, which would also make the hover reveal below unreachable. -->
   <div
-    class="pointer-events-auto w-52 rounded-lg border bg-white px-2.5 py-2 text-left shadow-sm dark:bg-ink-900"
+    class="group pointer-events-auto w-52 rounded-lg border bg-white px-2.5 py-2 text-left shadow-sm hover:shadow-md dark:bg-ink-900"
     :class="RING[data.status]"
   >
     <Handle
@@ -54,14 +54,17 @@ const PORTS = [
       :style="port.style"
       :connectable="false"
     />
+    <!-- Clipped text unclips while the pointer is over the box: hovering swaps the
+         nowrap truncation for normal wrapping, and the box grows to fit. -->
     <div class="flex items-center gap-2">
       <MapGlyph :kind="data.kind" size="sm" />
-      <span class="truncate text-[0.78rem] font-medium" :title="data.label">{{ data.label }}</span>
+      <span class="min-w-0 truncate text-[0.78rem] font-medium group-hover:whitespace-normal">
+        {{ data.label }}
+      </span>
     </div>
     <p
       v-if="data.detail"
-      class="mt-1 truncate text-[0.68rem] text-ink-500 dark:text-ink-400"
-      :title="data.detail"
+      class="mt-1 truncate text-[0.68rem] text-ink-500 group-hover:whitespace-normal dark:text-ink-400"
     >
       {{ data.detail }}
     </p>
