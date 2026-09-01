@@ -159,7 +159,8 @@ encounters:
           deletion even for an Owner until the lock itself is removed.
         diagram:
           - {op: add_node, node: rg-ops}
-          - {op: add_node, node: lock-data}
+          - {op: add_node, node: rg-reporting}
+          - {op: add_node, node: lock-reporting}
       - id: b
         label: Open a support case to have the resource group restored
         correct: false
@@ -247,6 +248,9 @@ encounters:
           CanNotDelete allows reading and modifying but blocks deletion, and it applies to
           everyone including Owners until the lock is removed. Applying it only where
           deletion is genuinely unacceptable keeps it credible.
+        diagram:
+          - {op: add_node, node: lock-data}
+          - {op: add_node, node: lock-reporting}
       - id: b
         label: A ReadOnly lock on every production resource group
         correct: false

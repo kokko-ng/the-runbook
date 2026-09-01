@@ -59,9 +59,11 @@ nodes:
   - {id: rg-depot, label: rg-depot, kind: resource-group, group: governance, x: 240, y: 585, present: true}
   - {id: rg-data, label: rg-data, kind: resource-group, group: governance, x: 240, y: 630, present: true}
   - {id: rg-ops, label: rg-ops, kind: resource-group, group: governance, x: 240, y: 720}
+  - {id: rg-reporting, label: rg-reporting, kind: resource-group, group: governance, x: 240, y: 765}
   - {id: policy-tags, label: Require costcenter tag, kind: policy, group: governance, x: 240, y: 810}
   - {id: policy-regions, label: Allowed regions policy, kind: policy, group: governance, x: 240, y: 900}
   - {id: lock-data, label: CanNotDelete on rg-data, kind: lock, group: governance, x: 240, y: 990}
+  - {id: lock-reporting, label: CanNotDelete on rg-reporting, kind: lock, group: governance, x: 240, y: 1035}
   - {id: budget-prod, label: Production budget alert, kind: budget, group: governance, x: 240, y: 1080}
 
   # --- edge -------------------------------------------------------------
