@@ -178,7 +178,7 @@ export const bonus: Quest = {
 
 export const index: ContentIndex = {
   version: 'test',
-  company: { name: 'Meridian Logistics' },
+  company: { name: 'Veymark Logistics' },
   ranks: [{ id: 'junior-cloud-admin', title: 'Junior Cloud Admin' }],
   cast: [{ id: 'marek', name: 'Marek Sobczak', role: 'Senior Cloud Admin', note: '' }],
   acts: [{ id: 'act1', number: 1, exam: 'AZ-104', title: 'The Ticket Queue', tagline: '', chapters: ['act1-networking', 'act1-monitoring'] }],

@@ -23,7 +23,7 @@ encounters:
     speaker: Hendrik Salim
     objectives: [AZ104-3.4.5, AZ104-3.4.4]
     intro: >
-      "track.meridianlogistics.com," says Hendrik. "Marketing has it on the flyer
+      "track.veymarklogistics.com," says Hendrik. "Marketing has it on the flyer
       already, which I am told is my fault for asking."
 
 
@@ -202,7 +202,7 @@ encounters:
   - id: c
     type: troubleshoot
     title: INC-4736
-    speaker: Meridian NOC
+    speaker: Veymark NOC
     objectives: [AZ104-3.4.7]
     intro: >
       The swap happened at 08:20 and the portal is up. Every page that reads
@@ -210,7 +210,7 @@ encounters:
       refused the connection.
 
 
-      The database is sql-meridian-tms, which was closed to public access last
+      The database is sql-veymark-tms, which was closed to public access last
       month as part of the storage and data work. The portal reached it fine
       yesterday, from the staging slot.
     hint: >
@@ -247,7 +247,7 @@ encounters:
     ticket:
       ref: INC-4736
       opened: "08:26"
-      reporter: Meridian NOC
+      reporter: Veymark NOC
       summary: Portal cannot reach the transport database after the slot swap.
       severity: sev1
     time_budget: 5
@@ -268,7 +268,7 @@ encounters:
     commands:
       - id: a
         label: Check the production app's outbound networking
-        cmd: az webapp show -n app-meridian-portal -g rg-app --query "{vnet:virtualNetworkSubnetId,https:httpsOnly}" -o json
+        cmd: az webapp show -n app-veymark-portal -g rg-app --query "{vnet:virtualNetworkSubnetId,https:httpsOnly}" -o json
         output: |
           {
             "https": true,
@@ -277,21 +277,21 @@ encounters:
         time_cost: 1
       - id: b
         label: Check the staging slot for comparison
-        cmd: az webapp show -n app-meridian-portal --slot staging -g rg-app --query "virtualNetworkSubnetId" -o tsv
+        cmd: az webapp show -n app-veymark-portal --slot staging -g rg-app --query "virtualNetworkSubnetId" -o tsv
         output: |
           /subscriptions/.../virtualNetworks/vnet-app/subnets/snet-appservice
         time_cost: 1
       - id: c
         label: Check what the app resolves the database name to
-        cmd: az webapp ssh -n app-meridian-portal -g rg-app --command "nslookup sql-meridian-tms.database.windows.net"
+        cmd: az webapp ssh -n app-veymark-portal -g rg-app --command "nslookup sql-veymark-tms.database.windows.net"
         output: |
-          Name:    sql-meridian-tms.privatelink.database.windows.net
+          Name:    sql-veymark-tms.privatelink.database.windows.net
           Address: 10.20.3.9
         note: The name resolves privately, so DNS is fine. The traffic has no route to that address.
         time_cost: 2
       - id: d
         label: Check the app settings that came across in the swap
-        cmd: az webapp config appsettings list -n app-meridian-portal -g rg-app --query "[?name=='SQL_CONNECTION'].{name:name,slotSetting:slotSetting}" -o table
+        cmd: az webapp config appsettings list -n app-veymark-portal -g rg-app --query "[?name=='SQL_CONNECTION'].{name:name,slotSetting:slotSetting}" -o table
         output: |
           Name             SlotSetting
           ---------------  -------------

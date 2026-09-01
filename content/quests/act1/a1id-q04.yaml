@@ -8,8 +8,8 @@ objectives:
   - AZ104-1.1.4
   - AZ104-1.1.5
 brief: >
-  Meridian subcontracts long-haul to two partners. Their planners need in, they
-  are not Meridian staff, and nobody wants to run accounts for another company.
+  Veymark subcontracts long-haul to two partners. Their planners need in, they
+  are not Veymark staff, and nobody wants to run accounts for another company.
 debrief: >
   Guests get their own accounts and their own tenant's problems, and the helpdesk
   gets its Monday mornings back.
@@ -27,10 +27,10 @@ encounters:
 
 
       They need to see shipments assigned to their firm and nothing else. Their
-      staff turn over often, and Meridian will not be told promptly when someone
+      staff turn over often, and Veymark will not be told promptly when someone
       leaves.
     hint: >
-      The awkward requirement is the last one: Meridian will not be told when
+      The awkward requirement is the last one: Veymark will not be told when
       their people leave. Ask which design makes the partner's own leaver
       process do the revoking, and keeps every sign-in attributable to one
       person.
@@ -41,7 +41,7 @@ encounters:
         must any workable answer give us?"
       options:
         - id: a
-          label: Identities their employer manages, with per-person access Meridian controls
+          label: Identities their employer manages, with per-person access Veymark controls
           correct: true
           explain: >
             Guests authenticate against their home tenant, so the partner's
@@ -49,7 +49,7 @@ encounters:
             your tenant stays per person and per firm. Both halves are required;
             each wrong answer dropped one.
         - id: b
-          label: Accounts Meridian fully owns, so nothing depends on the partners
+          label: Accounts Veymark fully owns, so nothing depends on the partners
           correct: false
           explain: >
             Owning the accounts means owning credentials and leavers for staff
@@ -82,14 +82,14 @@ encounters:
         diagram:
           - {op: add_node, node: entra-guests}
       - id: b
-        label: Create member accounts for them in the Meridian tenant with new passwords
+        label: Create member accounts for them in the Veymark tenant with new passwords
         correct: false
         rep: -9
         consequence: >
           Seventeen accounts for people you cannot reach, and in March a Sriwijaya planner
           who left in January is still signing in.
         explain: >
-          Member accounts make Meridian responsible for the credentials and lifecycle of
+          Member accounts make Veymark responsible for the credentials and lifecycle of
           another firm's staff, with no visibility of their leavers. That is the exact
           problem business-to-business guests exist to solve.
       - id: c
@@ -282,7 +282,7 @@ encounters:
         output: |
           Upn                                            Type    State
           ---------------------------------------------  ------  -----------------
-          p.tan_northgate.example#EXT#@meridian...       Guest   PendingAcceptance
+          p.tan_northgate.example#EXT#@veymark...       Guest   PendingAcceptance
         time_cost: 1
       - id: b
         label: Check a Sriwijaya guest for comparison
@@ -290,11 +290,11 @@ encounters:
         output: |
           Upn                                            Type    State
           ---------------------------------------------  ------  -----------------
-          a.putri_sriwijaya.example#EXT#@meridian...     Guest   Accepted
+          a.putri_sriwijaya.example#EXT#@veymark...     Guest   Accepted
         time_cost: 1
       - id: c
         label: Check the group membership of the failing guest
-        cmd: az ad user get-member-groups --id "p.tan_northgate.example#EXT#@meridianlogistics.com" -o table
+        cmd: az ad user get-member-groups --id "p.tan_northgate.example#EXT#@veymarklogistics.com" -o table
         output: |
           DisplayName
           --------------------
@@ -313,7 +313,7 @@ encounters:
     fixes:
       - id: a
         label: >
-          Work with Northgate's IT to get Meridian's invitation mail delivered, then have
+          Work with Northgate's IT to get Veymark's invitation mail delivered, then have
           the guests accept the invitation
         correct: true
         rep: 8
@@ -327,14 +327,14 @@ encounters:
           reconfiguring on your side helps. The state field said PendingAcceptance, which
           named the problem.
       - id: b
-        label: Re-invite the guests as member accounts so they get Meridian passwords
+        label: Re-invite the guests as member accounts so they get Veymark passwords
         correct: false
         rep: -9
         consequence: >
-          Eleven Meridian passwords now exist for people at another company, and the finding
+          Eleven Veymark passwords now exist for people at another company, and the finding
           you avoided last week comes back.
         explain: >
-          Turning guests into members moves the credential lifecycle to Meridian for people
+          Turning guests into members moves the credential lifecycle to Veymark for people
           it does not employ. The delivery problem is a mail problem, and it is fixable.
       - id: c
         label: Remove the multi-factor requirement for the partner group

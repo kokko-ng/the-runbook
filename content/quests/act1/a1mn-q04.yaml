@@ -9,7 +9,7 @@ objectives:
   - AZ104-5.2.2
   - AZ104-5.2.3
 brief: >
-  Meridian's backup story is one vault, one machine, and a policy somebody
+  Veymark's backup story is one vault, one machine, and a policy somebody
   accepted the defaults for in 2023.
 debrief: >
   Two vaults, chosen for what they protect rather than which button was nearest,

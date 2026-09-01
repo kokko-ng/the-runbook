@@ -106,7 +106,7 @@ encounters:
         correct: false
         rep: -7
         consequence: >
-          Meridian retires one file server and gains another, with patching, backup and a
+          Veymark retires one file server and gains another, with patching, backup and a
           single point of failure.
         explain: >
           It is the migration that avoids learning anything. Azure Files supports the same
@@ -273,7 +273,7 @@ encounters:
     commands:
       - id: a
         label: List snapshots on the share
-        cmd: az storage share list --account-name stmeridianpod --include-snapshots --query "[?name=='fs-depot-config'].{name:name,snapshot:snapshot}" -o table
+        cmd: az storage share list --account-name stveymarkpod --include-snapshots --query "[?name=='fs-depot-config'].{name:name,snapshot:snapshot}" -o table
         output: |
           Name              Snapshot
           ----------------  ----------
@@ -282,7 +282,7 @@ encounters:
         time_cost: 1
       - id: b
         label: Check the soft delete settings on the file service
-        cmd: az storage account file-service-properties show -n stmeridianpod -g rg-data --query "shareDeleteRetentionPolicy" -o json
+        cmd: az storage account file-service-properties show -n stveymarkpod -g rg-data --query "shareDeleteRetentionPolicy" -o json
         output: |
           {
             "days": 7,
@@ -292,7 +292,7 @@ encounters:
         time_cost: 1
       - id: c
         label: Look for a backup of the share
-        cmd: az backup item list --vault-name rsv-meridian -g rg-ops --query "[?contains(name,'depot')]" -o table
+        cmd: az backup item list --vault-name rsv-veymark -g rg-ops --query "[?contains(name,'depot')]" -o table
         output: |
           (no results)
         time_cost: 1

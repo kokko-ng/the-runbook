@@ -19,7 +19,7 @@ encounters:
   - id: a
     type: troubleshoot
     title: INC-4744
-    speaker: Meridian NOC
+    speaker: Veymark NOC
     objectives: [AZ104-4.3.3, AZ104-4.3.2]
     intro: >
       The intake scale set was rebuilt behind a new Standard Load Balancer at
@@ -70,7 +70,7 @@ encounters:
     ticket:
       ref: INC-4744
       opened: "21:40"
-      reporter: Meridian NOC
+      reporter: Veymark NOC
       summary: Intake backend instances cannot reach any external service after the load balancer rebuild.
       severity: sev2
     time_budget: 5
@@ -159,7 +159,7 @@ encounters:
         rep: 10
         consequence: >
           Outbound calls succeed within a minute of the association, and the source address
-          is now one Meridian can give the partner for their allow list.
+          is now one Veymark can give the partner for their allow list.
         explain: >
           Standard Load Balancer provides no outbound connectivity on its own, and backend
           instances with no public IP address have none by default. Outbound has to be
@@ -174,7 +174,7 @@ encounters:
         rep: -8
         consequence: >
           Nothing changes, and the security group now has a rule that implies the partner
-          initiates connections to Meridian, which they do not.
+          initiates connections to Veymark, which they do not.
         explain: >
           These are outbound sessions the instances start, and the effective rules already
           allow them. Return traffic for an allowed outbound flow does not need an inbound
@@ -305,7 +305,7 @@ encounters:
           explain: >
             Frontends and rules are lists over a shared backend pool, and only
             the combination of frontend, protocol and port must stay unique.
-            The customs feed is a second entry on the resource Meridian already
+            The customs feed is a second entry on the resource Veymark already
             runs, not a second resource.
         - id: b
           label: That separate audiences require separate resources by policy

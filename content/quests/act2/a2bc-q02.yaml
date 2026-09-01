@@ -143,7 +143,7 @@ encounters:
           correct: false
           explain: >
             Managed services are regional unless the design makes them
-            otherwise. Any capacity in East Asia exists because Meridian built
+            otherwise. Any capacity in East Asia exists because Veymark built
             it, deploys to it, and pays for it.
     prompt: What do you propose for regional failure?
     options:

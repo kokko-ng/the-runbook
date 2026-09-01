@@ -8,7 +8,7 @@ objectives:
   - AZ104-5.1.1
   - AZ104-5.1.4
 brief: >
-  Meridian has alerts. What it does not have is anyone who believes them, because
+  Veymark has alerts. What it does not have is anyone who believes them, because
   most of them are noise and the important ones go to a shared inbox.
 debrief: >
   Fewer rules, aimed at what users feel, going to a place with a person behind it,
@@ -118,7 +118,7 @@ encounters:
       and nobody acted for fifty minutes."
 
 
-      Meridian's on-call rotation is the Cebu NOC overnight and the platform team
+      Veymark's on-call rotation is the Cebu NOC overnight and the platform team
       during the day.
     hint: >
       There are two failures in that inbox: where the alerts go and how many

@@ -87,7 +87,7 @@ encounters:
           in the hub."
       - id: c
         action: Read the change record for CHG-2210
-        speaker: Meridian IT
+        speaker: Veymark IT
         reveals: >
           The record lists one task: "Delete and re-create hub-to-depot peering in
           rg-hub." Nothing about the spoke side. The rollback plan is the word

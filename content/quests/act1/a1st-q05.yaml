@@ -77,14 +77,14 @@ encounters:
           last modified time the way the script expects."
       - id: b
         action: Ask what the storage account has enabled
-        speaker: Meridian IT
+        speaker: Veymark IT
         reveals: >
           The account was created from the standard template: blob soft delete fourteen
           days, container soft delete seven days, versioning on.
     commands:
       - id: a
         label: List containers, including deleted ones
-        cmd: az storage container list --account-name stmeridianedi --include-deleted -o table
+        cmd: az storage container list --account-name stveymarkedi --include-deleted -o table
         output: |
           Name              Deleted    VersionId                             RemainingRetentionDays
           ----------------  ---------  ------------------------------------  ------------------------
@@ -94,7 +94,7 @@ encounters:
         time_cost: 1
       - id: b
         label: Check the container soft delete policy
-        cmd: az storage account blob-service-properties show -n stmeridianedi -g rg-data --query "containerDeleteRetentionPolicy" -o json
+        cmd: az storage account blob-service-properties show -n stveymarkedi -g rg-data --query "containerDeleteRetentionPolicy" -o json
         output: |
           {
             "days": 7,
@@ -103,7 +103,7 @@ encounters:
         time_cost: 1
       - id: c
         label: Check whether the EDI service is failing for any other reason
-        cmd: az storage blob list -c edi-inbound --account-name stmeridianedi --num-results 3 -o table
+        cmd: az storage blob list -c edi-inbound --account-name stveymarkedi --num-results 3 -o table
         output: |
           Name                      Blob Type      Length    Last Modified
           ------------------------  -------------  --------  -------------------------

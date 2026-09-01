@@ -180,7 +180,7 @@ encounters:
           before your maintenance window."
       - id: b
         action: Check what your change actually contained
-        speaker: Meridian IT
+        speaker: Veymark IT
         reveals: >
           CHG-2244 added nsg-depot to snet-depot with three rules: allow the scanner
           group to the hub on 445, 631 and 27000, allow HTTPS inbound from the hub,

@@ -103,7 +103,7 @@ encounters:
         correct: false
         rep: -7
         consequence: >
-          Meridian now operates two clusters, one of which exists to run a nightly job and a
+          Veymark now operates two clusters, one of which exists to run a nightly job and a
           single API.
         explain: >
           Cluster count is operational cost. A second one needs its own justification, which
@@ -174,7 +174,7 @@ encounters:
         rep: -6
         consequence: >
           The first call after an idle period takes several seconds, customs retry, and the
-          retry is treated as Meridian's fault.
+          retry is treated as Veymark's fault.
         explain: >
           Consumption is the cheapest and cold starts are its trade-off. With an explicit
           latency requirement, the plan that keeps instances warm is the one that meets it.

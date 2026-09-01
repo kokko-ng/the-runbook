@@ -18,7 +18,7 @@ debrief: >
 encounters:
   - id: a
     type: design
-    title: The license Meridian already owns
+    title: The license Veymark already owns
     speaker: Priya Raghunathan
     objectives: [AZ305-2.1.2]
     intro: >
@@ -77,7 +77,7 @@ encounters:
         correct: false
         rep: -7
         consequence: >
-          Meridian pays twice for an engine it already owns, for three years.
+          Veymark pays twice for an engine it already owns, for three years.
         explain: >
           The pay-as-you-go price includes the license, and the hybrid benefit is exactly the
           mechanism for not paying for it twice.

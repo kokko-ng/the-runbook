@@ -1,7 +1,7 @@
 id: a2id-q02
 chapter: act2-identity
 title: Who Approves the Approver
-summary: Thirty-one guests, eleven Meridian admins and one auditor who wants to know how access is granted and taken away.
+summary: Thirty-one guests, eleven Veymark admins and one auditor who wants to know how access is granted and taken away.
 variant: core
 estimated_minutes: 15
 objectives:
@@ -116,10 +116,10 @@ encounters:
     intro: >
       "Thirty-one Straits guests today," says Grace. "It will be sixty by
       November, across four applications, and Straits will not tell us promptly
-      when somebody leaves. Meridian's own contractors have the same shape."
+      when somebody leaves. Veymark's own contractors have the same shape."
 
 
-      "I do not want a design where somebody at Meridian is expected to remember."
+      "I do not want a design where somebody at Veymark is expected to remember."
     hint: >
       Grace has already told you the failure mode: somebody expected to
       remember. Test each idea against the day nobody remembers and Straits
@@ -151,7 +151,7 @@ encounters:
           label: A better notification agreement with Straits
           correct: false
           explain: >
-            Even a prompt and well-meaning Straits is a control Meridian cannot
+            Even a prompt and well-meaning Straits is a control Veymark cannot
             evidence or enforce. The design has to produce the right outcome
             when the notification never arrives.
     prompt: How do you handle guest access over time?
@@ -163,7 +163,7 @@ encounters:
         correct: true
         rep: 9
         consequence: >
-          Guests request the package they need, a Meridian sponsor approves it, and access
+          Guests request the package they need, a Veymark sponsor approves it, and access
           expires in ninety days unless someone actively renews it.
         explain: >
           Entitlement management packages up the groups, applications and roles a role needs,
@@ -194,7 +194,7 @@ encounters:
           Expiry without a request and approval path is an outage generator. The package
           provides the renewal route that makes expiry safe.
       - id: d
-        label: Ask Straits to notify Meridian within one working day of any leaver
+        label: Ask Straits to notify Veymark within one working day of any leaver
         correct: false
         rep: -8
         consequence: >

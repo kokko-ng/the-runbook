@@ -258,14 +258,14 @@ encounters:
           network I nominated is a copy of vnet-app in East Asia."
       - id: b
         action: Ask whether replication itself is healthy
-        speaker: Meridian NOC
+        speaker: Veymark NOC
         reveals: >
           "Healthy, four-minute recovery point, no errors in the replication view. It is
           only the failover that failed."
     commands:
       - id: a
         label: Read the failover job error
-        cmd: az site-recovery job show --vault-name rsv-meridian -g rg-ops -n "TestFailover_vm-scan01" --query "{state:state,error:errors[0].serviceErrorDetails.message}" -o json
+        cmd: az site-recovery job show --vault-name rsv-veymark -g rg-ops -n "TestFailover_vm-scan01" --query "{state:state,error:errors[0].serviceErrorDetails.message}" -o json
         output: |
           {
             "error": "The target network configuration for the protected item is not valid.
@@ -275,7 +275,7 @@ encounters:
         time_cost: 1
       - id: b
         label: Check the machine's replication network mapping
-        cmd: az site-recovery protected-item show --vault-name rsv-meridian -g rg-ops -n vm-scan01 --query "properties.providerSpecificDetails.vmNics[0].{source:sourceNicArmId,target:targetSubnetName}" -o json
+        cmd: az site-recovery protected-item show --vault-name rsv-veymark -g rg-ops -n vm-scan01 --query "properties.providerSpecificDetails.vmNics[0].{source:sourceNicArmId,target:targetSubnetName}" -o json
         output: |
           {
             "source": "/subscriptions/.../networkInterfaces/nic-scan01",
@@ -293,7 +293,7 @@ encounters:
         time_cost: 1
       - id: d
         label: Check the recovery point for the machine
-        cmd: az site-recovery recovery-point list --vault-name rsv-meridian -g rg-ops --protected-item vm-scan01 --query "[0].{time:properties.recoveryPointTime,type:properties.recoveryPointType}" -o json
+        cmd: az site-recovery recovery-point list --vault-name rsv-veymark -g rg-ops --protected-item vm-scan01 --query "[0].{time:properties.recoveryPointTime,type:properties.recoveryPointType}" -o json
         output: |
           {
             "time": "2026-08-24T14:48:00Z",

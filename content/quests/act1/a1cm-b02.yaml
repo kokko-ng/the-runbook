@@ -26,8 +26,8 @@ encounters:
       the certificate for their domain, issued by their own authority.
 
 
-      The plan is Standard. Meridian's own certificate is a managed certificate on
-      track.meridianlogistics.com.
+      The plan is Standard. Veymark's own certificate is a managed certificate on
+      track.veymarklogistics.com.
     hint: >
       Two constraints do the work: the certificate a browser sees must match
       the name it typed, and one application should stay one application.
@@ -57,7 +57,7 @@ encounters:
           correct: false
           explain: >
             A browser that typed northgate.example warns on a certificate for
-            meridianlogistics.com, whatever the DNS did on the way. Matching
+            veymarklogistics.com, whatever the DNS did on the way. Matching
             the typed name is the requirement, not minimizing certificates.
     prompt: How do you add the second name?
     options:
@@ -97,11 +97,11 @@ encounters:
           It works and doubles the deployment surface for a branding difference. Multiple
           bindings on one app is the feature for this.
       - id: d
-        label: Ask them to CNAME to Meridian's name, so only one certificate is needed
+        label: Ask them to CNAME to Veymark's name, so only one certificate is needed
         correct: false
         rep: -7
         consequence: >
-          Their customers see a certificate for meridianlogistics.com on a northgate.example
+          Their customers see a certificate for veymarklogistics.com on a northgate.example
           address, which is the warning you were avoiding.
         explain: >
           The certificate presented has to match the name the browser asked for. A CNAME does

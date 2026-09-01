@@ -16,7 +16,7 @@ const legend = [
   <div class="space-y-4">
     <header class="flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Meridian architecture</h1>
+        <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Veymark architecture</h1>
         <p class="text-sm text-ink-600 dark:text-ink-300">
           The estate as it stands. It grows when you deploy something and turns red when something
           you own is on fire.

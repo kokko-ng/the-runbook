@@ -79,7 +79,7 @@ encounters:
           timeout. Which is five minutes."
       - id: b
         action: Ask what the queue looks like after an event
-        speaker: Meridian NOC
+        speaker: Veymark NOC
         reveals: >
           "Message count dips, then recovers a few minutes later. So they do come back.
           The application that reads them has already reported the upload as failed by

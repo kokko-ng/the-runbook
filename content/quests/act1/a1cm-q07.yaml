@@ -91,7 +91,7 @@ encounters:
         correct: false
         rep: -8
         consequence: >
-          Wei Lin finds Meridian's label templates and internal host names in a public image
+          Wei Lin finds Veymark's label templates and internal host names in a public image
           layer.
         explain: >
           Images almost always carry more context than intended: configuration, paths,
@@ -117,7 +117,7 @@ encounters:
       a new version."
 
 
-      Nobody at Meridian has run Kubernetes and nobody wants to be the first.
+      Nobody at Veymark has run Kubernetes and nobody wants to be the first.
     hint: >
       Describe each workload in one clause: one starts, runs eleven minutes
       and stops; one must keep answering while new versions ship. Ask which
@@ -148,7 +148,7 @@ encounters:
           correct: false
           explain: >
             Kubernetes earns its keep at a scale and complexity these two
-            containers do not have, and Meridian would be learning it in
+            containers do not have, and Veymark would be learning it in
             production. Managed runtimes exist for exactly this size of
             problem.
     prompt: Where do you run them?
@@ -188,7 +188,7 @@ encounters:
         correct: false
         rep: -7
         consequence: >
-          Meridian acquires a cluster to upgrade, node pools to size, and an eleven-minute
+          Veymark acquires a cluster to upgrade, node pools to size, and an eleven-minute
           nightly job.
         explain: >
           Kubernetes is the right answer at a certain scale and complexity, and it comes with
@@ -206,7 +206,7 @@ encounters:
   - id: c
     type: troubleshoot
     title: INC-4718
-    speaker: Meridian NOC
+    speaker: Veymark NOC
     objectives: [AZ104-3.3.4]
     intro: >
       The tracking API went live on Monday. On Wednesday morning, between 06:40
@@ -250,7 +250,7 @@ encounters:
     ticket:
       ref: INC-4718
       opened: "07:15"
-      reporter: Meridian NOC
+      reporter: Veymark NOC
       summary: Tracking API returns intermittent 502 errors during the morning ramp.
       severity: sev2
     time_budget: 5

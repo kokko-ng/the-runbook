@@ -1,7 +1,7 @@
 id: a2id-q01
 chapter: act2-identity
 title: Two Tenants, One Company
-summary: Meridian has bought Straits Freight, and on Monday four hundred people need to sign in to things they do not have accounts for.
+summary: Veymark has bought Straits Freight, and on Monday four hundred people need to sign in to things they do not have accounts for.
 variant: core
 estimated_minutes: 15
 objectives:
@@ -24,7 +24,7 @@ encounters:
 
 
       "Straits Freight has its own Microsoft Entra tenant, four hundred and ten
-      users, and an on-premises Active Directory in Port Klang. Meridian has ours.
+      users, and an on-premises Active Directory in Port Klang. Veymark has ours.
       Legal completion is in eighteen months. Operations want shared dispatch
       visibility inside a fortnight."
 
@@ -61,7 +61,7 @@ encounters:
           correct: false
           explain: >
             Cross-tenant access settings already express exactly as much trust
-            as Meridian chooses. The gap was the mechanism for granting access,
+            as Veymark chooses. The gap was the mechanism for granting access,
             not a shortage of trust.
     prompt: What do you recommend for the immediate need?
     options:
@@ -85,7 +85,7 @@ encounters:
           - {op: add_edge, edge: e2-sf-tenant}
           - {op: add_edge, edge: e2-b2b-meridian}
       - id: b
-        label: Migrate the Straits tenant into Meridian's tenant before anything else
+        label: Migrate the Straits tenant into Veymark's tenant before anything else
         correct: false
         rep: -8
         consequence: >
@@ -96,7 +96,7 @@ encounters:
           application. It may well be the right end state, and it cannot be the answer to a
           two-week operational requirement.
       - id: c
-        label: Create Meridian accounts for the Straits staff who need access
+        label: Create Veymark accounts for the Straits staff who need access
         correct: false
         rep: -7
         consequence: >
@@ -128,7 +128,7 @@ encounters:
       an internet link that drops for a few minutes a day."
 
 
-      Those staff will need Meridian's dispatch application, which is
+      Those staff will need Veymark's dispatch application, which is
       cloud-hosted, within the year. Straits IT is two people and a contractor.
     hint: >
       Start from the failure Marek named: a link that drops daily and an IT
@@ -217,7 +217,7 @@ encounters:
     speaker: Wei Lin Tan
     objectives: [AZ305-1.2.1]
     intro: >
-      "Meridian requires multi-factor authentication for everyone," says Wei Lin.
+      "Veymark requires multi-factor authentication for everyone," says Wei Lin.
       "Straits requires it for administrators only. Their planners are about to be
       guests in our tenant, using our dispatch application, from their own laptops
       and their own network."
@@ -226,27 +226,27 @@ encounters:
       Straits already enforce multi-factor with the Microsoft Authenticator app
       for those administrators.
     hint: >
-      Separate two questions Wei Lin is holding together: what Meridian
+      Separate two questions Wei Lin is holding together: what Veymark
       requires of anyone touching its dispatch data, and what proof it accepts.
       The requirement is yours to set; the proof can come from more than one
       place.
     post_mortem:
       question: >
         Wei Lin adds a line to a finding that does not exist yet. "For the
-        record, then. Whose policy governs a guest's access to Meridian's data,
+        record, then. Whose policy governs a guest's access to Veymark's data,
         and what should that policy do about a factor already satisfied
         elsewhere?"
       options:
         - id: a
-          label: Meridian enforces its own requirement and trusts a compliant home tenant's claim
+          label: Veymark enforces its own requirement and trusts a compliant home tenant's claim
           correct: true
           explain: >
-            Access to Meridian's data is governed by Meridian's Conditional
+            Access to Veymark's data is governed by Veymark's Conditional
             Access, whatever the guest's home policy says. Trusting the home
             tenant's multi-factor claim spares compliant users a second
             registration without lowering the bar for anyone.
         - id: b
-          label: Guests sit outside Meridian's policy reach until the tenants merge
+          label: Guests sit outside Veymark's policy reach until the tenants merge
           correct: false
           explain: >
             A guest identity in your tenant is subject to your Conditional
@@ -263,7 +263,7 @@ encounters:
     options:
       - id: a
         label: >
-          Require multi-factor in Meridian's Conditional Access for guests, and configure
+          Require multi-factor in Veymark's Conditional Access for guests, and configure
           cross-tenant access to trust the Straits tenant's multi-factor claims
         correct: true
         rep: 9
@@ -271,9 +271,9 @@ encounters:
           Straits planners who already satisfy multi-factor at home are not challenged twice,
           and the ones who never had it are, which is what changes behavior at Straits.
         explain: >
-          Requiring multi-factor for guests is Meridian's policy to set. Trusting the home
+          Requiring multi-factor for guests is Veymark's policy to set. Trusting the home
           tenant's claim avoids double prompting for users who already comply, while users
-          from a tenant with no multi-factor still have to satisfy Meridian's requirement
+          from a tenant with no multi-factor still have to satisfy Veymark's requirement
           against their guest identity.
         diagram:
           - {op: add_node, node: cond-access}
@@ -293,7 +293,7 @@ encounters:
         correct: false
         rep: -5
         consequence: >
-          Straits administrators register a second authenticator for Meridian and complain
+          Straits administrators register a second authenticator for Veymark and complain
           about it in every steering meeting for a quarter.
         explain: >
           It is secure and it makes compliant users register twice. Trusting the claim is the
@@ -306,7 +306,7 @@ encounters:
           It is the right long-term ask and it delays dispatch visibility by a quarter while
           another company changes its policy.
         explain: >
-          Meridian can enforce its own requirement on access to its own resources today, and
+          Veymark can enforce its own requirement on access to its own resources today, and
           raise the Straits baseline as a separate workstream.
   - id: d
     type: knowledge

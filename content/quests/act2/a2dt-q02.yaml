@@ -93,7 +93,7 @@ encounters:
         consequence: >
           The pool's other databases slow down during peak, which is when they are also busy.
         explain: >
-          Elastic pools share a budget between databases with complementary peaks. Meridian's
+          Elastic pools share a budget between databases with complementary peaks. Veymark's
           databases all peak in the same fortnight.
       - id: d
         label: Cache the tracking portal's queries in Redis and leave the database as it is
@@ -267,7 +267,7 @@ encounters:
         time_cost: 1
       - id: b
         label: Check what the connection string asks for
-        cmd: az sql db show --name transport --server sql-meridian-tms -g rg-data --query "{tier:sku.name,readScale:readScale}" -o json
+        cmd: az sql db show --name transport --server sql-veymark-tms -g rg-data --query "{tier:sku.name,readScale:readScale}" -o json
         output: |
           {
             "readScale": "Enabled",
@@ -276,11 +276,11 @@ encounters:
         time_cost: 1
       - id: c
         label: Confirm which endpoint the extract connects to
-        cmd: az sql db replica list-links --name transport --server sql-meridian-tms -g rg-data -o table
+        cmd: az sql db replica list-links --name transport --server sql-veymark-tms -g rg-data -o table
         output: |
           Name              Role       PartnerServer
           ----------------  ---------  -------------------------
-          transport-nr01    Secondary  sql-meridian-tms-replica
+          transport-nr01    Secondary  sql-veymark-tms-replica
         note: The extract's connection string sets ApplicationIntent to ReadOnly.
         time_cost: 1
     post_incident:

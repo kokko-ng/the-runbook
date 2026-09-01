@@ -201,7 +201,7 @@ encounters:
   - id: c
     type: troubleshoot
     title: INC-4620
-    speaker: Meridian NOC
+    speaker: Veymark NOC
     objectives: [AZ104-3.1.2, AZ104-3.1.1]
     intro: >
       The size change was merged. The pipeline now fails at deployment, after
@@ -246,7 +246,7 @@ encounters:
     ticket:
       ref: INC-4620
       opened: "16:40"
-      reporter: Meridian NOC
+      reporter: Veymark NOC
       summary: Template deployment fails in production with a disk conflict after a size change.
       severity: sev3
     time_budget: 4
@@ -259,7 +259,7 @@ encounters:
           machine and its existing disks, which have names the template also wants to use."
       - id: b
         action: Ask what mode the pipeline deploys in
-        speaker: Meridian IT
+        speaker: Veymark IT
         reveals: >
           The pipeline runs az deployment group create with no mode argument, which means
           incremental.

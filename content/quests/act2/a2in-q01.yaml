@@ -98,7 +98,7 @@ encounters:
         correct: false
         rep: -7
         consequence: >
-          Meridian ends up running four compute platforms because four teams each had a
+          Veymark ends up running four compute platforms because four teams each had a
           preference.
         explain: >
           Team familiarity is a real input and it is not the driver. Standardizing on fewer

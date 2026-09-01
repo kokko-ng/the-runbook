@@ -12,10 +12,10 @@ const ui = useUiStore()
       class="fixed inset-0 z-50 flex flex-col bg-ink-50 dark:bg-ink-950"
       role="dialog"
       aria-modal="true"
-      aria-label="Meridian architecture"
+      aria-label="Veymark architecture"
     >
       <div class="flex items-center justify-between border-b border-ink-200 px-3 py-2 dark:border-ink-800">
-        <h2 class="text-sm font-semibold">Meridian architecture</h2>
+        <h2 class="text-sm font-semibold">Veymark architecture</h2>
         <button class="btn-quiet px-3" type="button" @click="ui.mapSheetOpen = false">Close</button>
       </div>
       <div class="min-h-0 grow">

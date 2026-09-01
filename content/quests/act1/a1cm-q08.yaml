@@ -9,7 +9,7 @@ objectives:
   - AZ104-3.4.2
   - AZ104-3.4.3
 brief: >
-  Meridian's first customer-facing application in Azure. Everything about it is a
+  Veymark's first customer-facing application in Azure. Everything about it is a
   decision somebody will quote back to you.
 debrief: >
   A plan sized for the load rather than the demo, autoscale that responds to the

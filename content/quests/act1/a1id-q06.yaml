@@ -32,7 +32,7 @@ encounters:
       quota by accident."
 
 
-      Meridian has one Azure agreement, and creating subscriptions under it is
+      Veymark has one Azure agreement, and creating subscriptions under it is
       not a problem.
     hint: >
       List what actually separates at a subscription and nowhere else: the
@@ -110,7 +110,7 @@ encounters:
         rep: -7
         consequence: >
           The data team ends up outside every policy, every role assignment and every
-          monitoring rule Meridian has.
+          monitoring rule Veymark has.
         explain: >
           A separate billing account puts the workload outside your tenant's governance.
           Separation inside the same tenant is what management groups and subscriptions are

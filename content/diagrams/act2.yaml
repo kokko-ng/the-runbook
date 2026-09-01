@@ -1,4 +1,4 @@
-# The Act 2 estate: what Meridian is designing, not what it is running.
+# The Act 2 estate: what Veymark is designing, not what it is running.
 #
 # Act 2 opens with the acquisition of Straits Freight, so the diagram starts
 # nearly empty on purpose. Nodes appear as designs are agreed, which makes the
@@ -31,7 +31,7 @@ groups:
     label: Business continuity
 
 nodes:
-  # --- what Meridian is buying ------------------------------------------
+  # --- what Veymark is buying ------------------------------------------
   - {id: sf-datacenter, label: Straits Freight data center, kind: onprem, group: acquired, x: 0, y: 0, present: true, detail: Two racks in Port Klang}
   - {id: sf-ad, label: straitsfreight.local, kind: onprem-ad, group: acquired, x: 0, y: 90, present: true}
   - {id: sf-tenant, label: straitsfreight.com tenant, kind: entra, group: acquired, x: 0, y: 180, present: true}
@@ -41,7 +41,7 @@ nodes:
   - {id: arc-servers, label: Azure Arc-enabled servers, kind: onprem, group: acquired, x: 0, y: 540}
 
   # --- platform ---------------------------------------------------------
-  - {id: mg-root2, label: mg-meridian, kind: management-group, group: platform, x: 240, y: 0, present: true}
+  - {id: mg-root2, label: mg-veymark, kind: management-group, group: platform, x: 240, y: 0, present: true}
   - {id: mg-platform2, label: mg-platform, kind: management-group, group: platform, x: 240, y: 90}
   - {id: mg-landingzones, label: mg-landing-zones, kind: management-group, group: platform, x: 240, y: 180}
   - {id: mg-sandbox, label: mg-sandbox, kind: management-group, group: platform, x: 240, y: 270}
@@ -54,7 +54,7 @@ nodes:
   - {id: tag-strategy, label: Tag strategy, kind: policy, group: platform, x: 240, y: 900}
 
   # --- identity ---------------------------------------------------------
-  - {id: entra-meridian, label: meridianlogistics.com, kind: entra, group: identity, x: 480, y: 0, present: true}
+  - {id: entra-meridian, label: veymarklogistics.com, kind: entra, group: identity, x: 480, y: 0, present: true}
   - {id: entra-b2b, label: Cross-tenant collaboration, kind: entra-guest, group: identity, x: 480, y: 90}
   - {id: entra-connect2, label: Entra Connect, kind: entra-connect, group: identity, x: 480, y: 180, present: true}
   - {id: entra-appproxy, label: Entra application proxy, kind: entra-feature, group: identity, x: 480, y: 270}
@@ -71,7 +71,7 @@ nodes:
   - {id: dcr-servers, label: Data collection rules, kind: workbook, group: management, x: 720, y: 180}
   - {id: sentinel, label: Microsoft Sentinel, kind: alert, group: management, x: 720, y: 270}
   - {id: defender-cloud, label: Defender for Cloud, kind: alert, group: management, x: 720, y: 360}
-  - {id: st-logs-archive, label: stmeridianlogs, kind: storage, group: management, x: 720, y: 450, detail: Long-term log archive}
+  - {id: st-logs-archive, label: stveymarklogs, kind: storage, group: management, x: 720, y: 450, detail: Long-term log archive}
   - {id: eventhub-logs, label: Log export event hub, kind: event-hub, group: management, x: 720, y: 540}
   - {id: appinsights-portal, label: Application Insights, kind: workbook, group: management, x: 720, y: 630}
 

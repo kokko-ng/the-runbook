@@ -8,7 +8,7 @@ objectives:
   - AZ305-1.3.1
   - AZ305-1.3.2
 brief: >
-  Every governance decision Meridian makes for the next five years hangs off a
+  Every governance decision Veymark makes for the next five years hangs off a
   hierarchy that takes an afternoon to design and years to change.
 debrief: >
   A hierarchy with a reason for every level, tags that answer questions people
@@ -65,7 +65,7 @@ encounters:
     options:
       - id: a
         label: >
-          A top-level Meridian group with platform, landing zones and sandbox beneath it, and
+          A top-level Veymark group with platform, landing zones and sandbox beneath it, and
           subscriptions placed by purpose
         correct: true
         rep: 9
@@ -235,7 +235,7 @@ encounters:
             on an arbitrary Tuesday. Audits, exports and blanket denies each
             produce a stale answer or a blocked platform.
         - id: b
-          label: An authority outside Meridian has certified it recently
+          label: An authority outside Veymark has certified it recently
           correct: false
           explain: >
             Certification is required and dated. The customer's question is
@@ -252,7 +252,7 @@ encounters:
       - id: a
         label: >
           Defender for Cloud with the relevant regulatory compliance standards assigned at the
-          top management group, plus a policy initiative for Meridian's own rules
+          top management group, plus a policy initiative for Veymark's own rules
         correct: true
         rep: 9
         consequence: >
@@ -260,7 +260,7 @@ encounters:
           before, and a list of what to fix in priority order.
         explain: >
           Defender for Cloud continuously assesses resources against built-in regulatory
-          standards and shows a compliance score with the failing controls. Meridian's own
+          standards and shows a compliance score with the failing controls. Veymark's own
           rules go in a custom policy initiative assigned at the same scope, so both are
           inherited by every subscription that appears later.
         diagram:

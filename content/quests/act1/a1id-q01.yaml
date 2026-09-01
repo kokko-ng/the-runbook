@@ -21,7 +21,7 @@ encounters:
     objectives: [AZ104-1.2.1, AZ104-1.2.2]
     intro: >
       Dana puts the export on the desk. Eleven Owner assignments on
-      sub-meridian-prod: two platform admins, four application developers, the
+      sub-veymark-prod: two platform admins, four application developers, the
       Jurong facilities manager, two people who left last year, a service
       principal named "temp-migration", and you.
 
@@ -154,7 +154,7 @@ encounters:
             are assigned, whatever anyone feels about them; the miss was in the
             grant, not in the sentiment.
         - id: c
-          label: Guest accounts were the wrong mechanism for people outside Meridian
+          label: Guest accounts were the wrong mechanism for people outside Veymark
           correct: false
           explain: >
             Guests in the tenant are precisely how an outside firm signs in for
@@ -163,7 +163,7 @@ encounters:
     prompt: What do you assign them?
     options:
       - id: a
-        label: Reader on sub-meridian-prod
+        label: Reader on sub-veymark-prod
         correct: true
         rep: 7
         consequence: >
@@ -175,7 +175,7 @@ encounters:
           entirely, and it does not grant access to data inside a storage account, which
           needs a separate data-plane role.
       - id: b
-        label: Reader on mg-meridian, the management group above both subscriptions
+        label: Reader on mg-veymark, the management group above both subscriptions
         correct: false
         rep: -7
         consequence: >
@@ -186,7 +186,7 @@ encounters:
           The requirement named one subscription, so the assignment belongs on that
           subscription.
       - id: c
-        label: Storage Blob Data Reader and Reader on sub-meridian-prod
+        label: Storage Blob Data Reader and Reader on sub-veymark-prod
         correct: false
         rep: -8
         consequence: >
@@ -197,7 +197,7 @@ encounters:
           Reader adds access to the contents of every blob in scope, which is customer data
           the requirement specifically excluded.
       - id: d
-        label: Contributor on sub-meridian-prod, with a resource lock to stop changes
+        label: Contributor on sub-veymark-prod, with a resource lock to stop changes
         correct: false
         rep: -9
         consequence: >
@@ -274,12 +274,12 @@ encounters:
     commands:
       - id: a
         label: List what Dana actually has
-        cmd: az role assignment list --assignee dana.ong@meridianlogistics.com --all -o table
+        cmd: az role assignment list --assignee dana.ong@veymarklogistics.com --all -o table
         output: |
           Principal                            Role         Scope
           -----------------------------------  -----------  -------------------------------------
-          dana.ong@meridianlogistics.com       Contributor  /subscriptions/.../resourceGroups/rg-app
-          dana.ong@meridianlogistics.com       Reader       /subscriptions/...
+          dana.ong@veymarklogistics.com       Contributor  /subscriptions/.../resourceGroups/rg-app
+          dana.ong@veymarklogistics.com       Reader       /subscriptions/...
         time_cost: 1
       - id: b
         label: Check what the Contributor role can do about role assignments
@@ -294,12 +294,12 @@ encounters:
         time_cost: 1
       - id: c
         label: Check whether anything is denying the action outright
-        cmd: az role assignment list --assignee dana.ong@meridianlogistics.com --include-inherited --include-groups -o table
+        cmd: az role assignment list --assignee dana.ong@veymarklogistics.com --include-inherited --include-groups -o table
         output: |
           Principal                            Role         Scope
           -----------------------------------  -----------  -------------------------------------
-          dana.ong@meridianlogistics.com       Contributor  /subscriptions/.../resourceGroups/rg-app
-          dana.ong@meridianlogistics.com       Reader       /subscriptions/...
+          dana.ong@veymarklogistics.com       Contributor  /subscriptions/.../resourceGroups/rg-app
+          dana.ong@veymarklogistics.com       Reader       /subscriptions/...
         time_cost: 1
       - id: d
         label: Check the subscription for deny assignments

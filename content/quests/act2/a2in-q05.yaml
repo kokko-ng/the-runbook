@@ -1,7 +1,7 @@
 id: a2in-q05
 chapter: act2-infrastructure
 title: One Front Door for the APIs
-summary: Nine APIs, three consumers who are not Meridian, and every team about to invent their own authentication.
+summary: Nine APIs, three consumers who are not Veymark, and every team about to invent their own authentication.
 variant: core
 estimated_minutes: 15
 objectives:
@@ -262,14 +262,14 @@ encounters:
         output: |
           Host                                    ResponseCode
           --------------------------------------  --------------
-          meridian-fd-a1b2.azurefd.net            403
+          veymark-fd-a1b2.azurefd.net            403
         time_cost: 1
       - id: b
         label: Check the Front Door origin configuration
-        cmd: az afd origin show -g rg-edge --profile-name fd-meridian --origin-group-name og-api --origin-name api-sea --query "{host:hostName,originHostHeader:originHostHeader}" -o json
+        cmd: az afd origin show -g rg-edge --profile-name fd-veymark --origin-group-name og-api --origin-name api-sea --query "{host:hostName,originHostHeader:originHostHeader}" -o json
         output: |
           {
-            "host": "apim-meridian.azure-api.net",
+            "host": "apim-veymark.azure-api.net",
             "originHostHeader": null
           }
         time_cost: 1
@@ -277,7 +277,7 @@ encounters:
         label: Confirm the origin works when called directly
         cmd: >-
           curl -sS -o /dev/null -w "%{http_code}" -H "Ocp-Apim-Subscription-Key: REDACTED"
-          https://apim-meridian.azure-api.net/shipments/v1/ping
+          https://apim-veymark.azure-api.net/shipments/v1/ping
         output: |
           200 OK
           {"status":"ok","region":"southeastasia"}

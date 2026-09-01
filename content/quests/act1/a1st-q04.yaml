@@ -202,7 +202,7 @@ encounters:
   - id: c
     type: troubleshoot
     title: INC-4529
-    speaker: Meridian NOC
+    speaker: Veymark NOC
     objectives: [AZ104-2.3.7]
     intro: >
       A fault in the intake service uploaded the same scan identifier for every
@@ -247,7 +247,7 @@ encounters:
     ticket:
       ref: INC-4529
       opened: "10:02"
-      reporter: Meridian NOC
+      reporter: Veymark NOC
       summary: Intake bug overwrote 406 proof-of-delivery scans with the same image.
       severity: sev1
     time_budget: 5
@@ -260,14 +260,14 @@ encounters:
           we set up the lifecycle rules, because the documentation recommended it."
       - id: b
         action: Ask whether the originals ever existed in Azure
-        speaker: Meridian IT
+        speaker: Veymark IT
         reveals: >
           Intake logs show 406 successful PUT operations before the faulty ones, each
           with a distinct content length. The originals were written.
     commands:
       - id: a
         label: Check versioning and soft delete on the account
-        cmd: az storage account blob-service-properties show -n stmeridianpod -g rg-data --query "{versioning:isVersioningEnabled,softDelete:deleteRetentionPolicy}" -o json
+        cmd: az storage account blob-service-properties show -n stveymarkpod -g rg-data --query "{versioning:isVersioningEnabled,softDelete:deleteRetentionPolicy}" -o json
         output: |
           {
             "softDelete": { "days": 14, "enabled": true },
@@ -276,7 +276,7 @@ encounters:
         time_cost: 1
       - id: b
         label: List the versions of one affected blob
-        cmd: az storage blob list -c pod-scans --account-name stmeridianpod --include v --prefix "2026/08/24/POD-88214" -o table
+        cmd: az storage blob list -c pod-scans --account-name stveymarkpod --include v --prefix "2026/08/24/POD-88214" -o table
         output: |
           Name                            VersionId                       IsCurrentVersion    Length
           ------------------------------  ------------------------------  ------------------  --------
@@ -285,14 +285,14 @@ encounters:
         time_cost: 1
       - id: c
         label: Check whether the deleted-blob list has anything
-        cmd: az storage blob list -c pod-scans --account-name stmeridianpod --include d --prefix "2026/08/24/" --query "[?deleted]" -o table
+        cmd: az storage blob list -c pod-scans --account-name stveymarkpod --include d --prefix "2026/08/24/" --query "[?deleted]" -o table
         output: |
           (no results)
         note: Nothing was deleted. Each blob was overwritten, which is a different event.
         time_cost: 1
       - id: d
         label: Check whether the container has a legal hold or immutability policy
-        cmd: az storage container immutability-policy show -c pod-scans --account-name stmeridianpod -g rg-data
+        cmd: az storage container immutability-policy show -c pod-scans --account-name stveymarkpod -g rg-data
         output: |
           (ImmutabilityPolicyNotFound) No immutability policy found on this container.
         time_cost: 1

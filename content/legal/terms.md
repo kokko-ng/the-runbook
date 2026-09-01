@@ -10,7 +10,7 @@ and it is not a substitute for hands-on practice in a real Azure subscription.
 ## What this is
 
 An independent, fan-made study aid in the shape of a career simulation. All
-scenarios, characters and company names are fictional. Meridian Logistics does
+scenarios, characters and company names are fictional. Veymark Logistics does
 not exist, and any resemblance to a real firm is coincidental.
 
 ## Not affiliated with Microsoft

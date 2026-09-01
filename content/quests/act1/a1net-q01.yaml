@@ -8,7 +8,7 @@ objectives:
   - AZ104-4.1.1
   - AZ104-4.1.3
 brief: >
-  Meridian is opening a cross-dock in Johor and the depot systems have to live in
+  Veymark is opening a cross-dock in Johor and the depot systems have to live in
   Azure from day one. You get to draw the network before anyone else draws it for you.
 debrief: >
   The address space is on a wiki page now, which is more documentation than the
@@ -61,7 +61,7 @@ encounters:
           correct: false
           explain: >
             Azure reserves addresses inside each subnet, not whole private
-            ranges. The collision was with Meridian's own estate, and every
+            ranges. The collision was with Veymark's own estate, and every
             range that mattered was on the printout Dana brought over.
     prompt: What address space do you put in the change request?
     options:
@@ -216,7 +216,7 @@ encounters:
 
 
       You are provisioning the public IP address for the intake load balancer this
-      afternoon. Meridian runs in Southeast Asia, which has availability zones, and
+      afternoon. Veymark runs in Southeast Asia, which has availability zones, and
       Hendrik has never once forgiven an address that moved.
     hint: >
       Hendrik's requirement is about what survives. The address has to outlive

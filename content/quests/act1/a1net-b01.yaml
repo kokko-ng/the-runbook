@@ -85,7 +85,7 @@ encounters:
           Jurong over the VPN fine."
       - id: c
         action: Check who built the peerings and when
-        speaker: Meridian IT
+        speaker: Veymark IT
         reveals: >
           Both peerings were created by template, three weeks apart, by different
           people. Neither template mentions forwarded traffic.

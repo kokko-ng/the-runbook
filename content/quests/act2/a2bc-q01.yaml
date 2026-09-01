@@ -11,7 +11,7 @@ brief: >
   agreed is most of the work and all of the accountability.
 debrief: >
   Objectives per workload, agreed by the people who own the consequences, and a
-  tiering that says what Meridian will and will not pay to protect.
+  tiering that says what Veymark will and will not pay to protect.
 encounters:
   - id: a
     type: design
@@ -48,7 +48,7 @@ encounters:
           label: The objectives were not strict enough for a freight company
           correct: false
           explain: >
-            Strictness is not the measure. Analytics can wait a day at Meridian
+            Strictness is not the measure. Analytics can wait a day at Veymark
             without harm; the flaw is setting numbers without asking what each
             workload's downtime costs, not setting them too loose.
         - id: c
@@ -257,7 +257,7 @@ encounters:
           - {op: add_node, node: rsv-platform}
           - {op: add_node, node: asr-platform}
       - id: b
-        label: Replicate the servers to Meridian's Jurong data center
+        label: Replicate the servers to Veymark's Jurong data center
         correct: false
         rep: -6
         consequence: >
