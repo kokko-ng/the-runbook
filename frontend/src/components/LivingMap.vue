@@ -256,6 +256,12 @@ watch(
 :deep(.map-group) {
   color: var(--color-map-label);
 }
+/* A hovered box un-truncates its text and grows, so it must paint above its
+   neighbours. Vue Flow writes z-index: 0 inline on every node wrapper, hence
+   the !important. */
+:deep(.vue-flow__node-resource:hover) {
+  z-index: 20 !important;
+}
 /* Link labels ride above the boxes rather than under them, which is what stops
    the box beside a label from slicing the words in half. */
 :deep(.vue-flow__edge-labels) {
