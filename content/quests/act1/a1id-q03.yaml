@@ -80,7 +80,7 @@ encounters:
           are handled by the same rule with no manual step. Dynamic groups need Microsoft
           Entra ID P1 licensing, which Meridian already has.
         diagram:
-          - {op: add_node, node: grp-depot-admins}
+          - {op: add_node, node: grp-depot-drivers}
       - id: b
         label: Create the fourteen accounts by hand and add each one to the right group
         correct: false

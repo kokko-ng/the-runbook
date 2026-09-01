@@ -54,9 +54,13 @@ const PORTS = [
     />
     <div class="flex items-center gap-2">
       <MapGlyph :kind="data.kind" size="sm" />
-      <span class="truncate text-[0.78rem] font-medium">{{ data.label }}</span>
+      <span class="truncate text-[0.78rem] font-medium" :title="data.label">{{ data.label }}</span>
     </div>
-    <p v-if="data.detail" class="mt-1 truncate text-[0.68rem] text-ink-500 dark:text-ink-400">
+    <p
+      v-if="data.detail"
+      class="mt-1 truncate text-[0.68rem] text-ink-500 dark:text-ink-400"
+      :title="data.detail"
+    >
       {{ data.detail }}
     </p>
   </div>

@@ -41,7 +41,8 @@ nodes:
   # --- identity ---------------------------------------------------------
   - {id: entra-tenant, label: meridianlogistics.com, kind: entra, group: identity, x: 0, y: 300, present: true}
   - {id: entra-connect, label: Entra Connect, kind: entra-connect, group: identity, x: 0, y: 390, present: true, detail: Password hash sync from meridian.local}
-  - {id: grp-depot-admins, label: sg-depot-admins, kind: entra-group, group: identity, x: 0, y: 480}
+  - {id: grp-depot-admins, label: sg-depot-leads, kind: entra-group, group: identity, x: 0, y: 480}
+  - {id: grp-depot-drivers, label: sg-depot-drivers, kind: entra-group, group: identity, x: 0, y: 525}
   - {id: grp-app-owners, label: sg-app-owners, kind: entra-group, group: identity, x: 0, y: 570}
   - {id: entra-sspr, label: Self-service password reset, kind: entra-feature, group: identity, x: 0, y: 660}
   - {id: entra-guests, label: Haulier guest accounts, kind: entra-guest, group: identity, x: 0, y: 750}
@@ -55,6 +56,7 @@ nodes:
   - {id: sub-nonprod, label: sub-meridian-nonprod, kind: subscription, group: governance, x: 240, y: 360}
   - {id: rg-hub, label: rg-hub, kind: resource-group, group: governance, x: 240, y: 450, present: true}
   - {id: rg-app, label: rg-app, kind: resource-group, group: governance, x: 240, y: 540, present: true}
+  - {id: rg-depot, label: rg-depot, kind: resource-group, group: governance, x: 240, y: 585, present: true}
   - {id: rg-data, label: rg-data, kind: resource-group, group: governance, x: 240, y: 630, present: true}
   - {id: rg-ops, label: rg-ops, kind: resource-group, group: governance, x: 240, y: 720}
   - {id: policy-tags, label: Require costcenter tag, kind: policy, group: governance, x: 240, y: 810}
@@ -106,7 +108,7 @@ nodes:
   - {id: vnet-depot, label: vnet-depot, kind: vnet, group: spoke-depot, x: 1200, y: 0, detail: 10.30.0.0/16}
   - {id: snet-depot, label: snet-depot, kind: subnet, group: spoke-depot, x: 1200, y: 90}
   - {id: nsg-depot, label: nsg-depot, kind: nsg, group: spoke-depot, x: 1200, y: 180}
-  - {id: vm-scan01, label: vm-scan01, kind: vm, group: spoke-depot, x: 1200, y: 270, detail: Handles proof-of-delivery scanner uploads}
+  - {id: vm-scan01, label: vm-scan01, kind: vm, group: spoke-depot, x: 1200, y: 270, present: true, detail: Handles proof-of-delivery scanner uploads}
 
   # --- data -------------------------------------------------------------
   - {id: st-pod, label: stmeridianpod, kind: storage, group: data, x: 1440, y: 0, present: true, detail: Proof-of-delivery scans}
