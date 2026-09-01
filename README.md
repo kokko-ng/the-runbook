@@ -1,6 +1,6 @@
 # The Runbook
 
-An Azure career RPG. You join Meridian Logistics as a junior cloud admin, work
+An Azure career RPG. You join Veymark Logistics as a junior cloud admin, work
 the ticket queue, survive the outages and the design reviews, and climb to
 solutions architect. Every objective on the current AZ-104 and AZ-305 study
 guides is covered by a scenario you actually play.
@@ -10,7 +10,7 @@ Free, both acts, no accounts required, no payments anywhere in the codebase.
 **The Runbook is an independent study aid. It is not affiliated with, endorsed
 by, or sponsored by Microsoft Corporation.** Microsoft, Azure, Microsoft Entra
 and the exam codes AZ-104 and AZ-305 are trademarks of the Microsoft group of
-companies. Meridian Logistics is fictional.
+companies. Veymark Logistics is fictional.
 
 ## How it works
 
@@ -27,7 +27,7 @@ companies. Meridian Logistics is fictional.
 - **Post-mortems claw back half.** The first wrong answer in an encounter opens
   a follow-up: name what actually went wrong, from three candidate lessons, and
   half the reputation comes back. Failure teaches twice or it costs double.
-- **A living architecture diagram.** The world map is Meridian's Azure estate. It
+- **A living architecture diagram.** The world map is Veymark's Azure estate. It
   grows when you deploy something and turns red when an incident touches it.
 - **Skill trees that tell the truth in two shades.** One tree per exam domain.
   An objective cleared without a wrong turn is solid; one recovered on a later

@@ -82,19 +82,19 @@ encounters:
           the scanners lived in the depot group."
       - id: c
         action: Check whether anything moved recently
-        speaker: Meridian IT
+        speaker: Veymark IT
         reveals: >
           CHG-2251, last Friday: "Move vm-scan01 to rg-app to sit with the intake
           service." Approved and completed. Role assignments were not mentioned.
     commands:
       - id: a
         label: List every assignment Hendrik has, inherited and through groups
-        cmd: az role assignment list --assignee hendrik.salim@meridianlogistics.com --all --include-inherited --include-groups -o table
+        cmd: az role assignment list --assignee hendrik.salim@veymarklogistics.com --all --include-inherited --include-groups -o table
         output: |
           Principal                    Role                        Scope
           ---------------------------  --------------------------  ------------------------------------------
           sg-depot-leads               Reader                      /subscriptions/...
-          hendrik.salim@meridianlo...  Virtual Machine Contributor /subscriptions/.../resourceGroups/rg-depot
+          hendrik.salim@veymarklo...  Virtual Machine Contributor /subscriptions/.../resourceGroups/rg-depot
         time_cost: 1
       - id: b
         label: Ask where the virtual machine lives now
@@ -106,7 +106,7 @@ encounters:
         time_cost: 1
       - id: c
         label: Check what Hendrik can do on the machine itself
-        cmd: az role assignment list --assignee hendrik.salim@meridianlogistics.com --scope /subscriptions/00000000/resourceGroups/rg-app/providers/Microsoft.Compute/virtualMachines/vm-scan01 --include-inherited -o table
+        cmd: az role assignment list --assignee hendrik.salim@veymarklogistics.com --scope /subscriptions/00000000/resourceGroups/rg-app/providers/Microsoft.Compute/virtualMachines/vm-scan01 --include-inherited -o table
         output: |
           Principal        Role     Scope
           ---------------  -------  --------------------
@@ -193,7 +193,7 @@ encounters:
 
 
       A service principal has Contributor at the mg-workload management group. It
-      also has Reader on sub-meridian-prod. And there is a deny assignment on
+      also has Reader on sub-veymark-prod. And there is a deny assignment on
       rg-data, inherited from a managed application, that covers delete actions.
 
 
@@ -251,7 +251,7 @@ encounters:
         correct: false
         rep: -7
         consequence: >
-          The audit report records an incorrect answer from Meridian, which is a worse
+          The audit report records an incorrect answer from Veymark, which is a worse
           finding than the one it was about.
         explain: >
           The inheritance half is right and the conclusion is not. A deny assignment is

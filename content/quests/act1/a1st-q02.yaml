@@ -9,7 +9,7 @@ objectives:
   - AZ104-2.1.2
   - AZ104-2.1.3
 brief: >
-  Northgate uploads customs paperwork straight into Meridian's storage. The way
+  Northgate uploads customs paperwork straight into Veymark's storage. The way
   they authenticate is about to become a finding.
 debrief: >
   A stored access policy you can revoke without rotating a key, and a key rotation
@@ -24,7 +24,7 @@ encounters:
       Wei Lin found it during the partner review.
 
 
-      "Northgate has key1 for stmeridianedi. The whole account key, in a
+      "Northgate has key1 for stveymarkedi. The whole account key, in a
       configuration file, on a server we do not manage. It gives them full control
       of every container in that account, forever, and we cannot revoke it without
       breaking everything else that uses the same key."
@@ -62,7 +62,7 @@ encounters:
           correct: false
           explain: >
             Entra authorization is the strongest choice for callers you control. Northgate
-            is another company's server, and creating a Meridian account for it would
+            is another company's server, and creating a Veymark account for it would
             re-create the unmanaged credential problem the finding describes.
     prompt: What do you move them to?
     options:
@@ -102,11 +102,11 @@ encounters:
           Both account keys grant complete control of the account. Rotating one and handing
           over the other is the same exposure with fresh characters in it.
       - id: d
-        label: Create a Meridian user account for Northgate and give it Storage Blob Data Contributor
+        label: Create a Veymark user account for Northgate and give it Storage Blob Data Contributor
         correct: false
         rep: -6
         consequence: >
-          Meridian now manages credentials for another firm's staff again, and the role
+          Veymark now manages credentials for another firm's staff again, and the role
           covers every container in the account.
         explain: >
           Microsoft Entra authorization is the strongest option for identities you control,
@@ -177,7 +177,7 @@ encounters:
     commands:
       - id: a
         label: Look at the stored access policy on the container
-        cmd: az storage container policy list --container-name customs -n stmeridianedi --account-name stmeridianedi -o json
+        cmd: az storage container policy list --container-name customs -n stveymarkedi --account-name stveymarkedi -o json
         output: |
           {
             "northgate-upload": {
@@ -189,14 +189,14 @@ encounters:
         time_cost: 1
       - id: b
         label: Decode the signature the partner was given
-        cmd: az storage blob url --container-name customs -n test.txt --account-name stmeridianedi --sas-token "sv=2024-11-04&si=northgate-upload&sr=c&st=2026-08-24T16:00:00Z&sig=..."
+        cmd: az storage blob url --container-name customs -n test.txt --account-name stveymarkedi --sas-token "sv=2024-11-04&si=northgate-upload&sr=c&st=2026-08-24T16:00:00Z&sig=..."
         output: |
-          https://stmeridianedi.blob.core.windows.net/customs/test.txt?sv=2024-11-04&si=northgate-upload&sr=c&st=2026-08-24T16:00:00Z&sig=...
+          https://stveymarkedi.blob.core.windows.net/customs/test.txt?sv=2024-11-04&si=northgate-upload&sr=c&st=2026-08-24T16:00:00Z&sig=...
         note: The signature carries its own start time of 16:00 UTC, which is midnight in Singapore.
         time_cost: 1
       - id: c
         label: Check what the account allows
-        cmd: az storage account show -n stmeridianedi -g rg-data --query "{sasPolicy:sasPolicy,sharedKey:allowSharedKeyAccess,https:supportsHttpsTrafficOnly}" -o table
+        cmd: az storage account show -n stveymarkedi -g rg-data --query "{sasPolicy:sasPolicy,sharedKey:allowSharedKeyAccess,https:supportsHttpsTrafficOnly}" -o table
         output: |
           SasPolicy    SharedKey    Https
           -----------  -----------  -------
@@ -206,7 +206,7 @@ encounters:
         label: Try the same signature yourself
         cmd: >-
           curl -sS -X PUT -H "x-ms-blob-type: BlockBlob" --data-binary @test.txt
-          "https://stmeridianedi.blob.core.windows.net/customs/test.txt?sv=2024-11-04&si=northgate-upload&st=2026-08-24T16:00:00Z&sig=..."
+          "https://stveymarkedi.blob.core.windows.net/customs/test.txt?sv=2024-11-04&si=northgate-upload&st=2026-08-24T16:00:00Z&sig=..."
         output: |
           <?xml version="1.0" encoding="utf-8"?>
           <Error><Code>AuthenticationFailed</Code><Message>Signature not valid in the specified

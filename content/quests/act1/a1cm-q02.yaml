@@ -208,7 +208,7 @@ encounters:
   - id: c
     type: troubleshoot
     title: INC-4638
-    speaker: Meridian NOC
+    speaker: Veymark NOC
     objectives: [AZ104-3.1.4]
     intro: >
       The first Bicep deployment into the non-production subscription fails after
@@ -253,7 +253,7 @@ encounters:
     ticket:
       ref: INC-4638
       opened: "10:14"
-      reporter: Meridian NOC
+      reporter: Veymark NOC
       summary: Bicep deployment fails in the non-production subscription. Works from a laptop.
       severity: sev3
     time_budget: 4
@@ -267,7 +267,7 @@ encounters:
           got its role assignments last week."
       - id: b
         action: Ask what the pipeline command looks like
-        speaker: Meridian IT
+        speaker: Veymark IT
         reveals: >
           az deployment group create -g rg-app-nonprod --template-file main.bicep
           --parameters @nonprod.bicepparam

@@ -199,7 +199,7 @@ encounters:
   - id: c
     type: troubleshoot
     title: INC-4688
-    speaker: Meridian NOC
+    speaker: Veymark NOC
     objectives: [AZ104-3.2.3]
     intro: >
       The move ran at 22:00 and failed at 22:04 with a validation error. Nothing
@@ -243,7 +243,7 @@ encounters:
     ticket:
       ref: INC-4688
       opened: "22:06"
-      reporter: Meridian NOC
+      reporter: Veymark NOC
       summary: Resource group move to the non-production subscription failed validation.
       severity: sev3
     time_budget: 4
@@ -257,7 +257,7 @@ encounters:
           month."
       - id: b
         action: Ask what the destination subscription looks like
-        speaker: Meridian IT
+        speaker: Veymark IT
         reveals: >
           The non-production subscription has the compute and network resource providers
           registered. Nothing else is in the destination resource group.
@@ -269,14 +269,14 @@ encounters:
           {
             "error": {
               "code": "ResourceMoveValidationFailed",
-              "message": "Resource '/subscriptions/.../vaults/rsv-meridian/backupFabrics/.../protectedItems/vm-report01'
+              "message": "Resource '/subscriptions/.../vaults/rsv-veymark/backupFabrics/.../protectedItems/vm-report01'
               is protected by Azure Backup. Disable protection before moving the virtual machine."
             }
           }
         time_cost: 1
       - id: b
         label: Check what is protecting the machines
-        cmd: az backup item list --vault-name rsv-meridian -g rg-ops --query "[?contains(name,'report')].{name:name,policy:properties.policyName}" -o table
+        cmd: az backup item list --vault-name rsv-veymark -g rg-ops --query "[?contains(name,'report')].{name:name,policy:properties.policyName}" -o table
         output: |
           Name          Policy
           ------------  ----------------

@@ -21,7 +21,7 @@ encounters:
     objectives: [AZ305-1.2.4]
     intro: >
       "Straits ERP runs on two Windows servers in Port Klang," says Grace. "It
-      authenticates with integrated Windows authentication. Twenty Meridian
+      authenticates with integrated Windows authentication. Twenty Veymark
       finance staff need it from the Singapore office and from home, and it cannot
       be published to the internet."
 
@@ -69,7 +69,7 @@ encounters:
         correct: true
         rep: 9
         consequence: >
-          Finance sign in with their Meridian account, get a multi-factor prompt on an
+          Finance sign in with their Veymark account, get a multi-factor prompt on an
           unfamiliar device, and reach an ERP that thinks they authenticated with Kerberos.
         explain: >
           Application proxy publishes an internal web application through Entra without
@@ -122,7 +122,7 @@ encounters:
       customer contracts say we must control."
 
 
-      One customer contract requires keys in hardware that Meridian alone
+      One customer contract requires keys in hardware that Veymark alone
       controls, with a compliance attestation. The rest are ordinary.
     hint: >
       One requirement in that pile is contractual and hardware-shaped; the rest
@@ -266,7 +266,7 @@ encounters:
         action: Ask what is different about the two users
         speaker: Marek Sobczak
         reveals: >
-          "Both joined after the Straits acquisition. Both are cloud-only Meridian
+          "Both joined after the Straits acquisition. Both are cloud-only Veymark
           accounts. The other eighteen are synchronized from the Jurong domain."
       - id: b
         action: Ask how the ERP identifies a user
@@ -293,22 +293,22 @@ encounters:
         time_cost: 1
       - id: b
         label: Check one of the failing users
-        cmd: az ad user show --id nadia.rahman@meridianlogistics.com --query "{upn:userPrincipalName,onprem:onPremisesUserPrincipalName,sync:onPremisesSyncEnabled}" -o json
+        cmd: az ad user show --id nadia.rahman@veymarklogistics.com --query "{upn:userPrincipalName,onprem:onPremisesUserPrincipalName,sync:onPremisesSyncEnabled}" -o json
         output: |
           {
             "onprem": null,
             "sync": null,
-            "upn": "nadia.rahman@meridianlogistics.com"
+            "upn": "nadia.rahman@veymarklogistics.com"
           }
         time_cost: 1
       - id: c
         label: Check a working user for comparison
-        cmd: az ad user show --id tomas.lim@meridianlogistics.com --query "{upn:userPrincipalName,onprem:onPremisesUserPrincipalName,sync:onPremisesSyncEnabled}" -o json
+        cmd: az ad user show --id tomas.lim@veymarklogistics.com --query "{upn:userPrincipalName,onprem:onPremisesUserPrincipalName,sync:onPremisesSyncEnabled}" -o json
         output: |
           {
-            "onprem": "tomas.lim@meridian.local",
+            "onprem": "tomas.lim@veymark.local",
             "sync": true,
-            "upn": "tomas.lim@meridianlogistics.com"
+            "upn": "tomas.lim@veymarklogistics.com"
           }
         time_cost: 1
       - id: d

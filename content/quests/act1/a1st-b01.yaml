@@ -22,7 +22,7 @@ encounters:
     speaker: Wei Lin Tan
     objectives: [AZ104-2.1.2]
     intro: >
-      A second partner integration is being built, this time by Meridian's own
+      A second partner integration is being built, this time by Veymark's own
       developers. Their service runs on a virtual machine in vnet-app with a
       managed identity, and it needs to hand short-lived upload links to a mobile
       app used by drivers.
@@ -115,7 +115,7 @@ encounters:
     speaker: Marek Sobczak
     objectives: [AZ104-2.1.3, AZ104-2.1.4]
     intro: >
-      It is 22:40. A partner reports that a laptop holding one of Meridian's
+      It is 22:40. A partner reports that a laptop holding one of Veymark's
       upload credentials has been stolen. You do not yet know which credential.
 
 

@@ -3,7 +3,7 @@
 # attribution; the linter reads it to check that every quest lands in a real
 # chapter and every speaker is a real person.
 company:
-  name: Meridian Logistics
+  name: Veymark Logistics
   descriptor: a mid-size regional freight and warehousing firm
   headquarters: Singapore
   footprint: >
@@ -11,7 +11,7 @@ company:
     Vietnam, a legacy data center in Jurong, and a follow-the-sun NOC in Cebu.
   primary_region: Southeast Asia
   secondary_region: East Asia
-  tenant: meridianlogistics.com
+  tenant: veymarklogistics.com
 ranks:
   - id: junior-cloud-admin
     title: Junior Cloud Admin
@@ -53,11 +53,11 @@ cast:
     role: Principal Architect
     note: Joins in Act 2. Asks what the requirement is until you stop guessing.
   - id: noc
-    name: Meridian NOC
+    name: Veymark NOC
     role: Cebu operations desk
     note: The shared inbox that pages you at 02:00.
   - id: system
-    name: Meridian IT
+    name: Veymark IT
     role: Ticketing and alerting
     note: Automated ticket and alert text.
 acts:
@@ -126,7 +126,7 @@ chapters:
     title: The Landing Zone
     rank: associate-architect
     blurb: >
-      Meridian is buying a competitor. Somebody has to design the identity,
+      Veymark is buying a competitor. Somebody has to design the identity,
       governance and monitoring the merged estate will run on.
   - id: act2-data
     act: act2
@@ -144,7 +144,7 @@ chapters:
     title: The Tabletop
     rank: solutions-architect
     blurb: >
-      The board wants numbers for how long Meridian can be down and how much data
+      The board wants numbers for how long Veymark can be down and how much data
       it can afford to lose. You have to defend both.
   - id: act2-infrastructure
     act: act2

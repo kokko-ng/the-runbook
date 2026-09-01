@@ -126,7 +126,7 @@ encounters:
         time_cost: 1
       - id: e
         label: Check the backup vault for anything from that group
-        cmd: az backup item list --vault-name rsv-meridian -g rg-ops -o table
+        cmd: az backup item list --vault-name rsv-veymark -g rg-ops -o table
         output: |
           Name              Type                 LastBackupStatus
           ----------------  -------------------  ------------------
@@ -286,7 +286,7 @@ encounters:
       whose it is before I have that conversation."
 
 
-      Meridian has agreed on three tags: costcenter, owner, and environment.
+      Veymark has agreed on three tags: costcenter, owner, and environment.
       About half the estate carries them.
     hint: >
       Priya needs two things at once: the estate attributed with real values,

@@ -275,7 +275,7 @@ encounters:
     commands:
       - id: a
         label: Check what is in the failover group
-        cmd: az sql failover-group show -n fog-transport -g rg-data -s sql-meridian-tms --query "{databases:databases,listener:readWriteEndpoint.failoverPolicy}" -o json
+        cmd: az sql failover-group show -n fog-transport -g rg-data -s sql-veymark-tms --query "{databases:databases,listener:readWriteEndpoint.failoverPolicy}" -o json
         output: |
           {
             "databases": ["/subscriptions/.../databases/transport"],
@@ -284,7 +284,7 @@ encounters:
         time_cost: 1
       - id: b
         label: Check where each database is now
-        cmd: az sql db list -s sql-meridian-tms -g rg-data --query "[].{name:name,status:status}" -o table
+        cmd: az sql db list -s sql-veymark-tms -g rg-data --query "[].{name:name,status:status}" -o table
         output: |
           Name        Status
           ----------  ---------
@@ -296,7 +296,7 @@ encounters:
         label: Check the reporting job's connection target
         cmd: "kql: AppTraces | where Message contains 'reporting' | top 1 by TimeGenerated desc | project Message"
         output: |
-          Login failed. Cannot open server 'sql-meridian-tms' requested by the login.
+          Login failed. Cannot open server 'sql-veymark-tms' requested by the login.
           The database 'transport' is not available on this server.
         time_cost: 1
     post_incident:

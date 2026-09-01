@@ -9,8 +9,8 @@ objectives:
   - AZ104-4.2.5
   - AZ104-4.3.1
 brief: >
-  Customer contracts say the scans stay on Meridian's network. Right now they stay
-  on Meridian's network in the sense that Meridian is the one uploading them.
+  Customer contracts say the scans stay on Veymark's network. Right now they stay
+  on Veymark's network in the sense that Veymark is the one uploading them.
 debrief: >
   Traffic to the scans never leaves the private address space now, and there is a
   private DNS zone with a linked virtual network to prove it.
@@ -21,7 +21,7 @@ encounters:
     speaker: Wei Lin Tan
     objectives: [AZ104-4.2.4, AZ104-4.2.5]
     intro: >
-      "stmeridianpod holds every proof-of-delivery scan we have. It accepts
+      "stveymarkpod holds every proof-of-delivery scan we have. It accepts
       connections from any network. The contract with the two largest customers
       says that data is only reachable from our network."
 
@@ -35,7 +35,7 @@ encounters:
       documentation seems to think I already know which one I want."
     hint: >
       Read the list of who needs access again and notice which network each of
-      them sits on. The right control gives the account a place on Meridian's
+      them sits on. The right control gives the account a place on Veymark's
       network that every one of those paths can reach.
     post_mortem:
       question: >
@@ -62,7 +62,7 @@ encounters:
           label: The contract wording should be renegotiated to allow keyed access
           correct: false
           explain: >
-            The contract says the scans are reachable only from Meridian's
+            The contract says the scans are reachable only from Veymark's
             network, and the customers who wrote it are the ones who sue over
             scans. Engineering to the requirement is cheaper than reopening it.
     prompt: Which do you take to the change board?
@@ -112,7 +112,7 @@ encounters:
           or a valid shared access signature can still reach the account from anywhere, which
           is exactly what the contract prohibits.
       - id: d
-        label: Restrict the storage firewall to Meridian's public IP ranges
+        label: Restrict the storage firewall to Veymark's public IP ranges
         correct: false
         rep: -7
         consequence: >
@@ -125,7 +125,7 @@ encounters:
   - id: b
     type: troubleshoot
     title: INC-4566
-    speaker: Meridian NOC
+    speaker: Veymark NOC
     objectives: [AZ104-4.3.1, AZ104-4.2.5]
     intro: >
       The private endpoint deployed at 11:20 and public network access was disabled
@@ -135,7 +135,7 @@ encounters:
 
       The endpoint shows as approved and healthy. Nothing in the application
       changed. The connection string still points at
-      stmeridianpod.blob.core.windows.net, which is what the documentation says it
+      stveymarkpod.blob.core.windows.net, which is what the documentation says it
       should do.
     hint: >
       The endpoint is healthy and the account still says no, so ask what the
@@ -171,7 +171,7 @@ encounters:
     ticket:
       ref: INC-4566
       opened: "11:26"
-      reporter: Meridian NOC
+      reporter: Veymark NOC
       summary: Application cannot reach blob storage after public access was disabled.
       severity: sev1
     time_budget: 6
@@ -188,9 +188,9 @@ encounters:
           Which, now that I say it out loud, is interesting."
       - id: b
         action: Check what was deployed with the private endpoint
-        speaker: Meridian IT
+        speaker: Veymark IT
         reveals: >
-          CHG-2261 created pe-stmeridianpod in snet-privatelink and set public network
+          CHG-2261 created pe-stveymarkpod in snet-privatelink and set public network
           access to Disabled. The private DNS zone integration checkbox is not mentioned
           anywhere in the record.
       - id: c
@@ -198,24 +198,24 @@ encounters:
         speaker: Joana Reyes
         reveals: >
           "Only storage. The database, the print queue and the portal are all fine. It
-          is specifically anything that talks to stmeridianpod."
+          is specifically anything that talks to stveymarkpod."
     commands:
       - id: a
         label: Resolve the storage endpoint from a virtual machine in the application spoke
-        cmd: nslookup stmeridianpod.blob.core.windows.net
+        cmd: nslookup stveymarkpod.blob.core.windows.net
         output: |
           Server:  168.63.129.16
           Address: 168.63.129.16#53
 
           Non-authoritative answer:
-          stmeridianpod.blob.core.windows.net  canonical name = blob.sin26prdstr03a.store.core.windows.net
+          stveymarkpod.blob.core.windows.net  canonical name = blob.sin26prdstr03a.store.core.windows.net
           Name:    blob.sin26prdstr03a.store.core.windows.net
           Address: 20.195.74.4
         note: That is a public address. The private endpoint is 10.20.3.4.
         time_cost: 1
       - id: b
         label: Show the private endpoint and its connection state
-        cmd: az network private-endpoint show -n pe-stmeridianpod -g rg-data --query "{state:provisioningState,ip:customDnsConfigs[0].ipAddresses[0],conn:privateLinkServiceConnections[0].privateLinkServiceConnectionState.status}" -o table
+        cmd: az network private-endpoint show -n pe-stveymarkpod -g rg-data --query "{state:provisioningState,ip:customDnsConfigs[0].ipAddresses[0],conn:privateLinkServiceConnections[0].privateLinkServiceConnectionState.status}" -o table
         output: |
           State      Ip         Conn
           ---------  ---------  --------
@@ -232,7 +232,7 @@ encounters:
         time_cost: 1
       - id: d
         label: Check the storage account's network rules
-        cmd: az storage account show -n stmeridianpod -g rg-data --query "{public:publicNetworkAccess,default:networkRuleSet.defaultAction}" -o table
+        cmd: az storage account show -n stveymarkpod -g rg-data --query "{public:publicNetworkAccess,default:networkRuleSet.defaultAction}" -o table
         output: |
           Public    Default
           --------  --------
@@ -318,12 +318,12 @@ encounters:
     objectives: [AZ104-4.3.1]
     intro: >
       "Customers keep asking for a tracking link that is not a Microsoft address,"
-      says Hendrik. "Marketing wants meridianlogistics.com to open the tracking
+      says Hendrik. "Marketing wants veymarklogistics.com to open the tracking
       portal. Not www. The bare name."
 
 
       The domain's zone is hosted in Azure DNS. The portal is an App Service with
-      the default host name app-meridian-portal.azurewebsites.net, which can and
+      the default host name app-veymark-portal.azurewebsites.net, which can and
       does change address.
     hint: >
       Two constraints have to hold at once: what DNS permits at the top of a
@@ -371,7 +371,7 @@ encounters:
           exactly this: an A record at the apex that tracks an Azure resource and follows it
           when its address changes.
       - id: b
-        label: A CNAME at the apex pointing at app-meridian-portal.azurewebsites.net
+        label: A CNAME at the apex pointing at app-veymark-portal.azurewebsites.net
         correct: false
         rep: -7
         consequence: >

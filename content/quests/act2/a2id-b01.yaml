@@ -209,7 +209,7 @@ encounters:
     options:
       - id: a
         label: >
-          The Meridian sponsor who requested the access, with users who do not respond removed
+          The Veymark sponsor who requested the access, with users who do not respond removed
           by default
         correct: true
         rep: 6

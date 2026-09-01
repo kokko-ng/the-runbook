@@ -60,7 +60,7 @@ encounters:
           label: Remote administration itself is the risk and should be phased out
           correct: false
           explain: >
-            Meridian's administrators are on call from home and one of them is
+            Veymark's administrators are on call from home and one of them is
             in Cebu, so removing remote access fails the stated requirement.
             The risk was never administration; it was the listening port on a
             public address.
@@ -114,7 +114,7 @@ encounters:
           The first out-of-hours incident is handled by someone driving to Jurong at 02:00.
         explain: >
           It is genuinely more secure and it does not meet the requirement, which is that
-          administrators can reach these machines. Meridian's admins are on call from home
+          administrators can reach these machines. Veymark's admins are on call from home
           and one of them is in Cebu.
   - id: b
     type: design
@@ -135,7 +135,7 @@ encounters:
     hint: >
       Subnet, address, and where it sits. Each has exactly one acceptable
       answer, and two of the three are the platform's requirements rather than
-      Meridian's preferences, so check the documented minimums before the blade
+      Veymark's preferences, so check the documented minimums before the blade
       checks them for you.
     post_mortem:
       question: >
@@ -210,7 +210,7 @@ encounters:
   - id: c
     type: troubleshoot
     title: INC-4530
-    speaker: Meridian NOC
+    speaker: Veymark NOC
     objectives: [AZ104-4.2.3]
     intro: >
       Bastion deployed cleanly at 14:10. At 14:40 nobody can use it.
@@ -260,7 +260,7 @@ encounters:
     ticket:
       ref: INC-4530
       opened: "14:40"
-      reporter: Meridian NOC
+      reporter: Veymark NOC
       summary: Bastion sessions fail to establish for all users and all targets.
       severity: sev3
     time_budget: 5

@@ -199,7 +199,7 @@ encounters:
         correct: false
         rep: -7
         consequence: >
-          Meridian builds and operates the consumers, the retention and the query layer that
+          Veymark builds and operates the consumers, the retention and the query layer that
           the platform already provides.
         explain: >
           Event hubs are for streaming to systems that want a feed. Making them the primary

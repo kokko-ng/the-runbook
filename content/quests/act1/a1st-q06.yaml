@@ -263,7 +263,7 @@ encounters:
     investigate:
       - id: a
         action: Ask exactly what was applied at 15:00
-        speaker: Meridian IT
+        speaker: Veymark IT
         reveals: >
           CHG-2280 set the default action to Deny on both accounts and added virtual
           network rules for snet-app and snet-depot. No exception was ticked.
@@ -276,7 +276,7 @@ encounters:
     commands:
       - id: a
         label: Check the network rules on the destination account
-        cmd: az storage account show -n stmeridianpoddr -g rg-data --query "networkRuleSet.{default:defaultAction,bypass:bypass,vnets:virtualNetworkRules[].id}" -o json
+        cmd: az storage account show -n stveymarkpoddr -g rg-data --query "networkRuleSet.{default:defaultAction,bypass:bypass,vnets:virtualNetworkRules[].id}" -o json
         output: |
           {
             "bypass": "None",
@@ -286,7 +286,7 @@ encounters:
         time_cost: 1
       - id: b
         label: Check the source account for comparison
-        cmd: az storage account show -n stmeridianpod -g rg-data --query "networkRuleSet.{default:defaultAction,bypass:bypass}" -o json
+        cmd: az storage account show -n stveymarkpod -g rg-data --query "networkRuleSet.{default:defaultAction,bypass:bypass}" -o json
         output: |
           {
             "bypass": "AzureServices",
@@ -295,7 +295,7 @@ encounters:
         time_cost: 1
       - id: c
         label: Look at the replication policy status
-        cmd: az storage account or-policy show -n stmeridianpod -g rg-data --policy-id "d4f2..." --query "rules[0].{src:sourceContainer,dst:destinationContainer,filters:filters}" -o json
+        cmd: az storage account or-policy show -n stveymarkpod -g rg-data --policy-id "d4f2..." --query "rules[0].{src:sourceContainer,dst:destinationContainer,filters:filters}" -o json
         output: |
           {
             "dst": "pod-scans",
@@ -305,7 +305,7 @@ encounters:
         time_cost: 1
       - id: d
         label: Check the destination container still exists
-        cmd: az storage container show -c pod-scans --account-name stmeridianpoddr --auth-mode login --query "name" -o tsv
+        cmd: az storage container show -c pod-scans --account-name stveymarkpoddr --auth-mode login --query "name" -o tsv
         output: |
           pod-scans
         time_cost: 1

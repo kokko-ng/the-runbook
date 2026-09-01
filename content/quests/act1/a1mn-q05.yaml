@@ -1,7 +1,7 @@
 id: a1mn-q05
 chapter: act1-monitoring
 title: Restore the Thing
-summary: The first real restore in Meridian's history, at 23:40, with the month-end close in the morning.
+summary: The first real restore in Veymark's history, at 23:40, with the month-end close in the morning.
 variant: core
 estimated_minutes: 15
 objectives:
@@ -76,14 +76,14 @@ encounters:
           yesterday's data on it, the job regenerates today's."
       - id: b
         action: Ask what changed on the machine
-        speaker: Meridian IT
+        speaker: Veymark IT
         reveals: >
           Update management applied eleven patches at 22:00, including a kernel update.
           Two other machines took the same patches and are fine.
     commands:
       - id: a
         label: List recovery points for the machine
-        cmd: az backup recoverypoint list --vault-name rsv-meridian -g rg-ops -c vm-report01 -i vm-report01 --query "[].{name:name,time:properties.recoveryPointTime,type:properties.recoveryPointType}" -o table
+        cmd: az backup recoverypoint list --vault-name rsv-veymark -g rg-ops -c vm-report01 -i vm-report01 --query "[].{name:name,time:properties.recoveryPointTime,type:properties.recoveryPointType}" -o table
         output: |
           Name              Time                      Type
           ----------------  ------------------------  -----------
@@ -92,7 +92,7 @@ encounters:
         time_cost: 1
       - id: b
         label: Check what the last backup job did
-        cmd: az backup job list --vault-name rsv-meridian -g rg-ops --query "[?entityFriendlyName=='vm-report01'] | [0:2].{op:operation,status:status,at:startTime}" -o table
+        cmd: az backup job list --vault-name rsv-veymark -g rg-ops --query "[?entityFriendlyName=='vm-report01'] | [0:2].{op:operation,status:status,at:startTime}" -o table
         output: |
           Op       Status              At
           -------  ------------------  ------------------------
@@ -111,7 +111,7 @@ encounters:
         time_cost: 1
       - id: d
         label: Check how long a full machine restore usually takes here
-        cmd: az backup job list --vault-name rsv-meridian -g rg-ops --query "[?operation=='Restore'].{op:operation,at:startTime}" -o table
+        cmd: az backup job list --vault-name rsv-veymark -g rg-ops --query "[?operation=='Restore'].{op:operation,at:startTime}" -o table
         output: |
           (no results)
         note: No restore has ever been run in this vault, so nobody knows how long one takes.

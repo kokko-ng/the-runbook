@@ -81,7 +81,7 @@ encounters:
         consequence: >
           Two hours are spent rebuilding a chart that was already on a blade.
         explain: >
-          Custom workbooks are excellent when the question is specific to Meridian. Reaching
+          Custom workbooks are excellent when the question is specific to Veymark. Reaching
           for one before looking at the curated view is work for its own sake.
       - id: c
         label: Enable the network performance monitor solution on the workspace
@@ -183,7 +183,7 @@ encounters:
           The test reports a hundred per cent availability from six continents while the depot
           continues to time out.
         explain: >
-          Global availability tests measure a path Meridian does not use. The question is
+          Global availability tests measure a path Veymark does not use. The question is
           specifically about the depot's link to the hub.
       - id: d
         label: Enable flow logs on the depot subnet and analyze them for retransmissions
@@ -249,7 +249,7 @@ encounters:
           says the scanners were slow for a bit and then fine."
       - id: b
         action: Ask what the monitor actually checks
-        speaker: Meridian IT
+        speaker: Veymark IT
         reveals: >
           TCP check from vm-scan01 to the hub print server on port 631, every thirty
           seconds, with a failure threshold of two consecutive checks.

@@ -19,7 +19,7 @@ encounters:
   - id: a
     type: troubleshoot
     title: INC-4600
-    speaker: Meridian NOC
+    speaker: Veymark NOC
     objectives: [AZ104-2.2.2]
     intro: >
       Southeast Asia has been degraded for fifty minutes. Storage in the region is
@@ -44,7 +44,7 @@ encounters:
           correct: true
           explain: >
             Writing new scans to the healthy replica account keeps everything and commits
-            Meridian to nothing. Failover discards whatever had not replicated and
+            Veymark to nothing. Failover discards whatever had not replicated and
             returns the account locally redundant, which is a permanent price for a
             temporary outage.
         - id: b
@@ -64,8 +64,8 @@ encounters:
     ticket:
       ref: INC-4600
       opened: "13:05"
-      reporter: Meridian NOC
-      summary: Regional storage degradation. Writes to stmeridianpod failing intermittently.
+      reporter: Veymark NOC
+      summary: Regional storage degradation. Writes to stveymarkpod failing intermittently.
       severity: sev1
     time_budget: 4
     investigate:
@@ -84,7 +84,7 @@ encounters:
     commands:
       - id: a
         label: Check the account's redundancy and last sync time
-        cmd: az storage account show -n stmeridianpod -g rg-data --query "{sku:sku.name,status:statusOfPrimary,secondary:statusOfSecondary,lastSync:geoReplicationStats.lastSyncTime}" -o json
+        cmd: az storage account show -n stveymarkpod -g rg-data --query "{sku:sku.name,status:statusOfPrimary,secondary:statusOfSecondary,lastSync:geoReplicationStats.lastSyncTime}" -o json
         output: |
           {
             "lastSync": "2026-08-24T12:54:11Z",
@@ -95,7 +95,7 @@ encounters:
         time_cost: 1
       - id: b
         label: Check whether the East Asia replica account is healthy
-        cmd: az storage account show -n stmeridianpoddr -g rg-data --query "{status:statusOfPrimary,sku:sku.name}" -o json
+        cmd: az storage account show -n stveymarkpoddr -g rg-data --query "{status:statusOfPrimary,sku:sku.name}" -o json
         output: |
           {
             "sku": "Standard_LRS",
@@ -104,7 +104,7 @@ encounters:
         time_cost: 1
       - id: c
         label: Check whether writes are failing everywhere or only sometimes
-        cmd: az storage blob upload --account-name stmeridianpod -c pod-scans -n probe.txt --data "probe" --auth-mode login
+        cmd: az storage blob upload --account-name stveymarkpod -c pod-scans -n probe.txt --data "probe" --auth-mode login
         output: |
           (ServiceUnavailable) The server is busy. Please retry the request.
         time_cost: 1
@@ -137,7 +137,7 @@ encounters:
           which is at least eleven minutes of scans, and the account comes back as locally
           redundant afterwards.
       - id: b
-        label: Initiate customer-initiated failover of stmeridianpod to the secondary region
+        label: Initiate customer-initiated failover of stveymarkpod to the secondary region
         correct: false
         rep: -11
         consequence: >

@@ -194,7 +194,7 @@ encounters:
   - id: c
     type: troubleshoot
     title: INC-4701
-    speaker: Meridian NOC
+    speaker: Veymark NOC
     objectives: [AZ104-3.2.7]
     intro: >
       A new intake image was published on Tuesday with a fix for a scanner
@@ -238,7 +238,7 @@ encounters:
     ticket:
       ref: INC-4701
       opened: "09:30"
-      reporter: Meridian NOC
+      reporter: Veymark NOC
       summary: Scale set instances behave inconsistently after an image update.
       severity: sev3
     time_budget: 4

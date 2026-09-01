@@ -29,7 +29,7 @@ const totals = computed(() => {
       </p>
       <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">The Runbook</h1>
       <p class="prose-beat text-ink-700 dark:text-ink-200">
-        You have just joined Meridian Logistics as a junior cloud admin. There is a ticket queue,
+        You have just joined Veymark Logistics as a junior cloud admin. There is a ticket queue,
         an estate nobody documented, and an auditor arriving in a fortnight. Survive the tickets,
         make the calls, and work your way up to solutions architect.
       </p>

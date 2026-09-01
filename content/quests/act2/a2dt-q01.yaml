@@ -92,7 +92,7 @@ encounters:
         correct: false
         rep: -5
         consequence: >
-          It works, and Meridian owns patching, backup, high availability and licensing for a
+          It works, and Veymark owns patching, backup, high availability and licensing for a
           database it wanted to stop operating.
         explain: >
           Infrastructure as a service is the compatibility answer of last resort and is right

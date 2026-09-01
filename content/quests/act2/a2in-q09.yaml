@@ -13,7 +13,7 @@ brief: >
   The last design review before the board. Everything else in the architecture
   rests on this and nobody has drawn it yet.
 debrief: >
-  A hub that scales to the sites Meridian will have, a private path to
+  A hub that scales to the sites Veymark will have, a private path to
   on-premises, and traffic that is inspected without being slow.
 encounters:
   - id: a

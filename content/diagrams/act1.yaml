@@ -1,4 +1,4 @@
-# The Meridian Azure estate as it stands when Act 1 opens, plus every node the
+# The Veymark Azure estate as it stands when Act 1 opens, plus every node the
 # act is allowed to grow. Nodes marked present: true are already there on day
 # one; the rest appear when a quest deploys them.
 #
@@ -12,7 +12,7 @@ act: 1
 groups:
   - id: onprem
     label: Jurong data center
-    note: What Meridian ran before anyone said the word cloud.
+    note: What Veymark ran before anyone said the word cloud.
   - id: identity
     label: Microsoft Entra ID
   - id: governance
@@ -35,12 +35,12 @@ groups:
 nodes:
   # --- on-premises ------------------------------------------------------
   - {id: dc-jurong, label: Jurong data center, kind: onprem, group: onprem, x: 0, y: 0, present: true, detail: Two racks and a UPS nobody wants to test}
-  - {id: ad-jurong, label: Active Directory, kind: onprem-ad, group: onprem, x: 0, y: 90, present: true, detail: "meridian.local, still authoritative for depot staff"}
+  - {id: ad-jurong, label: Active Directory, kind: onprem-ad, group: onprem, x: 0, y: 90, present: true, detail: "veymark.local, still authoritative for depot staff"}
   - {id: vgw-hub, label: vgw-hub, kind: vpn-gateway, group: onprem, x: 0, y: 180, present: true, detail: Site-to-site VPN to Jurong}
 
   # --- identity ---------------------------------------------------------
-  - {id: entra-tenant, label: meridianlogistics.com, kind: entra, group: identity, x: 0, y: 300, present: true}
-  - {id: entra-connect, label: Entra Connect, kind: entra-connect, group: identity, x: 0, y: 390, present: true, detail: Password hash sync from meridian.local}
+  - {id: entra-tenant, label: veymarklogistics.com, kind: entra, group: identity, x: 0, y: 300, present: true}
+  - {id: entra-connect, label: Entra Connect, kind: entra-connect, group: identity, x: 0, y: 390, present: true, detail: Password hash sync from veymark.local}
   - {id: grp-depot-admins, label: sg-depot-leads, kind: entra-group, group: identity, x: 0, y: 480}
   - {id: grp-depot-drivers, label: sg-depot-drivers, kind: entra-group, group: identity, x: 0, y: 525}
   - {id: grp-app-owners, label: sg-app-owners, kind: entra-group, group: identity, x: 0, y: 570}
@@ -49,11 +49,11 @@ nodes:
   - {id: entra-licenses, label: Entra ID P1 licenses, kind: license, group: identity, x: 0, y: 840}
 
   # --- governance -------------------------------------------------------
-  - {id: mg-meridian, label: mg-meridian, kind: management-group, group: governance, x: 240, y: 0}
+  - {id: mg-meridian, label: mg-veymark, kind: management-group, group: governance, x: 240, y: 0}
   - {id: mg-platform, label: mg-platform, kind: management-group, group: governance, x: 240, y: 90}
   - {id: mg-workload, label: mg-workload, kind: management-group, group: governance, x: 240, y: 180}
-  - {id: sub-prod, label: sub-meridian-prod, kind: subscription, group: governance, x: 240, y: 270, present: true}
-  - {id: sub-nonprod, label: sub-meridian-nonprod, kind: subscription, group: governance, x: 240, y: 360}
+  - {id: sub-prod, label: sub-veymark-prod, kind: subscription, group: governance, x: 240, y: 270, present: true}
+  - {id: sub-nonprod, label: sub-veymark-nonprod, kind: subscription, group: governance, x: 240, y: 360}
   - {id: rg-hub, label: rg-hub, kind: resource-group, group: governance, x: 240, y: 450, present: true}
   - {id: rg-app, label: rg-app, kind: resource-group, group: governance, x: 240, y: 540, present: true}
   - {id: rg-depot, label: rg-depot, kind: resource-group, group: governance, x: 240, y: 585, present: true}
@@ -68,7 +68,7 @@ nodes:
 
   # --- edge -------------------------------------------------------------
   - {id: internet, label: Internet, kind: internet, group: edge, x: 480, y: 0, present: true}
-  - {id: dns-public, label: meridianlogistics.com zone, kind: dns, group: edge, x: 480, y: 90}
+  - {id: dns-public, label: veymarklogistics.com zone, kind: dns, group: edge, x: 480, y: 90}
   - {id: dns-private, label: privatelink.blob.core.windows.net, kind: dns-private, group: edge, x: 480, y: 180}
   - {id: pip-lb-pod, label: pip-lb-pod, kind: public-ip, group: edge, x: 480, y: 270}
   - {id: lb-pod, label: lb-pod-intake, kind: load-balancer, group: edge, x: 480, y: 360}
@@ -100,9 +100,9 @@ nodes:
   - {id: vmss-intake, label: vmss-intake, kind: vmss, group: spoke-app, x: 960, y: 990}
   - {id: disk-tms-data, label: tms01-data-disk, kind: disk, group: spoke-app, x: 960, y: 1080}
   - {id: plan-portal, label: plan-portal, kind: app-service-plan, group: spoke-app, x: 960, y: 1170}
-  - {id: app-portal, label: app-meridian-portal, kind: app-service, group: spoke-app, x: 960, y: 1260, detail: Customer shipment tracking portal}
+  - {id: app-portal, label: app-veymark-portal, kind: app-service, group: spoke-app, x: 960, y: 1260, detail: Customer shipment tracking portal}
   - {id: slot-staging, label: portal staging slot, kind: deployment-slot, group: spoke-app, x: 960, y: 1350}
-  - {id: acr-meridian, label: acrmeridian, kind: container-registry, group: spoke-app, x: 960, y: 1440}
+  - {id: acr-meridian, label: acrveymark, kind: container-registry, group: spoke-app, x: 960, y: 1440}
   - {id: aci-labelgen, label: aci-labelgen, kind: container-instance, group: spoke-app, x: 960, y: 1530}
   - {id: aca-trackapi, label: aca-trackapi, kind: container-app, group: spoke-app, x: 960, y: 1620}
 
@@ -113,30 +113,30 @@ nodes:
   - {id: vm-scan01, label: vm-scan01, kind: vm, group: spoke-depot, x: 1200, y: 270, present: true, detail: Handles proof-of-delivery scanner uploads}
 
   # --- data -------------------------------------------------------------
-  - {id: st-pod, label: stmeridianpod, kind: storage, group: data, x: 1440, y: 0, present: true, detail: Proof-of-delivery scans}
+  - {id: st-pod, label: stveymarkpod, kind: storage, group: data, x: 1440, y: 0, present: true, detail: Proof-of-delivery scans}
   - {id: cnt-pod, label: pod-scans container, kind: blob-container, group: data, x: 1440, y: 90, present: true}
-  - {id: st-edi, label: stmeridianedi, kind: storage, group: data, x: 1440, y: 180, detail: Customer EDI drops}
+  - {id: st-edi, label: stveymarkedi, kind: storage, group: data, x: 1440, y: 180, detail: Customer EDI drops}
   - {id: share-depot, label: fs-depot-config, kind: file-share, group: data, x: 1440, y: 270}
-  - {id: pe-st-pod, label: pe-stmeridianpod, kind: private-endpoint, group: data, x: 1440, y: 360}
-  - {id: kv-meridian, label: kv-meridian, kind: key-vault, group: data, x: 1440, y: 450}
-  - {id: sql-tms, label: sql-meridian-tms, kind: sql-database, group: data, x: 1440, y: 540, present: true}
+  - {id: pe-st-pod, label: pe-stveymarkpod, kind: private-endpoint, group: data, x: 1440, y: 360}
+  - {id: kv-meridian, label: kv-veymark, kind: key-vault, group: data, x: 1440, y: 450}
+  - {id: sql-tms, label: sql-veymark-tms, kind: sql-database, group: data, x: 1440, y: 540, present: true}
   - {id: lifecycle-pod, label: pod-scans lifecycle policy, kind: policy, group: data, x: 1440, y: 630}
 
   # --- operations -------------------------------------------------------
-  - {id: law-meridian, label: law-meridian, kind: log-analytics, group: ops, x: 1680, y: 0}
+  - {id: law-meridian, label: law-veymark, kind: log-analytics, group: ops, x: 1680, y: 0}
   - {id: ag-oncall, label: ag-oncall, kind: action-group, group: ops, x: 1680, y: 90}
   - {id: alert-tms-cpu, label: TMS CPU alert rule, kind: alert, group: ops, x: 1680, y: 180}
   - {id: alert-processing, label: Maintenance suppression rule, kind: alert, group: ops, x: 1680, y: 270}
   - {id: netwatcher, label: Network Watcher, kind: network-watcher, group: ops, x: 1680, y: 360}
   - {id: connmon-depot, label: Connection monitor, kind: connection-monitor, group: ops, x: 1680, y: 450}
-  - {id: rsv-meridian, label: rsv-meridian, kind: recovery-vault, group: ops, x: 1680, y: 540}
-  - {id: bkv-meridian, label: bkv-meridian, kind: backup-vault, group: ops, x: 1680, y: 630}
+  - {id: rsv-meridian, label: rsv-veymark, kind: recovery-vault, group: ops, x: 1680, y: 540}
+  - {id: bkv-meridian, label: bkv-veymark, kind: backup-vault, group: ops, x: 1680, y: 630}
   - {id: policy-backup, label: TMS backup policy, kind: policy, group: ops, x: 1680, y: 720}
   - {id: asr-tms, label: Site Recovery for TMS, kind: site-recovery, group: ops, x: 1680, y: 810}
 
   # --- secondary region -------------------------------------------------
   - {id: vnet-hub-ea, label: vnet-hub-eastasia, kind: vnet, group: dr, x: 1920, y: 0}
-  - {id: st-pod-dr, label: stmeridianpoddr, kind: storage, group: dr, x: 1920, y: 90}
+  - {id: st-pod-dr, label: stveymarkpoddr, kind: storage, group: dr, x: 1920, y: 90}
   - {id: vm-tms01-dr, label: vm-tms01 (East Asia), kind: vm, group: dr, x: 1920, y: 180}
 
 edges:
@@ -170,7 +170,7 @@ edges:
   - {id: e-portal-internet, source: internet, target: app-portal, label: customers, kind: traffic}
   - {id: e-portal-plan, source: app-portal, target: plan-portal, kind: traffic}
   - {id: e-portal-slot, source: app-portal, target: slot-staging, label: swap, kind: traffic}
-  - {id: e-portal-dns, source: dns-public, target: app-portal, label: track.meridianlogistics.com, kind: traffic}
+  - {id: e-portal-dns, source: dns-public, target: app-portal, label: track.veymarklogistics.com, kind: traffic}
   - {id: e-aca-acr, source: aca-trackapi, target: acr-meridian, label: pulls image, kind: data}
   - {id: e-aci-acr, source: aci-labelgen, target: acr-meridian, label: pulls image, kind: data}
   - {id: e-tms-sql, source: vm-tms01, target: sql-tms, label: shipment data, kind: data, present: true}

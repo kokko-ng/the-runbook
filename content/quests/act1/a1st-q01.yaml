@@ -127,7 +127,7 @@ encounters:
       option costs and what each one actually protects against."
 
 
-      Meridian runs in Southeast Asia. The secondary region on the paper
+      Veymark runs in Southeast Asia. The secondary region on the paper
       architecture is East Asia. There is no requirement to read the scans from
       the second region, only to still have them.
     hint: >
@@ -221,7 +221,7 @@ encounters:
       access to their data independently of Microsoft."
 
 
-      Meridian has a key vault. Nobody has yet had to rotate anything in it.
+      Veymark has a key vault. Nobody has yet had to rotate anything in it.
     hint: >
       Separate the two questions the questionnaire runs together: whether the
       data is encrypted, and who can make it unreadable. Only one of those
@@ -238,7 +238,7 @@ encounters:
           explain: >
             Every storage account is encrypted at rest with platform-managed keys and it
             cannot be turned off. The open requirement was revocation, and customer-managed
-            keys in the vault are what put that decision in Meridian's hands.
+            keys in the vault are what put that decision in Veymark's hands.
         - id: b
           label: Stronger encryption than the platform applies by default
           correct: false

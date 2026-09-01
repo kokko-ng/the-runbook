@@ -11,7 +11,7 @@ brief: >
   Planned maintenance is coming for the host that vm-tms01 sits on. There is no
   second machine to fail over to, because nobody ever built one.
 debrief: >
-  Two machines, spread deliberately, and a conversation about zones that Meridian
+  Two machines, spread deliberately, and a conversation about zones that Veymark
   will have again in Act 2 with more money at stake.
 encounters:
   - id: a
@@ -220,7 +220,7 @@ encounters:
   - id: c
     type: troubleshoot
     title: INC-4655
-    speaker: Meridian NOC
+    speaker: Veymark NOC
     objectives: [AZ104-3.2.6, AZ104-3.2.1]
     intro: >
       vm-tms02 deployed and is running. The internal load balancer shows it as
@@ -263,7 +263,7 @@ encounters:
     ticket:
       ref: INC-4655
       opened: "20:35"
-      reporter: Meridian NOC
+      reporter: Veymark NOC
       summary: New transport application machine deployed but never becomes healthy in the load balancer.
       severity: sev3
     time_budget: 4
@@ -277,7 +277,7 @@ encounters:
           was added by hand two years ago."
       - id: b
         action: Ask whether the application is really running
-        speaker: Meridian IT
+        speaker: Veymark IT
         reveals: >
           A local curl to the health path on vm-tms02 returns 200 with the expected body.
           The service is listening on all interfaces.

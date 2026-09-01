@@ -8,7 +8,7 @@ import { RouterLink } from 'vue-router'
       <p class="text-ink-500 dark:text-ink-400">
         The Runbook is an independent study aid. It is not affiliated with, endorsed by, or
         sponsored by Microsoft Corporation. Microsoft, Azure, Microsoft Entra and the exam codes
-        AZ-104 and AZ-305 are trademarks of the Microsoft group of companies. Meridian Logistics
+        AZ-104 and AZ-305 are trademarks of the Microsoft group of companies. Veymark Logistics
         and everyone who works there are fictional.
       </p>
       <nav class="flex flex-wrap gap-x-4 gap-y-2 text-ink-600 dark:text-ink-300" aria-label="Legal">
