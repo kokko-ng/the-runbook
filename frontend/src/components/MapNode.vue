@@ -39,8 +39,10 @@ const PORTS = [
 </script>
 
 <template>
+  <!-- Vue Flow sets pointer-events: none inline on nodes that aren't draggable or
+       selectable, which also blocks the title tooltips below unless overridden here. -->
   <div
-    class="w-52 rounded-lg border bg-white px-2.5 py-2 text-left shadow-sm dark:bg-ink-900"
+    class="pointer-events-auto w-52 rounded-lg border bg-white px-2.5 py-2 text-left shadow-sm dark:bg-ink-900"
     :class="RING[data.status]"
   >
     <Handle
