@@ -180,7 +180,7 @@ encounters:
         correct: false
         rep: -6
         consequence: >
-          The template can no longer be used for the East Asia landing zone without editing
+          The template can no longer be used for the East Asia recovery region without editing
           it.
         explain: >
           Defaulting location to the resource group's location is idiomatic and keeps the

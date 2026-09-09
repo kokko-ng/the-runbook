@@ -1,7 +1,7 @@
 id: a2dt-q04
 chapter: act2-data
 title: The Cost of Keeping Everything
-summary: Seven years of manifests, ten years of telemetry, and a finance director who has done the arithmetic.
+summary: Seven years of manifests, ten years of telemetry, and a CFO who has done the arithmetic.
 variant: core
 estimated_minutes: 14
 objectives:
@@ -22,8 +22,8 @@ encounters:
     intro: >
       Priya has the projections. Manifests: fourteen terabytes now, growing by
       about one a year, read four times a month, kept seven years. Telemetry
-      history: nine terabytes a year, queried by analytics monthly for the last
-      three months and almost never beyond that. Proof-of-delivery scans: already
+      history: nine terabytes a year, kept ten years, queried by analytics monthly
+      for the last three months and almost never beyond that. Proof-of-delivery scans: already
       tiered, and the model works.
 
 
@@ -114,11 +114,11 @@ encounters:
     intro: >
       "Three data sets, three different consequences if we lose them," says Wei
       Lin. "The manifests are a contractual obligation. Telemetry history is
-      useful and reproducible from nothing. Proof-of-delivery scans are the ones
+      useful and nobody is contractually owed a byte of it. Proof-of-delivery scans are the ones
       customers sue about."
 
 
-      "The regulator's other question is whether a manifest can be altered after
+      "The regulator's own question is whether a manifest can be altered after
       the fact."
     hint: >
       Let the consequence of losing each data set set its protection, and read the
@@ -136,7 +136,7 @@ encounters:
           correct: true
           explain: >
             Contractual documents earn geo-redundancy, versioning and a locked
-            retention policy; reproducible telemetry earns none of that. Copies,
+            retention policy; low-value telemetry earns none of that. Copies,
             however many, do not stop an authorized write from changing history.
         - id: b
           label: The highest durability setting everywhere would have covered it
@@ -166,7 +166,7 @@ encounters:
         explain: >
           Durability is a per-data-set decision. Contractual documents need a copy outside the
           region, versioning to survive an overwrite and an immutability policy so they cannot
-          be altered or deleted within the retention period. Reproducible telemetry does not
+          be altered or deleted within the retention period. Uncontracted telemetry does not
           need any of that, and paying for it everywhere is how storage bills grow.
         diagram:
           - {op: add_node, node: st-grs-manifests}

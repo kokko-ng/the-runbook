@@ -1,7 +1,7 @@
 id: a2id-q01
 chapter: act2-identity
 title: Two Tenants, One Company
-summary: Veymark has bought Straits Freight, and on Monday four hundred people need to sign in to things they do not have accounts for.
+summary: Veymark has bought Straits Freight, and within a fortnight its planners need to sign in to things they do not have accounts for.
 variant: core
 estimated_minutes: 15
 objectives:
@@ -83,7 +83,7 @@ encounters:
         diagram:
           - {op: add_node, node: entra-b2b}
           - {op: add_edge, edge: e2-sf-tenant}
-          - {op: add_edge, edge: e2-b2b-meridian}
+          - {op: add_edge, edge: e2-b2b-veymark}
       - id: b
         label: Migrate the Straits tenant into Veymark's tenant before anything else
         correct: false
@@ -100,7 +100,7 @@ encounters:
         correct: false
         rep: -7
         consequence: >
-          Four hundred people now have two identities, two passwords and two sets of
+          Thirty-one planners now have two identities, two passwords and two sets of
           multi-factor prompts, and nobody knows which one leaves when they do.
         explain: >
           Duplicate identities break the joiner and leaver process at exactly the moment two
@@ -123,8 +123,8 @@ encounters:
     speaker: Marek Sobczak
     objectives: [AZ305-1.2.1]
     intro: >
-      "The Straits warehouse staff do not have Entra accounts at all," says Marek.
-      "They sign in to Windows against straitsfreight.local, and half the site has
+      "The Straits warehouse staff are not among the four hundred and ten," says Marek.
+      "They were never synchronized. They sign in to Windows against straitsfreight.local, and half the site has
       an internet link that drops for a few minutes a day."
 
 
@@ -172,8 +172,8 @@ encounters:
         correct: true
         rep: 8
         consequence: >
-          The first sixty warehouse accounts sync in a morning and keep working through the
-          afternoon's link outage.
+          The first sixty warehouse accounts sync into the Straits tenant in a morning, are
+          invited as guests by lunchtime, and keep working through the afternoon's link outage.
         explain: >
           Password hash synchronization keeps authentication in the cloud, so a broken site
           link stops file access but not sign-in. It is the lowest-maintenance option, needs
@@ -268,8 +268,8 @@ encounters:
         correct: true
         rep: 9
         consequence: >
-          Straits planners who already satisfy multi-factor at home are not challenged twice,
-          and the ones who never had it are, which is what changes behavior at Straits.
+          Straits staff who already satisfy multi-factor at home are not challenged twice,
+          and the planners who never had it are, which is what changes behavior at Straits.
         explain: >
           Requiring multi-factor for guests is Veymark's policy to set. Trusting the home
           tenant's claim avoids double prompting for users who already comply, while users

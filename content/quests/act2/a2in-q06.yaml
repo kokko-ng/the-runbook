@@ -103,7 +103,7 @@ encounters:
         correct: false
         rep: -7
         consequence: >
-          Eleven services now depend on the dispatch database to start, and a database failover
+          Eleven services now depend on the transport database to start, and a database failover
           takes the whole platform with it.
         explain: >
           Sharing a transactional database as a configuration store creates a dependency in the
@@ -205,8 +205,8 @@ encounters:
     speaker: Wei Lin Tan
     objectives: [AZ305-4.2.6]
     intro: >
-      "You have said rollback is automatic," says Wei Lin. "The last incident
-      could not be rolled back because the release included a schema change that
+      "You have said rollback is automatic," says Wei Lin. "The incident before that
+      one could not be rolled back at all, because the release included a schema change that
       dropped a column. What does the design say about that?"
     hint: >
       Automatic rollback is a promise about every release. Ask what a schema

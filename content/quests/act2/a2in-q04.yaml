@@ -11,8 +11,8 @@ brief: >
   The application architecture review. Two patterns that look similar on a
   whiteboard and behave nothing alike in an incident.
 debrief: >
-  Commands on a queue, facts on a topic, and a dispatch service that no longer
-  falls over because customs are slow.
+  Commands on a queue, facts published as events, and a dispatch service that no
+  longer falls over because customs are slow.
 encounters:
   - id: a
     type: design

@@ -29,7 +29,8 @@ encounters:
       arrive."
 
 
-      There are forty-one scanner virtual machines today and there will be more.
+      There are forty-one scanner station virtual machines today, one per dock door,
+      and there will be more.
       They already carry a common tag, and they all live in snet-depot alongside a
       print relay that must not be allowed to talk to the hub at all.
     hint: >
@@ -116,7 +117,7 @@ encounters:
           the same intent in one place.
   - id: b
     type: troubleshoot
-    title: INC-4502
+    title: INC-4765
     speaker: Joana Reyes
     objectives: [AZ104-4.2.2]
     intro: >
@@ -129,8 +130,8 @@ encounters:
       laptop in the same subnet, and that one surprised me."
 
 
-      Your change touched two things: a new subnet security group on snet-depot,
-      and the existing NIC-level group on the relay that predates you.
+      Your change touched two things: the rewritten subnet security group on snet-depot,
+      and the NIC-level group the relay's vendor image ships with.
     hint: >
       Two rule sets stand between the laptop and the console, and traffic has
       to satisfy every set, in the order the platform applies them. Find which
@@ -163,7 +164,7 @@ encounters:
             position depends on it. A scoped allow above it lets the console
             through without reopening NET-14.
     ticket:
-      ref: INC-4502
+      ref: INC-4765
       opened: "18:20"
       reporter: Joana Reyes
       summary: Depot supervisor cannot reach the print relay console after the security group change.
@@ -176,21 +177,21 @@ encounters:
         action: Ask the supervisor what exactly she sees
         speaker: Hendrik Salim
         reveals: >
-          "Browser spins and gives up. Same laptop, same subnet, worked this morning
-          before your maintenance window."
+          Hendrik reads it off his phone: "Browser spins and gives up. Same laptop, same
+          subnet, worked this morning before your maintenance window."
       - id: b
         action: Check what your change actually contained
         speaker: Veymark IT
         reveals: >
-          CHG-2244 added nsg-depot to snet-depot with three rules: allow the scanner
+          CHG-2344 replaced the rules on nsg-depot with three: allow the scanner
           group to the hub on 445, 631 and 27000, allow HTTPS inbound from the hub,
           and a deny for everything else inbound at priority 4000.
       - id: c
         action: Ask Wei Lin whether the relay had its own rules already
         speaker: Wei Lin Tan
         reveals: >
-          "nsg-relay-legacy, applied to the relay NIC since before either of us was
-          here. It allows 443 inbound from the depot subnet. It has never been the
+          "nsg-relay-legacy, baked into the vendor's relay image. It allows 443 inbound
+          from the depot subnet. It has never been the
           problem before."
     commands:
       - id: a

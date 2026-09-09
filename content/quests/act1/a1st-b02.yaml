@@ -87,7 +87,7 @@ encounters:
         cmd: az storage account show -n stveymarkpod -g rg-data --query "{sku:sku.name,status:statusOfPrimary,secondary:statusOfSecondary,lastSync:geoReplicationStats.lastSyncTime}" -o json
         output: |
           {
-            "lastSync": "2026-08-24T12:54:11Z",
+            "lastSync": "2026-08-24T04:54:11Z",
             "secondary": "available",
             "sku": "Standard_GRS",
             "status": "unavailable"
@@ -128,8 +128,9 @@ encounters:
         correct: true
         rep: 10
         consequence: >
-          The handhelds drain into East Asia within the hour. When the primary region
-          recovers, the two sets of scans are reconciled by prefix and nothing is lost.
+          A virtual network rule for snet-app goes onto the replica and the handhelds drain
+          into East Asia within the hour. When the primary region recovers, the two sets of
+          scans are reconciled by prefix and nothing is lost.
         explain: >
           The replica account created for object replication is an ordinary account in a
           healthy region, and it can take writes. Customer-initiated failover of the

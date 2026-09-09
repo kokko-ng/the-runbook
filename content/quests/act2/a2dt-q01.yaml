@@ -114,8 +114,8 @@ encounters:
     speaker: Priya Raghunathan
     objectives: [AZ305-2.1.2]
     intro: >
-      The assessment metrics: peak 6 processor cores in use, 240 gibibytes of data
-      growing at about 4 a month, 900 input and output operations a second at
+      The assessment metrics: peak 6 processor cores in use, 240 gigabytes of data
+      growing by about four gigabytes a month, 900 input and output operations a second at
       month end, and a requirement that a restore reach any point in the last
       thirty-five days.
 
@@ -161,7 +161,7 @@ encounters:
         correct: true
         rep: 8
         consequence: >
-          The instance runs at about sixty per cent of its cores at month end, and the
+          The instance sits at about forty per cent for most of the month, and the
           reservation is signed in the second quarter once the shape is proven.
         explain: >
           General Purpose suits most workloads: remote storage with good throughput and
@@ -204,7 +204,7 @@ encounters:
     objectives: [AZ305-2.1.1]
     intro: >
       "Two hundred and forty gigabytes over a link that manages about eighty
-      megabits on a good day," says Marek. "Straits runs six days a week. The
+      megabits on a good day," says Marek. "Straits run six days a week. The
       dispatch window they can give us is Sunday, six hours."
     hint: >
       Measure the copy against the link, then measure it against the window. When
@@ -228,7 +228,7 @@ encounters:
           label: The window was too short and should have been renegotiated
           correct: false
           explain: >
-            Straits runs six days a week; the window is a business fact. Designs
+            Straits run six days a week; the window is a business fact. Designs
             adapt to windows more easily than windows adapt to designs.
         - id: c
           label: Eighty megabits means the data had to travel on physical media

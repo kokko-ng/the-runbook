@@ -148,8 +148,8 @@ encounters:
           label: It is visible somewhere the NOC can check when they choose
           correct: false
           explain: >
-            Visibility on demand already exists in the portal, and nobody checked
-            at 03:00. An alert is the platform reaching out; anything that waits
+            Visibility on demand already exists in the portal, and nobody looked
+            during the fifty minutes that mattered. An alert is the platform reaching out; anything that waits
             to be looked at is a report.
     prompt: How do you rebuild the alerting?
     options:

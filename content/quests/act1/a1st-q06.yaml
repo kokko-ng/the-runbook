@@ -75,7 +75,7 @@ encounters:
           Object replication asynchronously copies block blobs from a source container to a
           destination container in another account, in another region if you like, with
           rules by prefix and creation time. Versioning and change feed must be on at the
-          source, which they already are. The destination is readable and writable
+          source; versioning already is, and change feed is one more switch. The destination is readable and writable
           independently, which is what makes it useful for a local reader.
         diagram:
           - {op: add_node, node: st-pod-dr}
@@ -122,9 +122,9 @@ encounters:
       account accepts a request from anywhere with a valid credential."
 
 
-      Who needs in: the intake service in vnet-app, the depot scanners in
-      vnet-depot, the claims team in Jurong over the VPN, and object replication
-      to East Asia. Marek also needs to run AzCopy from his laptop occasionally.
+      Who needs in: the intake service in vnet-app, the scanner uploads that arrive
+      through the hub, the customer service desk in Jurong over the VPN, and object
+      replication to East Asia. Marek also needs to run AzCopy from his laptop occasionally.
     hint: >
       Start from the full list of everyone who legitimately needs in, and
       notice that not all of them arrive from networks you own. The right
@@ -166,8 +166,8 @@ encounters:
         correct: true
         rep: 8
         consequence: >
-          The audit item closes, replication carries on, and Marek's laptop still works from
-          the office.
+          The design closes the audit item and Marek's laptop still works from the office.
+          The change goes to the NOC to apply.
         explain: >
           The storage firewall's default action of deny is what closes the account. Virtual
           network rules let named subnets through over service endpoints, an IP rule covers
@@ -266,7 +266,8 @@ encounters:
         speaker: Veymark IT
         reveals: >
           CHG-2280 set the default action to Deny on both accounts and added virtual
-          network rules for snet-app and snet-depot. No exception was ticked.
+          network rules for snet-app and the hub's shared subnet. The trusted services box
+          was left however each account already had it, and nobody checked what that was.
       - id: b
         action: Ask which direction is failing
         speaker: Marek Sobczak

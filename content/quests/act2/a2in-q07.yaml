@@ -167,7 +167,7 @@ encounters:
         correct: false
         rep: -6
         consequence: >
-          Eighty-one virtual machines arrive in Azure, and the modernization phase is deferred
+          Seventy-three virtual machines arrive in Azure, and the modernization phase is deferred
           indefinitely once the deadline passes.
         explain: >
           Rehost everything is fast and defensible when a data center lease is ending. It also

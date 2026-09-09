@@ -75,7 +75,7 @@ encounters:
           Admin user accounts on the registry exist for convenience and are the thing to leave
           disabled.
         diagram:
-          - {op: add_node, node: acr-meridian}
+          - {op: add_node, node: acr-veymark}
       - id: b
         label: A container registry with the admin user enabled, and the credentials in the pipeline
         correct: false
@@ -112,7 +112,7 @@ encounters:
     objectives: [AZ104-3.3.2, AZ104-3.3.3]
     intro: >
       "The label generator runs at 23:00, takes about eleven minutes, and stops,"
-      says Dana. "The tracking API answers a few requests a second during the day
+      says Dana. "The tracking API answers a few dozen requests a second during the day
       and almost nothing overnight, and it needs to keep answering when we deploy
       a new version."
 
@@ -295,12 +295,12 @@ encounters:
         output: |
           Average    TimeStamp
           ---------  -------------------
-          0.0        2026-08-24T06:35:00Z
-          1.2        2026-08-24T06:45:00Z
-          3.4        2026-08-24T06:50:00Z
-          5.0        2026-08-24T06:55:00Z
-          5.0        2026-08-24T07:00:00Z
-          5.0        2026-08-24T07:05:00Z
+          0.0        2026-08-26T06:35:00Z
+          1.2        2026-08-26T06:45:00Z
+          3.4        2026-08-26T06:50:00Z
+          5.0        2026-08-26T06:55:00Z
+          5.0        2026-08-26T07:00:00Z
+          5.0        2026-08-26T07:05:00Z
         time_cost: 1
       - id: d
         label: Check the container app's own logs for start-up errors

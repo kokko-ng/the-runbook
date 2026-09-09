@@ -72,7 +72,7 @@ encounters:
         correct: true
         rep: 8
         consequence: >
-          Both firms are in by Wednesday. When a Northgate planner leaves, their home
+          Both firms are invited by Wednesday. When a Northgate planner leaves, their home
           tenant disables the account and the guest sign-in stops working.
         explain: >
           Business-to-business collaboration invites the partner's own identity as a guest
@@ -332,7 +332,7 @@ encounters:
         rep: -9
         consequence: >
           Eleven Veymark passwords now exist for people at another company, and the finding
-          you avoided last week comes back.
+          you avoided earlier in the week comes back.
         explain: >
           Turning guests into members moves the credential lifecycle to Veymark for people
           it does not employ. The delivery problem is a mail problem, and it is fixable.

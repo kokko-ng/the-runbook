@@ -19,8 +19,9 @@ encounters:
     speaker: Grace Mendoza
     objectives: [AZ305-3.2.1]
     intro: >
-      Dispatch runs on a Kubernetes cluster in Southeast Asia. Today it has one
-      node pool, in one zone, with three nodes.
+      Dispatch is moving off the two transport machines onto a Kubernetes cluster in
+      Southeast Asia. The proof of concept has one node pool, in one zone, with three
+      nodes.
 
 
       "One hour recovery time," says Grace. "Start with the cheapest failure to
@@ -110,9 +111,10 @@ encounters:
     speaker: Dana Ong
     objectives: [AZ305-3.2.1]
     intro: >
-      "The board's question is what happens if Southeast Asia is unavailable for a
-      day," says Dana. "Dispatch has an hour. I need to know what we are proposing
-      and what it costs, not a diagram with two clouds on it."
+      "The board is asking again what happens if Southeast Asia is unavailable for a
+      day," says Dana. "Last time the answer was four machines and Site Recovery.
+      Dispatch has an hour now and it is becoming a cluster. I need to know what we
+      are proposing and what it costs, not a diagram with two clouds on it."
     hint: >
       Weigh two clocks: the hour after the region fails, and every month the
       bill arrives before it does. The mechanism has to satisfy the first

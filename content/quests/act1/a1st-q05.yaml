@@ -56,7 +56,7 @@ encounters:
           label: Whether the senders can be asked to supply the data again
           correct: false
           explain: >
-            Resending depends on every partner keeping copies, and one of them cannot.
+            Resending depends on every sender keeping copies, and one of them cannot.
             The platform's own retention is complete and immediate, which is why it is
             checked before anyone outside is asked for anything.
     ticket:
@@ -72,8 +72,8 @@ encounters:
         speaker: Marek Sobczak
         reveals: >
           "It matches anything starting with customs-. There is customs-archive, which
-          is genuinely stale, and customs-2026, which the EDI service writes to through a
-          shared access signature. The signature writes do not update the container's
+          is genuinely stale, and customs-2026, which the partners write to through their
+          shared access signatures. The signature writes do not update the container's
           last modified time the way the script expects."
       - id: b
         action: Ask what the storage account has enabled
@@ -107,7 +107,7 @@ encounters:
         output: |
           Name                      Blob Type      Length    Last Modified
           ------------------------  -------------  --------  -------------------------
-          NG-99120.edi              BlockBlob      8814      2026-08-24T01:12:04+00:00
+          NG-99120.edi              BlockBlob      8814      2026-08-26T17:12:04+00:00
         time_cost: 1
       - id: d
         label: Look at the deletion in the activity log
@@ -115,7 +115,7 @@ encounters:
         output: |
           Who                                  At
           -----------------------------------  ------------------------
-          sp-storage-tidyup                    2026-08-24T02:03:51Z
+          sp-storage-tidyup                    2026-08-26T18:03:51Z
         time_cost: 1
     post_incident:
       path: [a, d]
@@ -150,7 +150,7 @@ encounters:
         correct: false
         rep: -9
         consequence: >
-          Two partners can resend and one cannot, and re-creating the container blocks the
+          Two senders can resend and one cannot, and re-creating the container blocks the
           undelete that would have worked.
         explain: >
           Creating a container with the same name while a soft-deleted one exists prevents
@@ -182,7 +182,7 @@ encounters:
     speaker: Marek Sobczak
     objectives: [AZ104-2.2.5]
     intro: >
-      customs-archive really is stale: eight hundred thousand small documents,
+      customs-archive, undeleted alongside it, really is stale: eight hundred thousand small documents,
       about nine hundred gigabytes, that legal wants kept but nobody reads. They
       are going to a separate archive account in the same region.
 

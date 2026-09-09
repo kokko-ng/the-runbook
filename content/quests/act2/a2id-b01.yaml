@@ -22,8 +22,8 @@ encounters:
     speaker: Wei Lin Tan
     objectives: [AZ305-1.2.1]
     intro: >
-      The proposed Conditional Access baseline: require multi-factor for all
-      users, require compliant devices for administrative roles, and block legacy
+      The proposed Conditional Access baseline, replacing the per-application rules
+      Veymark has today: require multi-factor for all users, require compliant devices for administrative roles, and block legacy
       authentication protocols.
 
 
@@ -52,8 +52,8 @@ encounters:
           label: It should start with the riskiest accounts and expand outward
           correct: false
           explain: >
-            Scoping to administrators feels prudent and leaves the four hundred
-            ordinary accounts, where compromise usually begins, unprotected the
+            Scoping to administrators feels prudent and leaves the ordinary
+            accounts, where compromise usually begins, unprotected the
             longest. Report-only mode widens confidence without narrowing
             coverage.
         - id: c
@@ -96,8 +96,8 @@ encounters:
         correct: false
         rep: -6
         consequence: >
-          The accounts with the most access are protected and the four hundred that get
-          phished are not.
+          The accounts with the most access are protected and the hundreds of ordinary
+          accounts that get phished are not.
         explain: >
           Administrators are the highest-value targets and the initial compromise usually
           arrives through an ordinary user. Report-only mode is the way to build confidence
@@ -121,7 +121,7 @@ encounters:
     intro: >
       "Two kinds of privilege in the design," says Grace. "Entra roles, such as
       Global Administrator and User Administrator. And Azure resource roles, such
-      as Owner on the transport landing zone."
+      as Owner on the production subscription."
 
 
       "Somebody will ask you in the review whether Privileged Identity Management
@@ -230,7 +230,7 @@ encounters:
         label: The platform team, who own the resources being accessed
         correct: false
         rep: -5
-        consequence: Four hundred decisions land on three people who have no idea what any of the guests do.
+        consequence: Every decision lands on three people who have no idea what any of the guests do.
         explain: >
           Resource owners can review and rarely have the context. The person who asked for the
           access usually does.

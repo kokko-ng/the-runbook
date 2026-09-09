@@ -178,7 +178,7 @@ encounters:
           them are inherited by everything underneath. Assigning once at the right level is
           what stops the third subscription arriving ungoverned.
         diagram:
-          - {op: add_node, node: mg-meridian}
+          - {op: add_node, node: mg-veymark}
           - {op: add_node, node: mg-workload}
           - {op: add_edge, edge: e-mg-workload}
           - {op: add_edge, edge: e-mg-sub-prod}
@@ -198,8 +198,8 @@ encounters:
         correct: false
         rep: -7
         consequence: >
-          A sandbox subscription used for training suddenly cannot deploy anywhere except
-          Southeast Asia, and the only people who can change it are tenant administrators.
+          A sandbox subscription used for training suddenly cannot deploy outside the two
+          production regions, and the only people who can change it are tenant administrators.
         explain: >
           The root management group covers every subscription in the tenant including ones
           that should be exempt, and assignments there need elevated access to manage.
@@ -303,8 +303,8 @@ encounters:
         correct: false
         rep: -6
         consequence: >
-          A three-year commitment is signed for a fleet that is about to be resized during
-          the migration.
+          A three-year commitment is signed for a fleet that is about to be resized the
+          moment somebody reads its metrics.
         explain: >
           Commitment discounts are a real saving and they come after you understand the
           workload, not before. Committing to the current shape of an estate you are still

@@ -105,9 +105,9 @@ encounters:
     speaker: Grace Mendoza
     objectives: [AZ305-3.2.1]
     intro: >
-      A junior engineer's design proposes serving the tracking portal from the
-      geo-replicated secondary in East Asia to reduce load on the primary, and
-      counting that as the disaster recovery plan as well.
+      A junior engineer's design proposes moving the tracking portal's reads from the
+      named replica to the geo-replicated secondary in East Asia, so the standby earns
+      its keep, and counting that as the disaster recovery plan as well.
     hint: >
       Separate what the platform actually does from what the proposal assumes
       it does. There is a supported pattern in here and an unexamined one, and

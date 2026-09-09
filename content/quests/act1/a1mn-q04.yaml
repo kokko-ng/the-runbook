@@ -1,7 +1,7 @@
 id: a1mn-q04
 chapter: act1-monitoring
 title: Two Vaults
-summary: Backup exists for one virtual machine, by accident, and the auditor's next question is about everything else.
+summary: Production backup covers one virtual machine and a file share, both by accident, and the auditor's next question is about everything else.
 variant: core
 estimated_minutes: 14
 objectives:
@@ -9,8 +9,8 @@ objectives:
   - AZ104-5.2.2
   - AZ104-5.2.3
 brief: >
-  Veymark's backup story is one vault, one machine, and a policy somebody
-  accepted the defaults for in 2023.
+  Veymark's production backup story is one vault, one machine, one share, and a
+  policy somebody accepted the defaults for in 2023.
 debrief: >
   Two vaults, chosen for what they protect rather than which button was nearest,
   and a policy that matches what the business actually said about losing data.
@@ -68,7 +68,7 @@ encounters:
         correct: true
         rep: 8
         consequence: >
-          Two vaults, four protected items and one long-term retention policy on the database,
+          Two vaults, six protected items and one long-term retention policy on the database,
           and the diagram fits on one slide.
         explain: >
           Recovery Services vaults cover the older workload set: virtual machines, Azure Files,
@@ -76,8 +76,8 @@ encounters:
           including blobs, disks, PostgreSQL and Kubernetes. Azure SQL Database has its own
           automated backups, configured on the database, not through a vault.
         diagram:
-          - {op: add_node, node: rsv-meridian}
-          - {op: add_node, node: bkv-meridian}
+          - {op: add_node, node: rsv-veymark}
+          - {op: add_node, node: bkv-veymark}
           - {op: add_edge, edge: e-rsv-tms}
           - {op: add_edge, edge: e-bkv-st}
       - id: b

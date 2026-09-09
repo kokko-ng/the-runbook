@@ -21,7 +21,7 @@ encounters:
     speaker: Wei Lin Tan
     objectives: [AZ104-3.4.4]
     intro: >
-      A second customer wants the portal on their own branded name,
+      Northgate, the long-haul partner, wants the portal on their own branded name,
       track.northgate.example, pointing at the same application. They will provide
       the certificate for their domain, issued by their own authority.
 
@@ -68,8 +68,8 @@ encounters:
         correct: true
         rep: 8
         consequence: >
-          Both names serve their own certificates from the same app, and the second customer
-          never sees a warning.
+          Both names serve their own certificates from the same app, and Northgate's
+          customers never see a warning.
         explain: >
           An app can carry many custom domains, each with its own certificate binding. A
           name-based binding uses server name indication, which is how one address serves
@@ -81,7 +81,7 @@ encounters:
         rep: -6
         consequence: >
           The binding consumes a dedicated inbound address, which is billed and which changes
-          the DNS the first customer already configured.
+          the DNS already configured for Veymark's own name.
         explain: >
           Address-based bindings exist for clients that cannot do server name indication,
           which in practice means very old ones. They allocate a dedicated address and are
@@ -117,8 +117,8 @@ encounters:
 
       The portal must reach the transport database privately, which it now does
       through virtual network integration. And the security review wants the
-      portal itself unreachable from the public internet, because a partner-facing
-      gateway will front it.
+      portal itself unreachable from the public internet, because a web application
+      firewall in front of it will be the only public face.
 
 
       "People mix these two up constantly," says Marek. "Say which is which."

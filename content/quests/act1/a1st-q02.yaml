@@ -73,8 +73,8 @@ encounters:
         correct: true
         rep: 8
         consequence: >
-          Northgate swap the credential in an afternoon. Wei Lin closes the finding and asks
-          for the same treatment for Sriwijaya.
+          Northgate swap the credential in an afternoon. Wei Lin closes the finding and puts
+          Sriwijaya's ad hoc signature next on her list.
         explain: >
           A shared access signature grants scoped, time-limited access without handing over
           the account key. Tying it to a stored access policy on the container is what makes
@@ -122,7 +122,7 @@ encounters:
       failing with a 403, and their integration lead is on the phone.
 
 
-      Sriwijaya, who are still on the old arrangement, are uploading normally.
+      Sriwijaya, still on their ad hoc signature, are uploading normally.
     hint: >
       The error names a time frame, so interrogate every time field involved.
       Ask which clock the service reads those fields against, and which clock
@@ -163,10 +163,10 @@ encounters:
     investigate:
       - id: a
         action: Ask Northgate what their client reports
-        speaker: Hendrik Salim
+        speaker: Joana Reyes
         reveals: >
           "Their log says AuthenticationFailed, and something about the signature not
-          being valid for the requested time. They are in Kuala Lumpur, so an hour behind
+          being valid for the requested time. They are in Jakarta, so an hour behind
           us."
       - id: b
         action: Ask what was used to generate the signature
@@ -177,7 +177,7 @@ encounters:
     commands:
       - id: a
         label: Look at the stored access policy on the container
-        cmd: az storage container policy list --container-name customs -n stveymarkedi --account-name stveymarkedi -o json
+        cmd: az storage container policy list --container-name customs-2026 -n stveymarkedi --account-name stveymarkedi -o json
         output: |
           {
             "northgate-upload": {
@@ -189,9 +189,9 @@ encounters:
         time_cost: 1
       - id: b
         label: Decode the signature the partner was given
-        cmd: az storage blob url --container-name customs -n test.txt --account-name stveymarkedi --sas-token "sv=2024-11-04&si=northgate-upload&sr=c&st=2026-08-24T16:00:00Z&sig=..."
+        cmd: az storage blob url --container-name customs-2026 -n test.txt --account-name stveymarkedi --sas-token "sv=2024-11-04&si=northgate-upload&sr=c&st=2026-08-24T16:00:00Z&sig=..."
         output: |
-          https://stveymarkedi.blob.core.windows.net/customs/test.txt?sv=2024-11-04&si=northgate-upload&sr=c&st=2026-08-24T16:00:00Z&sig=...
+          https://stveymarkedi.blob.core.windows.net/customs-2026/test.txt?sv=2024-11-04&si=northgate-upload&sr=c&st=2026-08-24T16:00:00Z&sig=...
         note: The signature carries its own start time of 16:00 UTC, which is midnight in Singapore.
         time_cost: 1
       - id: c
@@ -206,7 +206,7 @@ encounters:
         label: Try the same signature yourself
         cmd: >-
           curl -sS -X PUT -H "x-ms-blob-type: BlockBlob" --data-binary @test.txt
-          "https://stveymarkedi.blob.core.windows.net/customs/test.txt?sv=2024-11-04&si=northgate-upload&st=2026-08-24T16:00:00Z&sig=..."
+          "https://stveymarkedi.blob.core.windows.net/customs-2026/test.txt?sv=2024-11-04&si=northgate-upload&st=2026-08-24T16:00:00Z&sig=..."
         output: |
           <?xml version="1.0" encoding="utf-8"?>
           <Error><Code>AuthenticationFailed</Code><Message>Signature not valid in the specified

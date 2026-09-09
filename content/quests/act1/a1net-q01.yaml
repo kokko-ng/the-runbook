@@ -23,7 +23,7 @@ encounters:
       Dana drops a chair next to your desk, which is how she asks for things.
 
 
-      "Johor cross-dock goes live in six weeks. Scanners, a print server, the
+      "Johor cross-dock goes live in six weeks. Scanner stations, a print relay, the
       usual. Marek says you are drawing the virtual network." She slides over a
       printout: vnet-hub is 10.10.0.0/16, vnet-app is 10.20.0.0/16, and the
       Jurong data center advertises 172.16.0.0/12 over the site-to-site VPN.
@@ -91,7 +91,7 @@ encounters:
         correct: false
         rep: -8
         consequence: >
-          Everything works until a scanner tries to reach the Jurong print queue, and
+          Everything works until a scanner tries to reach the ERP box in Jurong, and
           then it works even less.
         explain: >
           172.16.40.0/24 sits inside the 172.16.0.0/12 range Jurong already advertises
@@ -115,8 +115,8 @@ encounters:
       the smallest thing wrong with it first.
 
 
-      "Fine. Now subnets. You have got scanners, about forty of them, a print
-      server, and the security team will want Bastion in the hub eventually, not
+      "Fine. Now subnets. You have got scanner stations, about forty of them, one
+      per dock door, a print relay, and the security team will want Bastion in the hub eventually, not
       here. What are you giving me?"
 
 
@@ -158,7 +158,7 @@ encounters:
     prompt: How do you carve up 10.30.0.0/16?
     options:
       - id: a
-        label: snet-depot 10.30.1.0/24 for the scanners and print server, leaving the rest unallocated
+        label: snet-depot 10.30.1.0/24 for the scanner stations and print relay, leaving the rest unallocated
         correct: true
         rep: 6
         consequence: >
@@ -166,8 +166,8 @@ encounters:
           on the wiki before you forget them."
         explain: >
           A /24 gives 251 usable addresses once Azure takes the first four and the last
-          one in every subnet, which is comfortable for forty scanners and a print
-          server. Leaving the remainder of the /16 unallocated is the point of taking a
+          one in every subnet, which is comfortable for forty scanner stations and a print
+          relay. Leaving the remainder of the /16 unallocated is the point of taking a
           /16 in the first place.
         diagram:
           - {op: add_node, node: snet-depot}
@@ -215,8 +215,8 @@ encounters:
       firmware has it baked in and reflashing forty units means forty trips."
 
 
-      You are provisioning the public IP address for the intake load balancer this
-      afternoon. Veymark runs in Southeast Asia, which has availability zones, and
+      You are replacing the public IP address on the intake load balancer this
+      afternoon, because the one the scale-out project gave it is Basic and dynamic. Veymark runs in Southeast Asia, which has availability zones, and
       Hendrik has never once forgiven an address that moved.
     hint: >
       Hendrik's requirement is about what survives. The address has to outlive

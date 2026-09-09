@@ -1,7 +1,7 @@
 id: a2id-q05
 chapter: act2-identity
 title: One Workspace or Five
-summary: Fourteen subscriptions, two security teams and a logging bill that nobody has forecast.
+summary: Fourteen subscriptions, two companies' logs and a logging bill that nobody has forecast.
 variant: core
 estimated_minutes: 15
 objectives:
@@ -22,9 +22,10 @@ encounters:
     objectives: [AZ305-1.1.1]
     intro: >
       "Security want everything in one place with two years of retention," says
-      Grace. "The transport team want their application logs queryable without a
-      ticket, and they change their diagnostic settings weekly. Straits will be a
-      third party in the estate for a year, and their data has to stay separable."
+      Grace, "and today that place is law-veymark, which the transport team share.
+      They want their application logs queryable without a ticket, and they change
+      their diagnostic settings weekly. Straits will be a third party in the estate
+      for eighteen months, and their data has to stay separable."
 
 
       "There is no single right answer here, which is why it is worth arguing
@@ -78,11 +79,14 @@ encounters:
           A single workspace is simplest and makes everything visible to everyone with access;
           one per team gives isolation and fragments correlation. The common answer is both: a
           platform workspace for security and platform sources, workload workspaces for teams,
-          and resource-context access so engineers see the logs for resources they own without
-          workspace-wide permission.
+          resource-context access so engineers see the logs for resources they own without
+          workspace-wide permission, and Sentinel on the platform workspace so security
+          investigate in one place.
         diagram:
           - {op: add_node, node: law-platform}
           - {op: add_node, node: law-workload}
+          - {op: add_node, node: sentinel}
+          - {op: add_edge, edge: e2-law-platform}
       - id: b
         label: One workspace for everything, with role-based access to control who sees what
         correct: false

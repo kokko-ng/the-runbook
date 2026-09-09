@@ -25,8 +25,8 @@ encounters:
       depots can keep dispatching."
 
 
-      That is vm-tms01 and vm-tms02, the domain controller replica, and the
-      scanner intake host. The database already replicates. The blob scans already
+      That is vm-tms01 and vm-tms02, the domain controller replica, and vm-scan01,
+      which receives the depot scanner uploads. The database already replicates. The blob scans already
       replicate. Recovery time objective is four hours.
     hint: >
       Two things govern this design: the list the board gave and the four hours
@@ -107,7 +107,7 @@ encounters:
         correct: false
         rep: -5
         consequence: >
-          The bill covers replication for eleven machines that the board never asked to keep
+          The bill covers replication for seven machines the board never asked to keep
           running, including two test servers.
         explain: >
           Scope disaster recovery to what the business said has to survive. Everything else is
@@ -160,7 +160,7 @@ encounters:
         correct: true
         rep: 8
         consequence: >
-          The rehearsal runs on a Tuesday afternoon, takes fifty-five minutes to a working
+          The rehearsal runs on a Monday afternoon, takes fifty-five minutes to a working
           login, and does not touch production at all.
         explain: >
           Test failover brings the replicated machines up in a network you nominate, without
@@ -254,8 +254,8 @@ encounters:
         action: Ask what is different about that machine
         speaker: Marek Sobczak
         reveals: >
-          "It is the only one in vnet-depot. The other three are in vnet-app, and the test
-          network I nominated is a copy of vnet-app in East Asia."
+          "It is the only one in vnet-depot. The transport machines are in vnet-app and the
+          domain controller is in the hub, and I built East Asia copies of both of those."
       - id: b
         action: Ask whether replication itself is healthy
         speaker: Veymark NOC
@@ -287,6 +287,7 @@ encounters:
         cmd: az network vnet list -g rg-dr-eastasia --query "[].{name:name,subnets:subnets[].name}" -o json
         output: |
           [
+            { "name": "vnet-hub-dr", "subnets": ["snet-shared"] },
             { "name": "vnet-app-dr", "subnets": ["snet-app", "snet-db"] }
           ]
         note: There is no depot network in the target region at all.
@@ -307,7 +308,7 @@ encounters:
         precisely: no subnet for nic-scan01 in the selected network. The
         protected item's mapping confirms it from the replication side, with a
         target subnet of null. The network listing in rg-dr-eastasia explains why
-        nothing was ever mapped: only a copy of vnet-app exists there, and
+        nothing was ever mapped: only copies of vnet-app and the hub exist there, and
         vm-scan01 lives in vnet-depot, so its network has no counterpart at all.
         The recovery point check cannot move the diagnosis; replication reported
         healthy with a four-minute point, and a machine's data being current says
@@ -328,7 +329,8 @@ encounters:
           network with no counterpart in the target region has nowhere to go. This is exactly
           the class of gap a test failover exists to find.
         diagram:
-          - {op: set_status, node: vnet-hub-ea, status: healthy}
+          - {op: add_node, node: vnet-hub-ea}
+          - {op: add_edge, edge: e-hub-ea}
       - id: b
         label: Map vm-scan01 to the application subnet in the target region
         correct: false

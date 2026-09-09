@@ -19,7 +19,7 @@ debrief: >
 encounters:
   - id: a
     type: design
-    title: The name customers type, again
+    title: The name customers type
     speaker: Hendrik Salim
     objectives: [AZ104-3.4.5, AZ104-3.4.4]
     intro: >
@@ -210,8 +210,8 @@ encounters:
       refused the connection.
 
 
-      The database is sql-veymark-tms, which was closed to public access last
-      month as part of the storage and data work. The portal reached it fine
+      The database is sql-veymark-tms, which Wei Lin closed to public access last
+      month, with a private endpoint as the only way in. The portal reached it fine
       yesterday, from the staging slot.
     hint: >
       Ask what a swap actually moves and what stays with each slot. The
@@ -323,7 +323,7 @@ encounters:
           The staging slot had it, production did not, and the private endpoint is only
           reachable from inside the network.
         diagram:
-          - {op: set_detail, node: app-portal, detail: "Integrated with snet-app"}
+          - {op: set_detail, node: app-portal, detail: "Integrated with snet-appservice"}
       - id: b
         label: Swap back to the previous version
         correct: false
@@ -421,7 +421,7 @@ encounters:
         correct: false
         rep: -6
         consequence: >
-          A redeploy in January restores the code and loses two months of uploaded customer
+          A redeploy in November restores the code and loses two months of uploaded customer
           logos.
         explain: >
           Source control covers what is in source control. Uploaded content and configuration

@@ -21,8 +21,8 @@ encounters:
     speaker: Marek Sobczak
     objectives: [AZ104-4.3.2]
     intro: >
-      Two things need balancing and Marek wants both designed before either is
-      built.
+      Two things are load balanced today, and Marek wants both drawn properly before
+      the audit, because neither was designed so much as clicked.
 
 
       The first is intake: scanners across five countries upload over the internet
@@ -123,7 +123,7 @@ encounters:
           a health probe takes an unhealthy instance out of rotation in seconds.
   - id: b
     type: troubleshoot
-    title: INC-4611
+    title: INC-4774
     speaker: Joana Reyes
     objectives: [AZ104-4.3.3]
     intro: >
@@ -134,7 +134,8 @@ encounters:
 
       The intake endpoint is lb-pod-intake, a public Standard Load Balancer, in
       front of a four-instance scale set. Its health probe was configured during
-      the scale-out project last month by someone who has since left.
+      the scale-out project last month by the contractor who built it, and who has
+      since left.
     hint: >
       A probe only means what it measures. Ask what this one actually tests,
       and whether passing that test proves the thing the scanners need is
@@ -168,7 +169,7 @@ encounters:
             dead and still in rotation, so half of the traffic found them;
             capacity was never short, the rotation was wrong.
     ticket:
-      ref: INC-4611
+      ref: INC-4774
       opened: "06:40"
       reporter: Joana Reyes
       summary: About half of scanner uploads fail at the intake endpoint. Retries succeed.
@@ -332,8 +333,8 @@ encounters:
       at 10.10.1.4 and its vendor calls it transparent, whatever that means."
 
 
-      Today snet-depot has the default routes only: the local virtual network
-      prefix, and 0.0.0.0/0 pointing straight at the internet.
+      Today snet-depot has no route table of its own: only the system routes, with
+      0.0.0.0/0 pointing straight at the internet.
     hint: >
       Moving traffic somewhere takes a route, and being allowed to pass it on
       is a separate setting on the thing in the middle. A design needs both

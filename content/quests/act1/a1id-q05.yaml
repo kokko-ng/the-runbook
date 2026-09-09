@@ -14,7 +14,7 @@ brief: >
   resource group, so this is now a conversation about guard rails.
 debrief: >
   Locks on what must not vanish, a policy that stops untagged resources being
-  created, and an owner tag on everything so the next question has an answer.
+  created, and a costcenter tag on everything so the next question has an answer.
 encounters:
   - id: a
     type: troubleshoot
@@ -83,8 +83,9 @@ encounters:
         speaker: Marek Sobczak
         reveals: >
           "The database was in a server that is also gone, so no point-in-time restore.
-          The storage account is past its purge window for account-level recovery. There
-          is a backup vault, but rg-reporting was never added to it."
+          The storage account could be recovered, but nothing in it survives the nightly
+          rebuild anyway. There is a Recovery Services vault, but rg-reporting was never
+          added to it."
       - id: c
         action: Ask finance what they need first
         speaker: Priya Raghunathan
@@ -99,7 +100,7 @@ encounters:
         output: |
           Who                                       At                        Status
           ----------------------------------------  ------------------------  ---------
-          c.fernandez@contractor.example            2026-08-22T17:41:09Z      Succeeded
+          c.fernandez@contractor.example            2026-08-21T09:41:09Z      Succeeded
         time_cost: 1
       - id: b
         label: Check whether the group can simply be restored
@@ -122,7 +123,7 @@ encounters:
         output: |
           Name                Level          Scope
           ------------------  -------------  --------------------------------------------
-          protect-rg-data     CanNotDelete   /subscriptions/.../resourceGroups/rg-data
+          protect-rg-hub      CanNotDelete   /subscriptions/.../resourceGroups/rg-hub
         time_cost: 1
       - id: e
         label: Check the backup vault for anything from that group
@@ -186,12 +187,13 @@ encounters:
         correct: false
         rep: -5
         consequence: >
-          The restore fails because the account itself is gone, not just its blobs, and the
-          window for account recovery has passed.
+          There is no soft delete window to restore from, because the account itself is gone,
+          not just its blobs. Account recovery takes most of a day and returns data the nightly
+          job rebuilds in an hour.
         explain: >
-          Blob soft delete protects blobs inside an account. Recovering a deleted storage
-          account is a different, time-limited operation, and Marek said that window has
-          closed.
+          Blob soft delete protects blobs inside an account that still exists. Recovering a
+          deleted storage account is a different, time-limited operation, and here it buys
+          nothing the rebuild does not.
   - id: b
     type: design
     title: Guard rails, not memos
@@ -238,7 +240,7 @@ encounters:
     prompt: What do you put in place?
     options:
       - id: a
-        label: A CanNotDelete lock on rg-data and rg-reporting, and nothing on rg-app
+        label: A CanNotDelete lock on rg-data to match the one on rg-reporting, and nothing on rg-app
         correct: true
         rep: 7
         consequence: >

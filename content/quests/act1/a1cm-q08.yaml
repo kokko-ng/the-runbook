@@ -98,8 +98,8 @@ encounters:
         consequence: >
           The invoice is four times the estimate for a workload with a few hundred users.
         explain: >
-          Premium adds more instances, larger sizes and virtual network integration features
-          that matter at scale. Start where the requirements land and move up when a
+          Premium adds more instances, larger sizes and faster hardware that matter at
+          scale. Start where the requirements land and move up when a
           requirement says so.
       - id: d
         label: One Standard plan hosting both the portal and the test copy of it

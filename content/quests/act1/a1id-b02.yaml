@@ -117,8 +117,8 @@ encounters:
     objectives: [AZ104-1.3.2]
     intro: >
       A ReadOnly lock went on rg-data during the panic after rg-reporting
-      disappeared. Two days later the backup job starts failing, the storage
-      lifecycle rule stops moving blobs to cool, and somebody cannot rotate a key.
+      disappeared. Two days later the backup job starts failing, the transport
+      application cannot write its own configuration, and somebody cannot rotate a key.
 
 
       "I know what did it," says Marek. "I want to know what you would put back
@@ -138,7 +138,7 @@ encounters:
           correct: true
           explain: >
             The danger was deletion, and ReadOnly refuses every write, including
-            the ones backup, lifecycle and key rotation perform on your behalf.
+            the ones backup, configuration writes and key rotation perform on your behalf.
             A guard rail sized to the actual risk blocks the disaster and
             nothing else.
         - id: b
@@ -164,7 +164,7 @@ encounters:
         correct: true
         rep: 7
         consequence: >
-          Backups resume on the next run, the lifecycle rule catches up overnight, and
+          Backups resume on the next run, the configuration write goes through, and
           deletion is still refused.
         explain: >
           ReadOnly blocks every write in its scope, which includes operations that services
@@ -200,7 +200,7 @@ encounters:
       Attribution is at ninety-six per cent and Priya wants the last four.
 
 
-      "Every resource in rg-depot-johor belongs to the Johor cost center. Every
+      "Every resource in rg-depot belongs to the depot operations cost center. Every
       one. I do not want to type it on each resource, and I do not want it wrong
       when somebody deploys at eleven at night."
     hint: >

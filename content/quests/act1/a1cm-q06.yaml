@@ -20,7 +20,7 @@ encounters:
     objectives: [AZ104-3.2.7]
     intro: >
       "Intake handles scanner uploads," says Marek. "Stateless, behind the public
-      load balancer, writes straight to storage. In November we want four of them.
+      load balancer, writes straight to storage. In November we want four or five of them.
       In February one is plenty, and last February we were still paying for four
       because nobody switched them off."
     hint: >
@@ -70,6 +70,7 @@ encounters:
           is the current default and gives you scale set management with the control of
           individual machines, and zone spread comes with it.
         diagram:
+          - {op: add_node, node: lb-pod}
           - {op: add_node, node: vmss-intake}
           - {op: add_edge, edge: e-lb-vmss}
       - id: b
@@ -289,7 +290,7 @@ encounters:
         output: |
           {
             "average": 41.2,
-            "timeStamp": "2026-08-24T09:15:00Z"
+            "timeStamp": "2026-08-20T09:15:00Z"
           }
         time_cost: 2
     post_incident:

@@ -205,7 +205,7 @@ encounters:
       commitment stops being a guess.
     post_mortem:
       question: >
-        Priya taps the assessment printout. "Before you quote me another
+        Priya taps the utilization printout. "Before you quote me another
         number: what decides a size here, and what earns a three-year
         commitment?"
       options:
@@ -213,8 +213,8 @@ encounters:
           label: Measured utilization sets the size; a settled workload earns the commitment
           correct: true
           explain: >
-            The assessment already holds the real processor, memory and disk
-            numbers, which beat any specification or instinct. Committing
+            The servers' own performance counters already hold the real processor,
+            memory and disk numbers, which beat any specification or instinct. Committing
             money for years is only safe once the workload has run and the
             review has confirmed the shape.
         - id: b
@@ -235,7 +235,7 @@ encounters:
     options:
       - id: a
         label: >
-          Size from the assessment's measured utilization with headroom, commit to a review at
+          Size from the servers' measured utilization with headroom, commit to a review at
           ninety days, and use reservations only after that
         correct: true
         rep: 8
@@ -243,8 +243,8 @@ encounters:
           The ninety-day review drops two instances a size, and the reservation is bought
           against the shape that is actually running.
         explain: >
-          Migration assessments collect real processor, memory and disk data, which is a better
-          basis than the specification of hardware bought five years ago. Reviewing after the
+          Performance data from the existing servers is a better basis than the
+          specification of hardware bought five years ago. Reviewing after the
           workload has settled, then committing, is what avoids paying for a guess for three
           years.
       - id: b

@@ -78,7 +78,7 @@ encounters:
         speaker: Marek Sobczak
         reveals: >
           "Crash consistent points from 09:04 for all four machines, and an
-          application-consistent point from 08:30. Six minutes of shipment records
+          application-consistent point from 08:34. Six minutes of shipment records
           against thirty-six."
       - id: b
         action: Ask what the database is doing
@@ -93,10 +93,10 @@ encounters:
         output: |
           Name         Health    Rpo
           -----------  --------  ------------------------
-          vm-tms01     Normal    2026-08-24T09:04:11Z
-          vm-tms02     Normal    2026-08-24T09:04:09Z
-          vm-dc01      Normal    2026-08-24T09:03:58Z
-          vm-scan01    Normal    2026-08-24T09:04:20Z
+          vm-tms01     Normal    2026-09-04T09:04:11Z
+          vm-tms02     Normal    2026-09-04T09:04:09Z
+          vm-dc01      Normal    2026-09-04T09:03:58Z
+          vm-scan01    Normal    2026-09-04T09:04:20Z
         time_cost: 1
       - id: b
         label: Confirm the source region really is unreachable
@@ -106,11 +106,11 @@ encounters:
         time_cost: 1
       - id: c
         label: Check the recovery plan is ready to run
-        cmd: az site-recovery recovery-plan show --vault-name rsv-veymark -g rg-ops -n rp-transport --query "{groups:length(properties.groups),lastRun:properties.lastPlannedFailoverTime}" -o json
+        cmd: az site-recovery recovery-plan show --vault-name rsv-veymark -g rg-ops -n rp-transport --query "{groups:length(properties.groups),lastRun:properties.lastTestFailoverTime}" -o json
         output: |
           {
             "groups": 3,
-            "lastRun": "2026-08-11T06:40:00Z"
+            "lastRun": "2026-08-24T14:52:00Z"
           }
         time_cost: 1
     post_incident:
@@ -155,7 +155,7 @@ encounters:
           Planned failover requires the source to be reachable so it can be shut down cleanly.
           It is for announced migrations, not for a region that has already gone.
       - id: c
-        label: Fail over using the 08:30 application-consistent point to be safe
+        label: Fail over using the 08:34 application-consistent point to be safe
         correct: false
         rep: -6
         consequence: >
@@ -261,8 +261,8 @@ encounters:
         correct: false
         rep: -5
         consequence: >
-          The database's primary, the storage accounts and the network hub are all still in
-          Southeast Asia, so half the estate is now cross-region.
+          The storage accounts, the network hub and the database's failover group all still
+          treat Southeast Asia as home, so half the estate is now cross-region.
         explain: >
           It is a legitimate strategic option and a much larger decision than an incident
           response. Everything else in the estate would have to move with it.

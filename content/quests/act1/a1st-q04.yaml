@@ -140,7 +140,7 @@ encounters:
           correct: false
           explain: >
             Everything here is cheap to build; the runbook is an afternoon. The cost that
-            matters is operating it against four million blobs in year three, and that is
+            matters is operating it against twelve million blobs in year three, and that is
             where built-in wins.
         - id: c
           label: It had to put each blob in the right tier at upload
@@ -159,7 +159,7 @@ encounters:
         rep: 8
         consequence: >
           The policy is four lines of JSON and runs itself once a day. The first run moves
-          nine hundred thousand blobs and costs nothing to operate.
+          twenty-odd million blobs and costs nothing to operate.
         explain: >
           Lifecycle management is built into the storage account: rules match blobs by prefix
           or index tag and act on age since creation, last modification, or last access,
@@ -206,7 +206,7 @@ encounters:
     objectives: [AZ104-2.3.7]
     intro: >
       A fault in the intake service uploaded the same scan identifier for every
-      delivery on Tuesday afternoon, overwriting each one with the next. Four
+      delivery on Monday afternoon, overwriting each one with the next. Four
       hundred and six scans are now four hundred and six copies of a pallet of
       instant noodles bound for Ipoh.
 
@@ -256,8 +256,8 @@ encounters:
         action: Ask what protection the container has
         speaker: Marek Sobczak
         reveals: >
-          "Blob soft delete is on, fourteen days. Versioning I turned on last month when
-          we set up the lifecycle rules, because the documentation recommended it."
+          "Blob soft delete is on, fourteen days. Versioning I turned on when we set up
+          the lifecycle rules, because the documentation recommended it."
       - id: b
         action: Ask whether the originals ever existed in Azure
         speaker: Veymark IT
@@ -301,7 +301,7 @@ encounters:
       text: >
         Confirm the protections, then look at one victim. The account
         properties show versioning on, and the version list for a single
-        affected blob shows Tuesday's original at four hundred kilobytes
+        affected blob shows Monday's original at four hundred kilobytes
         sitting beneath a smaller current version. That one screen is the
         diagnosis and the recovery plan, repeated four hundred and six times.
         The deleted-blob listing has nothing to add, because an overwrite under
@@ -351,7 +351,7 @@ encounters:
         correct: false
         rep: -8
         consequence: >
-          The deliveries were completed on Tuesday. There is nothing left to scan, and the
+          The deliveries were completed on Monday. There is nothing left to scan, and the
           customer contract requires the original.
         explain: >
           The recovery point exists in the account already. Asking the business to redo work

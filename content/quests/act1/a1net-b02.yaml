@@ -18,7 +18,7 @@ debrief: >
 encounters:
   - id: a
     type: troubleshoot
-    title: INC-4744
+    title: INC-4778
     speaker: Veymark NOC
     objectives: [AZ104-4.3.3, AZ104-4.3.2]
     intro: >
@@ -44,11 +44,11 @@ encounters:
         why did the rebuilt fleet lose its way out?
       options:
         - id: a
-          label: Outbound was implicit before, and the Standard rebuild withdrew it
+          label: Outbound rode on a rule nobody wrote down, and the rebuild withdrew it
           correct: true
           explain: >
-            Basic Load Balancer granted implicit outbound access, and Standard
-            provides none on its own. Outbound has to be configured
+            An old outbound rule was the only thing granting egress, and a
+            Standard Load Balancer provides none on its own. Outbound has to be configured
             deliberately, through a NAT gateway, an outbound rule or
             per-instance public addresses, and a NAT gateway is the current
             recommendation.
@@ -68,7 +68,7 @@ encounters:
             that is not also an inbound door, which is what a NAT gateway is
             for.
     ticket:
-      ref: INC-4744
+      ref: INC-4778
       opened: "21:40"
       reporter: Veymark NOC
       summary: Intake backend instances cannot reach any external service after the load balancer rebuild.
@@ -79,8 +79,8 @@ encounters:
         action: Ask what the rebuild actually changed
         speaker: Marek Sobczak
         reveals: >
-          "New load balancer, new backend pool, same scale set image. The old one was
-          Basic. That is the only difference anyone wrote down."
+          "New load balancer, new backend pool, same scale set image. The old one still
+          had an outbound rule from the scale-out project that nobody carried across."
       - id: b
         action: Ask whether inbound is genuinely fine
         speaker: Joana Reyes
@@ -191,16 +191,16 @@ encounters:
           address, which is the exposure the design avoided. A NAT gateway gives outbound
           without inbound.
       - id: d
-        label: Revert to a Basic Load Balancer, since outbound worked before the rebuild
+        label: Copy the old outbound rule across untouched, since outbound worked before the rebuild
         correct: false
         rep: -9
         consequence: >
-          Outbound comes back, along with a retired SKU, no zone support, and the same
-          conversation again in six months.
+          Outbound comes back on an address nobody chose, and the same conversation again
+          the day a partner asks what to allow.
         explain: >
-          Basic Load Balancer's implicit outbound access is exactly the behavior being
-          retired, and depending on it is the reason this failure was a surprise. Configure
-          outbound deliberately instead.
+          Copying a rule nobody understood is how this failure was a surprise in the first
+          place. Configure outbound deliberately, with a source address you can hand to a
+          partner.
   - id: b
     type: design
     title: Where the route table bites

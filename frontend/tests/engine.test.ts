@@ -597,6 +597,21 @@ describe('save migration', () => {
     const migrated = migrateSave(state, index, NOW)
     expect(migrated.active).toMatchObject({ review: false, hint_used: false, post_mortem: null })
   })
+  it('carries living-map state across a renamed diagram id', () => {
+    const old = fresh()
+    old.diagram.nodes['kv-meridian'] = { present: true, status: 'degraded', detail: 'rotated' }
+    old.diagram.nodes['mg-meridian'] = { present: true, status: 'healthy' }
+    old.diagram.nodes['mg-veymark'] = { present: false, status: 'healthy' }
+    old.diagram.edges['e2-b2b-meridian'] = { present: true, status: 'healthy' }
+    const migrated = migrateSave(old, index, NOW)
+    expect(migrated.diagram.nodes['kv-veymark']).toEqual({ present: true, status: 'degraded', detail: 'rotated' })
+    expect(migrated.diagram.nodes['kv-meridian']).toBeUndefined()
+    // Whatever already sits under the new id is the player's and stays.
+    expect(migrated.diagram.nodes['mg-veymark'].present).toBe(false)
+    expect(migrated.diagram.nodes['mg-meridian']).toBeUndefined()
+    expect(migrated.diagram.edges['e2-b2b-veymark'].present).toBe(true)
+    expect(migrated.diagram.edges['e2-b2b-meridian']).toBeUndefined()
+  })
 })
 
 describe('starting at an act instead of earning it', () => {

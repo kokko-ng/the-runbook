@@ -29,6 +29,8 @@ import {
   type Action,
   type Chapter,
   type ContentIndex,
+  type DiagramNodeState,
+  type DiagramState,
   type Encounter,
   type EncounterRun,
   type EngineResult,
@@ -94,6 +96,40 @@ function summaryObjectives(index: ContentIndex, ref: string): string[] {
 }
 
 /**
+ * Diagram ids retired since a save may have been written, old id to new. The
+ * living map is keyed on these ids in every player's save, so a renamed id has
+ * to carry its state across or the node silently disappears from the map.
+ */
+const RENAMED_DIAGRAM_IDS: Record<keyof DiagramState, Record<string, string>> = {
+  nodes: {
+    'mg-meridian': 'mg-veymark',
+    'acr-meridian': 'acr-veymark',
+    'kv-meridian': 'kv-veymark',
+    'law-meridian': 'law-veymark',
+    'rsv-meridian': 'rsv-veymark',
+    'bkv-meridian': 'bkv-veymark',
+    'entra-meridian': 'entra-veymark',
+  },
+  edges: {
+    'e2-b2b-meridian': 'e2-b2b-veymark',
+  },
+}
+
+/** Move state stored under a retired id to its new id; the new id wins if both exist. */
+function renameDiagramKeys(
+  stored: Record<string, DiagramNodeState> | undefined,
+  renames: Record<string, string>,
+): Record<string, DiagramNodeState> {
+  const out = { ...(stored ?? {}) }
+  for (const [from, to] of Object.entries(renames)) {
+    if (!(from in out)) continue
+    if (!(to in out)) out[to] = out[from]
+    delete out[from]
+  }
+  return out
+}
+
+/**
  * Bring a save forward to the current shapes.
  *
  * Old saves are the player's property: never throw one away, fill in what is
@@ -114,8 +150,8 @@ export function migrateSave(save: SaveState, index: ContentIndex, now: string): 
     review_session: save.review_session ?? null,
     stats: { ...base.stats, ...(save.stats ?? {}) },
     diagram: {
-      nodes: { ...base.diagram.nodes, ...(save.diagram?.nodes ?? {}) },
-      edges: { ...base.diagram.edges, ...(save.diagram?.edges ?? {}) },
+      nodes: { ...base.diagram.nodes, ...renameDiagramKeys(save.diagram?.nodes, RENAMED_DIAGRAM_IDS.nodes) },
+      edges: { ...base.diagram.edges, ...renameDiagramKeys(save.diagram?.edges, RENAMED_DIAGRAM_IDS.edges) },
     },
   }
 

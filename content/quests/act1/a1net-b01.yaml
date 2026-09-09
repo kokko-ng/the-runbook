@@ -17,7 +17,7 @@ debrief: >
 encounters:
   - id: a
     type: troubleshoot
-    title: INC-4703
+    title: INC-4776
     speaker: Joana Reyes
     objectives: [AZ104-4.1.5, AZ104-4.1.2]
     intro: >
@@ -64,7 +64,7 @@ encounters:
             inspection requirement the design exists to satisfy. The control
             stands, and the two checkboxes are the price of it.
     ticket:
-      ref: INC-4703
+      ref: INC-4776
       opened: "08:05"
       reporter: Joana Reyes
       summary: Spoke-to-spoke traffic through the hub appliance never arrives. Appliance logs are empty.
@@ -87,12 +87,13 @@ encounters:
         action: Check who built the peerings and when
         speaker: Veymark IT
         reveals: >
-          Both peerings were created by template, three weeks apart, by different
-          people. Neither template mentions forwarded traffic.
+          hub-to-app came from a template. hub-to-depot was re-created by the platform
+          team in CHG-2310 and the spoke side by you during INC-4762. Nobody mentioned
+          forwarded traffic.
     commands:
       - id: a
         label: Show the effective routes on a scanner NIC
-        cmd: az network nic show-effective-route-table --name nic-scan01 -g rg-depot -o table
+        cmd: az network nic show-effective-route-table --name nic-scan01 -g rg-app -o table
         output: |
           Source    State     AddressPrefix    NextHopType         NextHopIp
           --------  --------  ---------------  ------------------  ----------
@@ -112,7 +113,7 @@ encounters:
         time_cost: 1
       - id: c
         label: Test the flow from a scanner to the application subnet
-        cmd: az network watcher test-ip-flow --vm vm-scan01 -g rg-depot --direction Outbound --protocol TCP --local 10.30.1.14:51022 --remote 10.20.1.11:443
+        cmd: az network watcher test-ip-flow --vm vm-scan01 -g rg-app --direction Outbound --protocol TCP --local 10.30.1.14:51022 --remote 10.20.1.11:443
         output: |
           {
             "access": "Allow",
