@@ -113,7 +113,9 @@ encounters:
       "The tracking portal and the partner APIs will run in Southeast Asia
       normally and East Asia during a failover," says Marek. "Traffic arrives from
       the public internet. We want the web application firewall in the path, and we
-      want failover in seconds rather than in whatever a resolver has cached."
+      want failover in seconds rather than in whatever a resolver has cached. The
+      continuity review said a global load balancer. Say which one and why, so the
+      board hears it once."
     hint: >
       Two requirements do the choosing: failover that does not wait on
       resolver caches, and a firewall that reads the request. Ask which

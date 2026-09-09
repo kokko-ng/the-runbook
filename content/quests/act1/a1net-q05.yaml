@@ -1,7 +1,7 @@
 id: a1net-q05
 chapter: act1-networking
 title: Private Lines
-summary: Proof-of-delivery scans are in a storage account anyone on the internet can reach with the right key, and the auditor noticed.
+summary: Proof-of-delivery scans still travel to a public endpoint, firewall or not, and the auditor noticed.
 variant: core
 estimated_minutes: 15
 objectives:
@@ -9,8 +9,9 @@ objectives:
   - AZ104-4.2.5
   - AZ104-4.3.1
 brief: >
-  Customer contracts say the scans stay on Veymark's network. Right now they stay
-  on Veymark's network in the sense that Veymark is the one uploading them.
+  Customer contracts say the scans stay on Veymark's network. The firewall closed
+  the account to strangers last month; every request Veymark makes still arrives
+  at a public address.
 debrief: >
   Traffic to the scans never leaves the private address space now, and there is a
   private DNS zone with a linked virtual network to prove it.
@@ -21,14 +22,15 @@ encounters:
     speaker: Wei Lin Tan
     objectives: [AZ104-4.2.4, AZ104-4.2.5]
     intro: >
-      "stveymarkpod holds every proof-of-delivery scan we have. It accepts
-      connections from any network. The contract with the two largest customers
-      says that data is only reachable from our network."
+      "stveymarkpod holds every proof-of-delivery scan we have. The firewall says no
+      to strangers now, but every request still arrives at a public address, and the
+      renewed contract with the two largest customers says that data never crosses
+      the public internet."
 
 
       She lists who needs access: the transport application in vnet-app, the
-      scanners in vnet-depot, and the claims team in Jurong, who open scans over
-      the site-to-site VPN.
+      scanners in vnet-depot, and the customer service desk in Jurong, who open
+      scans over the site-to-site VPN.
 
 
       "I have read about service endpoints and about private endpoints and the
@@ -49,7 +51,7 @@ encounters:
             The consumers span two virtual networks and a VPN from on-premises.
             Only a private endpoint puts the account at a private address all
             three paths reach; the alternatives either left the public door
-            open or closed it on the claims team.
+            open or closed it on the service desk.
         - id: b
           label: The storage firewall is the wrong layer for this requirement
           correct: false
@@ -74,13 +76,13 @@ encounters:
         correct: true
         rep: 9
         consequence: >
-          Wei Lin asks whether the claims team will notice. They will not, which is the
+          Wei Lin asks whether the service desk will notice. They will not, which is the
           answer she was hoping for.
         explain: >
           A private endpoint gives the storage account a private IP address inside your
           virtual network, so it is reachable from peered networks and from on-premises over
           the VPN. Service endpoints are the other pattern and they only work from inside
-          Azure virtual networks, so the Jurong claims team would have been cut off.
+          Azure virtual networks, so the Jurong service desk would have been cut off.
         diagram:
           - {op: add_node, node: pe-st-pod}
           - {op: add_node, node: snet-pe}
@@ -88,20 +90,21 @@ encounters:
           - {op: add_edge, edge: e-pe-subnet}
       - id: b
         label: >
-          A service endpoint for Microsoft.Storage on snet-app and snet-depot, with the
-          storage firewall restricted to those subnets
+          Add snet-depot to last month's service endpoint rules and call the firewall the
+          control
         correct: false
         rep: -8
         consequence: >
-          The scanners and the application keep working, and the claims team in Jurong loses
-          access to every scan at once.
+          The scanners and the application keep working, the auditor reads the word public in
+          the endpoint's name, and the service desk in Jurong stays on an IP exception that
+          drifts.
         explain: >
           Service endpoints keep the traffic on the Azure backbone and let the storage
-          firewall trust specific subnets, but they are a virtual network feature. Requests
-          arriving over the VPN from on-premises still come from a public path and are
-          blocked by the firewall.
+          firewall trust specific subnets, but they are a virtual network feature and the
+          account still answers at a public address. Requests arriving over the VPN from
+          on-premises still come from a public path.
       - id: c
-        label: Leave the account public and rotate the access keys on a schedule
+        label: Leave the firewall as it is and rotate the access keys on a schedule
         correct: false
         rep: -10
         consequence: >
@@ -124,7 +127,7 @@ encounters:
           that traffic stays off the public internet.
   - id: b
     type: troubleshoot
-    title: INC-4566
+    title: INC-4771
     speaker: Veymark NOC
     objectives: [AZ104-4.3.1, AZ104-4.2.5]
     intro: >
@@ -169,7 +172,7 @@ encounters:
             operations was fine; the missing piece was DNS, and it would still
             have been missing whenever the firewall closed.
     ticket:
-      ref: INC-4566
+      ref: INC-4771
       opened: "11:26"
       reporter: Veymark NOC
       summary: Application cannot reach blob storage after public access was disabled.
@@ -184,13 +187,13 @@ encounters:
         speaker: Marek Sobczak
         reveals: >
           "AuthorizationFailure on every request, and a few connection timeouts. It is
-          not a credential problem, the same key works from my laptop over the VPN.
-          Which, now that I say it out loud, is interesting."
+          not a credential problem, the same key worked from my laptop an hour ago, before
+          the change. Which, now that I say it out loud, is interesting."
       - id: b
         action: Check what was deployed with the private endpoint
         speaker: Veymark IT
         reveals: >
-          CHG-2261 created pe-stveymarkpod in snet-privatelink and set public network
+          CHG-2361 created pe-stveymarkpod in snet-privatelink and set public network
           access to Disabled. The private DNS zone integration checkbox is not mentioned
           anywhere in the record.
       - id: c
@@ -228,7 +231,8 @@ encounters:
           Name                                  ResourceGroup    NumberOfRecordSets    NumberOfVirtualNetworkLinks
           ------------------------------------  ---------------  --------------------  ----------------------------
           privatelink.blob.core.windows.net      rg-data          2                     0
-        note: The zone exists and has records. No virtual network is linked to it.
+          privatelink.database.windows.net       rg-data          2                     3
+        note: The blob zone exists and has records. No virtual network is linked to it; the database zone beside it is linked to three.
         time_cost: 1
       - id: d
         label: Check the storage account's network rules
@@ -297,7 +301,7 @@ encounters:
           host name, not for an IP address.
         explain: >
           Storage certificates are issued for the account host name, so connecting by
-          address breaks TLS. That is what the 400 from curl was telling you. Private
+          address breaks TLS. That is what the certificate error from curl was telling you. Private
           endpoints are designed to be reached by name.
       - id: d
         label: Delete and re-create the private endpoint with the DNS integration option ticked
@@ -313,13 +317,13 @@ encounters:
           disconnection.
   - id: c
     type: design
-    title: The name customers type
+    title: The name customers type, again
     speaker: Hendrik Salim
     objectives: [AZ104-4.3.1]
     intro: >
-      "Customers keep asking for a tracking link that is not a Microsoft address,"
-      says Hendrik. "Marketing wants veymarklogistics.com to open the tracking
-      portal. Not www. The bare name."
+      "Marketing liked track.veymarklogistics.com so much they want the bare name
+      too," says Hendrik. "veymarklogistics.com, on its own, to open the tracking
+      portal. Not www. Not track."
 
 
       The domain's zone is hosted in Azure DNS. The portal is an App Service with

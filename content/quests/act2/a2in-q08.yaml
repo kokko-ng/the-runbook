@@ -1,7 +1,7 @@
 id: a2in-q08
 chapter: act2-infrastructure
 title: Moving the Data
-summary: Four databases and fourteen terabytes of documents, over a link that was sized for email.
+summary: Three database moves and fourteen terabytes of documents, over a link that was sized for email.
 variant: core
 estimated_minutes: 14
 objectives:
@@ -16,13 +16,14 @@ debrief: >
 encounters:
   - id: a
     type: design
-    title: Four databases, four windows
+    title: Three databases, three windows
     speaker: Marek Sobczak
     objectives: [AZ305-4.3.4]
     intro: >
-      "The ERP databases are 240 gigabytes with a six-hour window," says Marek.
-      "The warehouse system's database is 40 gigabytes and can be down for a
-      weekend. There is also a MySQL database behind the driver app, 12 gigabytes,
+      "The ERP instance the data review settled on is 240 gigabytes across its four
+      databases, with a six-hour window," says Marek. "The warehouse system's database
+      is 40 gigabytes and can be down all Sunday. There is also a MySQL database
+      behind the driver app, 120 gigabytes,
       that the vendor says must not be down for more than an hour."
     hint: >
       Marek gave you three windows and three sizes. Do the arithmetic per
@@ -38,7 +39,7 @@ encounters:
           correct: true
           explain: >
             Online replication shrinks the outage to the cutover, which is
-            what tight windows buy with its setup cost. Where a weekend is
+            what tight windows buy with its setup cost. Where a whole Sunday is
             available, a restore does the job with nothing extra to
             configure or go wrong.
         - id: b
@@ -53,7 +54,7 @@ encounters:
           correct: false
           explain: >
             Size matters only against the window and the link. Forty
-            gigabytes with a weekend is easy by any method; two hundred and
+            gigabytes with a Sunday is easy by any method; two hundred and
             forty with six hours forces the choice.
     prompt: How do you move them?
     options:
@@ -64,7 +65,7 @@ encounters:
         correct: true
         rep: 9
         consequence: >
-          The two tight windows are met with continuous replication, and the weekend one is
+          The two tight windows are met with continuous replication, and the Sunday one is
           done with a restore and no extra machinery.
         explain: >
           Match the method to the window. Online migration replicates changes after an initial
@@ -77,7 +78,7 @@ encounters:
         correct: false
         rep: -5
         consequence: >
-          The warehouse database migration is set up with replication for a weekend window that
+          The warehouse database migration is set up with replication for a Sunday window that
           needed none.
         explain: >
           Online migration has real setup cost and prerequisites. Where the window is generous,
@@ -153,7 +154,7 @@ encounters:
         rep: 9
         consequence: >
           The bulk arrives on disk in ten days, and the incremental catch-up runs in two hours
-          on the cutover weekend.
+          on the cutover Sunday.
         explain: >
           When the data set divided by the available bandwidth exceeds the schedule, physical
           transfer is the answer: an appliance is shipped, loaded, returned and imported. The
@@ -165,8 +166,8 @@ encounters:
         correct: false
         rep: -6
         consequence: >
-          At the available off-hours bandwidth the copy takes about six weeks, which misses the
-          site closure date.
+          At the available off-hours bandwidth the copy takes about six weeks, and the site
+          cannot spare its only link for that long.
         explain: >
           Throttled transfer is the right approach for a few terabytes with time available. Here
           the arithmetic does not fit the schedule.

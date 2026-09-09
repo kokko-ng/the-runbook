@@ -1,7 +1,7 @@
 id: a1id-b01
 chapter: act1-identity
 title: Owner, Everywhere, Exam Hard
-summary: The same access review, with a custom role, an inherited deny, and a service principal that should not exist.
+summary: The same access review, with a custom role, an inherited deny, and a lock an Owner cannot talk past.
 variant: bonus
 bonus_of: a1id-q01
 estimated_minutes: 12
@@ -230,8 +230,8 @@ encounters:
         correct: true
         rep: 10
         consequence: >
-          The vendor adds the exclusion in the morning. Tonight, Marek restarts it himself
-          with the account that is already excluded.
+          The vendor adds the exclusion in the morning. Tonight, the vendor's on-call
+          restarts it with the identity that is already excluded.
         explain: >
           Deny assignments are created by the platform, most often by managed applications
           and blueprints, and they beat every role assignment. You cannot out-grant one:

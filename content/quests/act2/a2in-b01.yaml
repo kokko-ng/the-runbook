@@ -22,7 +22,7 @@ encounters:
     objectives: [AZ305-4.1.3]
     intro: >
       "The dispatch cluster will run eleven services, an ingress controller, the
-      monitoring agents, and the analytics team's occasional Spark job," says
+      monitoring agents, and the analytics team's month-end aggregation job," says
       Grace. "Somebody has proposed one node pool with autoscaling and letting the
       scheduler sort it out."
     hint: >
@@ -54,7 +54,7 @@ encounters:
           correct: false
           explain: >
             Faster scaling still scales one pool on the wrong dimension when
-            the Spark job lands. The problem is what shares nodes, not how
+            the month-end job lands. The problem is what shares nodes, not how
             quickly more nodes arrive.
     prompt: What do you recommend?
     options:
@@ -65,7 +65,7 @@ encounters:
         correct: true
         rep: 9
         consequence: >
-          A Spark job that fills its nodes no longer evicts the ingress controller, and each pool
+          A month-end job that fills its nodes no longer evicts the ingress controller, and each pool
           scales on its own shape.
         explain: >
           Node pools separate workloads that have different resource shapes, scaling behavior or
@@ -78,7 +78,7 @@ encounters:
         rep: -6
         consequence: >
           Requests and limits are set correctly for nine of thirteen workloads, and the other
-          four cause evictions during the Spark run.
+          four cause evictions during the month-end run.
         explain: >
           Requests and limits are necessary and are not isolation. They do not stop a large
           workload forcing the pool to scale on the wrong dimension, and they depend on every
@@ -113,8 +113,8 @@ encounters:
       price. What can we run on it?"
 
 
-      The cluster runs the dispatch services, the nightly routing batch and the
-      analytics job.
+      The cluster runs the dispatch services and the analytics job; the routing run
+      has its own Batch pool, and the spot price is on offer for both.
     hint: >
       Priya's discount has one string attached: the platform can take the
       capacity back at any moment. Ask which of the three workloads can

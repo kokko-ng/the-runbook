@@ -23,7 +23,7 @@ encounters:
       The scan output is four pages. Wei Lin has highlighted three lines.
 
 
-      "vm-dc01, vm-tms01 and the print relay all answer on 3389 from the public
+      "vm-dc01, vm-tms01 and vm-tms02 all answer on 3389 from the public
       internet. The source restriction is a security group rule listing our office
       address, which changed in March and nobody updated. Administrators still need
       to get to these machines. Fix it properly."
@@ -209,7 +209,7 @@ encounters:
           hub serves the spokes, which is most of the reason the hub exists.
   - id: c
     type: troubleshoot
-    title: INC-4530
+    title: INC-4768
     speaker: Veymark NOC
     objectives: [AZ104-4.2.3]
     intro: >
@@ -258,7 +258,7 @@ encounters:
             allowances the standard does not carry, which is a rule problem,
             not a targeting problem.
     ticket:
-      ref: INC-4530
+      ref: INC-4768
       opened: "14:40"
       reporter: Veymark NOC
       summary: Bastion sessions fail to establish for all users and all targets.
@@ -273,7 +273,8 @@ encounters:
         reveals: >
           "nsg-baseline. Inbound: allow 443 from our address ranges, deny everything else.
           Outbound: allow 443 to the internet, deny everything else. It is applied to
-          every subnet that did not already have a group. That is the standard."
+          every subnet that did not already have a group, except the gateway subnet, which
+          will not take one. That is the standard."
       - id: b
         action: Ask the administrators whether anything at all works
         speaker: Marek Sobczak

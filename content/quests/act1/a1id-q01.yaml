@@ -1,7 +1,7 @@
 id: a1id-q01
 chapter: act1-identity
 title: Owner, Everywhere
-summary: Your predecessor left, and eleven people have Owner on the production subscription.
+summary: Your predecessor left, and eleven Owner assignments sit on the production subscription.
 variant: core
 estimated_minutes: 14
 objectives:
@@ -27,7 +27,7 @@ encounters:
 
 
       "The auditor's first question will be who can delete production. Right now
-      the answer is eleven people and a script. Fix it, and do not break the
+      the answer is ten people and a script. Fix it, and do not break the
       deployment the developers are running on Thursday."
 
 
@@ -88,7 +88,7 @@ encounters:
         correct: false
         rep: -8
         consequence: >
-          The auditor asks who can delete production and the answer is still eleven people,
+          The auditor asks who can delete production and the answer is still the same eleven,
           because Contributor deletes things perfectly well.
         explain: >
           Contributor can create, change and delete every resource in its scope. It cannot
@@ -100,7 +100,7 @@ encounters:
         rep: -9
         consequence: >
           Two developers cannot redeploy their own test resources on Thursday, and eleven
-          people still hold Owner.
+          assignments still hold Owner.
         explain: >
           Policy governs what resources may look like, not who may act. It is the wrong
           control for an access finding, and blocking deletion outright breaks the normal
@@ -123,7 +123,7 @@ encounters:
     intro: >
       "The external audit firm needs to see the production estate for three
       weeks. Configuration only. They must not be able to change anything, read
-      any storage account contents, or see the non-production subscription."
+      any storage account contents, or see anything outside production."
 
 
       They are getting guest accounts in the tenant. You are deciding what those
@@ -143,7 +143,7 @@ encounters:
           correct: true
           explain: >
             Reader on the production subscription is the requirement translated
-            exactly. A wider scope inherits into non-production, a data-plane
+            exactly. A wider scope inherits into the training sandbox, a data-plane
             role reaches contents, and a write role reaches change; each is a
             clause of the finding handed away.
         - id: b
@@ -171,15 +171,15 @@ encounters:
           on the Friday three weeks later.
         explain: >
           Reader grants view access to resources and their configuration at its scope and
-          nothing else. Scoped to the production subscription it excludes non-production
+          nothing else. Scoped to the production subscription it excludes every other subscription
           entirely, and it does not grant access to data inside a storage account, which
           needs a separate data-plane role.
       - id: b
-        label: Reader on mg-veymark, the management group above both subscriptions
+        label: Reader on the tenant root management group, above every subscription
         correct: false
         rep: -7
         consequence: >
-          The auditors send screenshots of the non-production environment and ask why the
+          The auditors send screenshots of the training sandbox subscription and ask why the
           naming is different there.
         explain: >
           Assignments at a management group are inherited by every subscription beneath it.

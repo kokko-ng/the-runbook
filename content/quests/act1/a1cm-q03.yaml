@@ -21,7 +21,7 @@ encounters:
     objectives: [AZ104-3.2.6]
     intro: >
       "Second transport application machine," says Marek. "Same size, same image,
-      behind the internal load balancer. The only question is where you put it so
+      behind a new internal load balancer. The only question is where you put it so
       that it is not next to the first one."
 
 
@@ -137,8 +137,8 @@ encounters:
       same image, same size, same subnet, same extensions, no public address.
 
 
-      The existing machine was built by hand in 2023, and there is now a Bicep
-      file that describes it.
+      The existing machine was deployed from the consultant's template in 2023, and
+      there is now a Bicep file that describes it.
     hint: >
       The requirement is a peer, not a copy. Ask which method produces a
       second machine from a description, and which methods carry the first
@@ -274,7 +274,7 @@ encounters:
         reveals: >
           "Name, zone, and it picked up the newer template default for the network
           interface, which does not add it to the load balancer's backend pool. The old one
-          was added by hand two years ago."
+          was added by hand when the balancer went in."
       - id: b
         action: Ask whether the application is really running
         speaker: Veymark IT

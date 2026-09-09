@@ -23,9 +23,9 @@ encounters:
     objectives: [AZ305-4.4.2]
     intro: >
       "Two data centers for the next eighteen months, twenty-two depots
-      indefinitely, and the ERP will be talking to Azure constantly once it
-      moves," says Grace. "Today there is one site-to-site tunnel to Jurong, built
-      by somebody who has left, and nothing to Port Klang."
+      indefinitely, and the ERP will be talking to Azure constantly from the day the
+      rest of it lands," says Grace. "Today there are site-to-site tunnels to Jurong
+      and Johor, built by somebody who has left, and nothing to Port Klang."
     hint: >
       Two data centers with a chatty ERP, twenty-two depots with scanner
       uploads. Ask what each class of site actually demands, predictability
@@ -321,8 +321,8 @@ encounters:
     objectives: [AZ305-4.4.4]
     intro: >
       "Everything outbound goes through the firewall, which I want," says Wei Lin.
-      "The data platform also copies about two terabytes a night from the lake to
-      the analytics workspace, and last night that went through the firewall too."
+      "The data platform also lands a few hundred gigabytes a night in the lake from
+      the four sources, and last night that went through the firewall too."
     hint: >
       Ask what the firewall exists to see. Then ask whether a nightly copy
       between two platform services crosses that line, and what path serves
@@ -354,7 +354,7 @@ encounters:
           label: The nightly copy is the problem and should be shrunk
           correct: false
           explain: >
-            The copy is the data platform doing its job, and two terabytes
+            The copy is the data platform doing its job, and a few hundred gigabytes
             is what the job weighs. The design question was the path, not
             the payload.
     prompt: How do you handle the high-volume internal traffic?
@@ -401,7 +401,7 @@ encounters:
         correct: false
         rep: -8
         consequence: >
-          Two terabytes of internal copying now competes with dispatch traffic through the same
+          Hundreds of gigabytes of internal copying now compete with dispatch traffic through the same
           firewall.
         explain: >
           Moving the load to a busier period makes the problem worse and leaves the design

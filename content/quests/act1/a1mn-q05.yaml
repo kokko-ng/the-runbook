@@ -72,37 +72,38 @@ encounters:
         action: Ask what finance actually need by nine
         speaker: Priya Raghunathan
         reveals: >
-          "The close job and the extract files it reads. If the machine is back with
-          yesterday's data on it, the job regenerates today's."
+          "The close job and the extract files it reads. Today's extracts landed on that
+          machine this afternoon; if they go back to yesterday the depots have to resend
+          and we miss nine."
       - id: b
         action: Ask what changed on the machine
         speaker: Veymark IT
         reveals: >
-          Update management applied eleven patches at 22:00, including a kernel update.
-          Two other machines took the same patches and are fine.
+          An out-of-band run for a kernel advisory applied eleven patches at 22:00, outside
+          the monthly window. Two other machines took the same patches and are fine.
     commands:
       - id: a
         label: List recovery points for the machine
-        cmd: az backup recoverypoint list --vault-name rsv-veymark -g rg-ops -c vm-report01 -i vm-report01 --query "[].{name:name,time:properties.recoveryPointTime,type:properties.recoveryPointType}" -o table
+        cmd: az backup recoverypoint list --vault-name rsv-finance -g rg-finance-report -c vm-report01 -i vm-report01 --query "[].{name:name,time:properties.recoveryPointTime,type:properties.recoveryPointType}" -o table
         output: |
           Name              Time                      Type
           ----------------  ------------------------  -----------
-          8371926244771     2026-08-24T18:04:22Z      CrashConsistent
-          8371926244102     2026-08-23T18:03:51Z      AppConsistent
+          8371926244771     2026-08-31T18:04:22Z      CrashConsistent
+          8371926244102     2026-08-30T18:03:51Z      AppConsistent
         time_cost: 1
       - id: b
         label: Check what the last backup job did
-        cmd: az backup job list --vault-name rsv-veymark -g rg-ops --query "[?entityFriendlyName=='vm-report01'] | [0:2].{op:operation,status:status,at:startTime}" -o table
+        cmd: az backup job list --vault-name rsv-finance -g rg-finance-report --query "[?entityFriendlyName=='vm-report01'] | [0:2].{op:operation,status:status,at:startTime}" -o table
         output: |
           Op       Status              At
           -------  ------------------  ------------------------
-          Backup   CompletedWithWarnings  2026-08-24T18:00:11Z
-          Backup   Completed              2026-08-23T18:00:09Z
+          Backup   CompletedWithWarnings  2026-08-31T18:00:11Z
+          Backup   Completed              2026-08-30T18:00:09Z
         note: The most recent point is crash consistent, which means the application was not quiesced.
         time_cost: 1
       - id: c
         label: Check whether the disks themselves are readable
-        cmd: az disk show -n vm-report01-osdisk -g rg-app --query "{state:diskState,size:diskSizeGb}" -o json
+        cmd: az disk show -n vm-report01-osdisk -g rg-finance-report --query "{state:diskState,size:diskSizeGb}" -o json
         output: |
           {
             "diskState": "Attached",
@@ -111,7 +112,7 @@ encounters:
         time_cost: 1
       - id: d
         label: Check how long a full machine restore usually takes here
-        cmd: az backup job list --vault-name rsv-veymark -g rg-ops --query "[?operation=='Restore'].{op:operation,at:startTime}" -o table
+        cmd: az backup job list --vault-name rsv-finance -g rg-finance-report --query "[?operation=='Restore'].{op:operation,at:startTime}" -o table
         output: |
           (no results)
         note: No restore has ever been run in this vault, so nobody knows how long one takes.
@@ -143,8 +144,6 @@ encounters:
           here only the operating system disk is broken, and the data disk holds the extract
           files that are more current than any backup. An application-consistent point is
           preferred over a crash-consistent one when both exist.
-        diagram:
-          - {op: set_status, node: vm-tms01, status: healthy}
       - id: b
         label: Restore the full virtual machine from the most recent point, overwriting the existing one
         correct: false
@@ -187,15 +186,15 @@ encounters:
       application consistent.
 
 
-      "That warning has been there for six days," says Dana. "How would anyone
-      have known?"
+      "That warning sat there for five hours before the machine died," says Dana.
+      "How would anyone have known?"
     hint: >
-      The signal existed for six days and reached no one. Ask which signal is the
+      The signal existed for five hours and reached no one. Ask which signal is the
       direct one, and what carries a signal to a person without depending on
       memory or luck.
     post_mortem:
       question: >
-        "Six days," Dana repeats. "Have another go, but answer this first: what
+        "Five hours," Dana repeats. "Have another go, but answer this first: what
         has to happen to a warning for it to count as seen?"
       options:
         - id: a
@@ -235,7 +234,7 @@ encounters:
           answer the questions people ask afterwards: what is protected, what failed, how much
           is stored. Job alerts are what turn a silent warning into a notification.
         diagram:
-          - {op: set_detail, node: rsv-meridian, detail: "Reports and job alerts enabled"}
+          - {op: set_detail, node: rsv-veymark, detail: "Reports and job alerts enabled"}
       - id: b
         label: A weekly check of the vault's jobs blade during the operations meeting
         correct: false
@@ -264,8 +263,8 @@ encounters:
           Default notifications go to a classic alert configuration nobody has looked at, and
           warnings are not included.
         explain: >
-          Assuming a default exists and covers what you need is how six days of warnings go
-          unread. Configure it deliberately and confirm it fires.
+          Assuming a default exists and covers what you need is how a warning sits unread
+          until a restore finds it. Configure it deliberately and confirm it fires.
   - id: c
     type: design
     title: Proving it next time

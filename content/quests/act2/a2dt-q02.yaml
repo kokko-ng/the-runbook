@@ -56,7 +56,7 @@ encounters:
           label: The analytics extracts should have been kept out of peak season
           correct: false
           explain: >
-            The extracts are the business asking questions during the fortnight it
+            The extracts are the business asking questions during the two months it
             cares most. The design's job is to make them harmless, not to schedule
             them away.
     prompt: What do you recommend?
@@ -94,7 +94,7 @@ encounters:
           The pool's other databases slow down during peak, which is when they are also busy.
         explain: >
           Elastic pools share a budget between databases with complementary peaks. Veymark's
-          databases all peak in the same fortnight.
+          databases all peak in the same two months.
       - id: d
         label: Cache the tracking portal's queries in Redis and leave the database as it is
         correct: false
@@ -114,7 +114,8 @@ encounters:
       "Three requirements from the customer contracts," says Wei Lin. "Data at
       rest encrypted with keys we control. Nobody in the platform team able to read
       shipment values in the customer columns. And a way to recover from somebody
-      deleting a month of rows, which is not the same as a region failing."
+      deleting a month of rows, discovered a year later, which is not the same as a
+      region failing."
     hint: >
       Count the requirements, then count the controls in your answer. Custody of
       keys, unreadability to administrators and recovery from deletion are
@@ -162,7 +163,8 @@ encounters:
           Transparent data encryption protects data at rest and a customer-managed key puts
           custody in your vault. Always Encrypted keeps chosen columns encrypted in the engine
           itself, so administrators cannot read them. Point-in-time restore covers deletion;
-          long-term retention covers the seven-year contractual requirement.
+          long-term retention covers a deletion found a year later, and the seven years the
+          customer contracts ask for.
         diagram:
           - {op: set_detail, node: sqldb-transport, detail: "Customer-managed keys and long-term retention"}
       - id: b

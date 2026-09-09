@@ -1,7 +1,7 @@
 id: a1mn-q02
 chapter: act1-monitoring
 title: Where Do the Logs Go
-summary: An auditor asks for six months of sign-in and storage access logs, and Veymark has nine days of some of them.
+summary: An auditor asks for six months of storage, key vault and activity logs, and Veymark has three weeks of some of them.
 variant: core
 estimated_minutes: 15
 objectives:
@@ -78,7 +78,7 @@ encounters:
           workspace or table, and for an audit requirement it has to be at least the period
           being audited.
         diagram:
-          - {op: add_node, node: law-meridian}
+          - {op: add_node, node: law-veymark}
           - {op: add_edge, edge: e-law-st}
       - id: b
         label: Increase the workspace retention to two years and wait for the logs to arrive

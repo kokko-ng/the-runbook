@@ -24,8 +24,8 @@ encounters:
     intro: >
       "Eleven thousand images a day," says Marek. "About four hundred kilobytes
       each. Written once by the scanner intake service, read rarely, kept for
-      seven years because the customer contracts say so. The claims team reads
-      maybe two hundred a week, and they need them within a second or two."
+      seven years because the customer contracts say so. The claims team opens a
+      few hundred a day, and they need them within a second or two."
 
 
       He writes the options on the whiteboard, then draws a line under the ones he
@@ -96,8 +96,8 @@ encounters:
         correct: false
         rep: -6
         consequence: >
-          It works, and in year three the claims team is paying file share prices for six
-          hundred gigabytes nobody reads.
+          It works, and in year three the claims team is paying file share prices for five
+          terabytes nobody reads.
         explain: >
           Files is the right answer when something must mount a share. The intake service is
           being written anyway, and blob storage gives lifecycle tiering, versioning and
@@ -270,7 +270,7 @@ encounters:
           custody to your key vault, which is what makes independent revocation possible:
           disable the key and the data becomes unreadable.
         diagram:
-          - {op: add_node, node: kv-meridian}
+          - {op: add_node, node: kv-veymark}
       - id: b
         label: Enable encryption at rest on the storage account, which is off by default
         correct: false

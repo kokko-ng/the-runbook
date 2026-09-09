@@ -54,7 +54,7 @@ nodes:
   - {id: tag-strategy, label: Tag strategy, kind: policy, group: platform, x: 240, y: 900}
 
   # --- identity ---------------------------------------------------------
-  - {id: entra-meridian, label: veymarklogistics.com, kind: entra, group: identity, x: 480, y: 0, present: true}
+  - {id: entra-veymark, label: veymarklogistics.com, kind: entra, group: identity, x: 480, y: 0, present: true}
   - {id: entra-b2b, label: Cross-tenant collaboration, kind: entra-guest, group: identity, x: 480, y: 90}
   - {id: entra-connect2, label: Entra Connect, kind: entra-connect, group: identity, x: 480, y: 180, present: true}
   - {id: entra-appproxy, label: Entra application proxy, kind: entra-feature, group: identity, x: 480, y: 270}
@@ -133,7 +133,7 @@ edges:
   - {id: e2-sf-erp-mi, source: sf-erp, target: sqlmi-erp, label: database migration, kind: data}
   - {id: e2-sf-files, source: sf-fileserver, target: st-manifests, label: manifest copy, kind: data}
   - {id: e2-sf-tenant, source: sf-tenant, target: entra-b2b, label: cross-tenant access, kind: identity}
-  - {id: e2-b2b-meridian, source: entra-b2b, target: entra-meridian, kind: identity}
+  - {id: e2-b2b-veymark, source: entra-b2b, target: entra-veymark, kind: identity}
   - {id: e2-mg-platform, source: mg-root2, target: mg-platform2, kind: identity}
   - {id: e2-mg-lz, source: mg-root2, target: mg-landingzones, kind: identity}
   - {id: e2-mg-sandbox, source: mg-root2, target: mg-sandbox, kind: identity}
@@ -143,9 +143,9 @@ edges:
   - {id: e2-lz-transport, source: mg-landingzones, target: sub-lz-transport, kind: identity}
   - {id: e2-lz-analytics, source: mg-landingzones, target: sub-lz-analytics, kind: identity}
   - {id: e2-policy-mg, source: policy-initiative, target: mg-landingzones, label: assigned at, kind: identity}
-  - {id: e2-pim-entra, source: entra-pim, target: entra-meridian, kind: identity}
-  - {id: e2-ca-entra, source: cond-access, target: entra-meridian, kind: identity}
-  - {id: e2-idgov-entra, source: entra-idgov, target: entra-meridian, kind: identity}
+  - {id: e2-pim-entra, source: entra-pim, target: entra-veymark, kind: identity}
+  - {id: e2-ca-entra, source: cond-access, target: entra-veymark, kind: identity}
+  - {id: e2-idgov-entra, source: entra-idgov, target: entra-veymark, kind: identity}
   - {id: e2-appproxy-erp, source: entra-appproxy, target: sf-erp, label: publishes, kind: identity}
   - {id: e2-mi-kv, source: mi-workloads, target: kv-platform, label: reads secrets, kind: identity}
   - {id: e2-hsm-data, source: managed-hsm, target: st-datalake, label: customer-managed keys, kind: data}

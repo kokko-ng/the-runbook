@@ -20,7 +20,7 @@ encounters:
     speaker: Wei Lin Tan
     objectives: [AZ305-1.2.3]
     intro: >
-      "Eleven people hold Contributor on the transport landing zone permanently,"
+      "Eleven people hold Contributor on the production subscription permanently,"
       says Wei Lin. "They need it perhaps four times a month each, usually during
       an incident. The auditor's question is not whether they are trustworthy. It
       is what an attacker gets when one of their laptops is compromised at two in
@@ -166,7 +166,7 @@ encounters:
           Guests request the package they need, a Veymark sponsor approves it, and access
           expires in ninety days unless someone actively renews it.
         explain: >
-          Entitlement management packages up the groups, applications and roles a role needs,
+          Entitlement management packages up the groups, applications and roles a job needs,
           with a request and approval workflow, an expiry and a scoped set of who may request.
           Access reviews then re-attest what remains. Together they turn a memory problem into
           a scheduled one.

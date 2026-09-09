@@ -1,7 +1,7 @@
 id: a1cm-q05
 chapter: act1-compute
 title: Move It, Encrypt It
-summary: The auditor wants encryption of the temporary disk and cache, and the finance team wants their machines in their own subscription.
+summary: The auditor wants encryption of the temporary disk and cache, and the finance team wants their machines out of the production subscription.
 variant: core
 estimated_minutes: 14
 objectives:
@@ -115,8 +115,8 @@ encounters:
       have been told it is a right-click operation."
 
 
-      The machines are in rg-app with the transport application, use disks in the
-      same resource group, sit on a subnet in vnet-app, and one of them has a
+      The machines are in rg-finance-report, next door to the transport application,
+      use disks in the same resource group, sit on a subnet in vnet-app, and one of them has a
       public IP address for a partner feed.
     hint: >
       The phrase right-click operation hides a dependency set. Ask what a

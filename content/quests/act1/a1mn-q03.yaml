@@ -154,8 +154,8 @@ encounters:
         correct: true
         rep: 8
         consequence: >
-          A week later the graph shows loss climbing every weekday at 08:50, which turns out
-          to be a backup job at the far end.
+          A week later the graph has a number for last Tuesday at nine, and the operations
+          meeting stops being an argument.
         explain: >
           Connection monitor runs continuous synthetic checks between sources and destinations
           and records latency, loss and the hop-by-hop path. It stores results in the workspace

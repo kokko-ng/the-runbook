@@ -9,14 +9,15 @@ objectives:
   - AZ104-4.1.5
 brief: >
   Overnight maintenance touched the hub. By the time you sit down, the depot has
-  been offline for ninety minutes and the NOC has already written it up properly.
+  been offline since before the first shift clocked in, and the NOC has already
+  written it up properly.
 debrief: >
   Joana adds a line to the shift handover: peerings are two objects, and both of
   them count. It is the most useful thing anyone wrote down all week.
 encounters:
   - id: a
     type: troubleshoot
-    title: INC-4471
+    title: INC-4762
     speaker: Joana Reyes
     objectives: [AZ104-4.1.5, AZ104-4.1.2]
     intro: >
@@ -51,18 +52,18 @@ encounters:
           label: It trusted the change record over the platform's own state
           correct: false
           explain: >
-            The record was wrong, and distrusting it is not a fix. CHG-2210
+            The record was wrong, and distrusting it is not a fix. CHG-2310
             told you where to look; the miss was in what the attempt did once
             the platform had shown its state.
         - id: c
-          label: It should have rolled back CHG-2210 and rerun the maintenance
+          label: It should have rolled back CHG-2310 and rerun the maintenance
           correct: false
           explain: >
             The rollback plan was the word "revert" with no detail, and the hub
             side that survived is healthy. Creating the missing spoke object is
             smaller, faster and touches nothing that works.
     ticket:
-      ref: INC-4471
+      ref: INC-4762
       opened: "09:12"
       reporter: Joana Reyes
       summary: Johor depot cannot reach hub shared services. Internet from the same subnet works.
@@ -75,7 +76,7 @@ encounters:
         action: Ask the NOC what changed overnight
         speaker: Joana Reyes
         reveals: >
-          "Change CHG-2210, platform team, 03:10 to 03:40. Description says
+          "Change CHG-2310, platform team, 03:10 to 03:40. Description says
           re-created peering on vnet-hub after a failed template deployment.
           Marked successful."
       - id: b
@@ -86,7 +87,7 @@ encounters:
           print queue and the license server are dead, and those are both the ones
           in the hub."
       - id: c
-        action: Read the change record for CHG-2210
+        action: Read the change record for CHG-2310
         speaker: Veymark IT
         reveals: >
           The record lists one task: "Delete and re-create hub-to-depot peering in
@@ -106,7 +107,7 @@ encounters:
         output: |
           Name              PeeringState    AllowForwardedTraffic    AllowVirtualNetworkAccess
           ----------------  --------------  -----------------------  --------------------------
-          hub-to-app        Connected       True                     True
+          hub-to-app        Connected       False                    True
           hub-to-depot      Initiated       False                    True
         time_cost: 1
       - id: b
@@ -117,7 +118,7 @@ encounters:
         time_cost: 1
       - id: c
         label: Check the effective security rules on a scanner NIC
-        cmd: az network nic list-effective-nsg --name nic-scan01 -g rg-depot -o table
+        cmd: az network nic list-effective-nsg --name nic-scan01 -g rg-app -o table
         output: |
           Name              Direction    Access    Priority    SourceAddressPrefix    DestinationPortRange
           ----------------  -----------  --------  ----------  ---------------------  ----------------------
@@ -126,7 +127,7 @@ encounters:
         time_cost: 2
       - id: d
         label: Test the flow from the scanner subnet to the print server
-        cmd: az network watcher test-ip-flow --vm vm-scan01 -g rg-depot --direction Outbound --protocol TCP --local 10.30.1.14:60122 --remote 10.10.1.20:631
+        cmd: az network watcher test-ip-flow --vm vm-scan01 -g rg-app --direction Outbound --protocol TCP --local 10.30.1.14:60122 --remote 10.10.1.20:631
         output: |
           {
             "access": "Allow",
@@ -135,7 +136,7 @@ encounters:
         time_cost: 2
       - id: e
         label: Look at the effective routes on the scanner NIC
-        cmd: az network nic show-effective-route-table --name nic-scan01 -g rg-depot -o table
+        cmd: az network nic show-effective-route-table --name nic-scan01 -g rg-app -o table
         output: |
           Source    State     AddressPrefix    NextHopType       NextHopIp
           --------  --------  ---------------  ----------------  ---------
@@ -270,8 +271,8 @@ encounters:
         correct: true
         rep: 7
         consequence: >
-          Dana asks for the cost of both and takes the direct peering, on the grounds that
-          nobody has budget for an appliance this quarter.
+          Dana asks for the cost of both, then learns Wei Lin already has an inspection
+          appliance on order for the hub. The firmware push waits for it.
         explain: >
           Two spokes peered to the same hub cannot reach each other through it. Azure
           peering carries traffic between the two peered networks only. Spoke-to-spoke

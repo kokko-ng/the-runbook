@@ -1,7 +1,7 @@
 id: a2bc-q01
 chapter: act2-continuity
 title: The Numbers on the Slide
-summary: The board wants two numbers per system, and the last person who wrote them down guessed.
+summary: The board wants two numbers per system, and only one system has ever had its numbers agreed.
 variant: core
 estimated_minutes: 15
 objectives:
@@ -20,8 +20,9 @@ encounters:
     objectives: [AZ305-3.1.1]
     intro: >
       "The continuity plan has one recovery time objective for everything: four
-      hours," says Grace. "It was written by somebody in IT in 2022. Nobody in the
-      business has ever been asked."
+      hours," says Grace. "Priya signed that for the transport machines in the backup
+      review, and somebody copied it onto every other line. Nobody in the business has
+      been asked about the rest, and dispatch is not the system it was."
 
 
       Dispatch stops trucks when it is down. The tracking portal is
@@ -56,8 +57,8 @@ encounters:
           correct: false
           explain: >
             IT belongs in the room, because somebody has to say what each tier
-            costs to deliver. The flaw is IT deciding alone, not IT
-            participating.
+            costs to deliver. The flaw is one number copied across systems nobody
+            asked about, not IT participating.
     prompt: How do you establish the objectives?
     options:
       - id: a
@@ -89,8 +90,8 @@ encounters:
         correct: false
         rep: -8
         consequence: >
-          Dispatch is down for three hours in March and the board discovers that four hours was
-          never acceptable for it.
+          Dispatch is down for three hours in March and the board discovers that four hours
+          stopped being acceptable when dispatch started stopping trucks.
         explain: >
           Nothing having gone wrong is not evidence that the number is right. It is evidence
           that it has not been tested.
@@ -261,8 +262,8 @@ encounters:
         correct: false
         rep: -6
         consequence: >
-          Both sites are in the same country under the same regional risks, and Jurong is
-          itself being decommissioned.
+          Both sites sit a few hundred kilometers apart under the same regional risks, and
+          Jurong is itself being decommissioned.
         explain: >
           Replicating to another site you are retiring solves the problem for as long as that
           site exists. Azure is the destination the rest of the estate is already moving to.

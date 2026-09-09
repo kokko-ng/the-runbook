@@ -20,12 +20,13 @@ encounters:
     speaker: Grace Mendoza
     objectives: [AZ305-3.2.2]
     intro: >
-      The dispatch database is Azure SQL Database, Hyperscale, in Southeast Asia.
+      The dispatch database is Azure SQL Database, Hyperscale, in Southeast Asia,
+      with the active geo-replica in East Asia that the board exercise left behind.
       The recovery objectives are fifteen minutes of data and one hour to run.
 
 
       "The application has one connection string," says Grace. "I would prefer it
-      stayed that way after a failover."
+      stayed that way after a failover, which today it would not."
     hint: >
       Test each mechanism against all three constraints on the page: fifteen
       minutes of data, one hour of downtime, and one connection string that
@@ -64,12 +65,12 @@ encounters:
         - {id: app, label: Dispatch, kind: aks, col: 0, row: 1}
         - {id: listener, label: Failover group listener, kind: dns, col: 1, row: 1, tone: proposed}
         - {id: primary, label: transport, kind: sql-database, col: 2, row: 0, note: Southeast Asia}
-        - {id: secondary, label: transport, kind: sql-database, col: 2, row: 2, note: East Asia, tone: proposed}
+        - {id: secondary, label: transport, kind: sql-database, col: 2, row: 2, note: East Asia}
       edges:
         - {source: app, target: listener, label: one connection string}
         - {source: listener, target: primary, label: read-write}
         - {source: listener, target: secondary, label: on failover, tone: proposed}
-        - {source: primary, target: secondary, label: geo-replication, tone: proposed}
+        - {source: primary, target: secondary, label: geo-replication}
     prompt: What do you recommend?
     options:
       - id: a
@@ -166,8 +167,8 @@ encounters:
     options:
       - id: a
         label: >
-          Point-in-time restore within the retention window, plus long-term retention for the
-          seven-year contractual requirement
+          Keep point-in-time restore within the retention window and long-term retention for
+          the seven-year contractual requirement, on whichever server is primary
         correct: true
         rep: 9
         consequence: >
@@ -179,7 +180,7 @@ encounters:
           backups, which is the control for data-level accidents. Long-term retention keeps
           weekly, monthly and yearly copies for the contractual period.
         diagram:
-          - {op: set_detail, node: sqldb-transport, detail: "PITR 35 days, LTR 7 years"}
+          - {op: set_detail, node: sqldb-transport, detail: "CMK, PITR 35 days, LTR 7 years"}
       - id: b
         label: Failing over to the secondary, which will not have the delete yet
         correct: false
@@ -246,12 +247,13 @@ encounters:
             it. Slowing the policy down leaves both coverage gaps in place and
             adds a waiting human to the recovery time.
         - id: c
-          label: Cross-database references cannot survive a failover and the schema must be consolidated
+          label: A second database cannot share the group's listener and the schema must be consolidated
           correct: false
           explain: >
-            The reference works whenever both databases sit on the same server,
-            which is exactly the property the group can preserve. Consolidation
-            is a design debate on its merits, not the lesson of this rehearsal.
+            The listener serves every database that is a member of the group,
+            which is exactly the property the group exists to provide.
+            Consolidation is a design debate on its merits, not the lesson of
+            this rehearsal.
     ticket:
       ref: DRV-1140
       opened: "15:20"
@@ -271,7 +273,8 @@ encounters:
         speaker: Grace Mendoza
         reveals: >
           "It is in a second database on the same server, which was never added to the
-          failover group. Dispatch queries it with a cross-database reference."
+          failover group. Dispatch reaches it through the listener with a second connection
+          string, database name lookup."
     commands:
       - id: a
         label: Check what is in the failover group
@@ -303,8 +306,8 @@ encounters:
       path: [a, c]
       text: >
         The group listing settles the lookup half in one move: only the
-        transport database is a member, so the failover carried it to a server
-        the lookup database is not on, and the cross-database reference breaks.
+        transport database is a member, so the listener now lands on a server
+        the lookup database is not on, and the second connection string fails.
         The reporting trace settles the other half: the job logs into the old
         server by name, which no listener can rescue. Listing where each
         database now sits only confirms what those two already imply, because
@@ -344,7 +347,7 @@ encounters:
           The reporting job still fails, and two copies of a reference table now have to be kept
           in step.
         explain: >
-          Consolidating removes the cross-database dependency and is a real option worth
+          Consolidating removes the second database and is a real option worth
           considering on its merits. It does not address the reporting job's hard-coded server
           name, which is half the incident.
       - id: d

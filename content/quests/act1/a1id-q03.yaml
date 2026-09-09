@@ -235,7 +235,7 @@ encounters:
           label: License capacity running short for the last accounts created
           correct: false
           explain: >
-            The tenant showed 94 of 120 seats consumed, with fourteen new users
+            The tenant showed 94 of 120 seats consumed, with twelve of the new users
             already counted. Shortage would have failed the last accounts by
             number, not the two missing the same attribute.
     ticket:

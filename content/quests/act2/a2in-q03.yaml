@@ -1,7 +1,7 @@
 id: a2in-q03
 chapter: act2-infrastructure
 title: Ten Million Route Calculations
-summary: The overnight routing run takes six hours on one machine, and the depots want it finished by four in the morning.
+summary: The overnight routing run barely finishes by four in the morning on one machine, and peak season is about to double it.
 variant: core
 estimated_minutes: 14
 objectives:

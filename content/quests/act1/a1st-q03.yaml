@@ -273,7 +273,7 @@ encounters:
     commands:
       - id: a
         label: List snapshots on the share
-        cmd: az storage share list --account-name stveymarkpod --include-snapshots --query "[?name=='fs-depot-config'].{name:name,snapshot:snapshot}" -o table
+        cmd: az storage share list --account-name stveymarkfiles --include-snapshots --query "[?name=='fs-depot-config'].{name:name,snapshot:snapshot}" -o table
         output: |
           Name              Snapshot
           ----------------  ----------
@@ -282,7 +282,7 @@ encounters:
         time_cost: 1
       - id: b
         label: Check the soft delete settings on the file service
-        cmd: az storage account file-service-properties show -n stveymarkpod -g rg-data --query "shareDeleteRetentionPolicy" -o json
+        cmd: az storage account file-service-properties show -n stveymarkfiles -g rg-data --query "shareDeleteRetentionPolicy" -o json
         output: |
           {
             "days": 7,
@@ -323,7 +323,7 @@ encounters:
           schedules and retains for you. This time the recovery is luck; the fix is that next
           time it is not.
         diagram:
-          - {op: add_node, node: rsv-meridian}
+          - {op: add_node, node: rsv-veymark}
       - id: b
         label: Restore the share from soft delete
         correct: false

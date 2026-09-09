@@ -21,8 +21,8 @@ encounters:
     speaker: Grace Mendoza
     objectives: [AZ305-2.2.1]
     intro: >
-      "Telemetry is written in Southeast Asia and read in Southeast Asia and East
-      Asia," says Grace. "The dispatch screen must never show an older position
+      "Telemetry is written in Southeast Asia and read by dispatch here and by the
+      claims team in Hong Kong," says Grace. "The dispatch screen must never show an older position
       after showing a newer one, and it can tolerate being a few seconds behind
       reality. Nobody needs the absolute latest value across regions."
     hint: >
@@ -164,8 +164,8 @@ encounters:
         correct: false
         rep: -7
         consequence: >
-          The telemetry container hits the serverless throughput ceiling during the evening
-          peak and requests start being throttled.
+          The telemetry container hits the serverless throughput ceiling the first time the
+          monthly analytics read lands on top of the writes, and requests start being throttled.
         explain: >
           Serverless has per-container limits and no reserved capacity. A sustained
           high-throughput workload is exactly what it is not for.

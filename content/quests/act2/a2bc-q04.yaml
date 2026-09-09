@@ -25,8 +25,9 @@ encounters:
       only read by legal, occasionally."
 
 
-      Scans are in a geo-redundant account today. Manifests are in a separate
-      geo-redundant account.
+      Scans are in a geo-redundant account today, with the last two years replicated
+      into the Hong Kong claims account. Manifests are in a separate geo-redundant
+      account.
     hint: >
       Ask what each data set must do during the outage itself, and let the
       requirement price each one separately. Continuity for storage is about
@@ -56,9 +57,9 @@ encounters:
           label: A copy of the scans that the portal owns and controls itself
           correct: false
           explain: >
-            The platform already replicates the account continuously; a copy
-            the portal owned would be a day behind and one more thing to
-            reconcile. The gap was reachability of the existing copy, not
+            The platform already replicates the whole account continuously, and
+            the Hong Kong copy holds two years for one team; a copy the portal
+            owned would be a day behind and one more thing to reconcile. The gap was reachability of the existing copy, not
             ownership of a new one.
     prompt: What do you change?
     options:
@@ -83,7 +84,7 @@ encounters:
         correct: false
         rep: -6
         consequence: >
-          Fifteen terabytes of manifests are held at the most expensive redundancy option for a
+          Fourteen terabytes of manifests are held at the most expensive redundancy option for a
           read pattern of four requests a month.
         explain: >
           Consistency of configuration is not worth much when the data sets have nothing in
@@ -154,7 +155,7 @@ encounters:
       - id: a
         label: >
           Vaulted backup of the blob containers in a Backup vault, with a resource lock on the
-          account and immutability on the manifests
+          account alongside the immutability policy already on the manifests and scans
         correct: true
         rep: 9
         consequence: >
@@ -164,7 +165,7 @@ encounters:
           Operational backup keeps recovery points in the account itself, which is fast and does
           not survive the account being deleted. Vaulted backup copies data into a Backup vault
           under separate control, which is what survives a compromised or deleted account. Locks
-          and immutability stop the deletion happening in the first place.
+          and the existing immutability policy stop the deletion happening in the first place.
         diagram:
           - {op: add_node, node: bkv-platform}
           - {op: add_edge, edge: e2-bkv-lake}
@@ -193,7 +194,7 @@ encounters:
         correct: false
         rep: -7
         consequence: >
-          A job nobody owns copies fifteen terabytes weekly and fails silently in month three.
+          A job nobody owns copies fourteen terabytes weekly and fails silently in month three.
         explain: >
           Hand-built copying has no catalog, no retention and no restore path. Vaulted backup
           provides all three.

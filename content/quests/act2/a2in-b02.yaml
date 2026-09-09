@@ -202,7 +202,7 @@ encounters:
     speaker: Grace Mendoza
     objectives: [AZ305-4.4.3, AZ305-4.4.4]
     intro: >
-      The proof of concept works except for one path. The analytics workload in
+      The proof of concept works except for one path. The Straits warehouse workload in
       the East Asia spoke cannot reach the data lake's private endpoint in
       Southeast Asia. Name resolution returns the correct private address, the
       security groups allow it, and the firewall shows no denied traffic.
@@ -260,19 +260,19 @@ encounters:
           the spokes, which were written when there was one hub."
     commands:
       - id: a
-        label: Look at the effective routes on the analytics subnet
-        cmd: az network nic show-effective-route-table --name nic-analytics01 -g rg-lz-analytics -o table
+        label: Look at the effective routes on the warehouse subnet
+        cmd: az network nic show-effective-route-table --name nic-wms01 -g rg-lz-straits -o table
         output: |
           Source    State     AddressPrefix     NextHopType          NextHopIp
           --------  --------  ----------------  -------------------  ----------
           Default   Active    10.60.0.0/16      VnetLocal
           User      Active    0.0.0.0/0         VirtualAppliance     10.50.1.4
-          Default   Invalid   10.40.0.0/16      VNetPeering
+          Default   Invalid   10.10.0.0/16      VNetPeering
         note: The 0.0.0.0/0 route sends everything to the East Asia firewall, including traffic for the other region.
         time_cost: 1
       - id: b
         label: Check what the East Asia firewall does with it
-        cmd: "kql: AZFWNetworkRule | where DestinationIp startswith '10.40' | summarize count() by Action"
+        cmd: "kql: AZFWNetworkRule | where DestinationIp startswith '10.10' | summarize count() by Action"
         output: |
           Action    count_
           --------  --------
@@ -292,7 +292,7 @@ encounters:
         output: |
           Name                RemoteVirtualNetwork
           ------------------  ----------------------
-          conn-lz-analytics   vnet-lz-analytics
+          conn-lz-straits     vnet-lz-straits
         note: The East Asia hub has no connection to the Southeast Asia hub.
         time_cost: 1
     post_incident:
@@ -321,7 +321,7 @@ encounters:
           because it permitted the traffic and then had nowhere to send it. Effective routes and
           hub connections are the two places to look when a cross-region path fails silently.
       - id: b
-        label: Add a user-defined route in the analytics subnet for the Southeast Asia address space
+        label: Add a user-defined route in the warehouse subnet for the Southeast Asia address space
         correct: false
         rep: -7
         consequence: >
@@ -330,7 +330,7 @@ encounters:
           A route selects a next hop; it does not create connectivity behind that hop. The
           missing piece is between the hubs.
       - id: c
-        label: Peer the analytics spoke directly to the Southeast Asia hub
+        label: Peer the Straits spoke directly to the Southeast Asia hub
         correct: false
         rep: -6
         consequence: >
@@ -340,7 +340,7 @@ encounters:
           Spokes belong to one hub in this topology. Cross-region traffic is a hub-to-hub
           concern, which keeps the spoke configuration uniform.
       - id: d
-        label: Give the analytics workload access over the public endpoint instead
+        label: Give the warehouse workload access over the public endpoint instead
         correct: false
         rep: -9
         consequence: >

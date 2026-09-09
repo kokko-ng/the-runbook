@@ -25,8 +25,8 @@ encounters:
       over in a minute, and on Entra ID, which is a global service.
 
 
-      It also depends on the licensing service that runs on a virtual machine in
-      the hub, on private DNS zones linked to the hub network, and on a key vault
+      It also depends on a licensing service for the routing engine, one virtual
+      machine in the hub that is on nobody's diagram, on private DNS zones linked to the hub network, and on a key vault
       in Southeast Asia that holds the certificate its ingress uses.
     hint: >
       Follow the failover minute by minute and ask what dispatch needs already

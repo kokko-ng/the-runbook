@@ -10,8 +10,8 @@ brief: >
   Compute recovery for a hybrid estate in the middle of a migration, which is the
   least tidy and most common situation an architect gets asked about.
 debrief: >
-  One protection story for what is in Azure, one for what is not yet, and a
-  rehearsal date in the calendar.
+  One protection story for what is in Azure, one for what is not yet, and nothing
+  bought that outlives the sites.
 encounters:
   - id: a
     type: design
@@ -19,8 +19,9 @@ encounters:
     speaker: Grace Mendoza
     objectives: [AZ305-3.1.2]
     intro: >
-      "In Azure we have the ERP scale set, four virtual machines that run
-      integrations, and the Kubernetes cluster," says Grace. "The cluster is
+      "In Azure the plan puts the ERP on a scale set, next to four virtual machines
+      that run integrations and the Kubernetes cluster," says Grace. "Finance gave
+      the ERP two hours. The cluster is
       rebuilt from the pipeline, so leave it out. The other two need an answer that
       is not a screenshot of the portal."
     hint: >
@@ -109,8 +110,9 @@ encounters:
     speaker: Marek Sobczak
     objectives: [AZ305-3.1.2]
     intro: >
-      "Port Klang still has the two warehouse servers, and Jurong has the domain
-      controller and the print server until the depots finish moving," says Marek.
+      "Port Klang's two warehouse servers are covered from Wei Lin's finding, and Jurong
+      has the domain controller and the print server until the depots finish moving,"
+      says Marek.
       "Both sites are being decommissioned within eighteen months, so I do not want
       to build anything permanent."
     hint: >

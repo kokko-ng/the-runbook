@@ -11,8 +11,8 @@ brief: >
   Before you can change how something is deployed, you have to be able to read
   what it currently says. That is today.
 debrief: >
-  One parameter, one output, and a template that no longer hard-codes a size
-  somebody chose in 2023.
+  One list extended, one disk left alone, and a template that still refuses any
+  size nobody has costed.
 encounters:
   - id: a
     type: design
@@ -316,8 +316,8 @@ encounters:
         correct: true
         rep: 9
         consequence: >
-          The redeployment changes only the size, the machine restarts once, and the pipeline
-          is green.
+          The redeployment changes only the size and the pipeline is green; the production
+          run, and its one restart, are booked for Thursday's window once Priya signs the size.
         explain: >
           Incremental mode leaves resources alone that are not in the template, and it still
           sends the full definition of the resources that are. A createOption of FromImage on

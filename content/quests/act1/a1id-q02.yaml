@@ -20,8 +20,8 @@ encounters:
     speaker: Hendrik Salim
     objectives: [AZ104-1.2.3]
     intro: >
-      "You gave me access on Tuesday," says Hendrik, "and Marek gave me access on
-      Wednesday, and I still cannot start vm-scan01 when the depot calls at
+      "You gave me access on Tuesday last week," says Hendrik, "and Marek gave me
+      access on the Wednesday, and I still cannot start vm-scan01 when the depot calls at
       six in the morning. It says I do not have permission to perform the action."
 
 
@@ -192,12 +192,13 @@ encounters:
       Wei Lin forwards an export from the audit firm with a question on it.
 
 
-      A service principal has Contributor at the mg-workload management group. It
+      A service principal has Contributor at the tenant root management group. It
       also has Reader on sub-veymark-prod. And there is a deny assignment on
-      rg-data, inherited from a managed application, that covers delete actions.
+      rg-data, inherited from a managed application, that covers every virtual
+      machine action.
 
 
-      "Their question is whether this identity can delete a storage account in
+      "Their question is whether this identity can delete a virtual machine in
       rg-data. I would like to answer it correctly the first time."
     hint: >
       Work it the way the platform does, in two passes: first add up every role

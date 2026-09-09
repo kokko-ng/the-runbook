@@ -77,7 +77,7 @@ encounters:
         correct: false
         rep: -7
         consequence: >
-          Veymark pays twice for an engine it already owns, for three years.
+          Veymark pays twice for an engine it already owns, every year the reservation renews.
         explain: >
           The pay-as-you-go price includes the license, and the hybrid benefit is exactly the
           mechanism for not paying for it twice.

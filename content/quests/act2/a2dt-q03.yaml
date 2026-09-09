@@ -167,8 +167,9 @@ encounters:
         correct: true
         rep: 8
         consequence: >
-          The copy runs for six days over the link, the oldest data lands in archive, and legal
-          requests are answered from an index rather than a share.
+          The bulk arrives by appliance and the last week of changes over the link, the oldest
+          data lands in archive, and legal requests are answered from an index rather than a
+          share.
         explain: >
           Unstructured documents nobody reads are the case blob storage was built for, with
           lifecycle rules doing the tiering. Keeping the existing path as the prefix preserves
@@ -184,8 +185,8 @@ encounters:
           Fourteen terabytes are held at file share prices for documents that are read four
           times a month.
         explain: >
-          Files is right when something must mount a share. Nothing here mounts anything once
-          the application is retired, and blob tiering is dramatically cheaper at this volume.
+          Files is right when something must mount a share. Nothing here needs to mount anything once
+          the Port Klang file server is retired, and blob tiering is dramatically cheaper at this volume.
       - id: c
         label: Azure NetApp Files, for performance on the legal retrieval
         correct: false
