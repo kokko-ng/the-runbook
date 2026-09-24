@@ -1,0 +1,1361 @@
+# AZ-104 practice exam 2. Written by Opus 5.5 (claude-opus-5-5); every
+# question is grounded in, and cites, pages on learn.microsoft.com.
+id: az-104-2
+exam: AZ-104
+number: 2
+title: AZ-104 practice exam 2
+author: Opus 5.5
+model_id: claude-opus-5-5
+written_on: "2026-09-24"
+questions:
+  - id: q01
+    domain: AZ104-1
+    skill: Manage user and group properties
+    kind: single
+    stem: >-
+      Veymark Logistics has a Microsoft Entra security group named
+      Sales-All whose membership type is Dynamic User with the rule
+      user.department -eq "Sales". A manager asks you to add a contractor
+      whose department attribute is empty to Sales-All. When you open the
+      group's Members page, the option to add members is unavailable. The
+      contractor must end up in the group without changing the group type.
+      What should you do?
+    options:
+      - id: a
+        text: "Grant yourself the Groups Administrator role and add the contractor from the Members page."
+      - id: b
+        text: "Set the contractor's department attribute to Sales so that the membership rule adds the account."
+      - id: c
+        text: "Add the contractor as an owner of Sales-All, which also makes the account a member."
+      - id: d
+        text: "Use Microsoft Graph PowerShell to add the contractor as a direct member of Sales-All."
+    answer: [b]
+    explanation: >-
+      Membership of a dynamic membership group is controlled entirely by
+      its rule. Microsoft Entra evaluates rules when user attributes
+      change, adds users who satisfy the rule, and removes users who no
+      longer do. You can't manually add or remove a member of a dynamic
+      membership group, regardless of your role or the tool you use, so
+      the Groups Administrator role and Graph PowerShell don't help.
+      Group ownership is separate from membership. Setting the
+      contractor's department to Sales makes the rule user.department -eq
+      "Sales" evaluate to true, and the account is added automatically.
+    sources:
+      - https://learn.microsoft.com/en-us/entra/identity/users/groups-dynamic-membership
+
+  - id: q02
+    domain: AZ104-1
+    skill: Manage user and group properties
+    kind: multiple
+    stem: >-
+      Your company wants to assign the Helpdesk Administrator Microsoft
+      Entra role to a group instead of to individual users. An existing
+      security group named HD-Staff already contains the right people, and
+      its membership type is Assigned. You are a Privileged Role
+      Administrator. You need to create a group that can hold the role
+      assignment while meeting Microsoft's requirements for role-assignable
+      groups. Which two actions should you perform? Each correct answer
+      presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: "Edit HD-Staff and set Microsoft Entra roles can be assigned to the group to Yes."
+      - id: b
+        text: "Create a new security group with Microsoft Entra roles can be assigned to the group set to Yes."
+      - id: c
+        text: "Set the new group's membership type to Assigned and add the users directly."
+      - id: d
+        text: "Configure the new group with a dynamic membership rule based on job title."
+      - id: e
+        text: "Add HD-Staff as a nested member of the new group."
+    answer: [b, c]
+    explanation: >-
+      The isAssignableToRole property, shown in the admin center as
+      "Microsoft Entra roles can be assigned to the group", can be set only
+      when a group is created and is immutable afterward, so you can't
+      convert HD-Staff and must create a new group. Role-assignable groups
+      must use the Assigned membership type; dynamic membership isn't
+      allowed because automatic population could add an unwanted account
+      to a privileged role. Group nesting isn't supported, so HD-Staff
+      can't be added as a member. The users must be added directly.
+    sources:
+      - https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/groups-concept
+
+  - id: q03
+    domain: AZ104-1
+    skill: Assign roles at different scopes
+    kind: single
+    stem: >-
+      An organization places all production subscriptions under a
+      management group whose ID is prod-mg. You need to grant a user named
+      auditor@example.com the Reader role on every current and future
+      subscription under prod-mg by using a single Azure CLI command.
+      Which command should you run?
+    options:
+      - id: a
+        text: "az role assignment create --assignee auditor@example.com --role Reader --scope /providers/Microsoft.Management/managementGroups/prod-mg"
+      - id: b
+        text: "az role assignment create --assignee auditor@example.com --role Reader --scope /subscriptions/prod-mg"
+      - id: c
+        text: "az role assignment create --assignee auditor@example.com --role Reader --scope /managementGroups/prod-mg/subscriptions"
+      - id: d
+        text: "az role assignment create --assignee auditor@example.com --role Reader --resource-group prod-mg"
+    answer: [a]
+    explanation: >-
+      Azure RBAC supports four scope levels: management group,
+      subscription, resource group, and resource. Lower levels inherit role
+      assignments from higher levels, so one assignment on the management
+      group applies to all subscriptions within it, including ones moved in
+      later. The management group scope string has the format
+      /providers/Microsoft.Management/managementGroups/{managementGroupName}.
+      A /subscriptions/ scope expects a subscription GUID, not a
+      management group ID, and --resource-group targets a resource group.
+      The /managementGroups/prod-mg/subscriptions string isn't a valid
+      scope format.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/scope-overview
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/role-assignments-cli
+
+  - id: q04
+    domain: AZ104-1
+    skill: Assign roles at different scopes
+    kind: single
+    stem: >-
+      A storage account named stveymarkdata contains several blob
+      containers. An application's service principal must be able to read
+      and write blobs only in the container named invoices, following the
+      principle of least privilege. You plan to assign the Storage Blob
+      Data Contributor role. At which scope should you create the role
+      assignment?
+    options:
+      - id: a
+        text: "The resource group that contains stveymarkdata"
+      - id: b
+        text: "The stveymarkdata storage account"
+      - id: c
+        text: "The storage account resource ID followed by /blobServices/default/containers/invoices"
+      - id: d
+        text: "The subscription that contains stveymarkdata"
+    answer: [c]
+    explanation: >-
+      A blob container is a valid resource scope for an Azure role
+      assignment. The scope for a single container is the storage account
+      resource ID followed by /blobServices/default/containers/{name}, as in
+      the documented example that assigns Storage Blob Data Contributor to
+      blob-container-01. Assigning at the storage account, resource group,
+      or subscription grants access to every container at that level
+      because lower scopes inherit role assignments, which is broader than
+      required. Microsoft recommends granting access with the least
+      privilege needed and avoiding broader scopes.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/role-assignments-cli
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/scope-overview
+
+  - id: q05
+    domain: AZ104-1
+    skill: Configure resource locks
+    kind: single
+    stem: >-
+      To protect a production storage account from configuration changes,
+      an administrator applied a ReadOnly lock to it. Afterward, a
+      developer who holds the Contributor role on the account reports that
+      the Azure portal can no longer show the account access keys, and a
+      legacy script that retrieves the keys now fails. The developer can
+      still read the account's properties. What is the cause?
+    options:
+      - id: a
+        text: "The ReadOnly lock blocks the POST request used by the List Keys operation."
+      - id: b
+        text: "The ReadOnly lock removed the Contributor role assignment from the developer."
+      - id: c
+        text: "The ReadOnly lock disabled Shared Key authorization on the storage account."
+      - id: d
+        text: "The ReadOnly lock rotated both account keys and revoked existing tokens."
+    answer: [a]
+    explanation: >-
+      Locks override user permissions and apply to control plane
+      operations. A ReadOnly lock restricts users to roughly what the
+      Reader role allows, and it blocks POST requests to Azure Resource
+      Manager. Listing storage account keys is a POST operation, so a
+      ReadOnly lock on a storage account prevents users from listing the
+      keys; users without the keys must use Microsoft Entra credentials for
+      blob or queue data. The lock doesn't delete role assignments, rotate
+      keys, or change the account's Shared Key setting.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/lock-resources
+
+  - id: q06
+    domain: AZ104-1
+    skill: Configure resource locks
+    kind: single
+    stem: >-
+      Your company wants a team lead to be able to add and remove Delete
+      locks on the resource groups in one subscription. The team lead
+      currently has the Contributor role at the subscription scope, and
+      attempts to create a lock fail with an authorization error. You must
+      use a built-in role. Which role should you assign to the team lead at
+      the subscription scope?
+    options:
+      - id: a
+        text: "Reader"
+      - id: b
+        text: "User Access Administrator"
+      - id: c
+        text: "Resource Policy Contributor"
+      - id: d
+        text: "Management Group Contributor"
+    answer: [b]
+    explanation: >-
+      Creating or deleting management locks requires access to the
+      Microsoft.Authorization/* or Microsoft.Authorization/locks/*
+      actions. The lock documentation states that users assigned the Owner
+      and User Access Administrator roles have this access. Contributor
+      doesn't include Microsoft.Authorization write actions, which is why
+      the attempt fails. Reader grants only read access, Resource Policy
+      Contributor is for policy assignments, and Management Group
+      Contributor manages the management group hierarchy rather than
+      locks.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/lock-resources
+
+  - id: q07
+    domain: AZ104-1
+    skill: Configure management groups
+    kind: multiple
+    stem: >-
+      Veymark Logistics has a subscription named Sub-Ops that sits directly
+      under the Tenant root group. You need to move Sub-Ops into an
+      existing management group named Corp. You want to grant the
+      administrator who will perform the move only the built-in roles that
+      are required. Which two role assignments are needed? Each correct
+      answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: "Owner on the Sub-Ops subscription"
+      - id: b
+        text: "Management Group Contributor on the Corp management group"
+      - id: c
+        text: "Management Group Contributor on the Tenant root group"
+      - id: d
+        text: "Reader on the Corp management group"
+      - id: e
+        text: "Resource Policy Contributor on the Sub-Ops subscription"
+    answer: [a, b]
+    explanation: >-
+      Moving a subscription requires management group write and role
+      assignment write permissions on the child subscription (for example,
+      Owner), plus management group write access on the target parent
+      (Owner, Contributor, or Management Group Contributor) and on the
+      existing parent. There is an exception: if the target or existing
+      parent is the root management group, no permissions are needed on
+      it, because the root is the default landing spot. Sub-Ops is under
+      the root, so no role is required there. Reader and Resource Policy
+      Contributor don't grant management group write access.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/governance/management-groups/overview
+
+  - id: q08
+    domain: AZ104-1
+    skill: Configure management groups
+    kind: single
+    stem: >-
+      A newly hired administrator holds the Global Administrator role in
+      Microsoft Entra ID. They need to assign an Azure Policy at the Tenant
+      root group so that it applies to every subscription in the tenant.
+      When they open the Tenant root group, they can see it but can't
+      assign anything to it. No one in the organization has ever been
+      granted access to the root management group. What should the
+      administrator do first?
+    options:
+      - id: a
+        text: "Create a new management group and make it the parent of the Tenant root group."
+      - id: b
+        text: "Assign themselves the Owner role on each subscription in the tenant."
+      - id: c
+        text: "Use Elevate access to manage all Azure subscriptions and management groups."
+      - id: d
+        text: "Rename the Tenant root group so that its ID no longer matches the tenant ID."
+    answer: [c]
+    explanation: >-
+      No one has default access to the root management group. Global
+      Administrators are the only users who can elevate themselves to gain
+      access, which grants the User Access Administrator role at the root.
+      After elevating, they can assign any Azure role to themselves or
+      others to manage the hierarchy and assign policy. The root management
+      group can't be moved or deleted, so nothing can become its parent.
+      Owner on each subscription doesn't grant rights at the root scope,
+      and renaming changes only the display name, not the ID.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/governance/management-groups/overview
+
+  - id: q09
+    domain: AZ104-1
+    skill: Implement and manage Azure Policy
+    kind: single
+    stem: >-
+      An organization has two Azure Policy assignments that both use the
+      deny effect. Policy 1 is assigned to subscription A and allows
+      resources only in westus. Policy 2 is assigned to resource group B,
+      which is in subscription A, and allows resources only in eastus.
+      There are no exclusions. A developer tries to create a new storage
+      account in resource group B. What happens?
+    options:
+      - id: a
+        text: "The request succeeds only if the location is eastus, because the resource group assignment overrides the subscription assignment."
+      - id: b
+        text: "The request succeeds only if the location is westus, because the subscription assignment has broader scope."
+      - id: c
+        text: "The request succeeds in either region and is marked noncompliant with one of the policies."
+      - id: d
+        text: "The request is denied in every region because the assignments are evaluated independently and both must be satisfied."
+    answer: [d]
+    explanation: >-
+      Each policy assignment is evaluated individually, and the net result
+      of layering policy definitions is cumulative most restrictive. A
+      resource in resource group B must satisfy both deny rules at the same
+      time. Policy 1 denies anything not in westus and Policy 2 denies
+      anything not in eastus, so any new resource in resource group B is
+      denied. Narrower scopes don't override broader ones. To allow the
+      resource, review the exclusions on each assignment so that the right
+      assignments affect the right scopes.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/governance/policy/concepts/effect-basics
+
+  - id: q10
+    domain: AZ104-1
+    skill: Manage costs by using alerts, budgets, and Azure Advisor recommendations
+    kind: single
+    stem: >-
+      Your company created a monthly cost budget at the scope of a
+      management group that contains three subscriptions. Finance now wants
+      an Azure Automation runbook to run automatically through an action
+      group whenever spending in any of those subscriptions reaches 90
+      percent of its allocated amount. When editing the management group
+      budget, you can't find an option to select an action group. What
+      should you do?
+    options:
+      - id: a
+        text: "Change the budget reset period from Monthly to Billing month."
+      - id: b
+        text: "Create a budget for each subscription and configure each budget to call the action group."
+      - id: c
+        text: "Add a forecasted alert condition to the management group budget."
+      - id: d
+        text: "Configure the budget to stop the resources in the subscriptions when the threshold is reached."
+    answer: [b]
+    explanation: >-
+      Budgets can be created at management group, subscription, and
+      resource group scopes, but action groups are currently supported only
+      for subscription and resource group scopes. Creating a budget for
+      each subscription lets each one call an action group that can run
+      automation. Changing the reset period or adding a forecasted alert
+      doesn't add action group support at the management group scope.
+      Budgets never stop resources; notifications are triggered, but
+      resources aren't affected and consumption isn't stopped.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/tutorial-acm-create-budgets
+
+  - id: q11
+    domain: AZ104-2
+    skill: Create and use shared access signature (SAS) tokens
+    kind: single
+    stem: >-
+      A web application must hand out short-lived URLs that let partners
+      download individual blobs. Your security team requires that the
+      storage account key never be stored in the application's code or
+      configuration, and that any delegated access be secured with
+      Microsoft Entra credentials. Which type of shared access signature
+      should the application generate?
+    options:
+      - id: a
+        text: "Account SAS"
+      - id: b
+        text: "Service SAS associated with a stored access policy"
+      - id: c
+        text: "User delegation SAS"
+      - id: d
+        text: "Ad hoc service SAS"
+    answer: [c]
+    explanation: >-
+      A user delegation SAS is secured with Microsoft Entra credentials and
+      signed with a user delegation key, so the application doesn't need
+      the account key. Microsoft recommends it when possible for superior
+      security. To request the key, the security principal needs a role
+      that includes the generateUserDelegationKey action. A service SAS
+      and an account SAS are both secured with the storage account key,
+      whether they are ad hoc or tied to a stored access policy, so they
+      don't meet the requirement.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview
+
+  - id: q12
+    domain: AZ104-2
+    skill: Create and use shared access signature (SAS) tokens
+    kind: single
+    stem: >-
+      A batch process generates a SAS for a blob container and sets the
+      signed start time to the current time on the machine that creates
+      the token. Clients that use the SAS immediately sometimes receive
+      HTTP 403 (Forbidden) errors, but the same requests succeed a few
+      minutes later. The permissions and expiry are correct. What should
+      you change to prevent the intermittent failures?
+    options:
+      - id: a
+        text: "Switch the SAS to use HTTP instead of HTTPS."
+      - id: b
+        text: "Set the start time at least 15 minutes in the past, or omit it."
+      - id: c
+        text: "Regenerate the storage account keys before issuing each SAS."
+      - id: d
+        text: "Add the list permission to the SAS."
+    answer: [b]
+    explanation: >-
+      When a SAS start time is set to the current time, failures can occur
+      intermittently for the first few minutes because different machines
+      have slightly different clocks (clock skew). Microsoft recommends
+      setting the start time at least 15 minutes in the past, or not
+      setting it at all so the SAS is valid immediately. Regenerating keys
+      would invalidate tokens rather than fix timing. Adding permissions
+      doesn't address the time-based failure, and a SAS should always be
+      created and distributed over HTTPS.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-sas-overview
+
+  - id: q13
+    domain: AZ104-2
+    skill: Configure Azure Storage redundancy
+    kind: single
+    stem: >-
+      A general-purpose v2 storage account holds shipment tracking blobs
+      for Veymark Logistics. Requirements: the data must remain readable
+      and writable if one availability zone in the primary region fails,
+      the data must survive a complete regional disaster, and the
+      application must be able to read from the secondary region at any
+      time without waiting for a failover. Which redundancy option should
+      you choose?
+    options:
+      - id: a
+        text: "Zone-redundant storage (ZRS)"
+      - id: b
+        text: "Read-access geo-redundant storage (RA-GRS)"
+      - id: c
+        text: "Geo-zone-redundant storage (GZRS)"
+      - id: d
+        text: "Read-access geo-zone-redundant storage (RA-GZRS)"
+    answer: [d]
+    explanation: >-
+      GZRS copies data synchronously across availability zones in the
+      primary region and asynchronously to a secondary region, so it
+      survives a zone failure and a regional disaster. With plain GZRS,
+      though, the secondary isn't readable unless a failover occurs.
+      RA-GZRS adds read access to the secondary endpoint (the account name
+      with the -secondary suffix) at all times. RA-GRS keeps only LRS
+      copies in the primary region, so if the zone holding them fails,
+      writes are unavailable until a failover completes. ZRS has no secondary region.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-redundancy
+
+  - id: q14
+    domain: AZ104-2
+    skill: Configure Azure Storage redundancy
+    kind: single
+    stem: >-
+      You are creating a storage account of type FileStorage to host SSD
+      (premium) Azure file shares for a line-of-business application. The
+      shares must stay available if an availability zone in the region
+      fails, and clients shouldn't need to remount the shares after a zone
+      outage. Which redundancy option should you select?
+    options:
+      - id: a
+        text: "Locally redundant storage (LRS)"
+      - id: b
+        text: "Zone-redundant storage (ZRS)"
+      - id: c
+        text: "Geo-zone-redundant storage (GZRS)"
+      - id: d
+        text: "Read-access geo-redundant storage (RA-GRS)"
+    answer: [b]
+    explanation: >-
+      SSD file shares, hosted in FileStorage accounts, are supported only
+      on LRS and ZRS. ZRS replicates data across three or more availability
+      zones and keeps data readable and writable if a zone becomes
+      unavailable; Microsoft recommends ZRS for Azure Files because clients
+      don't need to remount shares after a zone outage. LRS keeps all
+      copies in one datacenter. GZRS isn't available for FileStorage
+      accounts, and Azure Files doesn't support RA-GRS or RA-GZRS at all.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-redundancy
+
+  - id: q15
+    domain: AZ104-2
+    skill: Create and configure a container in Azure Blob Storage
+    kind: single
+    stem: >-
+      A marketing team wants product images in a new blob container named
+      public-images to be readable by anonymous users, but anonymous users
+      must not be able to list the blobs in the container. In the Azure
+      portal, when you select the container and choose Change access level,
+      the Anonymous access level setting is disabled. What should you do?
+    options:
+      - id: a
+        text: "Enable Allow Blob anonymous access on the storage account, and then set the container access level to Blob."
+      - id: b
+        text: "Enable Allow Blob anonymous access on the storage account, and then set the container access level to Container."
+      - id: c
+        text: "Set the anonymous access level on each individual blob to Blob."
+      - id: d
+        text: "Generate an account SAS and set the container access level to Private."
+    answer: [a]
+    explanation: >-
+      A container's anonymous access level can be changed only if anonymous
+      access is allowed on the storage account through the
+      AllowBlobPublicAccess property (Allow Blob anonymous access in the
+      portal). When the account disallows it, the container setting is
+      disabled. The Blob level allows anonymous reads of blobs but doesn't
+      let anonymous clients enumerate blobs, while the Container level also
+      allows enumeration, which violates the requirement. Access levels
+      can't be set on individual blobs, and a SAS isn't anonymous access.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/anonymous-read-access-configure
+
+  - id: q16
+    domain: AZ104-2
+    skill: Configure blob versioning
+    kind: single
+    stem: >-
+      Blob versioning is enabled on a general-purpose v2 storage account.
+      To control costs, an operator must delete specific previous versions
+      of blobs by version ID. The operator has the Storage Blob Data
+      Contributor role on the account and can delete current blobs, but
+      requests to delete previous versions fail with an authorization
+      error. You must use a built-in role. Which role should you assign?
+    options:
+      - id: a
+        text: "Storage Blob Data Owner"
+      - id: b
+        text: "Storage Account Contributor"
+      - id: c
+        text: "Storage Blob Data Reader"
+      - id: d
+        text: "Reader and Data Access"
+    answer: [a]
+    explanation: >-
+      Blob versioning is designed to protect data from accidental or
+      malicious deletion, so deleting a previous version needs a special
+      data action,
+      Microsoft.Storage/storageAccounts/blobServices/containers/blobs/deleteBlobVersion/action,
+      which the Storage Blob Data Owner role provides. Storage Blob Data
+      Contributor includes only the blobs/delete action, which deletes the
+      current version. Storage Account Contributor is a management plane
+      role, and Storage Blob Data Reader and Reader and Data Access don't
+      grant this delete permission. Lifecycle management can also delete
+      old versions automatically.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/versioning-overview
+
+  - id: q17
+    domain: AZ104-2
+    skill: Configure object replication
+    kind: multiple
+    stem: >-
+      You plan to configure object replication to asynchronously copy
+      block blobs from a container in storage account stsource (East US) to
+      a container in storage account stdest (West Europe). Both are
+      standard general-purpose v2 accounts without a hierarchical
+      namespace. Which two features must you enable before you create the
+      replication policy? Each correct answer presents part of the
+      solution. Choose two.
+    options:
+      - id: a
+        text: "Blob versioning on both stsource and stdest"
+      - id: b
+        text: "Change feed on stsource"
+      - id: c
+        text: "Change feed on stdest only"
+      - id: d
+        text: "Geo-redundant storage (GRS) on both accounts"
+      - id: e
+        text: "Container soft delete on stdest"
+      - id: f
+        text: "Hierarchical namespace on stsource"
+    answer: [a, b]
+    explanation: >-
+      Object replication requires change feed on the source account and
+      blob versioning on both the source and destination accounts. Azure
+      Storage reads the source account's change feed to find write and
+      delete operations to replicate, and it copies the current version
+      and previous versions. A specific redundancy option and container
+      soft delete aren't prerequisites. Object replication isn't supported
+      in accounts that have a hierarchical namespace enabled, so enabling
+      it would block the configuration.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/object-replication-overview
+
+  - id: q18
+    domain: AZ104-3
+    skill: Modify an existing Azure Resource Manager template
+    kind: single
+    stem: >-
+      An ARM template deploys a storage account and has a string parameter
+      named storageSku with no constraints. Deployments sometimes fail late
+      or create accounts with unapproved SKUs because users type arbitrary
+      values. You need to modify the template so that a deployment fails
+      during validation unless the value is Standard_LRS or Standard_ZRS.
+      What should you add to the storageSku parameter?
+    options:
+      - id: a
+        text: "A defaultValue property set to Standard_LRS"
+      - id: b
+        text: "An allowedValues array containing Standard_LRS and Standard_ZRS"
+      - id: c
+        text: "A maxLength property set to 12"
+      - id: d
+        text: "A metadata description that lists the two approved SKUs"
+    answer: [b]
+    explanation: >-
+      The allowedValues property defines an array of permitted values for
+      a parameter, and the deployment fails during validation if a value
+      that isn't in the list is passed. A defaultValue is used only when no
+      value is supplied, so users can still override it. Length
+      constraints limit the number of characters but don't restrict the
+      value to specific SKUs. A metadata description only shows a tip in
+      the portal and doesn't enforce anything.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/parameters
+
+  - id: q19
+    domain: AZ104-3
+    skill: Modify an existing Azure Resource Manager template
+    kind: single
+    stem: >-
+      An ARM template uses a copy loop to deploy four storage accounts.
+      Operations wants to modify the template so that during updates only
+      two accounts are deployed at a time, with the next pair starting
+      only after the previous pair completes. Which copy element should you
+      use?
+    options:
+      - id: a
+        text: "\"copy\": { \"name\": \"storagecopy\", \"count\": 4, \"mode\": \"parallel\", \"batchSize\": 2 }"
+      - id: b
+        text: "\"copy\": { \"name\": \"storagecopy\", \"count\": 2, \"mode\": \"serial\" }"
+      - id: c
+        text: "\"copy\": { \"name\": \"storagecopy\", \"count\": 4, \"mode\": \"serial\", \"batchSize\": 2 }"
+      - id: d
+        text: "\"copy\": { \"name\": \"storagecopy\", \"count\": 4, \"batchSize\": 4 }"
+    answer: [c]
+    explanation: >-
+      By default, Resource Manager creates copy loop instances in parallel.
+      To deploy in sequence, set mode to serial and batchSize to the number
+      of instances to deploy at a time; Resource Manager then creates a
+      dependency so a batch doesn't start until the previous batch
+      completes. Count must stay at 4 to deploy four accounts, and
+      batchSize can't exceed count. Parallel mode, the default, doesn't
+      stagger batches, and a count of 2 would deploy only two accounts.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/copy-resources
+
+  - id: q20
+    domain: AZ104-3
+    skill: Configure encryption at host for Azure virtual machines
+    kind: multiple
+    stem: >-
+      Your company requires that temporary disks and OS and data disk
+      caches for an existing running VM be encrypted at rest. The VM uses a
+      supported size, has never used Azure Disk Encryption, and its disks
+      use platform-managed keys. Encryption at host has never been used in
+      the subscription. Which two actions must you perform to enable
+      encryption at host on the VM? Each correct answer presents part of
+      the solution. Choose two.
+    options:
+      - id: a
+        text: "Register the EncryptionAtHost feature for the Microsoft.Compute namespace in the subscription."
+      - id: b
+        text: "Deallocate the VM before you enable encryption at host."
+      - id: c
+        text: "Enable Azure Disk Encryption on the OS disk."
+      - id: d
+        text: "Create a disk encryption set that uses a customer-managed key."
+      - id: e
+        text: "Restart the guest operating system from inside the VM."
+    answer: [a, b]
+    explanation: >-
+      Before using encryption at host, you must register the feature for
+      the subscription, for example with az feature register --name
+      EncryptionAtHost --namespace Microsoft.Compute, and confirm it shows
+      Registered. Existing VMs must be deallocated and reallocated to be
+      encrypted. Azure Disk Encryption is incompatible: encryption at host
+      can't be enabled on VMs that ever had it. A disk encryption set is
+      needed only for customer-managed keys; with platform-managed keys,
+      caches are encrypted with platform-managed keys. A guest restart
+      doesn't deallocate the VM.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-machines/disks-enable-host-based-encryption-portal
+
+  - id: q21
+    domain: AZ104-3
+    skill: Deploy and configure an Azure Virtual Machine Scale Sets
+    kind: single
+    stem: >-
+      An organization runs a Virtual Machine Scale Set that was created
+      with Uniform orchestration. The team now wants to protect individual
+      instances with Azure Backup, mix Spot and on-demand instances, and
+      attach some existing standalone VMs to the set. What should you do?
+    options:
+      - id: a
+        text: "Change the existing scale set's orchestration mode to Flexible."
+      - id: b
+        text: "Deploy a new scale set that uses Flexible orchestration and migrate the workload to it."
+      - id: c
+        text: "Set the upgrade policy of the existing scale set to Rolling."
+      - id: d
+        text: "Enable single placement group on the existing scale set."
+    answer: [b]
+    explanation: >-
+      The orchestration mode is defined when you create a scale set and
+      can't be changed later. Flexible orchestration manages standard Azure
+      VMs and supports Azure Backup, mixing Spot and regular priority
+      instances, and adding existing VMs to the set. Uniform orchestration
+      doesn't support Azure Backup, requires instances to be all Spot or
+      all regular, and doesn't allow adding existing VMs. Upgrade policy
+      and placement group settings don't change these capabilities, so you
+      must deploy a new Flexible scale set.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-machine-scale-sets/virtual-machine-scale-sets-orchestration-modes
+
+  - id: q22
+    domain: AZ104-3
+    skill: Deploy and configure an Azure Virtual Machine Scale Sets
+    kind: multiple
+    stem: >-
+      Veymark Logistics runs a production web tier on a Virtual Machine
+      Scale Set with Flexible orchestration. When the scale set model
+      changes, for example a new image reference, instances must be updated
+      in batches so that a set number of instances always stays available,
+      and the platform must be able to tell whether the application on each
+      instance is healthy. Which two configurations should you use? Each
+      correct answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: "Set the upgrade policy mode to Rolling."
+      - id: b
+        text: "Set the upgrade policy mode to Automatic."
+      - id: c
+        text: "Set the upgrade policy mode to Manual."
+      - id: d
+        text: "Install the Application Health extension on the instances."
+      - id: e
+        text: "Rely on a load balancer health probe to report instance health."
+    answer: [a, d]
+    explanation: >-
+      The rolling upgrade policy updates instances in batches, with
+      settings such as batch size and max healthy percentage, and is suited
+      to production workloads that need a set number of instances
+      available. With Flexible orchestration, a rolling upgrade policy
+      requires the Application Health extension to monitor application
+      health; load balancer health probes are an option only for Uniform
+      orchestration. Automatic mode might take down all VMs at the same
+      time, and Manual mode doesn't update existing instances until you
+      choose to.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-machine-scale-sets/virtual-machine-scale-sets-upgrade-policy
+      - https://learn.microsoft.com/en-us/azure/virtual-machine-scale-sets/virtual-machine-scale-sets-orchestration-modes
+
+  - id: q23
+    domain: AZ104-3
+    skill: Provision a container by using Azure Container Instances
+    kind: single
+    stem: >-
+      You use az container create to run a nightly image-rendering job in
+      Azure Container Instances. The container should run to completion
+      and then stop so you are billed only while it runs. If the process
+      fails with a nonzero exit code, it should be restarted, but it
+      shouldn't restart after it exits successfully. Which value should you
+      pass to --restart-policy?
+    options:
+      - id: a
+        text: "Always"
+      - id: b
+        text: "Never"
+      - id: c
+        text: "OnFailure"
+      - id: d
+        text: "UnlessStopped"
+    answer: [c]
+    explanation: >-
+      With OnFailure, containers in the group are restarted only when the
+      process fails with a nonzero exit code, and they run at least once.
+      After a successful exit, the container's state becomes Terminated and
+      billing stops, since Container Instances bills by the second. Always
+      is the default and restarts containers even after success. Never
+      guarantees only that a container isn't restarted after a zero exit
+      code, so it doesn't express the retry-on-failure intent. UnlessStopped
+      isn't a Container Instances restart policy.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/container-instances/container-instances-restart-policy
+
+  - id: q24
+    domain: AZ104-3
+    skill: Provision a container by using Azure Container Instances
+    kind: single
+    stem: >-
+      A developer tries to deploy an Azure Container Instances container
+      group that contains two Windows containers: an application container
+      and a logging sidecar that should share the group's lifecycle and
+      local network. The deployment fails, although each container deploys
+      successfully on its own. What is the most likely cause?
+    options:
+      - id: a
+        text: "Multi-container groups currently support only Linux containers."
+      - id: b
+        text: "Containers in a group can't communicate over localhost."
+      - id: c
+        text: "A container group must be deployed by using a YAML file, not a template."
+      - id: d
+        text: "Container groups can expose only one container at a time."
+    answer: [a]
+    explanation: >-
+      A container group is a collection of containers scheduled on the same
+      host that share a lifecycle, resources, local network, and storage
+      volumes. Multi-container groups currently support only Linux
+      containers; for Windows containers, Container Instances supports only
+      a single container instance. Containers within a group can reach each
+      other over localhost on any port. Both Resource Manager templates and
+      YAML files can deploy multi-container groups, and a group can expose
+      multiple ports on its IP address.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/container-instances/container-instances-container-groups
+
+  - id: q25
+    domain: AZ104-3
+    skill: Configure scaling for an App Service plan
+    kind: single
+    stem: >-
+      A web app runs in an App Service plan on the Basic tier. During
+      seasonal peaks, you need the plan to scale out automatically, based
+      on CPU Percentage rules, to as many as 8 instances, and scale in when
+      load drops. You open Scale out (App Service plan) but can't configure
+      custom autoscale rules. What should you do first?
+    options:
+      - id: a
+        text: "Manually set the Basic plan instance count to 8."
+      - id: b
+        text: "Scale up the plan to the Standard tier or higher."
+      - id: c
+        text: "Move the web app to a new Basic plan in another region."
+      - id: d
+        text: "Create a deployment slot and enable autoscale on the slot."
+    answer: [b]
+    explanation: >-
+      Azure Monitor autoscale for an App Service plan requires the plan to
+      be on the Standard tier or higher. Scaling up changes the pricing
+      tier and unlocks features such as autoscaling. Basic plans also scale
+      out to at most 3 instances, while Standard allows up to 10, so a
+      Basic plan couldn't reach 8 instances even manually. Autoscale rules
+      apply to the entire plan and affect every app in it, not to
+      individual deployment slots. Moving to another Basic plan doesn't
+      change the tier's limits.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/autoscale/autoscale-get-started
+      - https://learn.microsoft.com/en-us/azure/app-service/manage-scale-up
+
+  - id: q26
+    domain: AZ104-3
+    skill: Configure networking settings for an App Service
+    kind: multiple
+    stem: >-
+      A web app in the multitenant App Service must call an API that runs
+      on VMs in an Azure virtual network in the same region. Separately,
+      users on the corporate network, which reaches the virtual network
+      over ExpressRoute, must reach the web app on a private IP address in
+      that virtual network. Which two App Service networking features
+      should you configure? Each correct answer presents part of the
+      solution. Choose two.
+    options:
+      - id: a
+        text: "Virtual network integration"
+      - id: b
+        text: "A private endpoint for the web app"
+      - id: c
+        text: "Hybrid Connections"
+      - id: d
+        text: "An app-assigned address"
+      - id: e
+        text: "Access restrictions that allow the corporate IP ranges"
+    answer: [a, b]
+    explanation: >-
+      App Service networking features are either inbound or outbound.
+      Virtual network integration is outbound and lets the app reach
+      resources in a virtual network in the same region. A private endpoint
+      is inbound only; it gives the app a private IP address in the
+      virtual network and can be reached across ExpressRoute and VPN
+      connections. Hybrid Connections is for outbound calls to a single
+      host and port, usually in networks not connected to Azure. An
+      app-assigned address and access restrictions don't expose the app on
+      a private IP.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/app-service/networking-features
+
+  - id: q27
+    domain: AZ104-3
+    skill: Configure networking settings for an App Service
+    kind: single
+    stem: >-
+      Your company publishes a web app through its own Azure Front Door
+      instance. Security requires that the app accept requests only from
+      that specific Front Door instance, not from other Front Door
+      profiles or directly from the internet. How should you configure the
+      app's access restrictions?
+    options:
+      - id: a
+        text: "Add an Allow rule for the AzureFrontDoor.Backend service tag with an X-Azure-FDID header filter set to your Front Door ID."
+      - id: b
+        text: "Add an Allow rule for the AzureFrontDoor.Backend service tag only."
+      - id: c
+        text: "Add a Deny rule for 0.0.0.0/0 with a higher priority number than an Allow rule for the AppService service tag."
+      - id: d
+        text: "Enable Use main site rules on the SCM site."
+    answer: [a]
+    explanation: >-
+      Front Door traffic comes from the IP ranges in the
+      AzureFrontDoor.Backend service tag, so a service tag rule limits
+      traffic to Front Door. That tag covers all Front Door instances,
+      however. To accept traffic only from your instance, filter on the
+      unique X-Azure-FDID HTTP header that Front Door sends; header filters
+      are evaluated after the rule, and both conditions must be true. The
+      AppService tag doesn't represent Front Door, and the SCM site setting
+      only controls the advanced tool site.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/app-service/app-service-ip-restrictions
+
+  - id: q28
+    domain: AZ104-4
+    skill: Create and configure virtual network peering
+    kind: single
+    stem: >-
+      A hub virtual network has a VPN gateway connected to on-premises. A
+      spoke virtual network is peered with the hub, and the spoke also has
+      its own VPN gateway that is no longer needed. You want spoke
+      workloads to reach on-premises through the hub gateway by enabling
+      the peering option to use the remote virtual network's gateway, but
+      the configuration is rejected. What should you do?
+    options:
+      - id: a
+        text: "Delete the spoke's own VPN gateway, and then enable use of the remote gateway on the spoke peering."
+      - id: b
+        text: "Convert the peering to global virtual network peering."
+      - id: c
+        text: "Add a user-defined route on the hub with next hop type Virtual network peering."
+      - id: d
+        text: "Create a second peering between the same two virtual networks."
+    answer: [a]
+    explanation: >-
+      You can configure the gateway in a peered virtual network as a
+      transit point to an on-premises network, but the virtual network
+      that uses a remote gateway can't have its own gateway. A virtual
+      network can have only one gateway, either local or remote in the
+      peered network. Removing the spoke gateway allows the spoke to use
+      the hub gateway. Both local and global peering support gateway
+      transit, so changing the peering type doesn't help. Virtual network
+      peering can't be specified as a next hop type in a user-defined
+      route.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/virtual-network-peering-overview
+      - https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-udr-overview
+
+  - id: q29
+    domain: AZ104-4
+    skill: Create and configure virtual network peering
+    kind: single
+    stem: >-
+      VNet-A (10.1.0.0/16) is peered with VNet-B. To accommodate growth, an
+      administrator adds the address range 10.5.0.0/16 to VNet-A and
+      creates a subnet in it. VMs in VNet-B can reach VMs in 10.1.0.0/16
+      but can't reach VMs in the new 10.5.0.0/16 subnet. NSGs allow the
+      traffic. What should you do?
+    options:
+      - id: a
+        text: "Delete and re-create the peering on both virtual networks with a maintenance window."
+      - id: b
+        text: "Sync the virtual network peering so the peers learn the new address space."
+      - id: c
+        text: "Enable gateway transit on the VNet-A side of the peering."
+      - id: d
+        text: "Add a user-defined route on VNet-B with next hop type Internet for 10.5.0.0/16."
+    answer: [b]
+    explanation: >-
+      You can resize the address space of peered virtual networks without
+      downtime, including adding address ranges. After the address space
+      is resized, peers must sync with the new address space changes, and
+      Microsoft recommends running sync after every resize operation. Sync
+      can be done from the Azure portal or Azure PowerShell. Re-creating the
+      peering is unnecessary and disruptive. Gateway transit concerns
+      sharing a VPN or ExpressRoute gateway, and routing to the Internet
+      next hop wouldn't deliver private peered traffic.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/virtual-network-peering-overview
+
+  - id: q30
+    domain: AZ104-4
+    skill: Evaluate effective security rules in NSGs
+    kind: single
+    stem: >-
+      VM1 is in Subnet1. NSG-Subnet is associated with Subnet1 and has an
+      inbound rule at priority 100 that allows TCP 443 from the Internet
+      service tag. NSG-NIC is associated with VM1's network interface and
+      contains only the default rules. Users on the internet can't reach
+      HTTPS on VM1's public IP address. What is the cause?
+    options:
+      - id: a
+        text: "NSG-NIC is evaluated first for inbound traffic, and its AllowVNetInBound rule rejects internet traffic."
+      - id: b
+        text: "NSG-Subnet allows the traffic, but NSG-NIC then denies it with the DenyAllInbound default rule."
+      - id: c
+        text: "Rules with priority 100 are reserved for Azure platform traffic and are ignored."
+      - id: d
+        text: "The AllowAzureLoadBalancerInBound default rule in NSG-NIC overrides custom rules."
+    answer: [b]
+    explanation: >-
+      For inbound traffic, Azure first processes the NSG associated with
+      the subnet and then the NSG associated with the network interface.
+      Traffic must be allowed by both. NSG-Subnet allows TCP 443, but
+      NSG-NIC has no matching allow rule, so its DenyAllInbound default
+      rule at priority 65500 blocks the traffic. The fix is to add an allow
+      rule to NSG-NIC or remove one of the NSGs. Priority 100 is a valid
+      custom priority, and default rules have the lowest priority. The
+      effective security rules view and IP flow verify can confirm which
+      rule denies the flow.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/network-security-group-how-it-works
+      - https://learn.microsoft.com/en-us/azure/virtual-network/network-security-groups-overview
+
+  - id: q31
+    domain: AZ104-4
+    skill: Evaluate effective security rules in NSGs
+    kind: single
+    stem: >-
+      An NSG associated with a subnet has these custom inbound rules: Rule1,
+      priority 200, deny TCP 3389 from any source; Rule2, priority 300,
+      allow TCP 3389 from 203.0.113.10. An administrator at 203.0.113.10
+      can't start an RDP session to a VM in the subnet. There is no NSG on
+      the network interface. What should you do so that only 203.0.113.10
+      can use RDP?
+    options:
+      - id: a
+        text: "Change Rule2's priority to 150."
+      - id: b
+        text: "Change Rule1's priority to 100."
+      - id: c
+        text: "Delete the DenyAllInbound default rule."
+      - id: d
+        text: "Change Rule2's priority to 65001."
+    answer: [a]
+    explanation: >-
+      NSG rules are processed in priority order, and lower numbers are
+      processed first. Once traffic matches a rule, processing stops. Rule1
+      at priority 200 matches the RDP traffic and denies it before Rule2 at
+      300 is evaluated. Giving Rule2 a lower number than Rule1, such as
+      150, lets traffic from 203.0.113.10 match the allow rule first, while
+      other sources still hit Rule1. Default rules can't be removed, and
+      custom priorities must be between 100 and 4096.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/network-security-groups-overview
+
+  - id: q32
+    domain: AZ104-4
+    skill: Configure an internal or public load balancer
+    kind: single
+    stem: >-
+      You deploy a Standard public load balancer with a load-balancing rule
+      for TCP 80 and a healthy backend pool of two VMs running a web
+      server. Neither the VMs' subnet nor their network interfaces have an
+      NSG associated. Clients on the internet can't reach the load
+      balancer's frontend IP address on port 80. What should you do?
+    options:
+      - id: a
+        text: "Change the load balancer SKU to Basic."
+      - id: b
+        text: "Associate an NSG with the subnet or network interfaces that allows inbound TCP 80."
+      - id: c
+        text: "Change the session persistence setting to Client IP."
+      - id: d
+        text: "Enable high-availability ports on the load-balancing rule."
+    answer: [b]
+    explanation: >-
+      Standard load balancers and public IP addresses are closed to inbound
+      connections by default, following a Zero Trust model. Network
+      security groups must explicitly permit allowed traffic, and traffic
+      is blocked if no NSG exists on the subnet or NIC. An NSG that allows
+      inbound TCP 80 fixes the issue. Basic Load Balancer was retired on
+      September 30, 2025. Session persistence changes how flows are
+      distributed, and HA ports are a rule option, neither of which opens
+      inbound access.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/load-balancer/load-balancer-overview
+      - https://learn.microsoft.com/en-us/azure/virtual-network/network-security-group-how-it-works
+
+  - id: q33
+    domain: AZ104-4
+    skill: Configure an internal or public load balancer
+    kind: single
+    stem: >-
+      An organization places Remote Desktop Gateway servers behind an Azure
+      Standard Load Balancer. Users report dropped sessions, and the team
+      traces the issue to the default distribution mode sending related
+      connections from the same client to different backend servers. Which
+      session persistence setting should you configure on the
+      load-balancing rule?
+    options:
+      - id: a
+        text: "None"
+      - id: b
+        text: "Client IP and protocol"
+      - id: c
+        text: "Five-tuple hash"
+      - id: d
+        text: "Floating IP"
+    answer: [b]
+    explanation: >-
+      By default, Azure Load Balancer uses a five-tuple hash, which is
+      configured as session persistence None in the portal and provides
+      stickiness only within a transport session. Session persistence
+      sends connections from the same client to the same backend instance.
+      The Microsoft documentation states that source IP affinity with
+      client IP and protocol (three-tuple) solves an incompatibility
+      between Azure Load Balancer and Remote Desktop Gateway. Switching
+      modes causes no downtime. Floating IP isn't a distribution mode.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/load-balancer/distribution-mode-concepts
+
+  - id: q34
+    domain: AZ104-4
+    skill: Configure user-defined routes
+    kind: multiple
+    stem: >-
+      Your company deploys a firewall network virtual appliance (NVA) VM
+      with private IP address 10.0.100.4 in its own subnet. All outbound
+      traffic from a workload subnet, including traffic to the internet,
+      must be sent through the NVA for inspection. The NVA forwards traffic
+      that isn't addressed to itself. Which two actions should you perform?
+      Each correct answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: "Associate the workload subnet with a route table containing a 0.0.0.0/0 route with next hop type Virtual appliance and next hop address 10.0.100.4."
+      - id: b
+        text: "Enable IP forwarding on the NVA's network interface in Azure."
+      - id: c
+        text: "Create a route with next hop type Virtual network peering that points to 10.0.100.4."
+      - id: d
+        text: "Deploy the NVA into the workload subnet and associate the route table with that subnet."
+      - id: e
+        text: "Create a 0.0.0.0/0 route with next hop type None."
+    answer: [a, b]
+    explanation: >-
+      A route with the 0.0.0.0/0 prefix and next hop type Virtual appliance
+      overrides the default Internet route, so traffic that doesn't match a
+      more specific route is sent to the appliance, and UDRs override
+      system routes. Any NIC that forwards traffic to an address other than
+      its own must have Enable IP forwarding turned on in Azure. Virtual
+      network peering can't be used as a UDR next hop. Placing the NVA in
+      the same subnet can cause routing loops, and next hop None drops
+      traffic.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-udr-overview
+
+  - id: q35
+    domain: AZ104-5
+    skill: Configure log settings in Azure Monitor
+    kind: single
+    stem: >-
+      You create a diagnostic setting on a key vault in the East US region
+      to send AuditEvent resource logs to a Log Analytics workspace and to
+      archive them in a Standard storage account. The storage account is in
+      West Europe, and the setting can't be saved with that storage
+      account as a destination. The workspace destination works. What
+      should you do?
+    options:
+      - id: a
+        text: "Use a storage account in East US as the archive destination."
+      - id: b
+        text: "Move the Log Analytics workspace to West Europe."
+      - id: c
+        text: "Create a second diagnostic setting that sends only to the West Europe storage account."
+      - id: d
+        text: "Upgrade the storage account to a Premium storage account."
+    answer: [a]
+    explanation: >-
+      For regional resources, storage account and Event Hubs destinations
+      must be in the same region as the monitored resource, so an East US
+      key vault needs an East US storage account. A second diagnostic
+      setting has the same region constraint. The Log Analytics workspace
+      destination isn't the problem, since it already works. Premium
+      storage accounts aren't supported as destinations; Standard storage
+      accounts are. Resource logs aren't collected at all until a
+      diagnostic setting exists, and each resource can have up to five
+      diagnostic settings.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/platform/diagnostic-settings
+
+  - id: q36
+    domain: AZ104-5
+    skill: Configure log settings in Azure Monitor
+    kind: single
+    stem: >-
+      An organization needs to collect Windows System and Application event
+      logs and selected performance counters from 50 Azure VMs into a Log
+      Analytics workspace in East US. Host metrics are already visible, but
+      no guest operating system logs are being collected. Which approach
+      should you use?
+    options:
+      - id: a
+        text: "Create a diagnostic setting on each VM that sends resource logs to the workspace."
+      - id: b
+        text: "Create a data collection rule in East US with Windows events and performance counter data sources, and add the VMs as resources."
+      - id: c
+        text: "Install the legacy Log Analytics agent on each VM alongside the Azure Monitor Agent."
+      - id: d
+        text: "Create a data collection rule in any region, because the rule region doesn't need to match the workspace."
+    answer: [b]
+    explanation: >-
+      Azure Monitor automatically collects host metrics and activity logs,
+      but guest OS log data isn't collected by default. You create a data
+      collection rule (DCR) with data sources such as Windows events and
+      performance counters, and add the VMs as resources; the portal
+      installs the Azure Monitor Agent if needed and associates the DCR.
+      The DCR must be in the same region as the destination Log Analytics
+      workspace. Running the legacy agent alongside the Azure Monitor Agent
+      can collect duplicate data. Diagnostic settings don't collect guest
+      OS logs.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/vm/data-collection
+
+  - id: q37
+    domain: AZ104-5
+    skill: Create an Azure Backup vault
+    kind: multiple
+    stem: >-
+      Veymark Logistics creates a new Backup vault (not a Recovery Services
+      vault) for a project. Which two workloads can be protected in the
+      Backup vault? Each correct answer presents a complete solution.
+      Choose two.
+    options:
+      - id: a
+        text: "Azure Disks"
+      - id: b
+        text: "Azure Database for PostgreSQL server"
+      - id: c
+        text: "Azure Virtual Machine"
+      - id: d
+        text: "Azure Files"
+      - id: e
+        text: "SQL in Azure VM"
+    answer: [a, b]
+    explanation: >-
+      Azure Backup supports two vault types that target different
+      datasources, so you must create the vault that matches the workload.
+      Backup vaults support Azure Disks, Azure Blobs, Azure Database for
+      PostgreSQL server, and Kubernetes services (preview). Recovery
+      Services vaults support Azure Virtual Machine, SQL in Azure VM, Azure
+      Files, SAP HANA in Azure VM, Azure Backup Server, the Azure Backup
+      agent, and DPM. Azure VMs, Azure Files, and SQL in Azure VM therefore
+      require a Recovery Services vault.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/backup/backup-azure-backup-faq
+      - https://learn.microsoft.com/en-us/azure/backup/backup-vault-overview
+
+  - id: q38
+    domain: AZ104-5
+    skill: Create an Azure Backup vault
+    kind: single
+    stem: >-
+      An administrator created a Backup vault with the default
+      Geo-redundant storage setting and has already protected several
+      Azure Disks in it. Because Azure isn't the organization's primary
+      backup storage endpoint, finance asks to switch the vault to
+      Locally redundant storage to reduce storage costs. The existing
+      protected items don't need to stay in this vault. What should you do?
+    options:
+      - id: a
+        text: "Change the Storage redundancy setting on the existing vault to Locally redundant."
+      - id: b
+        text: "Create a new Backup vault with Locally redundant storage and protect the disks in it."
+      - id: c
+        text: "Enable Cross Region Restore on the existing vault."
+      - id: d
+        text: "Apply a CanNotDelete lock to the vault's resource group."
+    answer: [b]
+    explanation: >-
+      When you create a Backup vault, you choose its storage redundancy,
+      and storage redundancy can't be changed after items are protected in
+      the vault. Microsoft recommends the default Geo-redundant setting
+      when Azure is the primary backup storage endpoint and Locally
+      redundant when it isn't, to reduce storage costs. Because the vault
+      already protects disks, you need a new vault created with Locally
+      redundant storage. Cross Region Restore relies on geo-redundant
+      storage, and a lock doesn't change redundancy.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/backup/create-manage-backup-vault
+
+  - id: q39
+    domain: AZ104-5
+    skill: Configure and interpret reports and alerts for backups
+    kind: single
+    stem: >-
+      Your company has more than 100 Recovery Services vaults across
+      several subscriptions and regions. You created a Log Analytics
+      workspace in a central subscription for Backup reports. You need
+      every current and future vault in a management group to send its
+      diagnostics data to the workspace with the least administrative
+      effort. What should you do?
+    options:
+      - id: a
+        text: "Create a Log Analytics workspace in each vault's region and subscription, because reports require co-located workspaces."
+      - id: b
+        text: "Assign the built-in Azure Policy definition that configures vault diagnostics settings at the management group scope."
+      - id: c
+        text: "Enable classic alerts on each vault."
+      - id: d
+        text: "Export Backup reports to a storage account through the Power BI template app."
+    answer: [b]
+    explanation: >-
+      Backup reports use Azure Monitor logs and workbooks, and each vault
+      must send diagnostics data to a Log Analytics workspace through
+      diagnostic settings. Azure Backup provides a built-in Azure Policy
+      definition that automates diagnostics settings for all Recovery
+      Services vaults in a scope. The workspace location and subscription
+      are independent of where vaults exist. The Power BI template app that
+      sourced data from a storage account is on a deprecation path, and
+      classic alerts aren't reports. Initial data can take up to 24 hours
+      to arrive.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/backup/configure-reports
+
+  - id: q40
+    domain: AZ104-5
+    skill: Configure and interpret reports and alerts for backups
+    kind: single
+    stem: >-
+      Azure VMs are protected in a Recovery Services vault. The operations
+      team wants to receive email whenever a backup job fails. Built-in
+      Azure Monitor alerts for backup failures already appear in the portal,
+      but nobody receives notifications. The team doesn't want to build
+      custom log queries. What should you configure?
+    options:
+      - id: a
+        text: "An alert processing rule that routes the backup alerts to an action group with an email receiver"
+      - id: b
+        text: "Classic alerts on the Backup Alerts tab of the vault"
+      - id: c
+        text: "A log search alert rule that queries the vault's diagnostics data every five minutes"
+      - id: d
+        text: "Turn off security alerts so that job failure alerts send email by default"
+    answer: [a]
+    explanation: >-
+      Azure Backup provides built-in Azure Monitor alerts for job failures,
+      which are turned on by default, and security alerts, which can't be
+      turned off. To send notifications such as email, you use alert
+      processing rules (action rules) and action groups to route the alerts
+      to channels such as email, ITSM, or webhooks. Classic alerts are
+      being deprecated, with migration to Azure Monitor alerts
+      recommended. A log search alert requires custom queries and
+      diagnostics data, which the team wants to avoid.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/backup/monitoring-and-alerts-overview

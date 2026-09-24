@@ -1,0 +1,1281 @@
+# AZ-104 practice exam 1. Written by Opus 5.5 (claude-opus-5-5); every
+# question is grounded in, and cites, pages on learn.microsoft.com.
+id: az-104-1
+exam: AZ-104
+number: 1
+title: AZ-104 practice exam 1
+author: Opus 5.5
+model_id: claude-opus-5-5
+written_on: "2026-09-24"
+questions:
+  - id: q01
+    domain: AZ104-1
+    skill: Create users and groups
+    kind: single
+    stem: >-
+      Veymark Logistics enrolls its Windows laptops in Microsoft Entra ID. The
+      endpoint team wants a group that automatically adds and removes devices
+      based on the device operating system attribute, so that a configuration
+      policy can target the group without manual membership updates. The tenant
+      has Microsoft Entra ID P1 licenses. Which group type and membership type
+      should you choose when you create the group?
+    options:
+      - id: a
+        text: "Microsoft 365 group with a dynamic membership rule for devices"
+      - id: b
+        text: "Security group with assigned membership"
+      - id: c
+        text: "Security group with a dynamic membership rule for devices"
+      - id: d
+        text: "Microsoft 365 group with a dynamic membership rule for users"
+    answer: [c]
+    explanation: >-
+      Dynamic membership for devices adds and removes devices automatically when
+      their attributes change, and dynamic membership groups require a Microsoft
+      Entra ID P1 license, which the tenant has. Security groups can contain
+      devices, but Microsoft 365 groups can include only users, so neither
+      Microsoft 365 option can hold laptops. Assigned membership would require
+      someone to add and remove each device by hand, which the requirement rules
+      out.
+    sources:
+      - https://learn.microsoft.com/en-us/entra/fundamentals/concept-learn-about-groups
+      - https://learn.microsoft.com/en-us/entra/identity/users/groups-create-rule
+
+  - id: q02
+    domain: AZ104-1
+    skill: Create users and groups
+    kind: single
+    stem: >-
+      A User Administrator at your company downloads the Bulk create template
+      from the Microsoft Entra admin center, fills in Name, User name, Initial
+      password, and Block sign in (set to No) for 150 new warehouse employees,
+      and submits it. The job completes successfully and the accounts appear as
+      members in All users. The next day, the employees report that they never
+      received an email telling them how to sign in. What is the cause?
+    options:
+      - id: a
+        text: "The Usage location column was left empty, so the service skipped the welcome emails"
+      - id: b
+        text: "Bulk create makes internal member accounts and sends no invitation emails, so the credentials must be delivered through your own process"
+      - id: c
+        text: "Bulk create requires the Global Administrator role to send notifications, and the User Administrator role only creates the accounts"
+      - id: d
+        text: "The Block sign in column must be set to Yes before invitation emails are generated"
+    answer: [b]
+    explanation: >-
+      The bulk create operation creates internal member accounts with the
+      passwords specified in the CSV and sends no invitation emails; you must
+      communicate sign-in credentials yourself. Only Name, User name, Initial
+      password, and Block sign in are required, so an empty Usage location does
+      not affect the job. User Administrator is the documented minimum role for
+      bulk create. Invitation emails come from the separate Bulk invite process
+      for external guest users, which would not create internal members.
+    sources:
+      - https://learn.microsoft.com/en-us/entra/identity/users/users-bulk-add
+
+  - id: q03
+    domain: AZ104-1
+    skill: Manage built-in Azure roles
+    kind: single
+    stem: >-
+      Your help desk lead must be able to grant the Reader role to other staff
+      on several resource groups in a subscription. Security policy states that
+      the lead must not be able to create, change, or delete resources and must
+      not be able to manage access through Azure Policy. You need to follow the
+      principle of least privilege. Which built-in role should you assign to the
+      help desk lead at the subscription scope?
+    options:
+      - id: a
+        text: "Role Based Access Control Administrator"
+      - id: b
+        text: "Contributor"
+      - id: c
+        text: "Owner"
+      - id: d
+        text: "User Access Administrator"
+    answer: [a]
+    explanation: >-
+      Role Based Access Control Administrator manages access to Azure resources
+      by assigning roles with Azure RBAC and explicitly does not allow managing
+      access in other ways, such as Azure Policy. Contributor can manage all
+      resources but cannot assign roles. Owner grants full access to manage all
+      resources, which violates the policy. User Access Administrator manages
+      user access and, per the management group role table, can also assign
+      policy, so it is broader than required.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
+      - https://learn.microsoft.com/en-us/azure/governance/management-groups/overview
+
+  - id: q04
+    domain: AZ104-1
+    skill: Manage built-in Azure roles
+    kind: multiple
+    stem: >-
+      Veymark Logistics separates duties in a resource group named rg-dispatch.
+      The application team must create and manage virtual machines, including
+      their disks, but must not manage the virtual network the VMs connect to.
+      The network team must manage the virtual network and its subnets but must
+      not deploy or manage virtual machines. Neither team may assign roles. You
+      need to assign built-in roles at the rg-dispatch scope by using the
+      principle of least privilege. Which two role assignments should you make?
+      Each correct answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: "Contributor to the application team"
+      - id: b
+        text: "Virtual Machine Contributor to the application team"
+      - id: c
+        text: "Virtual Machine Administrator Login to the application team"
+      - id: d
+        text: "Owner to the network team"
+      - id: e
+        text: "Network Contributor to the network team"
+      - id: f
+        text: "Reader to the network team"
+    answer: [b, e]
+    explanation: >-
+      Virtual Machine Contributor creates and manages VMs and disks, does not
+      grant management access to the virtual network, and cannot assign roles.
+      Network Contributor manages networks but does not grant permission to
+      deploy or manage VMs. Contributor would let the application team manage
+      the virtual network too. Virtual Machine Administrator Login only allows
+      viewing VMs and signing in as an administrator. Owner can assign roles,
+      and Reader cannot make any changes.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
+
+  - id: q05
+    domain: AZ104-1
+    skill: Implement and manage Azure Policy
+    kind: single
+    stem: >-
+      You assign a policy definition that uses the modify effect to add a
+      costCenter tag to resources in a subscription. The assignment was created
+      in the Azure portal with a system-assigned managed identity. New resources
+      now receive the tag, but about 300 resources that existed before the
+      assignment still have no costCenter tag, and the compliance view shows
+      them as non-compliant. What should you do to add the tag to the existing
+      resources?
+    options:
+      - id: a
+        text: "Wait for the next compliance evaluation cycle, which applies the modify operations to existing resources"
+      - id: b
+        text: "Change the policy effect to deny and trigger an on-demand evaluation"
+      - id: c
+        text: "Replace the modify effect with append so that existing resources are updated"
+      - id: d
+        text: "Create a remediation task for the policy assignment"
+    answer: [d]
+    explanation: >-
+      During an evaluation cycle, modify does not change resources that already
+      exist; it marks them non-compliant so they can be remediated through a
+      remediation task, which runs the modify operations by using the
+      assignment's managed identity. Waiting for another evaluation only
+      re-reports non-compliance. Deny blocks non-compliant create or update
+      requests and only marks existing resources non-compliant. Modify is
+      recommended over append for tags because modify can remediate existing
+      resources.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/governance/policy/concepts/effect-modify
+      - https://learn.microsoft.com/en-us/azure/governance/policy/how-to/remediate-resources
+
+  - id: q06
+    domain: AZ104-1
+    skill: Implement and manage Azure Policy
+    kind: single
+    stem: >-
+      Subscription Sub1 has a policy assignment with a deny effect that allows
+      resources only in West US. Resource group RG-B in Sub1 has a second
+      assignment with a deny effect that allows resources only in East US. An
+      engineer tries to create a storage account in RG-B in East US, and the
+      request fails with 403 (Forbidden). The business requires that resources
+      in RG-B can be created in East US while every other resource group in Sub1
+      stays restricted to West US. What should you do?
+    options:
+      - id: a
+        text: "Nothing, because the assignment at the resource group scope overrides the subscription assignment for resources in RG-B"
+      - id: b
+        text: "Add RG-B as an exclusion on the subscription-level assignment"
+      - id: c
+        text: "Change the effect of the RG-B assignment from deny to audit"
+      - id: d
+        text: "Move the RG-B assignment to the subscription scope"
+    answer: [b]
+    explanation: >-
+      Each assignment is evaluated independently and the result of layering is
+      cumulative most restrictive, so with both deny assignments any new
+      resource in RG-B is blocked: East US fails the subscription policy and
+      West US fails the resource group policy. The docs direct you to review the
+      exclusions on each assignment when a resource still needs to be created in
+      the target scope. A lower scope does not override a higher one, and
+      changing the RG-B effect to audit still leaves the subscription deny
+      blocking East US.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/governance/policy/concepts/effect-basics
+      - https://learn.microsoft.com/en-us/azure/governance/policy/concepts/effect-deny
+
+  - id: q07
+    domain: AZ104-1
+    skill: Manage costs by using alerts, budgets, and Azure Advisor recommendations
+    kind: single
+    stem: >-
+      A finance manager creates a monthly budget of USD 5,000 on the resource
+      group rg-analytics with an actual cost alert at 100 percent. The manager
+      expected the development VMs in the group to stop when the threshold was
+      reached, but spending continued past the budget. The manager asks you to
+      make the threshold automatically start a runbook that deallocates the
+      VMs. What should you do?
+    options:
+      - id: a
+        text: "Edit the budget so that the 100 percent threshold calls an action group that triggers the runbook"
+      - id: b
+        text: "Change the alert type from actual to forecasted, because forecasted alerts stop consumption"
+      - id: c
+        text: "Move the budget to the management group scope and attach an action group there"
+      - id: d
+        text: "Lower the threshold to 90 percent so that the budget deallocates resources before the limit"
+    answer: [a]
+    explanation: >-
+      Budget notifications do not affect resources and do not stop consumption;
+      they only notify. When you create or edit a budget at subscription or
+      resource group scope, you can configure it to call an action group, which
+      can trigger automation. Forecasted alerts are still notifications only.
+      Action groups are currently supported only for subscription and resource
+      group scopes, so a management group budget cannot call one. Changing the
+      percentage does not change the fact that budgets never stop resources.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/tutorial-acm-create-budgets
+
+  - id: q08
+    domain: AZ104-1
+    skill: Manage costs by using alerts, budgets, and Azure Advisor recommendations
+    kind: single
+    stem: >-
+      Azure Advisor shows a cost recommendation to resize an underused VM that
+      runs quarter-end reporting. The operations team agrees the recommendation
+      might be valid but wants to hide it for now and review it again after the
+      next quarter closes, without telling Advisor that the recommendation is
+      irrelevant or already done. Which recommendation status should you set?
+    options:
+      - id: a
+        text: "Dismissed"
+      - id: b
+        text: "Completed"
+      - id: c
+        text: "Postponed"
+      - id: d
+        text: "Active"
+    answer: [c]
+    explanation: >-
+      Postponed temporarily hides a recommendation so that you can review it
+      later, which matches the team's plan. Dismissed indicates the
+      recommendation isn't relevant, and Completed indicates you took the
+      recommended action; the team wants neither message recorded. Leaving the
+      recommendation Active keeps it visible, which does not meet the
+      requirement to hide it. States can be changed later until Advisor verifies
+      and marks a recommendation completed.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/advisor/advisor-overview
+
+  - id: q09
+    domain: AZ104-1
+    skill: Configure resource locks
+    kind: multiple
+    stem: >-
+      You apply a ReadOnly lock to a storage account named stveymarkdocs. Users
+      access blob data by using their Microsoft Entra credentials. Which two
+      operations will the lock block? Each correct answer presents a complete
+      solution. Choose two.
+    options:
+      - id: a
+        text: "Listing the storage account access keys"
+      - id: b
+        text: "Uploading a new blob by using a Microsoft Entra identity that has Storage Blob Data Contributor"
+      - id: c
+        text: "Creating an Azure RBAC role assignment scoped to the storage account"
+      - id: d
+        text: "Reading the properties of the storage account in the Azure portal"
+      - id: e
+        text: "Deleting a blob through the data plane endpoint"
+    answer: [a, c]
+    explanation: >-
+      A read-only lock blocks POST requests to Resource Manager, so it prevents
+      users from listing account keys, and it prevents Azure RBAC role
+      assignments scoped to the storage account or a data container. Locks
+      apply only to control plane operations, so uploading or deleting blobs
+      through the data plane endpoint is not blocked; a lock on a storage
+      account does not protect the data inside it. Reading properties is allowed
+      because ReadOnly works like the Reader role.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/lock-resources
+
+  - id: q10
+    domain: AZ104-1
+    skill: Configure management groups
+    kind: multiple
+    stem: >-
+      A custom role is defined with the Sandbox management group as its only
+      assignable scope. The role is assigned on subscription Sub-Test, which is
+      a child of Sandbox. You try to move Sub-Test under the Corp management
+      group, which is in a different branch of the hierarchy, and the move
+      fails with an error that the move would break the relationship between
+      the role assignment and its definition. Which two actions would each
+      allow the move to succeed? Each correct answer presents a complete
+      solution. Choose two.
+    options:
+      - id: a
+        text: "Remove the custom role assignment from Sub-Test before you move it"
+      - id: b
+        text: "Elevate a Global Administrator to User Access Administrator at the root management group"
+      - id: c
+        text: "Change the custom role's assignable scope from Sandbox to the root management group"
+      - id: d
+        text: "Assign yourself the Owner role on the Corp management group and retry the move"
+      - id: e
+        text: "Wait 30 minutes for the Resource Manager hierarchy cache to refresh and retry the move"
+    answer: [a, c]
+    explanation: >-
+      Moving the subscription would separate its role assignment from the role
+      definition on Sandbox. The documented fixes include removing the role
+      assignment before the move, or changing the assignable scope, for example
+      to the root management group so both branches can reach the definition.
+      The failure is not a permission problem, so elevating access or adding
+      Owner on Corp does not help. The 30-minute cache affects how quickly the
+      portal shows a move, not whether it is allowed.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/governance/management-groups/overview
+
+  - id: q11
+    domain: AZ104-2
+    skill: Configure Azure Storage firewalls and virtual networks
+    kind: multiple
+    stem: >-
+      A storage account in East US has public network access set to allow only
+      selected networks. VMs in subnet snet-app of a virtual network in East US
+      receive 403 errors when they read blobs. The VMs have no public IP
+      addresses. You configure access by using the Azure CLI, not the portal.
+      Which two actions should you perform? Each correct answer presents part of
+      the solution. Choose two.
+    options:
+      - id: a
+        text: "Enable the Microsoft.Storage service endpoint on snet-app"
+      - id: b
+        text: "Add an IP network rule for the private IP address range of snet-app"
+      - id: c
+        text: "Add a virtual network rule on the storage account for snet-app"
+      - id: d
+        text: "Enable the trusted Azure services exception on the storage account"
+      - id: e
+        text: "Create a resource instance rule for each VM"
+    answer: [a, c]
+    explanation: >-
+      Traffic from a subnet is blocked with 403 until you add a virtual network
+      rule for it, and the subnet must also have a Virtual Network service
+      endpoint. The portal creates the endpoint automatically, but with the CLI
+      you create it yourself; Microsoft.Storage covers accounts in the same
+      region. IP network rules are for public IP ranges, and with a service
+      endpoint the source is a private IP, so IP rules have no effect. Trusted
+      service exceptions and resource instance rules are for Azure services that
+      cannot be isolated by virtual network rules, not for VMs.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-network-security
+
+  - id: q12
+    domain: AZ104-2
+    skill: Configure Azure Storage firewalls and virtual networks
+    kind: single
+    stem: >-
+      Veymark Logistics keeps an archive storage account in West Europe that
+      allows access only from selected virtual networks. A reporting subnet in
+      a virtual network in North Europe must reach the account through a
+      service endpoint. The subnet currently has no storage service endpoint.
+      Which service endpoint should you enable on the reporting subnet before
+      you add the virtual network rule?
+    options:
+      - id: a
+        text: "Microsoft.Storage"
+      - id: b
+        text: "Microsoft.Storage.Global"
+      - id: c
+        text: "Both Microsoft.Storage and Microsoft.Storage.Global on the same subnet"
+      - id: d
+        text: "No endpoint; add an IP network rule for the subnet address range instead"
+    answer: [b]
+    explanation: >-
+      The Azure Storage cross-region service endpoint, Microsoft.Storage.Global,
+      provides connectivity to storage accounts in any region, which is required
+      because the subnet and account are in different regions.
+      Microsoft.Storage provides connectivity only to accounts in the same
+      region as the virtual network. You can associate only one of these
+      endpoint types with a subnet at a time. IP network rules allow public IP
+      ranges and do not replace a service endpoint for private subnet traffic.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-network-security
+
+  - id: q13
+    domain: AZ104-2
+    skill: Create and configure storage accounts
+    kind: single
+    stem: >-
+      A Linux analytics application must mount an Azure file share by using
+      the NFS protocol. You are creating a new storage account for the share.
+      Which type of storage account should you create?
+    options:
+      - id: a
+        text: "Standard general-purpose v2 with the Enable network file system v3 setting selected"
+      - id: b
+        text: "Premium block blobs"
+      - id: c
+        text: "Premium file shares"
+      - id: d
+        text: "Premium page blobs"
+    answer: [c]
+    explanation: >-
+      The storage account overview says that if you want NFS support in Azure
+      Files, you should use the premium file shares account type, which supports
+      both SMB and NFS file shares. The Enable network file system v3 setting in
+      a general-purpose v2 account applies only to Azure Blob Storage, not to
+      file shares. Premium block blob and premium page blob accounts do not
+      host Azure Files at all. The account type cannot be changed after
+      creation, so choose it correctly up front.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-account-overview
+      - https://learn.microsoft.com/en-us/azure/storage/files/create-classic-file-share
+
+  - id: q14
+    domain: AZ104-2
+    skill: Create and configure a file share in Azure Files
+    kind: single
+    stem: >-
+      Users at a branch office cannot map an SMB Azure file share over its
+      public endpoint. On a branch workstation, Test-NetConnection to the
+      storage account on port 445 fails, and the internet provider confirms it
+      blocks that port. The workstations run Windows 11. You need users to
+      reach the share without changing the provider. What should you do?
+    options:
+      - id: a
+        text: "Generate a shared access signature for the share and mount the share by using the SAS token"
+      - id: b
+        text: "Configure a point-to-site VPN from the workstations to Azure and mount the share over the VPN"
+      - id: c
+        text: "Regenerate the storage account keys and remap the drive"
+      - id: d
+        text: "Clear the Require secure transfer setting so that the share accepts SMB 2.1 connections"
+    answer: [b]
+    explanation: >-
+      SMB requires TCP port 445, and connections fail if it is blocked. To mount
+      an Azure file share from outside Azure without opening port 445, you can
+      use a point-to-site VPN; the documented script also points to site-to-site
+      VPN or ExpressRoute to tunnel SMB traffic. SAS tokens aren't supported for
+      mounting Azure file shares. New keys do not open a blocked port. SMB 2.1
+      still uses port 445, and clients outside the region must support SMB 3.x
+      to use the public endpoint anyway.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/files/storage-how-to-use-files-windows
+
+  - id: q15
+    domain: AZ104-2
+    skill: Configure blob lifecycle management
+    kind: single
+    stem: >-
+      A general-purpose v2 storage account holds block blobs of shipment
+      photos. You need block blobs that have not been read or written for 30
+      days to move to the cool tier, and any cool blob that a user opens later
+      to move back to the hot tier automatically. What should you configure?
+    options:
+      - id: a
+        text: "A rule with tierToCool on daysAfterModificationGreaterThan 30 and enableAutoTierToHotFromCool"
+      - id: b
+        text: "Access time tracking, plus a rule with tierToCool on daysAfterLastAccessTimeGreaterThan 30 and enableAutoTierToHotFromCool"
+      - id: c
+        text: "The default access tier of the account set to Cool"
+      - id: d
+        text: "A rule with tierToArchive on daysAfterLastAccessTimeGreaterThan 30"
+    answer: [b]
+    explanation: >-
+      Access time tracking updates the LastAccessTime property on reads and
+      writes, and daysAfterLastAccessTimeGreaterThan uses that value.
+      enableAutoTierToHotFromCool moves a cool blob back to hot when it is
+      accessed and is available only with the daysAfterLastAccessTimeGreaterThan
+      condition, so option A is invalid and would also ignore reads. Changing
+      the default tier moves nothing back automatically. Archive is offline, and
+      lifecycle policies cannot rehydrate blobs to an online tier.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/lifecycle-management-policy-structure
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/lifecycle-management-overview
+
+  - id: q16
+    domain: AZ104-2
+    skill: Configure blob lifecycle management
+    kind: single
+    stem: >-
+      A storage account configured for geo-zone-redundant storage (GZRS) has a
+      lifecycle rule that filters on block blobs with the prefix
+      invoices/2023 and applies tierToArchive when daysAfterModificationGreaterThan
+      is 90. The rule was saved three weeks ago, and many matching blobs are
+      older than 90 days, but none of them are in the archive tier. What is the
+      most likely cause?
+    options:
+      - id: a
+        text: "Lifecycle policies can take up to 24 hours before the first run, so the rule has not started"
+      - id: b
+        text: "Prefix filters do not support a forward slash, so no blobs match the rule"
+      - id: c
+        text: "The tierToArchive action isn't supported for blobs in accounts configured for GZRS"
+      - id: d
+        text: "Lifecycle management applies only to append blobs"
+    answer: [c]
+    explanation: >-
+      The tierToArchive action is not supported with blobs in accounts that use
+      ZRS, GZRS, or RA-GZRS, and the archive tier is supported only for LRS,
+      GRS, and RA-GRS accounts. To archive these blobs, the account would need a
+      supported redundancy setting, or you would use a tier such as cold. The
+      24-hour delay does not explain three weeks without action. A prefix must
+      start with the container name and can contain a path, as in
+      sample-container/blob1. Lifecycle management supports block blobs and
+      append blobs, and tiering applies only to block blobs.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/lifecycle-management-policy-structure
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-redundancy
+
+  - id: q17
+    domain: AZ104-2
+    skill: Configure stored access policies
+    kind: single
+    stem: >-
+      Your company issued several service SAS tokens to a carrier partner. Every
+      token references a stored access policy named carrier-read on the
+      manifests container. The partner reports that the token URLs were posted
+      in a public forum. You must revoke every token issued to the partner
+      immediately without affecting other SAS tokens or applications that use
+      the account keys. What should you do?
+    options:
+      - id: a
+        text: "Regenerate both storage account access keys"
+      - id: b
+        text: "Delete the carrier-read stored access policy from the manifests container"
+      - id: c
+        text: "Add a second stored access policy with a shorter expiry to the container"
+      - id: d
+        text: "Convert the partner tokens to user delegation SAS tokens"
+    answer: [b]
+    explanation: >-
+      A stored access policy can revoke the service SAS tokens associated with
+      it; you can delete it, rename its signed identifier, or set its expiry to
+      a past time, and the change affects all associated signatures. Only the
+      partner tokens use carrier-read, so other tokens are unaffected.
+      Regenerating account keys would break every SAS and key-based client.
+      Adding another policy does nothing to tokens bound to carrier-read, and
+      stored access policies aren't supported for user delegation SAS.
+    sources:
+      - https://learn.microsoft.com/en-us/rest/api/storageservices/define-stored-access-policy
+
+  - id: q18
+    domain: AZ104-3
+    skill: Interpret an Azure Resource Manager template or a Bicep file
+    kind: single
+    stem: >-
+      An ARM template defines a string parameter named deployDiagStorage with
+      allowedValues of yes and no and a defaultValue of no. A storage account
+      resource in the template has the property condition set to
+      [equals(parameters('deployDiagStorage'), 'yes')]. A virtual machine
+      resource has no condition. An engineer deploys the template and supplies
+      values for every other parameter but omits deployDiagStorage. What is the
+      result?
+    options:
+      - id: a
+        text: "The deployment fails validation because deployDiagStorage has no value"
+      - id: b
+        text: "The virtual machine and the storage account are both deployed"
+      - id: c
+        text: "The virtual machine is deployed and the storage account is skipped"
+      - id: d
+        text: "Neither resource is deployed because the condition evaluates to false for the whole template"
+    answer: [c]
+    explanation: >-
+      When no value is provided, Resource Manager uses the parameter's
+      defaultValue, so deployDiagStorage is no and validation passes. The
+      condition element is a Boolean that controls whether that resource is
+      provisioned during the deployment; when false, the resource is skipped.
+      The condition applies only to the resource that declares it, so the
+      virtual machine, which has no condition, is still deployed.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/syntax
+
+  - id: q19
+    domain: AZ104-3
+    skill: Modify an existing Bicep file
+    kind: single
+    stem: >-
+      A Bicep file declares param adminPassword string and passes the value to
+      a virtual machine resource. A security review finds that the password
+      must never be logged or displayed in the deployment history, the Azure
+      portal, or command-line output. What should you change in the Bicep file?
+    options:
+      - id: a
+        text: "Add the @secure() decorator above the adminPassword parameter"
+      - id: b
+        text: "Add the @description() decorator that marks the value as sensitive"
+      - id: c
+        text: "Add the @minLength(12) decorator to the adminPassword parameter"
+      - id: d
+        text: "Declare adminPassword as an existing resource by using the existing keyword"
+    answer: [a]
+    explanation: >-
+      The @secure() decorator, valid for string and object parameters, makes
+      Resource Manager treat the value as sensitive so it isn't logged or
+      displayed in deployment history, the Azure portal, or command-line
+      output. @description only supplies help text shown in the portal, and
+      @minLength only enforces a length constraint. The existing keyword
+      references an Azure resource that already exists and has nothing to do
+      with parameter values.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/parameters
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/existing-resource
+
+  - id: q20
+    domain: AZ104-3
+    skill: Create a virtual machine
+    kind: single
+    stem: >-
+      From Azure Cloud Shell, you run az vm create with --image set to an
+      Ubuntu 22.04 image, --admin-username azureuser, --generate-ssh-keys, and
+      --public-ip-sku Standard. Your Cloud Shell home directory already contains
+      an SSH key pair in ~/.ssh from an earlier project. What happens to SSH
+      authentication for the new VM?
+    options:
+      - id: a
+        text: "The command fails because a key pair already exists in ~/.ssh"
+      - id: b
+        text: "The CLI generates a new key pair and overwrites the existing key in ~/.ssh"
+      - id: c
+        text: "The CLI uses the existing SSH key it finds in ~/.ssh"
+      - id: d
+        text: "The CLI ignores SSH keys and prompts for an administrator password"
+    answer: [c]
+    explanation: >-
+      The --generate-ssh-keys parameter makes the CLI look for an available SSH
+      key in ~/.ssh. If it finds one, it uses that key; only if none exists
+      does it generate a key and store it in ~/.ssh. The command therefore
+      neither fails nor overwrites the existing key, and it does not fall back
+      to password authentication. The --public-ip-sku Standard parameter
+      separately ensures the VM is reachable through a public IP address.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-machines/linux/quick-create-cli
+
+  - id: q21
+    domain: AZ104-3
+    skill: Deploy virtual machines to availability zones and availability sets
+    kind: single
+    stem: >-
+      Veymark Logistics runs seven web VMs in one availability set that was
+      created with five update domains. During planned platform maintenance,
+      what is the maximum number of these VMs that can be restarted at the same
+      time?
+    options:
+      - id: a
+        text: "One"
+      - id: b
+        text: "Two"
+      - id: c
+        text: "Three"
+      - id: d
+        text: "Seven"
+    answer: [b]
+    explanation: >-
+      With more than five VMs in an availability set with five update domains,
+      the sixth VM is placed in the same update domain as the first and the
+      seventh with the second. Two update domains therefore contain two VMs
+      each. During planned maintenance only one update domain is restarted at a
+      time, so at most two VMs restart together. The update domain count can't
+      be changed after the availability set is created.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-machines/availability-set-overview
+
+  - id: q22
+    domain: AZ104-3
+    skill: Deploy virtual machines to availability zones and availability sets
+    kind: single
+    stem: >-
+      You are deploying two VMs that run the same stateless API in a region
+      that has three availability zones. The API must keep running if one
+      entire availability zone becomes unavailable. Which deployment meets the
+      requirement?
+    options:
+      - id: a
+        text: "Deploy both VMs without specifying a zone and let Azure choose placement"
+      - id: b
+        text: "Deploy both VMs to zone 1 to minimize latency between them"
+      - id: c
+        text: "Deploy both VMs into one availability set with three fault domains"
+      - id: d
+        text: "Deploy one VM to zone 1 and the other VM to zone 2"
+    answer: [d]
+    explanation: >-
+      A VM deployed to a zone you select is a zonal resource, and zonal
+      resources become zone-resilient only when you place separate instances in
+      multiple zones. Putting both VMs in zone 1 isolates them from other zones
+      but loses the API if zone 1 fails. Nonzonal (regional) VMs can be placed
+      in any zone, including the affected one. Availability sets give fault
+      isolation but remain susceptible to datacenter-level failures, and
+      availability zones offer higher resiliency.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/reliability/availability-zones-overview
+      - https://learn.microsoft.com/en-us/azure/virtual-machines/availability-set-overview
+
+  - id: q23
+    domain: AZ104-3
+    skill: Create and manage an Azure Container Registry
+    kind: single
+    stem: >-
+      Your company has an Azure Container Registry on the Standard SKU in East
+      US. You must replicate the registry to West Europe so that clusters there
+      pull images locally, and you must restrict access by using private
+      endpoints. Registry operations must not experience downtime. What should
+      you do first?
+    options:
+      - id: a
+        text: "Create a new Premium registry in West Europe and import every image into it"
+      - id: b
+        text: "Change the existing registry's SKU to Premium"
+      - id: c
+        text: "Enable the admin user on the existing registry"
+      - id: d
+        text: "Keep the Standard SKU and add a geo-replication for West Europe"
+    answer: [b]
+    explanation: >-
+      Geo-replication and private link with private endpoints are Premium-only
+      features. You can change a registry's SKU in the portal or with az acr
+      update --sku Premium, and changing SKU causes no downtime or impact on
+      registry operations, so a new registry and image migration are
+      unnecessary. The Standard SKU does not support geo-replication. The admin
+      user is an authentication option and does not unlock any SKU features.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/container-registry/container-registry-skus
+
+  - id: q24
+    domain: AZ104-3
+    skill: Create and manage an Azure Container Registry
+    kind: single
+    stem: >-
+      Five developers and an unattended CI/CD pipeline all sign in to a
+      container registry by using the admin user credentials. An audit requires
+      that each developer's pushes be attributable to that person, that access
+      be controlled with Azure RBAC, and that the pipeline keep pushing images
+      unattended. What should you do?
+    options:
+      - id: a
+        text: "Regenerate password2 of the admin user and give it only to the pipeline"
+      - id: b
+        text: "Have developers sign in with az acr login using their own Microsoft Entra identities, give the pipeline a service principal, and disable the admin user"
+      - id: c
+        text: "Enable anonymous pull access and keep the admin user for pushes"
+      - id: d
+        text: "Create one non-Microsoft Entra token for all developers and one for the pipeline"
+    answer: [b]
+    explanation: >-
+      The admin account is meant for a single user; everyone who uses it
+      appears as one user with push and pull access, and it doesn't support
+      Microsoft Entra RBAC. Individual sign-in with az acr login uses each
+      person's Entra identity with RBAC, and a service principal is the
+      documented choice for unattended CI/CD pushes. Both admin passwords share
+      one identity. Anonymous pull doesn't address pushes. Token-based
+      repository permissions don't support Entra RBAC role assignments.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/container-registry/container-registry-authentication
+
+  - id: q25
+    domain: AZ104-3
+    skill: Provision an App Service plan
+    kind: single
+    stem: >-
+      You are provisioning an App Service plan for a customer portal. The apps
+      must run on VM instances that are not shared with other customers, and
+      the team needs deployment slots to stage releases before they swap them
+      into production. You must choose the lowest pricing tier that meets both
+      requirements. Which tier should you choose?
+    options:
+      - id: a
+        text: "Shared"
+      - id: b
+        text: "Basic"
+      - id: c
+        text: "Standard"
+      - id: d
+        text: "IsolatedV2"
+    answer: [c]
+    explanation: >-
+      Free and Shared run apps on the same VMs as other customers' apps, so they
+      fail the isolation requirement. Basic and higher run on dedicated VMs, but
+      multiple deployment slots require the Standard, Premium, or Isolated tier,
+      so Basic lacks slots. Standard is the lowest tier with both dedicated
+      compute and deployment slots. IsolatedV2 also meets the requirements but
+      adds network isolation in a dedicated virtual network, which is more than
+      the scenario needs.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/app-service/overview-hosting-plans
+      - https://learn.microsoft.com/en-us/azure/app-service/deploy-staging-slots
+
+  - id: q26
+    domain: AZ104-3
+    skill: Configure backup for an App Service
+    kind: single
+    stem: >-
+      A Standard-tier web app needs scheduled custom backups. Company policy
+      requires that the target storage account allow traffic only from a
+      specific virtual network, and backups to that account currently fail
+      with storage access errors. What should you do so that custom backups
+      succeed while the storage firewall stays enabled?
+    options:
+      - id: a
+        text: "Grant the app's managed identity Storage Blob Data Contributor on the storage account"
+      - id: b
+        text: "Rely on automatic backups instead, because they can be written to any storage account"
+      - id: c
+        text: "Integrate the app with the virtual network, allow that network on the storage account, and select Backup/restore over virtual network integration"
+      - id: d
+        text: "Scale the plan to Premium so that backups bypass storage firewalls"
+    answer: [c]
+    explanation: >-
+      Custom backups can go to a firewall-protected storage account when the app
+      is integrated with a virtual network that the storage account allows, and
+      you select Backup/restore over virtual network integration. Managed
+      identity authentication to the storage account isn't supported for App
+      Service backup; SAS-based authorization is required. Automatic backups
+      need no storage account and are stored on the platform, so they don't
+      meet the requirement for backups in the company account. No tier bypasses
+      the storage firewall.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/app-service/manage-backup
+
+  - id: q27
+    domain: AZ104-3
+    skill: Configure deployment slots for an App Service
+    kind: single
+    stem: >-
+      A web app has a production slot and a staging slot. Each slot has an app
+      setting named PaymentsEndpoint, and staging points to a test payments
+      service. After the last swap, production started calling the test
+      payments service. You need the value of PaymentsEndpoint to stay with its
+      slot on every future swap. What should you do?
+    options:
+      - id: a
+        text: "Mark PaymentsEndpoint as a deployment slot setting in each slot"
+      - id: b
+        text: "Enable auto swap on the staging slot"
+      - id: c
+        text: "Use swap with preview for future swaps"
+      - id: d
+        text: "Clone the production configuration into the staging slot before each swap"
+    answer: [a]
+    explanation: >-
+      App settings are swapped by default but can be configured to stick to a
+      slot. Selecting Deployment slot setting, or using --slot-settings in the
+      CLI, makes the setting unswappable. Auto swap automates swapping after
+      each push and would still move the setting. Swap with preview only pauses
+      after applying target settings so you can validate. Cloning configuration
+      copies values when a slot is created and does not change swap behavior.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/app-service/deploy-staging-slots
+
+  - id: q28
+    domain: AZ104-4
+    skill: Create and configure virtual networks and subnets
+    kind: single
+    stem: >-
+      You are adding a subnet for a tracking service that needs 25 VM network
+      interfaces, each with one private IP address. The virtual network has
+      limited free address space, so you must choose the smallest subnet that
+      can host all 25 interfaces. Which prefix length should you use?
+    options:
+      - id: a
+        text: "/29"
+      - id: b
+        text: "/28"
+      - id: c
+        text: "/27"
+      - id: d
+        text: "/26"
+    answer: [c]
+    explanation: >-
+      Azure reserves five IP addresses in every subnet: the first four and the
+      last one. A /27 contains 32 addresses, leaving 27 usable, which fits 25
+      interfaces. A /28 has 16 addresses and only 11 usable. A /29 is the
+      smallest supported IPv4 subnet and leaves just three usable addresses. A
+      /26 works but wastes address space that the scenario says is limited.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-faq
+
+  - id: q29
+    domain: AZ104-4
+    skill: Create and configure virtual networks and subnets
+    kind: single
+    stem: >-
+      Veymark Logistics wants to deploy VMs in West Europe and North Europe and
+      proposes creating a single virtual network with one subnet in each region
+      so that all VMs share one address space. You need to advise on the design.
+      What should you recommend?
+    options:
+      - id: a
+        text: "Create one virtual network with a subnet in each region, because a virtual network can span regions"
+      - id: b
+        text: "Create one virtual network and deploy it across availability zones in both regions"
+      - id: c
+        text: "Create a virtual network in each region with overlapping address spaces, then peer them"
+      - id: d
+        text: "Create a virtual network in each region with non-overlapping address spaces, then connect them, for example with peering"
+    answer: [d]
+    explanation: >-
+      A virtual network is limited to a single region, although it does span
+      the availability zones within that region, so one virtual network can't
+      host subnets in two regions. You need a virtual network per region. To
+      connect them with peering, the address spaces must not overlap, because
+      virtual network peering can't be enabled when address spaces overlap.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-faq
+
+  - id: q30
+    domain: AZ104-4
+    skill: Evaluate effective security rules in NSGs
+    kind: single
+    stem: >-
+      An NSG associated with a management subnet has two custom inbound rules.
+      Rule DenyRdpAll has priority 150 and denies TCP port 3389 from any source.
+      Rule AllowRdpOffice has priority 200 and allows TCP port 3389 from the
+      office public IP range. Administrators in the office cannot connect by
+      using RDP. You must allow RDP from the office while still denying it from
+      everywhere else. What should you do?
+    options:
+      - id: a
+        text: "Change the priority of AllowRdpOffice to a number lower than 150, such as 140"
+      - id: b
+        text: "Change the priority of AllowRdpOffice to 4096"
+      - id: c
+        text: "Delete the DenyAllInbound default rule"
+      - id: d
+        text: "Change the priority of DenyRdpAll to 200 so both rules share a priority"
+    answer: [a]
+    explanation: >-
+      NSG rules are processed in priority order, lower numbers first, and
+      processing stops at the first match. Office RDP traffic matches
+      DenyRdpAll at 150 before reaching the allow rule at 200. Giving
+      AllowRdpOffice a lower number, such as 140, makes it match first while
+      other sources still hit the deny rule. A priority of 4096 makes it worse.
+      Default rules can't be removed, and two rules can't share the same
+      priority and direction.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/network-security-groups-overview
+
+  - id: q31
+    domain: AZ104-4
+    skill: Create and configure network security groups (NSGs) and application security groups
+    kind: single
+    stem: >-
+      You created an application security group named AsgWeb and added the
+      network interfaces of two web VMs in VNet1. You now try to add the network
+      interface of a new web VM in VNet2 to AsgWeb, and the operation fails.
+      What is the cause?
+    options:
+      - id: a
+        text: "A network interface can be a member of only one application security group"
+      - id: b
+        text: "All network interfaces in an application security group must be in the same virtual network as the first interface assigned to it"
+      - id: c
+        text: "An application security group can be used only when an NSG is associated with the network interface"
+      - id: d
+        text: "Application security groups support at most two network interfaces"
+    answer: [b]
+    explanation: >-
+      All network interfaces assigned to an application security group must
+      exist in the same virtual network as the first interface assigned to it,
+      so after VNet1 interfaces are members, a VNet2 interface can't be added.
+      A network interface can belong to multiple application security groups up
+      to Azure limits. Membership doesn't require an NSG on the interface; in
+      the documented example, the NSG is associated to the subnets and none of
+      the interfaces has one.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/application-security-groups
+
+  - id: q32
+    domain: AZ104-4
+    skill: Configure Azure DNS
+    kind: single
+    stem: >-
+      A virtual network is linked to the private DNS zone internal.veymark.local
+      with autoregistration enabled. A records appear automatically for every
+      VM in the virtual network, but no record appears for an internal load
+      balancer that you deployed in the same virtual network. Clients must
+      resolve the load balancer by name. What should you do?
+    options:
+      - id: a
+        text: "Enable autoregistration on a second virtual network link to the same virtual network"
+      - id: b
+        text: "Restart the load balancer so that autoregistration detects it"
+      - id: c
+        text: "Manually create an A record for the internal load balancer in the private DNS zone"
+      - id: d
+        text: "Create a PTR record so that autoregistration can match the load balancer IP address"
+    answer: [c]
+    explanation: >-
+      Autoregistration works only for virtual machines, and only for the
+      primary NIC. For other resources, such as internal load balancers, you
+      create DNS records manually in the private DNS zone linked to the virtual
+      network. A virtual network can be linked to only one private DNS zone
+      with autoregistration enabled, and restarting a resource doesn't change
+      which resource types are registered. Autoregistration doesn't support
+      reverse DNS pointer records.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/dns/private-dns-autoregistration
+
+  - id: q33
+    domain: AZ104-4
+    skill: Configure Azure DNS
+    kind: multiple
+    stem: >-
+      Veymark Logistics registered the domain veymarklogistics.com with a
+      third-party domain registrar. You need Azure DNS to host the public DNS
+      records for the domain so that internet users resolve names from Azure.
+      Which two actions should you perform? Each correct answer presents part
+      of the solution. Choose two.
+    options:
+      - id: a
+        text: "Create a public DNS zone named veymarklogistics.com in Azure DNS"
+      - id: b
+        text: "Create a private DNS zone named veymarklogistics.com and link it to your virtual networks"
+      - id: c
+        text: "At the registrar, set the NS records for the domain to all four Azure DNS name servers assigned to the zone"
+      - id: d
+        text: "At the registrar, create a CNAME record for the domain that points to azure-dns.com"
+      - id: e
+        text: "Manually create an SOA record in the Azure DNS zone before delegating"
+    answer: [a, c]
+    explanation: >-
+      To host a domain in Azure DNS, you create the DNS zone, retrieve the name
+      servers Azure assigns to it, and delegate the domain by updating the NS
+      records at the registrar with all four Azure DNS name servers. A private
+      zone resolves names only inside linked virtual networks, not for internet
+      users. Delegation uses NS records, not a CNAME. The SOA record is created
+      automatically with the zone, and you query it with nslookup to verify the
+      delegation.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/dns/dns-delegate-domain-azure-dns
+
+  - id: q34
+    domain: AZ104-4
+    skill: Configure Azure DNS
+    kind: single
+    stem: >-
+      The public website for veymarklogistics.com is served by a VM behind a
+      Standard SKU public IP address resource. The DNS zone is hosted in Azure
+      DNS. Users must reach the site at the zone apex, veymarklogistics.com, and
+      the DNS record must update automatically if the public IP address changes
+      or is deleted. What should you create at the zone apex?
+    options:
+      - id: a
+        text: "A CNAME record that points to the public IP address DNS name"
+      - id: b
+        text: "An A record that contains the current public IP address"
+      - id: c
+        text: "An alias A record set that references the public IP address resource"
+      - id: d
+        text: "An NS record that points to the public IP address resource"
+    answer: [c]
+    explanation: >-
+      An alias A record set can point to a Standard SKU public IP resource and
+      changes automatically if the IP address changes or is deleted, which
+      prevents dangling records. Alias records can be created at the zone apex.
+      The DNS protocol prevents CNAME records at the zone apex. A plain A record
+      with a static value would not follow IP changes. NS records delegate
+      zones and don't point to IP resources.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/dns/dns-alias
+
+  - id: q35
+    domain: AZ104-5
+    skill: Interpret metrics in Azure Monitor
+    kind: single
+    stem: >-
+      In metrics explorer, you chart the Network Out Total metric for a VM with
+      the Sum aggregation. The time range is the last 24 hours and you set the
+      time granularity to 15 minutes. How many data points does the chart plot,
+      and what does each data point represent?
+    options:
+      - id: a
+        text: "96 data points, each the sum of bytes sent during a 15-minute period"
+      - id: b
+        text: "96 data points, each the average of bytes sent per minute during a 15-minute period"
+      - id: c
+        text: "1,440 data points, each the bytes sent during one minute"
+      - id: d
+        text: "48 data points, each the sum of bytes sent during a 30-minute period"
+    answer: [a]
+    explanation: >-
+      Metrics explorer aggregates stored values into one data point per time
+      granularity interval. With 15-minute granularity over 24 hours, the chart
+      has 4 points per hour times 24, or 96 points, and with the Sum aggregation
+      each point is the total of all values in that 15-minute period. Average
+      would divide Sum by Count. A 1-minute granularity gives 1,440 points, and
+      a 30-minute granularity gives 48.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/metrics/metrics-aggregation-explained
+
+  - id: q36
+    domain: AZ104-5
+    skill: Interpret metrics in Azure Monitor
+    kind: single
+    stem: >-
+      An operations analyst wants to compare VM CPU platform metrics from 60
+      days ago with today. In the Metrics tile, the analyst sets a custom time
+      range covering the last 60 days, and the chart shows only partial data.
+      What should the analyst do to view the older data in metrics explorer?
+    options:
+      - id: a
+        text: "Nothing can be done, because platform metrics are retained for only 30 days"
+      - id: b
+        text: "Select a time range of 30 days or less and pan the chart back through the retention window"
+      - id: c
+        text: "Change the time granularity to 1 minute so that more data points are loaded"
+      - id: d
+        text: "Install the legacy Log Analytics agent on the VM to backfill the missing data"
+    answer: [b]
+    explanation: >-
+      Platform metrics are stored for 93 days, but a single chart in the Metrics
+      tile can query at most 30 days of data. If the chart is blank or partial,
+      keep the difference between start and end dates at 30 days or less, then
+      pan the chart to view the full retention window. A finer granularity
+      doesn't lift the 30-day limit. The Log Analytics agent was retired and
+      can't backfill past platform metrics.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/metrics/data-platform-metrics
+
+  - id: q37
+    domain: AZ104-5
+    skill: Use Azure Network Watcher and Connection monitor
+    kind: single
+    stem: >-
+      A VM named vm-edi01 cannot open outbound TCP connections to a partner
+      server on port 443. The VM's subnet and its network interface each have
+      an NSG. You need to quickly identify whether a security rule is blocking
+      the traffic and, if so, which rule and which NSG. Network Watcher is
+      enabled in the VM's region. Which Network Watcher feature should you use?
+    options:
+      - id: a
+        text: "Next hop"
+      - id: b
+        text: "IP flow verify"
+      - id: c
+        text: "Connection monitor"
+      - id: d
+        text: "Virtual network flow logs"
+    answer: [b]
+    explanation: >-
+      IP flow verify tests a flow by direction, protocol, local and remote IP,
+      and ports against the NSG rules applied to the VM's network interface,
+      whether associated with the subnet or the NIC. It returns Access allowed
+      or Access denied, the rule name, and the NSG. Next hop reports routing
+      information, not security rules. Connection monitor provides continuous
+      reachability and latency monitoring rather than a quick rule check. Flow
+      logs record traffic but don't directly name the blocking rule.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/network-watcher/ip-flow-verify-overview
+      - https://learn.microsoft.com/en-us/azure/network-watcher/next-hop-overview
+
+  - id: q38
+    domain: AZ104-5
+    skill: Use Azure Network Watcher and Connection monitor
+    kind: single
+    stem: >-
+      You are creating a connection monitor to measure packet loss and
+      round-trip time from Azure VMs and from an on-premises Windows server in
+      a regional office to an Azure storage account endpoint. The Azure VMs
+      appear as available sources, but the on-premises server does not. What
+      must you do so the on-premises server can be a source endpoint?
+    options:
+      - id: a
+        text: "Install the legacy Log Analytics agent on the on-premises server"
+      - id: b
+        text: "Install the Network Watcher Agent VM extension on the storage account"
+      - id: c
+        text: "Enable the Azure Arc agent on the server, and then enable Azure Monitor Agent"
+      - id: d
+        text: "Add the server's public IP address as a destination endpoint instead"
+    answer: [c]
+    explanation: >-
+      To monitor connectivity from an on-premises host, the host must be
+      enabled with the Azure Arc agent, and then Azure Monitor Agent is
+      enabled. Connection monitor currently supports only Arc-enabled
+      on-premises hosts as sources, and the Log Analytics agent is no longer
+      supported for this purpose. The Network Watcher Agent extension is for
+      Azure VMs and scale sets that act as sources, and destinations don't
+      need it. Listing the server as a destination doesn't make it a source.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/network-watcher/connection-monitor-overview
+
+  - id: q39
+    domain: AZ104-5
+    skill: Create a Recovery Services vault
+    kind: multiple
+    stem: >-
+      Veymark Logistics runs VMs in East US and in West Europe. You must back
+      them up with Azure Backup. Compliance requires that backup data stay in
+      the region of each workload and be protected against the failure of a
+      single datacenter zone, by using zone-redundant storage. No backups have
+      been configured yet. Which two actions should you perform? Each correct
+      answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: "Create one Recovery Services vault in East US and one in West Europe"
+      - id: b
+        text: "Create a single Recovery Services vault in East US and protect the VMs from both regions"
+      - id: c
+        text: "Set the storage replication type of each vault to Zone-redundant before you configure any backup"
+      - id: d
+        text: "Configure backups first, and then change each vault's storage replication type to Zone-redundant"
+      - id: e
+        text: "Create a storage account in each region and select it as the backup target in the vault"
+    answer: [a, c]
+    explanation: >-
+      A Recovery Services vault must be in the same region as the data source,
+      so each region needs its own vault. Change the storage replication type
+      before configuring backup, because afterward the option is disabled; ZRS
+      keeps data available within the region without downtime and supports
+      data residency. You don't specify storage accounts for backup data, since
+      the vault and Azure Backup handle storage automatically.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/backup/backup-create-recovery-services-vault
+
+  - id: q40
+    domain: AZ104-5
+    skill: Perform a failover to a secondary region by using Site Recovery
+    kind: multiple
+    stem: >-
+      During a regional outage, you fail over a replicated Azure VM to the
+      secondary region by using Azure Site Recovery with the Latest processed
+      recovery point. The VM is running in the secondary region and the
+      application team has validated it. You need to finish the failover and
+      then start replicating the VM back toward the primary region. Which two
+      actions should you perform? Each correct answer presents part of the
+      solution. Choose two.
+    options:
+      - id: a
+        text: "Select Commit on the replicated item"
+      - id: b
+        text: "Select Cleanup test failover and mark testing as complete"
+      - id: c
+        text: "Select Re-protect after the status shows Failover committed"
+      - id: d
+        text: "Select Change recovery point after the commit completes"
+      - id: e
+        text: "Disable replication on the replicated item and enable it again from the primary region"
+    answer: [a, c]
+    explanation: >-
+      After a validated failover, Commit finishes the failover; it deletes the
+      available recovery points, so you can't change the recovery point
+      afterward. When the status shows Failover committed, Re-protect starts
+      replication from the secondary region back to the primary region.
+      Cleanup test failover applies to disaster recovery drills, not a real
+      failover. Disabling and re-enabling replication isn't the documented
+      reprotect flow.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/site-recovery/azure-to-azure-tutorial-failover-failback
+      - https://learn.microsoft.com/en-us/azure/site-recovery/azure-to-azure-tutorial-dr-drill

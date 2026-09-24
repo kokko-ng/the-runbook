@@ -14,6 +14,17 @@ export const router = createRouter({
     },
     { path: '/skills', name: 'skills', component: () => import('@/views/SkillsView.vue') },
     { path: '/review', name: 'review', component: () => import('@/views/ReviewView.vue') },
+    {
+      path: '/practice',
+      name: 'practice',
+      component: () => import('@/views/PracticeExamsView.vue'),
+    },
+    {
+      path: '/practice/:examId',
+      name: 'practice-exam',
+      component: () => import('@/views/PracticeExamView.vue'),
+      props: true,
+    },
     { path: '/map', name: 'map', component: () => import('@/views/MapView.vue') },
     { path: '/account', name: 'account', component: () => import('@/views/AccountView.vue') },
     { path: '/about', name: 'about', component: () => import('@/views/AboutView.vue') },

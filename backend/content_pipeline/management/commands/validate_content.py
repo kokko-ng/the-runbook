@@ -9,7 +9,7 @@ import sys
 
 from django.core.management.base import BaseCommand, CommandError
 
-from content_pipeline import core
+from content_pipeline import core, practice
 
 
 class Command(BaseCommand):
@@ -35,6 +35,8 @@ class Command(BaseCommand):
             require_full_coverage=not options["partial"],
             require_all_chapters=options["require_all_chapters"],
         )
+        practice_sets = practice.load_practice()
+        problems += practice.validate_practice(practice_sets)
         coverage = core.build_coverage(library)
         total_objectives = sum(len(s.all_objectives) for s in library.objective_sets)
 
@@ -49,6 +51,7 @@ class Command(BaseCommand):
                         "pending": coverage.pending,
                         "quests": len(library.quests),
                         "encounters": sum(len(q.encounters) for q in library.quests),
+                        "practice_exams": sum(len(p.exams) for p in practice_sets),
                     },
                     indent=2,
                 )
@@ -60,7 +63,8 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"{len(library.quests)} quests, "
                 f"{sum(len(q.encounters) for q in library.quests)} encounters, "
-                f"{covered}/{total_objectives} objectives covered"
+                f"{covered}/{total_objectives} objectives covered, "
+                f"{sum(len(p.exams) for p in practice_sets)} practice exams"
             )
             if coverage.unmapped:
                 self.stdout.write(

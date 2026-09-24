@@ -1,0 +1,1349 @@
+# AZ-104 practice exam 4. Written by Opus 5.5 (claude-opus-5-5); every
+# question is grounded in, and cites, pages on learn.microsoft.com.
+id: az-104-4
+exam: AZ-104
+number: 4
+title: AZ-104 practice exam 4
+author: Opus 5.5
+model_id: claude-opus-5-5
+written_on: "2026-09-24"
+questions:
+  - id: q01
+    domain: AZ104-1
+    skill: Manage external users
+    kind: single
+    stem: >-
+      Veymark Logistics has set the Microsoft Entra external collaboration
+      guest invite setting to "Only users assigned to specific admin roles can
+      invite guest users". A project coordinator who is a member user with no
+      admin roles must start inviting partner contacts as B2B guests. You must
+      follow the principle of least privilege and must not change who else can
+      invite guests. What should you do?
+    options:
+      - id: a
+        text: Assign the User Administrator role to the project coordinator.
+      - id: b
+        text: >-
+          Change the guest invite setting to "Anyone in the organization can
+          invite guest users including guests and non-admins".
+      - id: c
+        text: Assign the Guest Inviter role to the project coordinator.
+      - id: d
+        text: >-
+          Add the partner domains to an allow list under Collaboration
+          restrictions.
+    answer: [c]
+    explanation: >-
+      The Guest Inviter role lets an individual user invite guests without a
+      higher-privilege admin role, and users with this role can invite guests
+      even when "Only users assigned to specific admin roles can invite guest
+      users" is selected. User Administrator can also invite guests but grants
+      far more than needed. Changing the invite setting would let every user,
+      including guests, send invitations. An allow list controls which domains
+      can receive invitations, not who can send them.
+    sources:
+      - https://learn.microsoft.com/en-us/entra/external-id/external-collaboration-settings-configure
+  - id: q02
+    domain: AZ104-1
+    skill: Manage external users
+    kind: single
+    stem: >-
+      Your organization has used B2B collaboration for a year. Last month, a
+      guest with a gmail.com address redeemed an invitation. Yesterday, another
+      user invited a second gmail.com contact who has not yet redeemed the
+      invitation. Today, you set Collaboration restrictions to "Deny
+      invitations to the specified domains" and add gmail.com. What is the
+      effect on these two external users?
+    options:
+      - id: a
+        text: >-
+          Both guests are blocked immediately, and the redeemed guest account is
+          deleted.
+      - id: b
+        text: >-
+          The redeemed guest keeps access, and the pending invitation fails when
+          the contact tries to redeem it.
+      - id: c
+        text: >-
+          The redeemed guest is blocked at next sign-in, and the pending
+          invitation can still be redeemed because it was sent before the
+          policy.
+      - id: d
+        text: >-
+          Neither guest is affected, because the block list applies only to
+          invitations sent after it is saved.
+    answer: [b]
+    explanation: >-
+      The allow or block list doesn't apply to external users who already
+      redeemed their invitation, so the first guest keeps access. The list is
+      enforced after it is set up, and if an invitation is still pending when
+      you block its domain, the user's attempt to redeem the invitation fails.
+      The policy doesn't delete existing guest accounts.
+    sources:
+      - https://learn.microsoft.com/en-us/entra/external-id/allow-deny-list
+  - id: q03
+    domain: AZ104-1
+    skill: Manage external users
+    kind: single
+    stem: >-
+      A security review at Veymark Logistics found that B2B guest users can see
+      the membership of groups in the Microsoft Entra tenant. The new
+      requirement is that guests can view only their own profile and must not
+      see other users, groups, or group memberships. Internal member users must
+      keep their current access. Which Guest user access option should you
+      select in External collaboration settings?
+    options:
+      - id: a
+        text: Guest users have the same access as members (most inclusive)
+      - id: b
+        text: >-
+          Guest users have limited access to properties and memberships of
+          directory objects
+      - id: c
+        text: >-
+          Guest user access is restricted to properties and memberships of
+          their own directory objects (most restrictive)
+      - id: d
+        text: >-
+          No one in the organization can invite guest users including admins
+          (most restrictive)
+    answer: [c]
+    explanation: >-
+      The most restrictive guest user access option lets guests access only
+      their own profiles; they can't see other users' profiles, groups, or
+      group memberships. The default option, limited access, still lets guests
+      see the membership of all non-hidden groups, which is the behavior the
+      review flagged. Same access as members is the most inclusive. The "No one
+      can invite" choice is a guest invite setting and doesn't restrict what
+      existing guests can see.
+    sources:
+      - https://learn.microsoft.com/en-us/entra/external-id/external-collaboration-settings-configure
+  - id: q04
+    domain: AZ104-1
+    skill: Manage built-in Azure roles
+    kind: single
+    stem: >-
+      A server operations team must create and manage virtual machines, manage
+      their disks, and reset local passwords by using VM extensions in a
+      resource group. The networking team owns the virtual networks, and the
+      operations team must not get management access to them or to the storage
+      accounts that the VMs use. The team must not be able to assign roles.
+      Which built-in role should you assign to the team at the resource group
+      scope?
+    options:
+      - id: a
+        text: Contributor
+      - id: b
+        text: Virtual Machine Contributor
+      - id: c
+        text: Virtual Machine Administrator Login
+      - id: d
+        text: Network Contributor
+    answer: [b]
+    explanation: >-
+      Virtual Machine Contributor lets users create and manage virtual
+      machines, manage disks, and reset passwords and local accounts by using
+      VM extensions, and it doesn't grant management access to the virtual
+      network or storage account the VMs are connected to or allow role
+      assignment. Contributor grants full access to manage all resources in the
+      scope, including networks. Virtual Machine Administrator Login only lets
+      users view VMs and sign in as administrator. Network Contributor manages
+      networks and doesn't grant permission to deploy or manage VMs.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
+  - id: q05
+    domain: AZ104-1
+    skill: Manage built-in Azure roles
+    kind: single
+    stem: >-
+      A deployment pipeline's managed identity creates resources and must then
+      assign Azure roles to the managed identities of those resources at a
+      resource group scope. Your security team requires that this identity be
+      able to manage access only by assigning Azure RBAC roles, and not by
+      other means such as Azure Policy. Which built-in role should you assign
+      to the pipeline identity for access management?
+    options:
+      - id: a
+        text: Owner
+      - id: b
+        text: User Access Administrator
+      - id: c
+        text: Role Based Access Control Administrator
+      - id: d
+        text: Contributor
+    answer: [c]
+    explanation: >-
+      Role Based Access Control Administrator manages access to Azure resources
+      by assigning roles using Azure RBAC and explicitly doesn't allow you to
+      manage access using other ways, such as Azure Policy. User Access
+      Administrator manages user access and can also assign policy according to
+      the management group role chart. Owner grants full access to all
+      resources. Contributor can't assign roles in Azure RBAC.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
+      - https://learn.microsoft.com/en-us/azure/governance/management-groups/overview
+  - id: q06
+    domain: AZ104-1
+    skill: Manage built-in Azure roles
+    kind: single
+    stem: >-
+      A data analyst must read and list blobs in a storage account by signing
+      in with a Microsoft Entra account. The analyst must not be able to
+      change or delete data and must not be able to obtain the storage account
+      access keys. Which built-in role should you assign at the storage account
+      scope?
+    options:
+      - id: a
+        text: Storage Account Contributor
+      - id: b
+        text: Storage Blob Data Contributor
+      - id: c
+        text: Storage Blob Data Reader
+      - id: d
+        text: Contributor
+    answer: [c]
+    explanation: >-
+      Storage Blob Data Reader allows reading and listing Azure Storage
+      containers and blobs, which meets the requirement without write access.
+      Storage Blob Data Contributor adds write and delete permissions. Storage
+      Account Contributor and Contributor include the listkeys action, which
+      grants access to the account keys and therefore full access to all data
+      through Shared Key authorization.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
+      - https://learn.microsoft.com/en-us/azure/storage/common/shared-key-authorization-prevent
+  - id: q07
+    domain: AZ104-1
+    skill: Manage resource groups
+    kind: single
+    stem: >-
+      Veymark Logistics is deploying a new tracking solution that has resources
+      in both West Europe and East US. All the resources share the same
+      lifecycle and must be deployed, updated, and deleted together. A
+      compliance rule requires that the resource group metadata be stored in
+      West Europe. What should you do?
+    options:
+      - id: a
+        text: >-
+          Create one resource group in West Europe and deploy the resources for
+          both regions into it.
+      - id: b
+        text: >-
+          Create one resource group per region, because a resource group can
+          contain only resources in its own region.
+      - id: c
+        text: >-
+          Create the resource group in East US and apply a tag that records
+          West Europe as the metadata location.
+      - id: d
+        text: >-
+          Create a management group in West Europe and place the resources
+          directly in it.
+    answer: [a]
+    explanation: >-
+      A resource group stores metadata about its resources, and the location
+      you specify for the resource group is where that metadata is stored.
+      Resources inside a resource group can be in different regions, so one
+      West Europe resource group can hold resources from both regions. Resources
+      that share a lifecycle should be in the same resource group. A tag doesn't
+      change where metadata is stored, and management groups hold
+      subscriptions and other management groups, not resources.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/manage-resource-groups-portal
+      - https://learn.microsoft.com/en-us/azure/governance/management-groups/overview
+  - id: q08
+    domain: AZ104-1
+    skill: Manage resource groups
+    kind: multiple
+    stem: >-
+      You plan to move a virtual machine, its managed disks, and its network
+      resources from a resource group in Subscription1 to a resource group in
+      Subscription2. The destination subscription has never hosted a virtual
+      machine. Which two conditions must be met for the move to succeed? Each
+      correct answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: >-
+          Subscription1 and Subscription2 must exist in the same Microsoft
+          Entra tenant.
+      - id: b
+        text: >-
+          Subscription2 must be registered for the resource providers of the
+          resources being moved.
+      - id: c
+        text: >-
+          A read-only lock must be placed on the source resource group to
+          prevent changes during the move.
+      - id: d
+        text: >-
+          Role assignments on the VM must be copied first so that they move
+          with the resource.
+      - id: e
+        text: >-
+          The destination resource group must be in the same region as the
+          virtual machine.
+    answer: [a, b]
+    explanation: >-
+      Source and destination subscriptions must be in the same Microsoft Entra
+      tenant, and the destination subscription must be registered for the
+      resource provider of each moved resource, or the move fails with an error
+      that the subscription isn't registered for a resource type. Resources
+      can't be moved if a read-only lock exists on the source or destination.
+      Role assignments don't move; they become orphaned and must be re-created.
+      A move doesn't change the physical region of a resource, so the resource
+      group region isn't a requirement.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-resource-group-and-subscription
+  - id: q09
+    domain: AZ104-1
+    skill: Configure resource locks
+    kind: single
+    stem: >-
+      A resource group that contains production virtual machines has a
+      Read-only lock to protect it from accidental deletion. Operators with the
+      Virtual Machine Contributor role now report that they can't start or
+      restart the VMs. You must allow the operators to start and restart VMs
+      while still preventing anyone from deleting the resource group. What
+      should you do?
+    options:
+      - id: a
+        text: Assign the Owner role to the operators at the resource group scope.
+      - id: b
+        text: >-
+          Add a Delete lock to the resource group and keep the existing
+          Read-only lock.
+      - id: c
+        text: Replace the Read-only lock with a Delete lock on the resource group.
+      - id: d
+        text: Move the virtual machines to a new resource group that has no lock.
+    answer: [c]
+    explanation: >-
+      A read-only lock on a resource group that contains a VM prevents all
+      users from starting or restarting it, because those operations use POST
+      requests. A Delete (CanNotDelete) lock lets authorized users read and
+      modify resources but not delete them. Locks override user permissions,
+      so assigning Owner doesn't help. When locks are combined, the most
+      restrictive lock takes precedence, so keeping the Read-only lock keeps
+      the problem. Moving the VMs out leaves them unprotected, and a
+      read-only lock on the group also blocks moving resources out.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/lock-resources
+  - id: q10
+    domain: AZ104-1
+    skill: Configure management groups
+    kind: single
+    stem: >-
+      Your organization assigned an Azure Policy that restricts allowed regions
+      to a management group named Corp, which sits under the Tenant root group.
+      A team created a new subscription this morning and deployed resources to
+      a disallowed region without being blocked. The policy works for the
+      subscriptions that are already under Corp. What is the most likely
+      cause?
+    options:
+      - id: a
+        text: >-
+          New subscriptions are placed in the root management group by default,
+          so the new subscription isn't under Corp.
+      - id: b
+        text: >-
+          The management group hierarchy exceeds the supported depth, so policy
+          inheritance stops.
+      - id: c
+        text: >-
+          Policies assigned to management groups apply only to subscriptions
+          that have a matching tag.
+      - id: d
+        text: >-
+          A subscription can have multiple parents, and the new subscription was
+          added to a second management group that overrides Corp.
+    answer: [a]
+    explanation: >-
+      New subscriptions automatically default to the root management group
+      when they are created, so a policy assigned to Corp doesn't apply until
+      the subscription is moved under Corp. Governance conditions on a
+      management group cascade to all associated subscriptions through
+      inheritance, and each subscription supports only one parent. The
+      six-level depth limit wouldn't affect only one new subscription, and
+      policy inheritance doesn't depend on tags.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/governance/management-groups/overview
+  - id: q11
+    domain: AZ104-2
+    skill: Manage access keys
+    kind: single
+    stem: >-
+      An application at Veymark Logistics connects to a storage account with a
+      connection string that uses key1. The keys aren't stored in Azure Key
+      Vault. You must manually rotate both access keys without the application
+      losing access to storage. What should you do first?
+    options:
+      - id: a
+        text: Regenerate key1 in the Access keys pane.
+      - id: b
+        text: >-
+          Update the application connection string to reference the secondary
+          access key (key2).
+      - id: c
+        text: Regenerate key1 and key2 at the same time.
+      - id: d
+        text: Set a key expiration policy of 60 days on the storage account.
+    answer: [b]
+    explanation: >-
+      The documented manual rotation process starts by updating connection
+      strings to reference the secondary key, then regenerating the primary
+      key, updating the connection strings to the new primary key, and then
+      regenerating the secondary key. Two keys exist so that applications keep
+      access throughout rotation. Regenerating key1 first, or both keys
+      together, breaks clients still using key1. A key expiration policy only
+      sets a rotation reminder.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage
+  - id: q12
+    domain: AZ104-2
+    skill: Manage access keys
+    kind: single
+    stem: >-
+      You want Azure to remind you to rotate the access keys of an older
+      storage account every 90 days. In the Azure portal, on the Access keys
+      pane, the Set rotation reminder button is unavailable (grayed out). What
+      should you do so that you can create the key expiration policy?
+    options:
+      - id: a
+        text: Disable Shared Key authorization on the storage account.
+      - id: b
+        text: Rotate each of the two account access keys at least once.
+      - id: c
+        text: >-
+          Assign yourself the Storage Account Key Operator Service Role on the
+          storage account.
+      - id: d
+        text: Store both access keys as secrets in Azure Key Vault.
+    answer: [b]
+    explanation: >-
+      A key expiration policy needs the keyCreationTime property. Older
+      accounts can have a null keyCreationTime, and until you rotate the keys
+      you can't create the policy. If the Set rotation reminder button is
+      grayed out, you need to rotate each key. Disabling Shared Key access or
+      storing keys in Key Vault doesn't set keyCreationTime, and the role
+      assignment doesn't address the missing property.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage
+  - id: q13
+    domain: AZ104-2
+    skill: Manage access keys
+    kind: multiple
+    stem: >-
+      An operations engineer must be able to view the access keys of a storage
+      account in the Azure portal so that the engineer can update a legacy
+      application configuration. The engineer isn't a Service Administrator.
+      Which two built-in roles, assigned at the storage account scope, would
+      each let the engineer view the access keys? Each correct answer presents
+      a complete solution. Choose two.
+    options:
+      - id: a
+        text: Reader
+      - id: b
+        text: Contributor
+      - id: c
+        text: Storage Account Key Operator Service Role
+      - id: d
+        text: Storage Blob Data Contributor
+      - id: e
+        text: Storage Blob Data Reader
+    answer: [b, c]
+    explanation: >-
+      Viewing access keys requires the
+      Microsoft.Storage/storageAccounts/listkeys/action permission. The
+      built-in roles that include it are Owner, Contributor, and Storage
+      Account Key Operator Service Role. Reader can view resources but can't
+      make changes or list keys. The Storage Blob Data roles grant data access
+      to containers and blobs through Microsoft Entra ID and don't include the
+      listkeys action.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
+  - id: q14
+    domain: AZ104-2
+    skill: Configure storage account encryption
+    kind: multiple
+    stem: >-
+      You plan to configure an existing storage account to use a
+      customer-managed key stored in an Azure key vault. The key vault is in a
+      different subscription from the storage account. Which two settings must
+      the key vault have for the configuration to be supported? Each correct
+      answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: Soft delete is enabled.
+      - id: b
+        text: Purge protection is enabled.
+      - id: c
+        text: >-
+          The key vault is moved to the same subscription and region as the
+          storage account.
+      - id: d
+        text: The key is an elliptic curve (EC) key.
+      - id: e
+        text: Public network access to the key vault is disabled.
+    answer: [a, b]
+    explanation: >-
+      A key vault or managed HSM that stores a customer-managed key for Azure
+      Storage must have soft delete and purge protection enabled, and the key
+      must be an RSA or RSA-HSM key of size 2048, 3072, or 4096, so an EC key
+      isn't supported. The storage account and key vault can be in different
+      Microsoft Entra tenants, regions, and subscriptions, so moving the vault
+      isn't required. Disabling public network access isn't a listed
+      requirement.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/customer-managed-keys-overview
+  - id: q15
+    domain: AZ104-2
+    skill: Configure storage account encryption
+    kind: single
+    stem: >-
+      A new compliance rule requires that an existing general-purpose v2
+      storage account have infrastructure encryption enabled at the storage
+      account level so that all data is encrypted twice with two different
+      keys. The account currently uses Microsoft-managed keys and was created
+      without infrastructure encryption. What should you do?
+    options:
+      - id: a
+        text: >-
+          Enable infrastructure encryption on the Encryption page of the
+          existing storage account.
+      - id: b
+        text: >-
+          Run az storage account update with the
+          --require-infrastructure-encryption option.
+      - id: c
+        text: >-
+          Configure customer-managed keys in Azure Key Vault for the existing
+          account.
+      - id: d
+        text: >-
+          Create a new storage account with infrastructure encryption enabled
+          and migrate the data to it.
+    answer: [d]
+    explanation: >-
+      Infrastructure encryption must be configured when the storage account is
+      created and can't be enabled or disabled after the account exists, so
+      you need a new account created with it enabled. Customer-managed keys
+      change the key that protects service-level encryption; they don't add
+      the second, infrastructure-level layer, which always uses a separate
+      Microsoft-managed key.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/infrastructure-encryption-enable
+  - id: q16
+    domain: AZ104-2
+    skill: Configure soft delete for blobs and containers
+    kind: single
+    stem: >-
+      A storage account has blob soft delete with a 14-day retention period and
+      blob versioning enabled. A user deleted a blob named manifest.json two
+      days ago. You call the Undelete Blob operation, but the blob still has no
+      current version. You must make manifest.json available again with its
+      content from before the deletion. What should you do next?
+    options:
+      - id: a
+        text: >-
+          Promote the most recent previous version by copying it over the
+          current version.
+      - id: b
+        text: Increase the blob soft delete retention period to 30 days.
+      - id: c
+        text: Enable container soft delete and restore the container.
+      - id: d
+        text: Disable blob versioning and call Undelete Blob again.
+    answer: [a]
+    explanation: >-
+      When versioning is enabled, deleting a blob turns the current version
+      into a previous version, and calling Undelete Blob restores any
+      soft-deleted versions or snapshots but doesn't restore the current
+      version. To restore the current version, promote a previous version by
+      copying it to the current version. Changing the retention period
+      affects only data deleted afterward, and container soft delete restores
+      deleted containers, not individual blobs.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/soft-delete-blob-overview
+  - id: q17
+    domain: AZ104-2
+    skill: Configure soft delete for blobs and containers
+    kind: single
+    stem: >-
+      A storage account has container soft delete enabled with the default
+      retention period. Two days ago, an administrator deleted a container
+      named invoices by mistake. Yesterday, a developer created a new, empty
+      container named invoices. Today, your attempt to restore the soft-deleted
+      invoices container fails. What is the cause?
+    options:
+      - id: a
+        text: The retention period for the deleted container has expired.
+      - id: b
+        text: >-
+          Blob soft delete must also be enabled before a container can be
+          restored.
+      - id: c
+        text: >-
+          A soft-deleted container must be restored to its original name, and
+          that name is now used by a new container.
+      - id: d
+        text: >-
+          Restore Container restores only the container, not the blobs, so it
+          is blocked when the container name exists.
+    answer: [c]
+    explanation: >-
+      When you restore a container, you must restore it to its original name.
+      If the original name is used to create a new container, you can't
+      restore the soft-deleted container. The default container soft delete
+      retention period is seven days, so a container deleted two days ago is
+      still within retention. Restoring a container also restores its blobs,
+      versions, and snapshots, and container restore doesn't require blob soft
+      delete.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/soft-delete-container-overview
+  - id: q18
+    domain: AZ104-3
+    skill: Deploy resources by using an Azure Resource Manager template or a Bicep file
+    kind: single
+    stem: >-
+      Resource group RG1 contains resources A, B, and C. An engineer deploys an
+      ARM template that defines resources A, B, and D by running az deployment
+      group create with the --mode Complete parameter. The resource group has
+      no locks. Which resources exist in RG1 after the deployment?
+    options:
+      - id: a
+        text: A, B, C, and D
+      - id: b
+        text: A, B, and D
+      - id: c
+        text: A and B only
+      - id: d
+        text: D only
+    answer: [b]
+    explanation: >-
+      In complete mode, Resource Manager deletes resources that exist in the
+      resource group but aren't specified in the template, so C is deleted
+      and A, B, and D remain. In the default incremental mode, C would have
+      been left unchanged. Microsoft recommends incremental mode and deployment
+      stacks for deletions, and running what-if before any complete mode
+      deployment.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/deployment-modes
+  - id: q19
+    domain: AZ104-3
+    skill: Deploy resources by using an Azure Resource Manager template or a Bicep file
+    kind: single
+    stem: >-
+      You deploy a Bicep file with the Azure CLI by running az deployment group
+      create --resource-group rg-app --template-file main.bicep --parameters
+      main.bicepparam. The main.bicepparam file contains a using statement that
+      references main.bicep. The command fails with the error "Only a .bicep
+      file is allowed with a .bicepparam file". What should you do?
+    options:
+      - id: a
+        text: >-
+          Remove the --template-file parameter and pass only the .bicepparam
+          file to --parameters.
+      - id: b
+        text: Convert main.bicepparam to a JSON parameters file.
+      - id: c
+        text: Run az deployment sub create instead of az deployment group create.
+      - id: d
+        text: Build main.bicep to a JSON template and pass the JSON file instead.
+    answer: [a]
+    explanation: >-
+      Because a Bicep parameters file includes a using statement, you don't
+      provide the --template-file switch when you pass a .bicepparam file to
+      --parameters, and including it produces this exact error. Converting to
+      JSON parameters or a JSON template is unnecessary. az deployment sub
+      create targets a subscription scope, not the resource group.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/deploy-cli
+  - id: q20
+    domain: AZ104-3
+    skill: Interpret an Azure Resource Manager template or a Bicep file
+    kind: single
+    stem: >-
+      A Bicep file contains only one resource, of type
+      Microsoft.Authorization/locks@2016-09-01, with the properties level set
+      to CanNotDelete and a notes value. The lock resource has no scope
+      property. An administrator deploys the file with az deployment group
+      create to resource group rg-prod. What is the result?
+    options:
+      - id: a
+        text: >-
+          The deployment fails, because a lock resource must always specify a
+          scope property.
+      - id: b
+        text: >-
+          rg-prod is locked, and its resources inherit the lock, so they can be
+          modified but not deleted.
+      - id: c
+        text: >-
+          rg-prod is locked, and its resources can be read but can't be
+          modified or deleted.
+      - id: d
+        text: >-
+          The subscription that contains rg-prod is locked against deletion.
+    answer: [b]
+    explanation: >-
+      To lock the deployment scope, such as a resource group, you don't set
+      the scope property on the lock; you set scope only when locking a
+      specific resource within the deployment scope. Resources within a locked
+      scope inherit the lock. CanNotDelete means authorized users can read and
+      modify a resource but can't delete it. ReadOnly would block
+      modifications, and a resource group deployment doesn't lock the
+      subscription.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/lock-resources
+  - id: q21
+    domain: AZ104-3
+    skill: Manage virtual machine sizes
+    kind: single
+    stem: >-
+      VM1 is one of three virtual machines in an availability set. You must
+      resize VM1 to a new VM size. When you run Get-AzVMSize for VM1, the new
+      size isn't in the list of sizes available on the hardware cluster that
+      currently hosts the VM. What should you do to resize VM1?
+    options:
+      - id: a
+        text: Resize VM1 while it is running; Azure will move it automatically.
+      - id: b
+        text: >-
+          Deallocate all the VMs in the availability set, resize VM1, and then
+          start the VMs.
+      - id: c
+        text: Deallocate only VM1, resize it, and then start it.
+      - id: d
+        text: Redeploy VM1 to a new host, and then resize it while it runs.
+    answer: [b]
+    explanation: >-
+      If the new size for a VM in an availability set isn't available on the
+      hardware cluster that currently hosts the VM, you need to deallocate all
+      VMs in the availability set to resize the VM, and you might also need to
+      update the size of the other VMs. Resizing a running VM works only when
+      the size is available on the current cluster and still restarts the VM.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/resize-vm
+  - id: q22
+    domain: AZ104-3
+    skill: Manage virtual machine sizes
+    kind: single
+    stem: >-
+      A Windows Server VM runs on a VM size that has no local temp disk. The
+      application team now requires a VM size that includes a local temp disk,
+      but the resize operation isn't allowed. You need to run the workload on
+      the new size. What should you do?
+    options:
+      - id: a
+        text: Stop and deallocate the VM, and then retry the resize.
+      - id: b
+        text: >-
+          Create a snapshot of the VM's disk, create a disk from the snapshot,
+          and create a new VM from that disk by using the new size.
+      - id: c
+        text: Attach an empty data disk and mark it as the temp disk.
+      - id: d
+        text: Move the VM to a different resource group and then resize it.
+    answer: [b]
+    explanation: >-
+      For Windows VMs, resizing is allowed only from a size with a local temp
+      disk to another size with one, or from a size without a local temp disk
+      to another size without one. The documented workaround is to create a
+      snapshot of the VM without a local temp disk, create a disk from the
+      snapshot, and create a VM from the disk with a size that has a local
+      temp disk. Deallocating or moving the VM doesn't remove the restriction.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/resize-vm
+  - id: q23
+    domain: AZ104-3
+    skill: Manage sizing and scaling for containers, including Azure Container Instances and Azure Container Apps
+    kind: single
+    stem: >-
+      An Azure Container Instances container group runs two Linux containers.
+      The app container requests 1 CPU and the sidecar container requests 1
+      CPU, so the group is allocated 2 CPUs. The app container occasionally
+      needs more CPU while the sidecar is idle. You must let the app container
+      use up to 2 CPUs without increasing the resources allocated to the
+      group. What should you do?
+    options:
+      - id: a
+        text: Increase the app container's resource request to 2 CPUs.
+      - id: b
+        text: Set a resource limit of 2 CPUs on the app container.
+      - id: c
+        text: Add a scale rule that adds container instances when CPU is high.
+      - id: d
+        text: Redeploy the group as a Windows multi-container group.
+    answer: [b]
+    explanation: >-
+      A container group is allocated the sum of its instances' resource
+      requests. A container's optional resource limit lets it use more than
+      its request, up to the total allocated to the group, so a 2 CPU limit
+      lets the app container burst while the group stays at 2 CPUs. Raising
+      the request to 2 would increase the group allocation to 3 CPUs.
+      Multi-container groups support only Linux containers.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/container-instances/container-instances-container-groups
+  - id: q24
+    domain: AZ104-3
+    skill: Manage sizing and scaling for containers, including Azure Container Instances and Azure Container Apps
+    kind: single
+    stem: >-
+      A container app processes messages from an Azure Service Bus queue. It
+      has ingress disabled and no scale rules or minimum replica setting. After
+      an idle period, the app stops processing new messages. You must make the
+      app scale out as queue length grows and scale in to zero when the queue
+      is empty. What should you do?
+    options:
+      - id: a
+        text: Set the minimum number of replicas to 1.
+      - id: b
+        text: Add an HTTP scale rule with a concurrent requests threshold of 10.
+      - id: c
+        text: >-
+          Add a custom scale rule of type azure-servicebus that references the
+          queue.
+      - id: d
+        text: Increase the maximum number of replicas to 30.
+    answer: [c]
+    explanation: >-
+      Without a scale rule, the default HTTP rule applies with a minimum of 0
+      replicas; if ingress is disabled and no minReplicas or custom rule is
+      defined, the app scales to zero and has no way of starting back up. A
+      custom KEDA-based scale rule such as azure-servicebus scales on queue
+      messages and still allows scale to zero. Setting minimum replicas to 1
+      prevents scaling to zero, an HTTP rule can't trigger without ingress
+      traffic, and raising maximum replicas doesn't add a trigger.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/container-apps/scale-app
+  - id: q25
+    domain: AZ104-3
+    skill: Configure certificates and Transport Layer Security (TLS) for an App Service
+    kind: single
+    stem: >-
+      Veymark Logistics hosts several App Service apps in a Standard App
+      Service plan and must secure multiple subdomains with a single wildcard
+      TLS certificate. The security team manages the PKCS12 certificate in
+      Azure Key Vault and renews it there. After each renewal, the app bindings
+      must pick up the new certificate without manual uploads. Which option
+      should you use to add the certificate to App Service?
+    options:
+      - id: a
+        text: Create a free App Service managed certificate for each subdomain.
+      - id: b
+        text: Import the certificate from Key Vault.
+      - id: c
+        text: Upload the certificate as a password-protected .pfx file.
+      - id: d
+        text: Upload the certificate as a public .cer certificate.
+    answer: [b]
+    explanation: >-
+      A certificate imported from Key Vault is synced by App Service
+      automatically within 24 hours of renewal, and applicable bindings are
+      updated; App Service must be authorized to read the vault. The free
+      managed certificate doesn't support wildcard certificates. An uploaded
+      .pfx has no automatic binding update when renewed. Public .cer
+      certificates aren't used to secure custom domains.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/app-service/configure-ssl-certificate
+  - id: q26
+    domain: AZ104-3
+    skill: Configure certificates and Transport Layer Security (TLS) for an App Service
+    kind: single
+    stem: >-
+      A web app runs in a Basic tier App Service plan and has a custom domain
+      with an SNI SSL binding. A partner system requires the app to have a
+      dedicated IP address for its TLS endpoint, so you must switch the
+      binding to IP based SSL. What should you do first?
+    options:
+      - id: a
+        text: Scale up the App Service plan to the Standard tier or higher.
+      - id: b
+        text: Set the minimum TLS version for the app to 1.3.
+      - id: c
+        text: Replace the certificate with a free App Service managed certificate.
+      - id: d
+        text: Remap the CNAME record to sni.<app-name>.azurewebsites.net.
+    answer: [a]
+    explanation: >-
+      IP based SSL is supported only in the Standard tier or higher, so the
+      Basic plan must be scaled up first. After you configure an IP based SSL
+      binding, App Service creates a dedicated IP address and you remap the A
+      record to it. The minimum TLS version and the certificate type don't
+      control whether a dedicated IP is available, and the sni prefix remap
+      applies to a different scenario.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/app-service/configure-ssl-bindings
+  - id: q27
+    domain: AZ104-3
+    skill: Configure deployment slots for an App Service
+    kind: multiple
+    stem: >-
+      An App Service app has a production slot and a staging slot. Before you
+      swap staging into production, a release manager asks which
+      configuration elements will stay with the production slot rather than
+      move with the swapped content. No slot settings have been marked and no
+      override app settings are used. Which two elements stay with the
+      production slot? Each correct answer presents a complete solution.
+      Choose two.
+    options:
+      - id: a
+        text: Custom domain names
+      - id: b
+        text: Scale settings
+      - id: c
+        text: App settings
+      - id: d
+        text: Handler mappings
+      - id: e
+        text: WebJobs content
+    answer: [a, b]
+    explanation: >-
+      Custom domain names and scale settings are among the settings that
+      aren't swapped, so they stay with their slot. Language framework
+      settings, app settings and connection strings (unless configured to
+      stick to a slot), handler mappings, public certificates, and WebJobs
+      content are swapped with the app content.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/app-service/deploy-staging-slots
+  - id: q28
+    domain: AZ104-4
+    skill: Configure user-defined routes
+    kind: single
+    stem: >-
+      You deploy a firewall virtual appliance VM with private IP address
+      10.0.100.4 in a dedicated subnet. You create a route table with a route
+      for 0.0.0.0/0 that has next hop type Virtual appliance and next hop
+      address 10.0.100.4, and associate it with the workload subnet. Effective
+      routes on a workload VM show the route as active, and packets arrive at
+      the appliance, but traffic destined for other addresses is never
+      forwarded by the appliance's network interface. Which Azure setting
+      should you enable?
+    options:
+      - id: a
+        text: IP forwarding on the appliance's network interface
+      - id: b
+        text: Virtual network gateway route propagation on the route table
+      - id: c
+        text: A service endpoint on the workload subnet
+      - id: d
+        text: Accelerated networking on the workload VM
+    answer: [a]
+    explanation: >-
+      Any network interface attached to a VM that forwards traffic to an
+      address other than its own must have the Azure Enable IP forwarding
+      option enabled, which disables Azure's source and destination check for
+      that interface. You might also need to enable forwarding in the guest
+      operating system. Route propagation concerns gateway routes, and a
+      service endpoint only adds routes for specific Azure services.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-udr-overview
+  - id: q29
+    domain: AZ104-4
+    skill: Configure user-defined routes
+    kind: single
+    stem: >-
+      A route table associated with Subnet1 contains two user-defined routes:
+      10.1.0.0/16 with next hop type Virtual appliance (10.0.100.4), and
+      10.1.5.0/24 with next hop type None. A VM in Subnet1 sends traffic to
+      10.1.5.20 and to 10.1.8.4. How does Azure route this traffic?
+    options:
+      - id: a
+        text: >-
+          Both flows go to the virtual appliance, because the first matching
+          route in the table is used.
+      - id: b
+        text: >-
+          Traffic to 10.1.5.20 is dropped, and traffic to 10.1.8.4 goes to the
+          virtual appliance.
+      - id: c
+        text: >-
+          Traffic to 10.1.5.20 goes to the virtual appliance, and traffic to
+          10.1.8.4 is dropped.
+      - id: d
+        text: Both flows are dropped, because a None route overrides all others.
+    answer: [b]
+    explanation: >-
+      Azure selects a route by using the longest prefix match. 10.1.5.20 falls
+      in both prefixes, but 10.1.5.0/24 is longer, so its None next hop drops
+      the traffic. 10.1.8.4 isn't within 10.1.5.0/24, so the 10.1.0.0/16 route
+      sends it to the virtual appliance. Route order in the table doesn't
+      matter, and None applies only to its own prefix.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/virtual-networks-udr-overview
+  - id: q30
+    domain: AZ104-4
+    skill: Create and configure virtual networks and subnets
+    kind: multiple
+    stem: >-
+      You create a new virtual network in the Azure portal and deploy four
+      Windows Server VMs to its only subnet. The VMs have no public IP
+      addresses, and the subnet has no route table. The VMs can communicate
+      with each other, but they can't reach Windows Update or other public
+      endpoints on the internet. Security policy forbids assigning public IP
+      addresses to the VMs' network interfaces. You need to give the VMs
+      outbound internet access. What should you do? Each correct answer
+      presents a complete solution. Choose two.
+    options:
+      - id: a
+        text: Associate an Azure NAT gateway with the subnet.
+      - id: b
+        text: >-
+          Add the VMs to the backend pool of a Standard public load balancer
+          that has outbound rules defined.
+      - id: c
+        text: Associate a Standard public IP address with each VM's network interface.
+      - id: d
+        text: >-
+          Add an outbound NSG rule that allows traffic to the Internet service
+          tag.
+      - id: e
+        text: >-
+          Associate a route table with a 0.0.0.0/0 route that uses next hop
+          type Internet.
+    answer: [a, b]
+    explanation: >-
+      The Azure portal creates subnets as private by default, so VMs in them
+      don't get default outbound access and need an explicit outbound method.
+      A NAT gateway on the subnet (the recommended method) or a Standard load
+      balancer with outbound rules each provide it without public IPs on the
+      NICs. A public IP on each NIC would also work but violates the policy.
+      The AllowInternetOutBound default rule already allows the traffic, so
+      an NSG rule adds no connectivity. Routes with next hop type Internet
+      break in a private subnet.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/ip-services/default-outbound-access
+      - https://learn.microsoft.com/en-us/azure/virtual-network/network-security-groups-overview
+  - id: q31
+    domain: AZ104-4
+    skill: Configure service endpoints for Azure platform as a service (PaaS)
+    kind: single
+    stem: >-
+      Subnet Data already has the Microsoft.Storage service endpoint enabled.
+      To reduce the risk of data exfiltration, VMs in Subnet Data must be able
+      to reach only two specific storage accounts that your company owns. All
+      other storage accounts, including accounts owned by other organizations,
+      must be unreachable from the subnet. What should you configure?
+    options:
+      - id: a
+        text: >-
+          A network security group outbound rule that allows the Storage service
+          tag for the region
+      - id: b
+        text: >-
+          A service endpoint policy that lists the two storage accounts,
+          associated with Subnet Data
+      - id: c
+        text: >-
+          Virtual network rules for Subnet Data on the two storage accounts'
+          firewalls
+      - id: d
+        text: >-
+          A user-defined route with the Storage service tag as the address
+          prefix and next hop type None
+    answer: [b]
+    explanation: >-
+      Service endpoint policies filter egress traffic from a subnet to Azure
+      Storage over service endpoints and allow access only to the storage
+      accounts listed; once a policy is on the subnet, access to all other
+      storage accounts is denied. A Storage service tag allows traffic to any
+      account in the selected region. Firewall rules on the two accounts
+      control who can reach those accounts, not which other accounts the
+      subnet can reach. A None route would drop storage traffic entirely.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/virtual-network-service-endpoint-policies-overview
+  - id: q32
+    domain: AZ104-4
+    skill: Configure Azure DNS
+    kind: single
+    stem: >-
+      Veymark Logistics bought the domain veymark-freight.com from a
+      third-party domain registrar. You created a public DNS zone named
+      veymark-freight.com in Azure DNS and added A and CNAME records. Internet
+      clients still can't resolve the new records, and nslookup for the SOA
+      record doesn't return an Azure DNS primary name server. What should you
+      do?
+    options:
+      - id: a
+        text: >-
+          At the registrar, update the domain's NS records to all four name
+          servers assigned to the Azure DNS zone.
+      - id: b
+        text: Create an SOA record in the Azure DNS zone.
+      - id: c
+        text: Link the DNS zone to a virtual network.
+      - id: d
+        text: >-
+          At the registrar, add only the first Azure DNS name server so that
+          the registrar's name servers stay authoritative.
+    answer: [a]
+    explanation: >-
+      To host a domain in Azure DNS, you retrieve the name servers assigned to
+      the zone and delegate the domain by updating the NS records at the
+      registrar, using all four name servers. Azure DNS automatically creates
+      the SOA and authoritative NS records in the zone, so you don't create
+      them. Virtual network links apply to private DNS zones, not public
+      internet resolution.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/dns/dns-delegate-domain-azure-dns
+  - id: q33
+    domain: AZ104-4
+    skill: Configure Azure DNS
+    kind: single
+    stem: >-
+      VNet1 is linked to the private DNS zone corp.veymark.internal with
+      autoregistration enabled. VMs in VNet1 must also resolve records in a
+      second private DNS zone, apps.veymark.internal, which is managed by
+      another team. When you try to link VNet1 to apps.veymark.internal with
+      autoregistration enabled, the link fails. What should you do?
+    options:
+      - id: a
+        text: >-
+          Link VNet1 to apps.veymark.internal without enabling
+          autoregistration.
+      - id: b
+        text: >-
+          Disable autoregistration on the corp.veymark.internal link and enable
+          it on both links.
+      - id: c
+        text: Create a second link from VNet1 to corp.veymark.internal.
+      - id: d
+        text: Move the VMs to a new virtual network that has no zone links.
+    answer: [a]
+    explanation: >-
+      A virtual network can be linked to only one private DNS zone with
+      autoregistration enabled, so it can have only one registration zone.
+      A virtual network can have multiple resolution zones, and VMs in a
+      resolution virtual network can query records in the linked zone. Linking
+      apps.veymark.internal without autoregistration meets the requirement.
+      You can create only one link between a given zone and virtual network.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/dns/private-dns-autoregistration
+      - https://learn.microsoft.com/en-us/azure/dns/private-dns-virtual-network-links
+  - id: q34
+    domain: AZ104-4
+    skill: Implement Azure Bastion
+    kind: single
+    stem: >-
+      Veymark Logistics deployed Azure Bastion in VNet-Ops, the same virtual
+      network as the Windows Server VM named VM-Dispatch. A help desk
+      engineer must connect to VM-Dispatch through Bastion in the Azure
+      portal by using a local username and password. The engineer has the
+      Reader role on VM-Dispatch and on the Bastion resource, but can't
+      start a Bastion connection to the VM. You need to grant the missing
+      access by following the principle of least privilege. What should you
+      do?
+    options:
+      - id: a
+        text: Assign the engineer the Reader role on the network interface of VM-Dispatch.
+      - id: b
+        text: Assign the engineer the Virtual Machine Contributor role on VM-Dispatch.
+      - id: c
+        text: Assign the engineer the Virtual Machine Administrator Login role on VM-Dispatch.
+      - id: d
+        text: Assign the engineer the Network Contributor role on the AzureBastionSubnet.
+    answer: [a]
+    explanation: >-
+      To connect through Bastion, a user needs the Reader role on the VM, on
+      the network interface that has the VM's IP address, and on the Bastion
+      resource. Reader on the virtual network is needed only when Bastion is
+      deployed in a peered network, which isn't the case here. The engineer
+      is missing Reader on the NIC. Virtual Machine Contributor and Network
+      Contributor grant far more than required. Virtual Machine
+      Administrator Login is required only for Microsoft Entra ID
+      authentication, not for a local username and password.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/bastion/bastion-connect-vm-rdp-windows
+  - id: q35
+    domain: AZ104-5
+    skill: Set up alert rules, action groups, and alert processing rules in Azure Monitor
+    kind: single
+    stem: >-
+      Your company must be notified whenever any virtual machine in the
+      production resource group is deleted, regardless of who deletes it. You
+      must not configure diagnostic settings or send data to a Log Analytics
+      workspace. Which type of alert rule should you create?
+    options:
+      - id: a
+        text: A metric alert rule on the Percentage CPU metric
+      - id: b
+        text: An activity log alert rule
+      - id: c
+        text: A log search alert rule
+      - id: d
+        text: A Prometheus alert rule
+    answer: [b]
+    explanation: >-
+      Activity logs audit all actions on resources, and activity log alerts
+      notify you when a specific event happens to a resource, such as the
+      deletion of a VM in a production resource group. A metric alert
+      evaluates metric values, not administrative operations. A log search
+      alert requires the data to be in logs queried with KQL. Prometheus
+      alerts evaluate Prometheus metrics.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-types
+  - id: q36
+    domain: AZ104-5
+    skill: Set up alert rules, action groups, and alert processing rules in Azure Monitor
+    kind: single
+    stem: >-
+      Several alert rules, each with an action group, cover VMs across a
+      subscription. Every Saturday from 22:00 to 02:00, the VMs in resource
+      group rg-erp undergo planned maintenance. During that window, no
+      notifications should be sent for alerts from rg-erp, but alerts must
+      still fire and be visible in the portal, and alerts from other resource
+      groups must keep notifying. What should you do?
+    options:
+      - id: a
+        text: >-
+          Disable all alert rules at the start of the window and enable them
+          afterward.
+      - id: b
+        text: >-
+          Create an alert processing rule scoped to rg-erp with the Suppress
+          notifications action and a weekly recurring schedule.
+      - id: c
+        text: >-
+          Remove the action groups from all alert rules and add them back after
+          maintenance.
+      - id: d
+        text: >-
+          Create an alert processing rule scoped to the subscription with the
+          Apply action group action.
+    answer: [b]
+    explanation: >-
+      An alert processing rule with suppression removes the action groups from
+      affected fired alerts, and the alerts remain visible in the portal. You
+      can scope it to a resource group and set a recurring schedule, such as a
+      weekly window. Disabling alert rules stops alerts from firing and would
+      also silence other resource groups that the same rules cover. Editing
+      each rule is error prone, and Apply action group adds notifications
+      rather than removing them.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-processing-rules
+  - id: q37
+    domain: AZ104-5
+    skill: Set up alert rules, action groups, and alert processing rules in Azure Monitor
+    kind: single
+    stem: >-
+      You are creating an action group for critical alerts. The notification
+      must reach every user who holds the Owner role on the subscription, and
+      the list must stay current as owners change without anyone editing the
+      action group. What should you configure in the action group?
+    options:
+      - id: a
+        text: An Email notification with a shared distribution list address
+      - id: b
+        text: An Email Azure Resource Manager role notification for Owner
+      - id: c
+        text: A Secure webhook action that calls Microsoft Graph
+      - id: d
+        text: An SMS notification for each current owner
+    answer: [b]
+    explanation: >-
+      The Email Azure Resource Manager role notification type sends email to
+      the members of a subscription role, including Microsoft Entra user and
+      group members, and it supports Owner, Contributor, Reader, Monitoring
+      Contributor, and Monitoring Reader. Because membership is resolved from
+      the role, the recipients follow role assignment changes. A distribution
+      list or per-person SMS entries must be maintained manually, and a secure
+      webhook calls a protected API rather than emailing role members.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/action-groups
+  - id: q38
+    domain: AZ104-5
+    skill: Configure and interpret reports and alerts for backups
+    kind: single
+    stem: >-
+      Azure Backup protects VMs in a Recovery Services vault and raises
+      built-in Azure Backup alerts when backup jobs fail. These alerts aren't
+      generated by an Azure Monitor alert rule that you created. The on-call
+      team wants the existing action group AG-Oncall to be triggered whenever
+      one of these Backup alerts fires. What should you do?
+    options:
+      - id: a
+        text: >-
+          Create an alert processing rule with the Apply action group action,
+          scoped to the vault, that adds AG-Oncall.
+      - id: b
+        text: Create a Service Health alert that uses AG-Oncall.
+      - id: c
+        text: Set the processing region of AG-Oncall to Global.
+      - id: d
+        text: Create an alert processing rule with the Suppress notifications action.
+    answer: [a]
+    explanation: >-
+      Some alert sources, such as Azure Backup alerts, don't let you specify
+      action groups. For those alert types, you can use an alert processing
+      rule to add action groups to the fired alerts. A Service Health alert
+      covers Azure service issues, not backup job failures. The action group
+      region doesn't attach it to alerts, and suppression removes action
+      groups instead of adding them.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-processing-rules
+  - id: q39
+    domain: AZ104-5
+    skill: Perform backup and restore operations by using Azure Backup
+    kind: single
+    stem: >-
+      A managed-disk VM protected by Azure Backup in a Recovery Services vault
+      was accidentally deleted. You must restore it from yesterday's recovery
+      point into an existing availability set in the same region. What should
+      you do?
+    options:
+      - id: a
+        text: Use the Replace existing option to replace the VM's disks.
+      - id: b
+        text: >-
+          Use the Create new virtual machine option and select the availability
+          set in the restore wizard.
+      - id: c
+        text: >-
+          Use the Restore disks option, and then create the VM from the restored
+          disks by using the generated template, specifying the availability
+          set.
+      - id: d
+        text: Use Cross Region Restore to restore the VM in the paired region.
+    answer: [c]
+    explanation: >-
+      When you restore a VM from the portal, there's no option to choose an
+      availability set. With Restore disks, the restore job generates a
+      template you can use to customize settings and specify an availability
+      set when you create the VM. Replace existing requires the current VM to
+      exist, so it can't be used after deletion. Cross Region Restore restores
+      to the secondary region, not the same region.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/backup/backup-azure-arm-restore-vms
+  - id: q40
+    domain: AZ104-5
+    skill: Perform backup and restore operations by using Azure Backup
+    kind: multiple
+    stem: >-
+      You need to recover a few files from an Azure VM recovery point by using
+      File Recovery. You will run the downloaded executable on a Windows
+      Server VM whose network security group already allows outbound DNS on
+      port 53 and outbound traffic to Microsoft Entra ID. The script fails to
+      connect. Which two outbound NSG rules should you add? Each correct answer
+      presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: Outbound TCP 3260 to the AzureBackup service tag
+      - id: b
+        text: Outbound TCP 443 to the AzureFrontDoor.FirstParty service tag
+      - id: c
+        text: Outbound TCP 445 to the Storage service tag
+      - id: d
+        text: Outbound TCP 3389 to the AzureCloud service tag
+      - id: e
+        text: Outbound TCP 1433 to the Sql service tag
+    answer: [a, b]
+    explanation: >-
+      File Recovery mounts the recovery point by using iSCSI, so the machine
+      needs outbound access on port 3260 to the Recovery Service URLs or the
+      AzureBackup service tag. It also needs outbound port 443 to
+      download.microsoft.com or the AzureFrontDoor.FirstParty service tag to
+      download components that build the secure channel. SMB port 445, RDP
+      port 3389, and SQL port 1433 aren't among the documented requirements.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/backup/backup-azure-restore-files-from-vm

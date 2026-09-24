@@ -1,6 +1,6 @@
 # Privacy
 
-Last updated 24 August 2026.
+Last updated 24 September 2026.
 
 The Runbook is a free study aid. It is built to need as little of your data as
 possible, and this page is short because there is not much to describe.
@@ -43,7 +43,8 @@ which include IP addresses, and holds them under its own retention policy.
 
 A session cookie and a CSRF cookie, both strictly necessary and both set only
 once you sign in or submit a form. Local storage holds your save, a theme
-preference and the random analytics identifier. There are no advertising,
+preference, the random analytics identifier, and your practice exam answers and
+scores, which never leave the browser. There are no advertising,
 tracking or third-party cookies, and no third-party scripts on any page.
 
 ## Why it is collected

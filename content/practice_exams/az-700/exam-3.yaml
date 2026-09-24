@@ -1,0 +1,1253 @@
+# AZ-700 practice exam 3. Written by Opus 5.5 (claude-opus-5-5); every
+# question is grounded in, and cites, pages on learn.microsoft.com.
+id: az-700-3
+exam: AZ-700
+number: 3
+title: AZ-700 practice exam 3
+author: Opus 5.5
+model_id: claude-opus-5-5
+written_on: "2026-09-24"
+questions:
+  - id: q01
+    domain: AZ700-1
+    skill: Plan and configure subnetting for services, including virtual network gateways, private endpoints, service endpoints, firewalls, application gateways, VNet-integrated platform services, and Azure Bastion
+    kind: single
+    stem: >-
+      Veymark Logistics is deploying Azure Bastion Standard SKU into an existing
+      virtual network so that administrators can reach VMs without public IP
+      addresses. The team plans to use host scaling later as usage grows. A
+      network engineer has already created an empty subnet named
+      AzureBastionSubnet with a /27 prefix, and the Bastion deployment fails
+      validation. What should you do?
+    options:
+      - id: a
+        text: Rename the subnet to BastionSubnet and keep the /27 prefix.
+      - id: b
+        text: Delegate the existing /27 subnet to the Microsoft.Network/bastionHosts service.
+      - id: c
+        text: Re-create the subnet as AzureBastionSubnet with a /26 or larger prefix.
+      - id: d
+        text: Keep the /27 subnet and deploy a second Bastion host into another /27 subnet for scaling.
+    answer: [c]
+    explanation: >-
+      For Azure Bastion resources deployed on or after November 2, 2021, the
+      dedicated subnet must be named AzureBastionSubnet and be /26 or larger,
+      and a /26 or larger subnet is recommended for host scaling. The subnet
+      must also not contain other resources. Renaming the subnet breaks the
+      mandatory name, delegation is not the Bastion requirement described, and
+      adding a second /27 subnet does not satisfy the minimum size.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/bastion/configuration-settings
+  - id: q02
+    domain: AZ700-1
+    skill: Plan and configure subnetting for services, including virtual network gateways, private endpoints, service endpoints, firewalls, application gateways, VNet-integrated platform services, and Azure Bastion
+    kind: multiple
+    stem: >-
+      Your company is designing a hub virtual network that will host a
+      VpnGw2AZ VPN gateway, Azure Firewall, and an Application Gateway
+      Standard_v2 instance. The security team wants every subnet to follow
+      supported configurations. Which two subnet designs should you use? Each
+      correct answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: A subnet named GatewaySubnet with a /27 prefix and no network security group.
+      - id: b
+        text: A subnet named AzureFirewallSubnet with a /26 prefix.
+      - id: c
+        text: A single /24 subnet shared by the Application Gateway v2 instances and the web VMs.
+      - id: d
+        text: A subnet named GatewaySubnet with an NSG that denies all inbound internet traffic.
+      - id: e
+        text: A route table on GatewaySubnet that sends 0.0.0.0/0 to the firewall.
+    answer: [a, b]
+    explanation: >-
+      Gateway SKUs other than Basic require a GatewaySubnet of /27 or larger,
+      and NSGs or 0.0.0.0/0 user-defined routes on the gateway subnet are not
+      supported. Azure Firewall needs a /26 AzureFirewallSubnet so it has
+      enough addresses to scale, and a /26 is sufficient for all scaling. An
+      Application Gateway subnet can hold other application gateways but no
+      other resources, so sharing it with web VMs is not allowed.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/vpn-gateway/vpn-gateway-about-vpn-gateway-settings
+      - https://learn.microsoft.com/en-us/azure/firewall/firewall-faq
+      - https://learn.microsoft.com/en-us/azure/application-gateway/configuration-infrastructure
+  - id: q03
+    domain: AZ700-1
+    skill: Design and implement Azure DNS Private Resolver
+    kind: single
+    stem: >-
+      An organization is deploying Azure DNS Private Resolver in a hub virtual
+      network. On-premises DNS servers must conditionally forward queries for
+      Azure private DNS zones into Azure, and Azure workloads must forward
+      queries for the on-premises domain back to on-premises DNS. You need to
+      plan the subnets for the resolver. What should you create?
+    options:
+      - id: a
+        text: One /27 subnet delegated to Microsoft.Network/dnsResolvers that hosts both the inbound and outbound endpoints.
+      - id: b
+        text: Two separate subnets, each /28 or larger and each delegated to Microsoft.Network/dnsResolvers, one per endpoint.
+      - id: c
+        text: Two /29 subnets with no delegation, one per endpoint.
+      - id: d
+        text: One /28 subnet inside GatewaySubnet address space so the endpoints are reachable over the VPN.
+    answer: [b]
+    explanation: >-
+      An inbound endpoint lets on-premises DNS forward into Azure, and an
+      outbound endpoint with a forwarding ruleset forwards from Azure to
+      on-premises. Resolver subnets must be between /28 and /24, can only be
+      delegated to Microsoft.Network/dnsResolvers, and multiple resolver
+      endpoints can't share a subnet. A shared subnet, a /29 subnet, or use of
+      the gateway subnet all violate these restrictions.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/dns/dns-private-resolver-overview
+  - id: q04
+    domain: AZ700-1
+    skill: Plan and implement a Custom IP address prefix (bring your own IP)
+    kind: single
+    stem: >-
+      Veymark Logistics is bringing its registered public IPv4 range to Azure
+      so partners can keep existing allowlists. Ownership validation succeeded,
+      the custom IP prefix resource was provisioned, and Standard public IP
+      addresses derived from it are attached to an application. External
+      partners still cannot reach the application on those addresses. What
+      should you do?
+    options:
+      - id: a
+        text: Commission the custom IP prefix so that Microsoft advertises the range.
+      - id: b
+        text: Associate the custom IP prefix directly with the application's load balancer frontend.
+      - id: c
+        text: Move the custom IP prefix to a different subscription and provision it again.
+      - id: d
+        text: Advertise the range to Microsoft over ExpressRoute Microsoft peering.
+    answer: [a]
+    explanation: >-
+      Bringing a prefix to Azure has three phases: validation, provision, and
+      commission. After provisioning, IPs can be derived and associated, but
+      they aren't advertised and aren't reachable until you commission the
+      range, which advertises it from the region and then to the internet. A
+      custom prefix can't be attached directly to a resource, provisioned
+      prefixes can't be moved to another subscription, and advertising custom
+      IP prefix addresses over ExpressRoute Microsoft peering isn't supported.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/ip-services/custom-ip-address-prefix
+  - id: q05
+    domain: AZ700-1
+    skill: Plan and implement a Custom IP address prefix (bring your own IP)
+    kind: single
+    stem: >-
+      Your company has a commissioned custom IPv4 prefix (BYOIP) in an Azure
+      region. An engineer tries to select the custom IP prefix resource itself
+      as the frontend address of a new Application Gateway v2 and cannot find
+      it in the list. You need the gateway to use an address from the company
+      range. What should you do?
+    options:
+      - id: a
+        text: Upgrade the custom IP prefix to the Global tier and then select it as the frontend.
+      - id: b
+        text: Derive a public IP prefix from the custom IP prefix, create a Standard public IP from it, and assign that IP to the gateway.
+      - id: c
+        text: Create a Basic public IP address and set its address manually to a value in the custom range.
+      - id: d
+        text: Delete the custom IP prefix and re-create it without availability zone settings.
+    answer: [b]
+    explanation: >-
+      A custom IP address prefix can't be attached directly to a resource.
+      Public IP address prefixes and Standard SKU public IPs are derived from
+      the custom prefix and then associated with any resource that supports
+      Standard public IPs. Custom prefixes don't support deriving Global tier
+      IPs, Basic IPs aren't derived from custom prefixes, and in zone-enabled
+      regions a custom prefix must have zone settings, so removing them isn't
+      possible.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/ip-services/custom-ip-address-prefix
+  - id: q06
+    domain: AZ700-1
+    skill: Design public DNS zones
+    kind: single
+    stem: >-
+      Veymark Logistics hosts its public domain in Azure DNS. A web
+      application is load balanced by an Azure Traffic Manager profile with
+      external endpoints. Users must reach the site by typing the bare domain
+      name (the zone apex) as well as the www name, and the record must keep
+      working if the profile's endpoints change. What should you create at the
+      zone apex?
+    options:
+      - id: a
+        text: A CNAME record set named @ that points to the Traffic Manager profile FQDN.
+      - id: b
+        text: An alias record set named @ that references the Traffic Manager profile.
+      - id: c
+        text: An A record set named @ containing the current IP address of one endpoint.
+      - id: d
+        text: An NS record set named @ that delegates the apex to Traffic Manager.
+    answer: [b]
+    explanation: >-
+      The zone apex already contains the NS and SOA record sets, so a CNAME
+      can't be created there. Alias records can be created at the zone apex and
+      can reference a Traffic Manager profile, so the apex and www names can
+      point to the same profile. A static A record would not follow endpoint
+      changes, and the apex NS record set is created automatically and holds
+      the Azure DNS name servers, not a delegation target.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/dns/dns-alias
+      - https://learn.microsoft.com/en-us/azure/dns/dns-zones-records
+  - id: q07
+    domain: AZ700-1
+    skill: Design public DNS zones
+    kind: single
+    stem: >-
+      An organization hosts its public parent zone in Azure DNS. The
+      engineering team wants to manage the records for an engineering
+      subdomain in its own Azure DNS zone, in a separate resource group,
+      without receiving permissions on the parent zone. What should you do?
+    options:
+      - id: a
+        text: Create a private DNS zone for the subdomain and link it to the engineering virtual networks.
+      - id: b
+        text: Create a CNAME record named engineering in the parent zone that points to the new zone.
+      - id: c
+        text: Create a DNS zone for the subdomain and add an NS record set named engineering in the parent zone that lists the child zone's name servers.
+      - id: d
+        text: Edit the SOA record of the parent zone so its host property points to the child zone.
+    answer: [c]
+    explanation: >-
+      To delegate a subdomain, create the child zone (optionally with the
+      Child zone option, which can use a different subscription or resource
+      group) and add an NS record set with the subdomain name in the parent
+      zone that lists the child zone's Azure DNS name servers. A private DNS
+      zone doesn't serve public resolution, a CNAME doesn't delegate a zone,
+      and the SOA host property can't be modified.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/dns/delegate-subdomain
+      - https://learn.microsoft.com/en-us/azure/dns/dns-zones-records
+  - id: q08
+    domain: AZ700-1
+    skill: Implement and manage virtual network connectivity by using Azure Virtual Network Manager
+    kind: multiple
+    stem: >-
+      Your company uses Azure Virtual Network Manager with a hub-and-spoke
+      connectivity configuration. The hub hosts shared services. Production
+      spoke virtual networks exist in two Azure regions and are members of a
+      network group named Production. Production spokes must communicate with
+      each other directly, including across regions, without traffic passing
+      through the hub. Which two settings should you enable? Each correct
+      answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: Direct connectivity for the Production spoke network group.
+      - id: b
+        text: Mesh connectivity across regions (global mesh) for the Production network group.
+      - id: c
+        text: Use hub as a gateway for the Production network group.
+      - id: d
+        text: Delete existing peerings in the connectivity configuration.
+      - id: e
+        text: User-defined routes in each spoke that point to an NVA in the hub.
+    answer: [a, b]
+    explanation: >-
+      Enabling direct connectivity for a spoke network group creates a
+      connected group so members talk directly without the extra hop through
+      the hub. It is regional by default, so you must also enable mesh
+      connectivity across regions for the group. Use hub as a gateway only
+      lets spokes use the hub VPN or ExpressRoute gateway, deleting existing
+      peerings removes nonmatching peerings, and UDRs to a hub NVA send traffic
+      through the hub.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network-manager/concept-connectivity-configuration
+  - id: q09
+    domain: AZ700-1
+    skill: Implement and manage virtual network connectivity by using Azure Virtual Network Manager
+    kind: single
+    stem: >-
+      Veymark Logistics creates new spoke virtual networks every week, each
+      tagged env=prod. Every tagged virtual network must automatically receive
+      the existing Azure Virtual Network Manager connectivity configuration
+      that is already deployed to its region. You must minimize ongoing
+      administrative effort. What should you do?
+    options:
+      - id: a
+        text: Use a network group with static membership and redeploy the configuration after each new virtual network is added.
+      - id: b
+        text: Use a network group with dynamic membership that is defined by an Azure Policy condition on the env tag.
+      - id: c
+        text: Enable peering enforcement in the connectivity configuration.
+      - id: d
+        text: Create a new connectivity configuration for each new virtual network and deploy it.
+    answer: [b]
+    explanation: >-
+      Dynamic membership uses Azure Policy conditions, such as a tag, to add
+      virtual networks to a network group at scale. Changes to network group
+      membership take effect without redeploying the configuration, so a new
+      member automatically receives an active configuration in its region.
+      Static membership needs manual selection, peering enforcement only
+      protects peerings from changes, and a configuration per virtual network
+      adds effort.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network-manager/concept-network-groups
+      - https://learn.microsoft.com/en-us/azure/virtual-network-manager/concept-deployments
+  - id: q10
+    domain: AZ700-1
+    skill: Design and implement Azure Route Server
+    kind: single
+    stem: >-
+      A hub virtual network contains an ExpressRoute gateway, an Azure Route
+      Server, and an SD-WAN network virtual appliance (NVA) that peers over BGP
+      with both Route Server instances. VMs in the hub learn the SD-WAN branch
+      prefixes, but the on-premises datacenter connected through ExpressRoute
+      does not learn them, and the NVA does not learn the datacenter prefixes.
+      What should you do?
+    options:
+      - id: a
+        text: Enable branch-to-branch on the Route Server.
+      - id: b
+        text: Create a user-defined route on RouteServerSubnet that points to the NVA.
+      - id: c
+        text: Change the NVA ASN to 65515 so it matches Route Server.
+      - id: d
+        text: Peer the NVA with only one Route Server instance to avoid duplicate routes.
+    answer: [a]
+    explanation: >-
+      By default, Route Server doesn't propagate routes it receives from an NVA
+      and a virtual network gateway to each other; it exchanges them after you
+      enable branch-to-branch. UDRs aren't supported on RouteServerSubnet, 65515
+      is an Azure-reserved ASN that the NVA can't use, and each NVA must peer
+      with both Route Server instances for high availability.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/route-server/route-server-faq
+      - https://learn.microsoft.com/en-us/azure/route-server/overview
+  - id: q11
+    domain: AZ700-1
+    skill: Monitor and troubleshoot networks by using Azure Monitor for Networks
+    kind: single
+    stem: >-
+      The network operations team at your company manages ExpressRoute and VPN
+      connections across several subscriptions. They want one view that shows
+      the health and metrics of all these connections, the reachability status
+      of existing Connection Monitor tests, and quick access to tools such as
+      VPN troubleshoot, without deploying agents or additional configuration.
+      What should they use?
+    options:
+      - id: a
+        text: Traffic analytics on virtual network flow logs.
+      - id: b
+        text: Azure Monitor Network Insights.
+      - id: c
+        text: Network Watcher packet capture on each gateway.
+      - id: d
+        text: A Log Analytics workspace query over gateway diagnostic logs.
+    answer: [b]
+    explanation: >-
+      Azure Monitor Network Insights shows health and metrics for all deployed
+      network resources without requiring configuration. Its Network health
+      tab includes an ExpressRoute and VPN connections tile, the Connectivity
+      tab shows Connection Monitor tests, and the Diagnostic Toolkit links to
+      VPN troubleshoot, next hop, and IP flow verify. Traffic analytics focuses
+      on flow data, packet capture is a single diagnostic, and a workspace
+      query requires log collection to be configured.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/network-watcher/network-insights-overview
+  - id: q12
+    domain: AZ700-2
+    skill: Implement a site-to-site VPN connection
+    kind: single
+    stem: >-
+      Veymark Logistics is connecting a small branch office to Azure with a
+      site-to-site VPN. The branch VPN device receives a public IPv4 address
+      from its ISP that changes periodically, and the device registers a
+      constant name with a dynamic DNS service. You need the Azure side of the
+      connection to keep working after the address changes. What should you
+      configure?
+    options:
+      - id: a
+        text: Set the local network gateway endpoint to FQDN and enter the dynamic DNS name.
+      - id: b
+        text: Set the local network gateway address space to 0.0.0.0/0.
+      - id: c
+        text: Set the connection mode to ResponderOnly so the branch always initiates.
+      - id: d
+        text: Configure a point-to-site configuration on the gateway for the branch device.
+    answer: [a]
+    explanation: >-
+      A local network gateway endpoint can be an IP address or an FQDN. When
+      the device has a dynamic public IP, you use a constant DNS name through a
+      dynamic DNS service and the Azure VPN gateway resolves the FQDN to find
+      the address. The gateway supports one IPv4 address per FQDN and refreshes
+      its DNS cache every 5 minutes. The address space must list the
+      on-premises prefixes, connection mode only controls initiation, and P2S
+      is for individual clients.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/vpn-gateway/tutorial-site-to-site-portal
+      - https://learn.microsoft.com/en-us/azure/vpn-gateway/vpn-gateway-about-vpn-gateway-settings
+  - id: q13
+    domain: AZ700-2
+    skill: Diagnose and resolve virtual network gateway connectivity issues
+    kind: single
+    stem: >-
+      A site-to-site VPN between your company's datacenter and Azure worked for
+      months. Yesterday the security team applied a baseline network security
+      group to every subnet in the hub virtual network, including GatewaySubnet.
+      Since then the tunnel will not reconnect. The shared key and peer IP
+      addresses are unchanged. What should you do first?
+    options:
+      - id: a
+        text: Upgrade the VPN gateway to a larger SKU.
+      - id: b
+        text: Remove the network security group from GatewaySubnet.
+      - id: c
+        text: Enable perfect forward secrecy on the on-premises device.
+      - id: d
+        text: Add the on-premises device's public IP address to the local network gateway address space.
+    answer: [b]
+    explanation: >-
+      NSGs on the gateway subnet aren't supported and can cause VPN and
+      ExpressRoute gateways to stop functioning. The site-to-site
+      troubleshooting guidance says to check for and remove UDRs or NSGs on
+      the gateway subnet and test again. A SKU upgrade doesn't address the
+      cause, the guidance recommends disabling (not enabling) perfect forward
+      secrecy when it causes problems, and including the device's
+      internet-facing IP in the local network definition can cause
+      disconnections.
+    sources:
+      - https://learn.microsoft.com/en-us/troubleshoot/azure/vpn-gateway/vpn-gateway-troubleshoot-site-to-site-cannot-connect
+      - https://learn.microsoft.com/en-us/azure/vpn-gateway/tutorial-site-to-site-portal
+  - id: q14
+    domain: AZ700-2
+    skill: Diagnose and resolve client-side and authentication issues
+    kind: single
+    stem: >-
+      Veymark Logistics uses point-to-site VPN with Azure certificate
+      authentication. One enterprise root certificate is uploaded to the VPN
+      gateway, and every employee has a unique client certificate issued from
+      that root. A dispatcher reports that a laptop with a client certificate
+      installed was stolen. You must block VPN connections that use that
+      laptop's certificate immediately, without affecting other employees and
+      without reissuing any certificates. What should you do?
+    options:
+      - id: a
+        text: >-
+          Remove the trusted root certificate from the point-to-site
+          configuration.
+      - id: b
+        text: >-
+          Generate a new VPN client profile configuration package and
+          distribute it to the other employees.
+      - id: c
+        text: >-
+          Add the thumbprint of the stolen laptop's client certificate to the
+          Revoked certificates list on the point-to-site configuration page.
+      - id: d
+        text: >-
+          Change the point-to-site tunnel type from IKEv2 and OpenVPN to
+          IKEv2 and SSTP.
+    answer: [c]
+    explanation: >-
+      The certificate revocation list selectively denies point-to-site
+      connectivity for individual client certificates. You add the client
+      certificate thumbprint in the Revoked certificates section, and after
+      the list updates, the certificate can no longer be used to connect,
+      while other certificates generated from the same root keep working.
+      Removing the trusted root certificate revokes access for every client
+      certificate signed by it, so all employees would need new certificates.
+      A new client profile package or a tunnel type change doesn't invalidate
+      the stolen certificate, and changing the tunnel type would force every
+      client to apply a new profile.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/vpn-gateway/point-to-site-certificate-gateway
+
+  - id: q15
+    domain: AZ700-2
+    skill: Specify Azure requirements for Always On VPN
+    kind: multiple
+    stem: >-
+      Your company wants domain-joined laptops to connect to Azure through an
+      Always On VPN device tunnel before users sign in, so that devices can be
+      managed remotely. You are preparing the Azure VPN gateway and the
+      clients. Which three requirements must be met? Each correct answer
+      presents part of the solution. Choose three.
+    options:
+      - id: a
+        text: Configure the point-to-site gateway to use IKEv2 with certificate-based authentication.
+      - id: b
+        text: Use computers that are domain joined and run Windows 10 Enterprise or Education version 1809 or later.
+      - id: c
+        text: Install the client certificate in the Local Machine certificate store.
+      - id: d
+        text: Configure the gateway for Microsoft Entra ID authentication with the OpenVPN tunnel type.
+      - id: e
+        text: Install the client certificate only in each user's personal certificate store.
+      - id: f
+        text: Configure the SSTP tunnel type for the device tunnel.
+    answer: [a, b, c]
+    explanation: >-
+      The gateway must be configured to use IKEv2 and certificate-based
+      authentication. A device tunnel requires a domain-joined computer running
+      Windows 10 Enterprise or Education version 1809 or later, it uses the
+      built-in VPN client with IKEv2 and computer certificate authentication,
+      and the certificate must be in the Local Machine store. Entra ID with
+      OpenVPN, a user certificate store, and SSTP don't meet the device tunnel
+      requirements.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/vpn-gateway/vpn-gateway-howto-always-on-device-tunnel
+  - id: q16
+    domain: AZ700-2
+    skill: Design and implement ExpressRoute to meet requirements, including cross-region connectivity, redundancy, and disaster recovery
+    kind: multiple
+    stem: >-
+      Veymark Logistics has two geo-redundant ExpressRoute circuits, ER1 and
+      ER2, in different peering locations, both connected to the same Azure
+      virtual network. On-premises advertises identical prefixes over both.
+      ER1 has lower latency and must carry traffic in both directions during
+      normal operation, with ER2 used only if ER1 fails. Traffic must stay
+      symmetric. Which two actions should you perform? Each correct answer
+      presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: Configure a higher connection weight on the connection that links the virtual network to ER1.
+      - id: b
+        text: On the on-premises BGP routers, set a higher local preference for routes learned over ER1.
+      - id: c
+        text: Prepend the on-premises ASN to the routes advertised over ER1.
+      - id: d
+        text: Advertise less specific prefixes over ER1 than over ER2.
+      - id: e
+        text: Enable FastPath on the connection to ER2.
+    answer: [a, b]
+    explanation: >-
+      With identical advertisements, Azure uses ECMP across circuits. A higher
+      connection weight makes the virtual network prefer ER1. You must also
+      make on-premises prefer ER1 for Azure-bound traffic to avoid asymmetric
+      flows, typically with iBGP local preference, where the highest value
+      wins. AS path prepend belongs on the less preferred circuit, and a more
+      specific (not less specific) route should be advertised on the preferred
+      path. FastPath doesn't affect path selection.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/expressroute/designing-for-disaster-recovery-with-expressroute-privatepeering
+  - id: q17
+    domain: AZ700-2
+    skill: Design and implement ExpressRoute to meet requirements, including cross-region connectivity, redundancy, and disaster recovery
+    kind: single
+    stem: >-
+      An organization wants disaster recovery for its ExpressRoute
+      connectivity. To reduce the chance that a single natural disaster
+      affects both paths, it will place a second circuit in a peering location
+      in a different metro that is outside the geopolitical region of the first
+      circuit. Both circuits will connect to the same Azure virtual networks.
+      Which circuit SKU should you use?
+    options:
+      - id: a
+        text: Local SKU for both circuits.
+      - id: b
+        text: Standard SKU for both circuits.
+      - id: c
+        text: Premium SKU for the second circuit only.
+      - id: d
+        text: Premium SKU for both circuits.
+    answer: [d]
+    explanation: >-
+      When you use different metros for redundancy, the secondary location
+      should normally be in the same geopolitical region. To choose a location
+      outside the geopolitical region, you need to use the Premium SKU for both
+      circuits in the parallel paths. Using Premium on only one circuit, or
+      Standard or Local on both, doesn't meet that requirement. The tradeoff is
+      higher end-to-end latency.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/expressroute/designing-for-disaster-recovery-with-expressroute-privatepeering
+  - id: q18
+    domain: AZ700-2
+    skill: Create and configure an ExpressRoute gateway
+    kind: single
+    stem: >-
+      Your company is creating a zone-redundant ExpressRoute virtual network
+      gateway in a hub. The design requires ExpressRoute FastPath and the
+      ability to connect up to 16 ExpressRoute circuits to the gateway. You
+      must choose the gateway SKU and the size of GatewaySubnet. What should
+      you choose?
+    options:
+      - id: a
+        text: ErGw2Az with a /27 gateway subnet.
+      - id: b
+        text: ErGw3Az with a /27 gateway subnet.
+      - id: c
+        text: ErGw3Az with a /26 gateway subnet.
+      - id: d
+        text: ErGw1Az with a /26 gateway subnet.
+    answer: [c]
+    explanation: >-
+      Ultra Performance/ErGw3Az supports FastPath and up to 16 circuit
+      connections, while ErGw1Az supports 4 and ErGw2Az supports 8, and neither
+      supports FastPath. A /27 gateway subnet is enough for most
+      configurations, but if you plan to connect 16 ExpressRoute circuits to
+      the gateway you must create a gateway subnet of /26 or larger.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/expressroute/expressroute-about-virtual-network-gateways
+  - id: q19
+    domain: AZ700-2
+    skill: Diagnose and resolve ExpressRoute connection issues
+    kind: single
+    stem: >-
+      Veymark Logistics ordered a new ExpressRoute circuit through a
+      connectivity provider two weeks ago. Private peering cannot be
+      established. In the Azure portal, the circuit Overview shows Circuit
+      status as Enabled and Provider status as Not provisioned. What should
+      you do?
+    options:
+      - id: a
+        text: Open a case with Microsoft Support to enable the circuit.
+      - id: b
+        text: Contact the connectivity provider to complete provisioning of the circuit.
+      - id: c
+        text: Reset the ExpressRoute virtual network gateway.
+      - id: d
+        text: Delete and re-create the connection between the gateway and the circuit.
+    answer: [b]
+    explanation: >-
+      For a circuit to be operational, Circuit status must be Enabled and
+      Provider status must be Provisioned. Provider status shows whether the
+      service provider has provisioned the circuit, and if it is stuck in Not
+      provisioned you contact your service provider. Microsoft Support is the
+      contact when Circuit status is stuck in Not enabled. Gateway resets or
+      re-creating the connection don't address provider provisioning.
+    sources:
+      - https://learn.microsoft.com/en-us/troubleshoot/azure/expressroute/expressroute-troubleshooting-expressroute-overview
+  - id: q20
+    domain: AZ700-2
+    skill: Create a virtual hub in Virtual WAN
+    kind: single
+    stem: >-
+      Your company is creating a new virtual hub in a Standard Virtual WAN. The
+      hub will become a secured hub with Azure Firewall, and the team wants the
+      firewall to be able to scale to maximum throughput. Which hub address
+      space should you specify when you create the hub?
+    options:
+      - id: a
+        text: A /26 address space, because that is the Azure Firewall subnet size.
+      - id: b
+        text: A /24 address space, and expand it later if the firewall needs more addresses.
+      - id: c
+        text: A /23 address space, the general recommendation for future scalability.
+      - id: d
+        text: A /22 address space.
+    answer: [d]
+    explanation: >-
+      The Virtual WAN hub address space can't be modified after the hub is
+      created. The minimum is /24 and a /23 or larger is recommended in
+      general, but when you use Azure Firewall in the hub a minimum hub address
+      space of /22 is required so the firewall can allocate enough IP
+      addresses to scale to maximum throughput. A /26 is a subnet size for
+      firewalls in a virtual network, not a hub address space.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-wan/virtual-wan-faq
+  - id: q21
+    domain: AZ700-3
+    skill: Choose an Azure Load Balancer SKU and tier
+    kind: single
+    stem: >-
+      Veymark Logistics runs a pair of firewall network virtual appliances in
+      a hub virtual network. Spoke subnets use user-defined routes whose next
+      hop is the private frontend IP of a load balancer in front of the
+      appliances. The load balancer must forward all ports and protocols with
+      a single rule, use a zone-redundant frontend, and carry an SLA. Which
+      load balancer should you deploy?
+    options:
+      - id: a
+        text: A Standard internal load balancer with an HA ports rule.
+      - id: b
+        text: A Basic internal load balancer with a rule for each port.
+      - id: c
+        text: A Gateway Load Balancer chained to the spoke VMs.
+      - id: d
+        text: A Standard public load balancer on the Global tier.
+    answer: [a]
+    explanation: >-
+      HA ports are available for the Standard internal load balancer, and
+      Standard supports zone-redundant frontends and a 99.99% SLA. Basic Load
+      Balancer was retired, has no HA ports, no availability zones, and no
+      SLA. A Gateway Load Balancer frontend can't be configured as a UDR next
+      hop; it must be chained from a Standard public load balancer or public IP
+      configuration. The Global tier is for cross-region public load
+      balancing.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/load-balancer/skus
+      - https://learn.microsoft.com/en-us/azure/load-balancer/gateway-overview
+  - id: q22
+    domain: AZ700-3
+    skill: Implement Gateway Load Balancer
+    kind: single
+    stem: >-
+      An application is published through a Standard public load balancer.
+      The security team wants a third-party intrusion prevention appliance
+      inserted transparently into the path of all traffic to and from the
+      application, with flow symmetry and the client source IP preserved, and
+      without maintaining user-defined routes. The appliances are deployed in
+      the backend pool of a Gateway Load Balancer. What should you do next?
+    options:
+      - id: a
+        text: Create a UDR in the application subnet with the Gateway Load Balancer frontend IP as the next hop.
+      - id: b
+        text: Reference the Gateway Load Balancer frontend IP configuration from the public load balancer's frontend IP configuration.
+      - id: c
+        text: Add the application VMs to the Gateway Load Balancer backend pool.
+      - id: d
+        text: Upgrade the public load balancer to the Global tier and chain it to the Gateway Load Balancer.
+    answer: [b]
+    explanation: >-
+      Chaining means the Standard public load balancer frontend (or a Standard
+      public IP configuration on a VM) references the Gateway Load Balancer
+      frontend IP configuration. After chaining, no UDRs are needed, traffic
+      is sent to the appliances first, flows stay symmetric, and the source IP
+      is preserved. A Gateway Load Balancer frontend can't be a UDR next hop,
+      the backend pool holds the appliances, and Gateway Load Balancer doesn't
+      work with the Global tier.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/load-balancer/gateway-overview
+  - id: q23
+    domain: AZ700-3
+    skill: Choose between manual and autoscale
+    kind: single
+    stem: >-
+      Your company is deploying Application Gateway WAF_v2 for an ordering
+      site. Baseline traffic needs about four instances at all times, and
+      during promotions traffic can triple within minutes. You want to control
+      cost outside promotions, avoid waiting for new instances to provision
+      when baseline traffic arrives, and prevent traffic loss during peaks.
+      Which scaling configuration should you use?
+    options:
+      - id: a
+        text: Manual scaling with a fixed instance count of 125.
+      - id: b
+        text: Autoscaling with a minimum instance count of 0 and no maximum.
+      - id: c
+        text: Autoscaling with a minimum instance count of 4 and a maximum instance count sized for promotion peaks.
+      - id: d
+        text: Manual scaling with a fixed instance count of 4.
+    answer: [c]
+    explanation: >-
+      Autoscaling scales out and in with traffic, and the minimum instance
+      count ensures the gateway never falls below that number even without
+      traffic, which matters because a new instance can take three to five
+      minutes to provision. An optional maximum caps growth (default 10 if not
+      specified). Manual mode with 4 instances can lose traffic during peaks,
+      125 fixed instances wastes cost, and a minimum of 0 means baseline
+      capacity must be provisioned on demand.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/application-gateway/application-gateway-autoscaling-zone-redundant
+  - id: q24
+    domain: AZ700-3
+    skill: Configure HTTP settings
+    kind: single
+    stem: >-
+      An application gateway publishes an Azure App Service web app that uses
+      only its default azurewebsites.net host name. Clients connect to the
+      gateway's own DNS name. The backend pool contains the app's FQDN, but
+      requests forwarded to the app fail because the app does not recognize
+      the host header it receives. Which backend setting should you configure?
+    options:
+      - id: a
+        text: Enable cookie-based affinity.
+      - id: b
+        text: Enable Pick host name from backend address.
+      - id: c
+        text: Increase the connection draining timeout.
+      - id: d
+        text: Set an override backend path of /.
+    answer: [b]
+    explanation: >-
+      App Service is multitenant and can only be reached through host names
+      configured on the app. Pick host name from backend address dynamically
+      sets the Host header to the backend pool host name, which lets the
+      gateway reach the app when the gateway's DNS name differs from the
+      backend's domain. Cookie-based affinity handles session stickiness,
+      connection draining handles removal of backend members, and the backend
+      path override changes the forwarded path, not the host header.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/application-gateway/configuration-http-settings
+  - id: q25
+    domain: AZ700-3
+    skill: Choose an appropriate tier
+    kind: single
+    stem: >-
+      Veymark Logistics is deploying Azure Front Door for a customer portal.
+      The origins are internal applications that must not be exposed to the
+      internet, so Front Door must connect to them through Private Link. The
+      security team also requires the Microsoft-managed WAF rule set and bot
+      protection. Which offering should you choose?
+    options:
+      - id: a
+        text: Azure Front Door Standard.
+      - id: b
+        text: Azure Front Door Premium.
+      - id: c
+        text: Azure Front Door (classic).
+      - id: d
+        text: Azure CDN Standard from Microsoft (classic).
+    answer: [b]
+    explanation: >-
+      In the service comparison, Private Link connection to origin, the
+      Microsoft-managed rule set, and bot protection are all available in
+      Azure Front Door Premium. Front Door Standard supports only custom WAF
+      rules, Front Door (classic) lacks Private Link origins and no longer
+      supports profile creation, and CDN Standard from Microsoft (classic) has
+      neither Private Link origins nor WAF managed rules.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/frontdoor/front-door-cdn-comparison
+      - https://learn.microsoft.com/en-us/azure/web-application-firewall/afds/afds-overview
+  - id: q26
+    domain: AZ700-3
+    skill: Implement rules, URL rewrite, and URL redirect
+    kind: single
+    stem: >-
+      Your company uses Azure Front Door Standard. All requests that arrive
+      over HTTP must be sent back to the client with a permanent redirect to
+      the same URL over HTTPS, and browsers should update their references.
+      You are adding a URL redirect action to a rule set. Which redirect type
+      and redirect protocol should you configure?
+    options:
+      - id: a
+        text: Redirect type 302 (Found) with protocol HTTPS only.
+      - id: b
+        text: Redirect type 301 (Moved permanently) with protocol Match request.
+      - id: c
+        text: Redirect type 301 (Moved permanently) with protocol HTTPS only.
+      - id: d
+        text: A URL rewrite action with destination / and preserve unmatched path set to Yes.
+    answer: [c]
+    explanation: >-
+      In Front Door Standard/Premium, URL redirect is configured in a rule
+      set. The 301 status code indicates a new permanent URI and is the code
+      to use for HTTP to HTTPS redirection, and the HTTPS only protocol
+      redirects HTTP traffic to HTTPS. 302 indicates a temporary location,
+      Match request keeps HTTP requests on HTTP, and URL rewrite changes the
+      path sent to the origin instead of redirecting the client.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/frontdoor/front-door-url-redirect
+  - id: q27
+    domain: AZ700-3
+    skill: Implement rules, URL rewrite, and URL redirect
+    kind: single
+    stem: >-
+      Veymark Logistics is moving static images on its origin from a folder
+      named /sub/ to a folder named /foo/. Users and partner sites still
+      request URLs such as /sub/image/1.jpg through Azure Front Door Premium,
+      and those URLs must keep working without the client being redirected.
+      The request /sub/image/1.jpg must be served from /foo/image/1.jpg on the
+      origin. How should you configure the URL rewrite action?
+    options:
+      - id: a
+        text: Source pattern /sub/, destination /foo/, preserve unmatched path set to Yes.
+      - id: b
+        text: Source pattern /sub/, destination /foo/, preserve unmatched path set to No.
+      - id: c
+        text: Source pattern /, destination /foo/, preserve unmatched path set to Yes.
+      - id: d
+        text: A URL redirect action with redirect type 308 and destination path /foo/.
+    answer: [a]
+    explanation: >-
+      URL rewrite changes the request path routed to the origin. The source
+      pattern is prefix based, and with preserve unmatched path set to Yes the
+      remaining path is appended, so /sub/image/1.jpg with source /sub/ and
+      destination /foo/ becomes /foo/image/1.jpg. Setting it to No (the
+      default) drops the remaining path. A source of / would produce
+      /foo/sub/image/1.jpg, and a redirect sends the client a new URL, which
+      the scenario forbids.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/frontdoor/front-door-url-rewrite
+  - id: q28
+    domain: AZ700-4
+    skill: Configure access to private endpoints
+    kind: single
+    stem: >-
+      An organization deploys private endpoints for Azure SQL Database into a
+      subnet named snet-pe. A network security group associated with snet-pe
+      denies inbound TCP 1433 from the development subnet, yet developers can
+      still connect to the database through the private endpoint. No other
+      rules exist. What should you do?
+    options:
+      - id: a
+        text: Associate the NSG with the private endpoint's network interface instead of the subnet.
+      - id: b
+        text: Enable network policies for network security groups on snet-pe.
+      - id: c
+        text: Add a user-defined route of 0.0.0.0/0 to the development subnet.
+      - id: d
+        text: Create a private DNS zone named privatelink.database.windows.net and link it to the development virtual network.
+    answer: [b]
+    explanation: >-
+      By default, network policies are disabled for private endpoints in a
+      subnet, so NSG rules aren't applied to private endpoint traffic. You can
+      enable network policies for network security groups, route tables, or
+      both (for example PrivateEndpointNetworkPolicies set to
+      NetworkSecurityGroupEnabled or Enabled). The private endpoint network
+      interface is read-only and created automatically, a default route
+      doesn't filter traffic, and a private DNS zone only controls name
+      resolution.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/private-link/disable-private-endpoint-network-policy
+      - https://learn.microsoft.com/en-us/azure/private-link/private-endpoint-overview
+  - id: q29
+    domain: AZ700-4
+    skill: Configure access to private endpoints
+    kind: multiple
+    stem: >-
+      Veymark Logistics has a spoke virtual network with address space
+      10.20.0.0/16. A private endpoint for a storage account is in subnet
+      snet-pe of that spoke. Traffic from VMs in snet-app of the same spoke to
+      the private endpoint must pass through an Azure Firewall in the hub for
+      inspection. The existing route table on snet-app contains only a
+      0.0.0.0/0 route to the firewall, and traffic still goes directly to the
+      private endpoint. Which two actions should you perform? Each correct
+      answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: Enable network policies for route tables on snet-pe.
+      - id: b
+        text: Add a route for 10.20.0.0/16 with the firewall as the next hop to the route table on snet-app.
+      - id: c
+        text: Change the existing route prefix from 0.0.0.0/0 to 0.0.0.0/1.
+      - id: d
+        text: Disable network policies on snet-pe.
+      - id: e
+        text: Associate an NSG that denies VirtualNetwork traffic with snet-pe.
+    answer: [a, b]
+    explanation: >-
+      A private endpoint propagates a /32 route, so by longest prefix match a
+      0.0.0.0/0 route can't override it. To override it, the UDR prefix must
+      be no broader than the virtual network address space where the endpoint
+      is provisioned, and network policies must be enabled on the subnet that
+      hosts the private endpoint. A /1 route is still broader than the VNet,
+      disabling policies is the default that causes the problem, and an NSG
+      filters rather than redirects traffic.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/private-link/disable-private-endpoint-network-policy
+  - id: q30
+    domain: AZ700-4
+    skill: Configure access to private endpoints
+    kind: single
+    stem: >-
+      Your company needs private access to a partner's Azure resource. You
+      don't have any Azure RBAC permissions on that resource, so you created a
+      private endpoint by using the manual connection approval method. The
+      private endpoint shows a connection status of Pending, and clients
+      can't send traffic through it. What must happen next?
+    options:
+      - id: a
+        text: The partner, as the private-link resource owner, must approve the private endpoint connection.
+      - id: b
+        text: You must enable network policies on the private endpoint subnet.
+      - id: c
+        text: You must create a private DNS zone and link it to your virtual network.
+      - id: d
+        text: You must delete the private endpoint and re-create it with automatic approval.
+    answer: [a]
+    explanation: >-
+      With the manual request method, the private endpoint and connection are
+      created in a Pending state, and the private-link resource owner is
+      responsible for approving the connection. Only private endpoints in an
+      Approved state can send traffic. Automatic approval requires the
+      privateEndpointConnectionsApproval permission on the resource, which you
+      don't have. Network policies and DNS configuration don't change the
+      connection state.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/private-link/private-endpoint-overview
+  - id: q31
+    domain: AZ700-4
+    skill: Configure service endpoint policies
+    kind: multiple
+    stem: >-
+      Veymark Logistics runs analytics VMs in a subnet named snet-analytics.
+      To prevent data exfiltration, the VMs must be able to reach only three
+      approved Azure Storage accounts over the Azure backbone, and access to
+      every other storage account, in any region, must be denied. Which two
+      actions should you perform? Each correct answer presents part of the
+      solution. Choose two.
+    options:
+      - id: a
+        text: Enable the Microsoft.Storage service endpoint on snet-analytics.
+      - id: b
+        text: Create a service endpoint policy that lists the three storage account resource IDs and associate it with snet-analytics.
+      - id: c
+        text: Add an outbound NSG rule that allows the Storage service tag for the region.
+      - id: d
+        text: Configure the storage firewall on the three approved accounts to allow snet-analytics.
+      - id: e
+        text: Create a private DNS zone named privatelink.blob.core.windows.net.
+    answer: [a, b]
+    explanation: >-
+      Service endpoint policies filter egress virtual network traffic to only
+      the Azure Storage accounts you list, and service endpoints for Azure
+      Storage must be enabled on the subnet for the policy to apply. Once a
+      policy is attached, access to all other storage accounts is denied, and
+      the scope becomes global. A Storage service tag allows any account in
+      the region, the storage firewall restricts who can reach the approved
+      accounts but not where the VMs can send data, and a private DNS zone is
+      for private endpoints.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/virtual-network-service-endpoint-policies-overview
+  - id: q32
+    domain: AZ700-4
+    skill: Configure service endpoint policies
+    kind: single
+    stem: >-
+      An organization attached a service endpoint policy to a subnet. The
+      policy lists two storage accounts that the application uses. After the
+      change, the application can still reach one of the accounts but receives
+      access denied errors from the other, which is a classic storage account.
+      NSG rules have not changed. What is the cause?
+    options:
+      - id: a
+        text: The policy must be in a different region from the virtual network.
+      - id: b
+        text: Classic storage accounts aren't supported in service endpoint policies and are denied by default.
+      - id: c
+        text: RA-GRS secondary access must be listed separately in the policy.
+      - id: d
+        text: The storage account is in a different Microsoft Entra tenant from the virtual network.
+    answer: [b]
+    explanation: >-
+      Only Azure Resource Manager storage accounts can be specified in a
+      service endpoint policy. Classic storage accounts aren't supported, and
+      policies deny access to all classic accounts by default, so endpoint
+      policies shouldn't be used when an application needs both. The virtual
+      network must be in the same region as the policy, RA-GRS secondary
+      access is automatically allowed when the primary is listed, and storage
+      accounts can be in a different tenant.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/virtual-network-service-endpoint-policies-overview
+  - id: q33
+    domain: AZ700-5
+    skill: Create an application security group (ASG)
+    kind: single
+    stem: >-
+      Your company created an application security group named asg-web and
+      added the network interfaces of three web VMs in a virtual network named
+      VNet1. An engineer now tries to add the network interface of a web VM in
+      a peered virtual network named VNet2 to asg-web, and the operation
+      fails. What should you do?
+    options:
+      - id: a
+        text: Create a separate application security group for the VNet2 web VMs and use it in the VNet2 rules.
+      - id: b
+        text: Associate asg-web with the VNet2 subnet instead of with the network interface.
+      - id: c
+        text: Enable gateway transit on the peering between VNet1 and VNet2.
+      - id: d
+        text: Move asg-web to the same resource group as the VNet2 VM.
+    answer: [a]
+    explanation: >-
+      All network interfaces assigned to an application security group must
+      exist in the same virtual network as the first network interface that was
+      assigned to it, so interfaces from different virtual networks can't be
+      added to the same ASG, even when peered. Using a separate ASG for VNet2
+      works. ASGs are assigned to network interfaces, not subnets, and gateway
+      transit or resource group location doesn't change the constraint.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/application-security-groups
+  - id: q34
+    domain: AZ700-5
+    skill: Create an application security group (ASG)
+    kind: single
+    stem: >-
+      Veymark Logistics groups VM network interfaces into application security
+      groups AsgWeb, AsgLogic, and AsgDb in one virtual network, and one NSG is
+      associated with all subnets. Only AsgLogic members may connect to AsgDb
+      members on TCP 1433; every other source, including other VMs in the
+      virtual network, must be blocked. Which rules should you add to the NSG?
+    options:
+      - id: a
+        text: An allow rule from AsgLogic to AsgDb on TCP 1433 at priority 110 and a deny rule from any source to AsgDb on 1433 at priority 120.
+      - id: b
+        text: An allow rule from AsgLogic to AsgDb on TCP 1433 at priority 130 and a deny rule from any source to AsgDb on 1433 at priority 120.
+      - id: c
+        text: Only an allow rule from AsgLogic to AsgDb on TCP 1433 at priority 110, relying on the default rules to block other sources.
+      - id: d
+        text: Only a deny rule from AsgWeb to AsgDb on 1433 at priority 120.
+    answer: [a]
+    explanation: >-
+      The AllowVNetInBound default rule allows all traffic between resources in
+      the same virtual network, so an explicit deny to AsgDb is required. Rules
+      are processed in priority order, and a lower number is processed first,
+      so the allow from AsgLogic at 110 is evaluated before the deny at 120.
+      With the allow at 130, the deny wins. Relying on defaults leaves other VNet
+      sources allowed, and denying only AsgWeb leaves other sources open.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/application-security-groups
+  - id: q35
+    domain: AZ700-5
+    skill: Verify IP flow
+    kind: single
+    stem: >-
+      An administrator at your company cannot open an RDP session on TCP 3389
+      from an on-premises management IP address to an Azure VM. The VM has
+      NSGs associated with both its subnet and its network interface, and the
+      virtual network is also targeted by Azure Virtual Network Manager
+      security admin rules. You need to quickly determine whether the traffic
+      is allowed or denied and the name of the rule responsible. Which Network
+      Watcher feature should you use?
+    options:
+      - id: a
+        text: Next hop.
+      - id: b
+        text: IP flow verify.
+      - id: c
+        text: Packet capture.
+      - id: d
+        text: Connection monitor.
+    answer: [b]
+    explanation: >-
+      IP flow verify uses direction, protocol, local and remote IP, and local
+      and remote port to test the NSG rules applied to the VM's network
+      interface, whether associated with the subnet or the NIC, plus Azure
+      Virtual Network Manager admin rules. It returns Access allowed or Access
+      denied and the name of the rule and NSG responsible. Next hop checks
+      routing, packet capture records traffic, and Connection monitor tracks
+      reachability over time.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/network-watcher/ip-flow-verify-overview
+  - id: q36
+    domain: AZ700-5
+    skill: Verify IP flow
+    kind: single
+    stem: >-
+      A network engineer uses IP flow verify to troubleshoot why ping (ICMP
+      echo) requests from a monitoring server fail to reach an Azure VM, but
+      the tool does not provide a result for ICMP. The engineer needs to test
+      the effective security rules for this ICMP traffic. What should the
+      engineer use instead?
+    options:
+      - id: a
+        text: NSG diagnostics.
+      - id: b
+        text: IP flow verify with the protocol set to TCP and port 0.
+      - id: c
+        text: VPN troubleshoot.
+      - id: d
+        text: Next hop.
+    answer: [a]
+    explanation: >-
+      IP flow verify only tests TCP and UDP rules. To test ICMP traffic rules,
+      the page directs you to NSG diagnostics, which is also the tool to use
+      for rules applied to virtual machine scale sets. Testing TCP instead
+      doesn't evaluate ICMP rules, VPN troubleshoot diagnoses gateways and
+      connections, and next hop reports routing rather than security rules.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/network-watcher/ip-flow-verify-overview
+  - id: q37
+    domain: AZ700-5
+    skill: Design an Azure Firewall deployment
+    kind: single
+    stem: >-
+      Veymark Logistics is deploying a new Azure Firewall in its hub virtual
+      network. Compliance requires that all internet-bound traffic from Azure
+      be sent through the on-premises edge firewall over the VPN before it
+      reaches the internet, and the Azure Firewall data path must not have a
+      public IP address. What must you enable when you create the firewall?
+    options:
+      - id: a
+        text: The Firewall Management network interface.
+      - id: b
+        text: DNAT rules for inbound internet access.
+      - id: c
+        text: An NSG on AzureFirewallSubnet that blocks outbound internet traffic.
+      - id: d
+        text: Threat intelligence in Alert and deny mode.
+    answer: [a]
+    explanation: >-
+      To route internet-bound traffic to a designated next hop such as an
+      on-premises firewall, you must create Azure Firewall with the Firewall
+      Management network interface enabled. The management interface has a
+      public IP used only by the Azure platform, so the data path can have no
+      public IP. DNAT isn't supported with forced tunneling, subnet-level NSGs
+      on AzureFirewallSubnet are disabled, and threat intelligence mode doesn't
+      control routing.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/firewall/forced-tunneling
+      - https://learn.microsoft.com/en-us/azure/firewall/firewall-faq
+  - id: q38
+    domain: AZ700-5
+    skill: Select an appropriate Azure Firewall SKU
+    kind: single
+    stem: >-
+      An organization in the payment industry must inspect outbound HTTPS
+      traffic from Azure workloads for malware by decrypting it, apply
+      signature-based intrusion detection and prevention to east-west
+      traffic, and filter on full URL paths rather than only FQDNs. Which
+      Azure Firewall SKU should you deploy?
+    options:
+      - id: a
+        text: Basic.
+      - id: b
+        text: Standard.
+      - id: c
+        text: Premium.
+      - id: d
+        text: Standard with a Web Application Firewall policy attached.
+    answer: [c]
+    explanation: >-
+      Azure Firewall Premium adds TLS inspection, which decrypts outbound
+      traffic for inspection, signature-based IDPS that applies to inbound,
+      east-west, and outbound traffic, and URL filtering that considers the
+      entire URL. Premium also complies with PCI DSS requirements. These are
+      Premium features, and for URLs the Standard SKU examines only the FQDN.
+      A WAF policy protects Application Gateway or Front Door, not firewall
+      traffic.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/firewall/premium-features
+  - id: q39
+    domain: AZ700-5
+    skill: Configure detection or prevention mode
+    kind: single
+    stem: >-
+      Your company is enabling a WAF policy on a new Application Gateway
+      WAF_v2 in production. The application team is concerned that managed
+      rules might block legitimate requests. You want to identify false
+      positives and create exclusions before any traffic is blocked. What
+      should you do?
+    options:
+      - id: a
+        text: Run the policy in Prevention mode and review the 403 responses returned to users.
+      - id: b
+        text: Run the policy in Detection mode with the WAF log enabled, tune exclusions or custom rules, and then switch to Prevention mode.
+      - id: c
+        text: Disable the managed rule set and use only custom rules with the Allow action.
+      - id: d
+        text: Associate the policy with the gateway only after all backends are removed.
+    answer: [b]
+    explanation: >-
+      In Detection mode the WAF monitors and logs threat alerts but doesn't
+      block requests; you must enable diagnostics with the WAF log. Microsoft
+      recommends running a newly deployed WAF in Detection mode for a short
+      period to collect firewall logs and update exceptions or custom rules
+      before moving to Prevention mode, which blocks attacks with a 403
+      response. Prevention would block users during tuning, and disabling
+      managed rules removes protection.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/web-application-firewall/ag/ag-overview
+  - id: q40
+    domain: AZ700-5
+    skill: Configure detection or prevention mode
+    kind: single
+    stem: >-
+      An Application Gateway WAF policy that uses the default OWASP CRS 3.2
+      anomaly scoring runs in Prevention mode. In the WAF log, a request shows
+      one matched rule with Warning severity, and the request reached the
+      backend. A second request matched one Critical rule and was blocked. Why
+      was the first request allowed?
+    options:
+      - id: a
+        text: The policy is actually running in Detection mode.
+      - id: b
+        text: Warning rules are evaluated only when the policy is in Detection mode.
+      - id: c
+        text: A Warning match adds 3 to the anomaly score, which is below the blocking threshold of 5.
+      - id: d
+        text: Custom rules always allow requests that match only one managed rule.
+    answer: [c]
+    explanation: >-
+      In anomaly scoring mode, a matched rule isn't immediately blocked in
+      Prevention mode. Each severity adds a value to the anomaly score:
+      Critical 5, Error 4, Warning 3, Notice 2. The threshold to block is 5,
+      so a single Critical match blocks the request, but a single Warning match
+      doesn't. Detection mode would not have blocked the Critical request
+      either, and Warning rules are evaluated in both modes.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/web-application-firewall/ag/ag-overview

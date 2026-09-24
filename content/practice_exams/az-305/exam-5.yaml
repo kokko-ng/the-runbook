@@ -1,0 +1,1379 @@
+# AZ-305 practice exam 5. Written by Opus 5.5 (claude-opus-5-5); every
+# question is grounded in, and cites, pages on learn.microsoft.com.
+id: az-305-5
+exam: AZ-305
+number: 5
+title: AZ-305 practice exam 5
+author: Opus 5.5
+model_id: claude-opus-5-5
+written_on: "2026-09-24"
+questions:
+  - id: q01
+    domain: AZ305-1
+    skill: Recommend a solution for routing logs
+    kind: single
+    stem: >-
+      Veymark Logistics runs a non-Microsoft security information and event
+      management (SIEM) platform in its own datacenter. The security team
+      requires that Azure Key Vault resource logs and the subscription activity
+      log be streamed to the SIEM in near real time. The team doesn't want to
+      query the data in Azure. Which destination should you recommend for the
+      diagnostic settings?
+    options:
+      - id: a
+        text: An Azure Storage account with an immutability policy
+      - id: b
+        text: A Log Analytics workspace in the same region as the key vault
+      - id: c
+        text: An Azure event hub in the same region as the monitored resources
+      - id: d
+        text: Azure Monitor metrics explorer with a pinned dashboard
+    answer: [c]
+    explanation: >-
+      Diagnostic settings can send data to Azure Event Hubs specifically to
+      stream it to external systems such as non-Microsoft SIEM solutions, and
+      the activity log page gives the same guidance for sending entries outside
+      Azure. The event hub must be in the same region as a regional monitored
+      resource. A storage account is intended for audit, static analysis, or
+      backup rather than streaming. A Log Analytics workspace is for querying
+      and alerting inside Azure, which the team doesn't need. Metrics explorer
+      isn't a diagnostic setting destination.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/data-collection/diagnostic-settings
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/fundamentals/activity-log
+
+  - id: q02
+    domain: AZ305-1
+    skill: Recommend a solution for routing logs
+    kind: single
+    stem: >-
+      An organization has a key vault in West Europe. An administrator tries to
+      create a diagnostic setting that archives the key vault's audit logs to an
+      existing Standard general-purpose v2 storage account in North Europe, but
+      the storage account isn't accepted as a destination. The storage account
+      has no firewall rules. You need to archive the logs with the least
+      change. What should you do?
+    options:
+      - id: a
+        text: Enable Allow trusted Microsoft services on the storage account.
+      - id: b
+        text: Create a Standard storage account in West Europe and use it as the destination.
+      - id: c
+        text: Replace the storage account with a Premium block blob storage account in North Europe.
+      - id: d
+        text: Select the allLogs category group instead of the audit category group.
+    answer: [b]
+    explanation: >-
+      For regional resources, a storage account destination must be in the same
+      region as the monitored resource, so the fix is a storage account in West
+      Europe. Any Standard storage account is supported. Allowing trusted
+      Microsoft services is needed only when virtual network rules block the
+      diagnostic settings service, and this account has no firewall rules.
+      Premium storage accounts aren't supported as destinations at all. The
+      category group controls which logs are collected, not which destinations
+      are allowed.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/data-collection/diagnostic-settings
+
+  - id: q03
+    domain: AZ305-1
+    skill: Recommend a solution for routing logs
+    kind: single
+    stem: >-
+      Your company must send the resource logs from one Azure SQL logical
+      server's database to three places: a Log Analytics workspace owned by the
+      security team, a different Log Analytics workspace owned by the operations
+      team, and a storage account for long-term archive. You need to minimize the
+      number of diagnostic settings that you create on the database. How many
+      diagnostic settings should you create?
+    options:
+      - id: a
+        text: One
+      - id: b
+        text: Two
+      - id: c
+        text: Three
+      - id: d
+        text: Five
+    answer: [b]
+    explanation: >-
+      A single diagnostic setting can define no more than one destination of
+      each type, so two Log Analytics workspaces require two settings. The
+      storage account can be added to either of those settings because it is a
+      different destination type. One setting can't hold two workspaces, three
+      settings works but isn't the minimum, and five is only the maximum number
+      of diagnostic settings a resource can have.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/data-collection/diagnostic-settings
+
+  - id: q04
+    domain: AZ305-1
+    skill: Recommend a solution to manage secrets, certificates, and keys
+    kind: single
+    stem: >-
+      Veymark Logistics stores the secrets for 12 applications in one Azure
+      Key Vault that is shared by the development, preproduction, and
+      production environments in two regions. A security review finds that a
+      compromise of any one application's access could expose secrets that
+      belong to every other application and environment. You need to reduce
+      the blast radius of a security event by following Key Vault security
+      guidance. What should you recommend?
+    options:
+      - id: a
+        text: >-
+          Move the shared vault to the Premium tier so that secrets are
+          protected by HSMs.
+      - id: b
+        text: >-
+          Use one key vault for each application, environment, and region,
+          with Azure RBAC for access.
+      - id: c
+        text: >-
+          Create one vault per environment and share it across all
+          applications in that environment.
+      - id: d
+        text: >-
+          Keep the shared vault and use legacy access policies to scope each
+          application's access.
+    answer: [b]
+    explanation: >-
+      Key vaults define security boundaries, and grouping secrets in the same
+      vault increases the blast radius of a security event. Key Vault security
+      guidance is to use one vault per application, region, and environment,
+      with Azure RBAC for access. A vault per environment still mixes
+      applications. The Premium tier changes how keys are protected but not
+      the access boundary. Legacy access policies have known security
+      weaknesses, lack support for Privileged Identity Management, and aren't
+      recommended.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/key-vault/general/secure-key-vault
+
+  - id: q05
+    domain: AZ305-1
+    skill: Recommend a solution to manage secrets, certificates, and keys
+    kind: multiple
+    stem: >-
+      Veymark Logistics encrypts several Azure services by using a
+      customer-managed key stored in Azure Key Vault. A new policy requires the
+      key to be rotated every 12 months with no manual steps and no code to
+      maintain, and the services must start using the new key material
+      automatically. What should you do? Each correct answer presents part of
+      the solution. Choose two.
+    options:
+      - id: a
+        text: Configure a key rotation policy on the key with a rotation time of 12 months.
+      - id: b
+        text: Configure each service to use the versionless key URI.
+      - id: c
+        text: Configure each service to use the versioned key URI of the current key.
+      - id: d
+        text: Subscribe an Azure Function to the Event Grid key near expiry event and create new key versions from code.
+      - id: e
+        text: Assign the Key Vault Secrets User role to each service identity.
+    answer: [a, b]
+    explanation: >-
+      A key rotation policy makes Key Vault create a new key version at the
+      chosen interval, giving zero-touch rotation for customer-managed keys.
+      Rotation produces a new key version, so target services should use the
+      versionless key URI to refresh to the latest version automatically. A
+      versioned URI pins the old version. The Event Grid near expiry pattern is
+      meant for cases where automated rotation can't be used, and it requires
+      custom code. Secrets User is a secrets role and doesn't rotate keys.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/key-vault/keys/how-to-configure-key-rotation
+
+  - id: q06
+    domain: AZ305-1
+    skill: Recommend a solution to manage secrets, certificates, and keys
+    kind: single
+    stem: >-
+      A key vault holds keys used to encrypt Azure Storage accounts. Soft delete
+      is enabled with a 90-day retention period. An auditor points out that a
+      subscription owner could still delete a key and then permanently remove it
+      the same day, causing data loss. You need to ensure that deleted keys
+      can't be permanently removed by anyone until the retention period passes.
+      What should you recommend?
+    options:
+      - id: a
+        text: Remove the Key Vault Purge Operator role from all users.
+      - id: b
+        text: Recreate the vault with a soft-delete retention period of 7 days.
+      - id: c
+        text: Switch the vault from access policies to the Azure RBAC permission model.
+      - id: d
+        text: Enable purge protection on the key vault.
+    answer: [d]
+    explanation: >-
+      With purge protection on, a vault or object in the deleted state can't be
+      purged until the retention period passes, and Microsoft recommends it
+      when keys are used for encryption; most integrated services such as
+      Storage require it. Soft delete alone still allows a privileged purge:
+      the subscription owner or a Key Vault Purge Operator can purge, so
+      removing only the role doesn't stop the owner. A shorter retention period
+      weakens protection, and changing the permission model doesn't block
+      purges.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/key-vault/general/soft-delete-overview
+
+  - id: q07
+    domain: AZ305-1
+    skill: Recommend a solution to manage secrets, certificates, and keys
+    kind: single
+    stem: >-
+      Your company buys its public TLS certificates from DigiCert and stores
+      them in Azure Key Vault. Today an engineer downloads a certificate signing
+      request, submits it to the CA, and merges the signed request by hand
+      before every expiry. You need Key Vault to handle renewal end to end with
+      minimal administrative effort. What should you recommend?
+    options:
+      - id: a
+        text: Keep importing the certificates and add certificate contacts for near-expiry email notifications.
+      - id: b
+        text: Integrate DigiCert as a certificate authority in Key Vault and set the certificate policy to auto-renew.
+      - id: c
+        text: Replace the certificates with self-signed certificates that Key Vault renews automatically.
+      - id: d
+        text: Generate a new certificate version each year and merge the signed CSR by using the Azure CLI.
+    answer: [b]
+    explanation: >-
+      Key Vault handles the end-to-end maintenance of certificates issued by the
+      integrated CAs DigiCert and GlobalSign, so integrating DigiCert and using
+      an auto-renew policy removes the manual CSR workflow. Certificate contacts
+      only send notifications, and nonintegrated CA certificates still need the
+      CSR and merge steps. Scripting the CSR merge keeps the manual process.
+      Self-signed certificates do auto-renew, but the scenario requires
+      DigiCert-issued public certificates.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/key-vault/certificates/overview-renew-certificate
+
+  - id: q08
+    domain: AZ305-1
+    skill: Recommend a solution for managing compliance
+    kind: multiple
+    stem: >-
+      Veymark Logistics has enabled Microsoft Defender for Cloud on its Azure
+      subscriptions with only the free foundational features. Auditors require
+      continuous assessment of the Azure environment against PCI DSS and a
+      downloadable report of compliance status for that standard. What should
+      you do? Each correct answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: Enable at least one paid Defender for Cloud plan on the subscriptions.
+      - id: b
+        text: Add the PCI DSS standard in the Regulatory compliance dashboard.
+      - id: c
+        text: Assign the Security Reader role to the auditors so they can see policy compliance data.
+      - id: d
+        text: Create a Microsoft Entra access review for the subscription Owner role.
+      - id: e
+        text: Configure a diagnostic setting that sends the activity log to a Log Analytics workspace.
+    answer: [a, b]
+    explanation: >-
+      The Microsoft cloud security benchmark is enabled by default, and you can
+      add non-default standards such as PCI DSS only when at least one paid
+      Defender for Cloud plan is enabled. After the standard is added, the
+      Regulatory compliance dashboard continuously assesses it and offers
+      Download report for a PDF summary. The Security Reader role doesn't have
+      access to policy compliance data, while Reader does. Access reviews and
+      activity log export don't provide standard-based compliance assessment.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/defender-for-cloud/regulatory-compliance-dashboard
+
+  - id: q09
+    domain: AZ305-1
+    skill: Recommend a solution for managing compliance
+    kind: single
+    stem: >-
+      An organization assigns a custom Azure Policy definition that uses the
+      deployIfNotExists effect to add a diagnostic setting to every key vault.
+      New key vaults receive the setting, but 40 key vaults that existed before
+      the assignment are reported as noncompliant and remain unchanged. You need
+      to bring the existing key vaults into compliance with minimal effort. What
+      should you do?
+    options:
+      - id: a
+        text: Change the policy effect to deny and trigger a compliance scan.
+      - id: b
+        text: Create a remediation task for the assignment by using its managed identity.
+      - id: c
+        text: Add an existenceCondition that matches any diagnostic setting.
+      - id: d
+        text: Create a policy exemption in the Mitigated category for each key vault.
+    answer: [b]
+    explanation: >-
+      A deployIfNotExists policy deploys its template when resources are
+      created or updated. During an evaluation cycle, existing matching
+      resources are only marked noncompliant, and they're remediated with a
+      remediation task, which uses the assignment's managed identity. Deny
+      blocks new noncompliant requests with 403 and only marks existing
+      resources noncompliant. Changing the existenceCondition changes what
+      counts as compliant but deploys nothing. A Mitigated exemption says the
+      intent is met another way, which isn't true here.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/governance/policy/concepts/effect-deploy-if-not-exists
+      - https://learn.microsoft.com/en-us/azure/governance/policy/concepts/effect-deny
+
+  - id: q10
+    domain: AZ305-1
+    skill: Recommend a solution for managing compliance
+    kind: single
+    stem: >-
+      A policy assignment audits that storage accounts disable public network
+      access. One storage account must keep public access until a partner
+      integration is retired at the end of the quarter. Compliance officers
+      want the account to stay visible in compliance reporting, show why it's
+      allowed, and automatically lose the exception after the quarter ends.
+      What should you recommend?
+    options:
+      - id: a
+        text: A policy exemption in the Waiver category with an expiresOn date
+      - id: b
+        text: A policy exemption in the Mitigated category with no expiration
+      - id: c
+        text: Change the assignment effect to Disabled until the end of the quarter.
+      - id: d
+        text: Move the storage account to a resource group outside the assignment scope.
+    answer: [a]
+    explanation: >-
+      A Waiver exemption records that the noncompliant state is temporarily
+      accepted. Exempt resources still count toward overall compliance with a
+      state of Exempt, and the expiresOn property ends the exemption on a set
+      date while keeping the object for record-keeping. Mitigated means the
+      policy intent is met another way, which isn't the case. Disabling the
+      effect stops evaluation for every storage account, and moving the account
+      out of scope removes it from reporting instead of tracking the exception.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/governance/policy/concepts/exemption-structure
+
+  - id: q11
+    domain: AZ305-1
+    skill: Recommend a solution for identity governance
+    kind: single
+    stem: >-
+      HR-driven provisioning creates Microsoft Entra accounts for new
+      employees with the employeeHireDate attribute populated. On each new
+      employee's first day, their manager must automatically receive a
+      Temporary Access Pass by email so the employee can set up passwordless
+      credentials. The company wants a built-in solution with an audit trail
+      and no custom code. What should you recommend?
+    options:
+      - id: a
+        text: >-
+          An entitlement management access package that new employees request
+          on their first day
+      - id: b
+        text: >-
+          A joiner lifecycle workflow triggered by employeeHireDate that runs
+          the Generate Temporary Access Pass and send via email to user's
+          manager task
+      - id: c
+        text: >-
+          A dynamic membership group based on employeeHireDate that triggers a
+          custom Logic App to create the pass
+      - id: d
+        text: >-
+          A recurring access review of new employees with managers as
+          reviewers
+    answer: [b]
+    explanation: >-
+      Lifecycle workflows automate joiner, mover, and leaver tasks, with
+      triggers based on user attributes such as employeeHireDate and workflow
+      history and audit logs for troubleshooting and compliance. The built-in
+      joiner task Generate Temporary Access Pass and send via email to user's
+      manager uses the hire date as the pass start time. The feature requires
+      Microsoft Entra ID Governance or Microsoft Entra Suite licenses. An
+      access package requires the user to request access and doesn't issue a
+      Temporary Access Pass. A custom Logic App adds code. Access reviews
+      certify existing access.
+    sources:
+      - https://learn.microsoft.com/en-us/entra/id-governance/what-are-lifecycle-workflows
+      - https://learn.microsoft.com/en-us/entra/id-governance/lifecycle-workflow-tasks
+
+  - id: q12
+    domain: AZ305-2
+    skill: Recommend a solution for storing relational data
+    kind: single
+    stem: >-
+      Your company is moving an on-premises SQL Server instance that hosts 12
+      databases to Azure. The application uses cross-database queries, SQL
+      Server Agent jobs, CLR modules, and Service Broker. Requirements: minimal
+      application and database changes, a private IP address in a virtual
+      network, and no operating system patching or backup administration.
+      Which service should you recommend?
+    options:
+      - id: a
+        text: SQL Server on Azure Virtual Machines
+      - id: b
+        text: Azure SQL Database single databases in the Hyperscale service tier
+      - id: c
+        text: Azure Cosmos DB for PostgreSQL
+      - id: d
+        text: Azure SQL Managed Instance
+    answer: [d]
+    explanation: >-
+      SQL Managed Instance offers near 100% compatibility with the SQL Server
+      Enterprise engine and supports SQL Server Agent, cross-database queries
+      and transactions, CLR modules, and Service Broker. It has a native
+      virtual network implementation that exposes the SQL endpoint only through
+      a private IP address in a default deployment, and
+      Microsoft handles patching and backups, so it fits lift and shift with
+      minimal changes. SQL Server on VMs keeps OS management with you. The
+      Hyperscale tier is an Azure SQL Database option aimed at scale, not
+      instance-level compatibility. Cosmos DB for PostgreSQL isn't SQL Server.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-sql/managed-instance/sql-managed-instance-paas-overview
+
+  - id: q13
+    domain: AZ305-2
+    skill: Recommend a solution for storing relational data
+    kind: single
+    stem: >-
+      Your company runs an in-house application on community PostgreSQL and
+      wants to move it to Azure with minimal refactoring. The operations team
+      wants the service to patch the operating system and database engine
+      during a custom maintenance window, and development servers must be
+      stoppable so that compute billing stops when they aren't in use. Which
+      data platform should you recommend?
+    options:
+      - id: a
+        text: >-
+          Azure SQL Database with the serverless compute tier
+      - id: b
+        text: >-
+          PostgreSQL installed on Azure virtual machines
+      - id: c
+        text: >-
+          Azure Cosmos DB for NoSQL
+      - id: d
+        text: >-
+          Azure Database for PostgreSQL flexible server
+    answer: [d]
+    explanation: >-
+      Azure Database for PostgreSQL flexible server runs the community version
+      of PostgreSQL, giving application compatibility with minimal
+      refactoring. It patches the hardware, OS, and database engine
+      automatically, and you can choose a custom maintenance schedule. You can
+      stop and start the server on demand, and compute billing stops
+      immediately when it is stopped; the Burstable tier also suits low-cost
+      development. Azure SQL Database isn't PostgreSQL, so the application
+      would need changes. PostgreSQL on VMs leaves patching with you. Cosmos
+      DB for NoSQL is a nonrelational store.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/postgresql/overview
+
+  - id: q14
+    domain: AZ305-2
+    skill: Recommend a solution for storing semi-structured data
+    kind: single
+    stem: >-
+      A multitenant SaaS application stores user activity in an Azure Cosmos
+      DB for NoSQL container. Most queries filter by TenantId and then by
+      UserId. Several large tenants are expected to store well over 20 GB of
+      data each, and tenant-scoped queries should avoid fanning out to every
+      partition. Which partition key design should you recommend?
+    options:
+      - id: a
+        text: >-
+          A hierarchical partition key with TenantId as the first level and
+          UserId as the second level
+      - id: b
+        text: >-
+          A partition key of /TenantId
+      - id: c
+        text: >-
+          A partition key of /id
+      - id: d
+        text: >-
+          A partition key of /Country
+    answer: [a]
+    explanation: >-
+      Each logical partition can store up to 20 GB, so /TenantId alone fails
+      for the large tenants and risks hot partitions. Hierarchical partition
+      keys support up to three levels, help avoid the 20 GB limit, and keep
+      queries that target the first level, such as a single TenantId,
+      efficient. Using /id distributes data well but makes any query that
+      filters on other properties cross-partition. A low-cardinality field
+      such as Country creates few logical partitions and uneven RU and
+      storage distribution.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/cosmos-db/partitioning
+
+  - id: q15
+    domain: AZ305-2
+    skill: Recommend a data solution for protection and durability
+    kind: single
+    stem: >-
+      A payments ledger uses Azure Cosmos DB for NoSQL across two Azure regions.
+      The business requires a recovery point objective (RPO) of zero if the
+      primary region suffers a region-wide outage. The regions are 1,500 miles
+      apart. Higher write latency is acceptable. Which account configuration
+      should you recommend?
+    options:
+      - id: a
+        text: Multiple write regions with strong consistency
+      - id: b
+        text: A single write region with strong consistency
+      - id: c
+        text: Multiple write regions with session consistency
+      - id: d
+        text: A single write region with bounded staleness consistency
+    answer: [b]
+    explanation: >-
+      For accounts with more than one region, only a single write region with
+      strong consistency gives an RPO of zero, because writes commit in every
+      region before completing. Accounts with multiple write regions can't use
+      strong consistency. Session consistency has an RPO of under 15 minutes,
+      and bounded staleness has an RPO defined by its K and T values. Strong
+      consistency is blocked by default only when regions span more than 5,000
+      miles, which doesn't apply here.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/cosmos-db/consistency-levels
+
+  - id: q16
+    domain: AZ305-2
+    skill: Recommend a solution for storing semi-structured data
+    kind: single
+    stem: >-
+      An IoT platform runs a self-managed Apache Cassandra cluster on
+      on-premises servers. The team wants Azure to host and maintain the
+      cluster, but the application relies on Cassandra-specific configuration
+      and behaviors, so the target must be pure open-source Apache Cassandra
+      with full native platform compatibility. Which service should you
+      recommend?
+    options:
+      - id: a
+        text: Azure Cosmos DB for Apache Cassandra
+      - id: b
+        text: Azure Cosmos DB for NoSQL
+      - id: c
+        text: Azure Managed Instance for Apache Cassandra
+      - id: d
+        text: Azure Table Storage
+    answer: [c]
+    explanation: >-
+      Azure Managed Instance for Apache Cassandra is a first-party service that
+      hosts and maintains pure open-source Apache Cassandra clusters with full
+      native platform compatibility, which the Cosmos DB documentation
+      recommends for lift-and-shift migrations. Azure Cosmos DB for Apache
+      Cassandra supports CQL and existing drivers, but its behavior and
+      configuration can differ from the native platform. Cosmos DB for NoSQL and
+      Table Storage would require rewriting the data access layer.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/cosmos-db/cassandra/overview
+
+  - id: q17
+    domain: AZ305-2
+    skill: Recommend a solution for data analysis
+    kind: single
+    stem: >-
+      Delivery vans send GPS and engine telemetry to Azure Event Hubs. The
+      analytics team needs to compute rolling averages per van and detect
+      anomalies as events arrive, then send results to a Power BI dashboard
+      for real-time visualization and to Azure SQL Database. The team knows
+      SQL, doesn't want to provision clusters or manage infrastructure, and
+      wants to pay only for the streaming capacity it uses. What should you
+      recommend?
+    options:
+      - id: a
+        text: >-
+          An Azure Synapse Analytics serverless SQL pool querying the event
+          data
+      - id: b
+        text: >-
+          An Azure Stream Analytics job with Event Hubs as input and Power BI
+          and Azure SQL Database as outputs
+      - id: c
+        text: >-
+          An Azure Data Factory pipeline that runs every five minutes on a
+          schedule trigger
+      - id: d
+        text: >-
+          An Azure Batch pool that runs a custom aggregation application
+    answer: [b]
+    explanation: >-
+      Azure Stream Analytics is a fully managed stream processing engine. A
+      job can read from Event Hubs, use a SQL query language with temporal
+      constraints and anomaly detection functions, and send output to Power
+      BI for real-time visualization and to Azure SQL Database. There's no
+      cluster provisioning or upfront cost; you pay for the streaming units
+      you consume. A serverless SQL pool queries data at rest, not a live
+      event stream. A scheduled Data Factory pipeline is batch processing and
+      isn't real time. Azure Batch requires custom code and pool management.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/stream-analytics/stream-analytics-introduction
+
+  - id: q18
+    domain: AZ305-2
+    skill: Recommend a solution for storing unstructured data
+    kind: multiple
+    stem: >-
+      Veymark Logistics receives shipping manifests from dozens of partners
+      whose systems can only upload files by using SFTP clients with SSH key
+      authentication. The files must land directly in Azure Blob Storage. The
+      company doesn't want to deploy, patch, or scale any SFTP server VMs, and
+      partners can't change their tools. What should you recommend? Each
+      correct answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: >-
+          Create a general-purpose v2 storage account with the hierarchical
+          namespace enabled.
+      - id: b
+        text: >-
+          Deploy a Linux VM scale set that runs an SFTP server and writes the
+          files to the storage account.
+      - id: c
+        text: >-
+          Enable NFS 3.0 support on the storage account.
+      - id: d
+        text: >-
+          Enable SFTP on the account and create a local user for each partner
+          with an SSH public key and container permissions.
+      - id: e
+        text: >-
+          Install Azure File Sync on a server and sync the partner uploads to
+          the storage account.
+    answer: [a, d]
+    explanation: >-
+      Blob Storage supports SFTP natively, removing the need to host SFTP
+      server VMs. SFTP support requires the hierarchical namespace to be
+      enabled. After you enable SFTP, you create local users that
+      authenticate with a password or an SSH key pair and grant them
+      permissions on specific containers. An SFTP server on VMs is exactly the
+      infrastructure the company wants to avoid. NFS 3.0 is a different
+      protocol that SFTP clients can't use. Azure File Sync works with Azure
+      file shares and requires a server to run.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/secure-file-transfer-protocol-support
+
+  - id: q19
+    domain: AZ305-2
+    skill: Recommend a solution for data integration
+    kind: single
+    stem: >-
+      An Azure Data Factory instance was created in East US. A new pipeline must
+      copy data from a blob container in UK South to an Azure Synapse Analytics
+      workspace in UK South. A data residency rule states that the data must not
+      be processed outside the United Kingdom. What should you configure for
+      the linked services?
+    options:
+      - id: a
+        text: The default autoresolve Azure integration runtime
+      - id: b
+        text: An Azure integration runtime created in UK South and referenced by both linked services
+      - id: c
+        text: An autoresolve Azure integration runtime in a managed virtual network
+      - id: d
+        text: Move the data factory to UK South and keep the autoresolve integration runtime.
+    answer: [b]
+    explanation: >-
+      The integration runtime location defines where data movement is
+      performed, and it can differ from the data factory's location. For strict
+      data compliance, Microsoft recommends explicitly creating an Azure IR in
+      the required region and pointing the linked services to it. Autoresolve
+      only makes a best effort to detect the sink region and falls back to the
+      factory's region, East US. With a managed virtual network, autoresolve
+      uses the factory's region. Recreating the factory is unnecessary when an
+      explicit regional IR meets the requirement.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/data-factory/concepts-integration-runtime
+
+  - id: q20
+    domain: AZ305-2
+    skill: Recommend a data storage solution to balance features, performance, and costs
+    kind: single
+    stem: >-
+      Your company must keep scanned customs documents in Azure Blob Storage for
+      seven years. After the first month the documents are rarely read, but when
+      an auditor requests one, it must be returned in milliseconds. The storage
+      account uses zone-redundant storage (ZRS), which must not change. Which
+      access tier should you use for documents older than one month to
+      minimize cost?
+    options:
+      - id: a
+        text: Hot
+      - id: b
+        text: Cool
+      - id: c
+        text: Cold
+      - id: d
+        text: Archive
+    answer: [c]
+    explanation: >-
+      The cold tier is an online tier for data that is rarely accessed but still
+      needs fast retrieval, with millisecond time to first byte and lower
+      storage costs than cool. Its 90-day minimum retention is easily met by
+      seven-year retention. Archive is offline, and rehydration can take up to
+      15 hours; it also isn't supported for ZRS accounts. Hot and cool meet the
+      latency requirement but have higher storage costs than cold.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/access-tiers-overview
+
+  - id: q21
+    domain: AZ305-3
+    skill: Recommend a recovery solution for Azure and hybrid workloads that meets recovery objectives
+    kind: single
+    stem: >-
+      A branch office has four on-premises Windows servers. The company must
+      back up selected folders and the Windows system state on each server to
+      Azure every night and be able to restore individual files to the same
+      server or to a different server. The office has no spare hardware, so
+      no additional backup server can be deployed. What should you recommend?
+    options:
+      - id: a
+        text: >-
+          Replicate the servers to Azure by using Azure Site Recovery.
+      - id: b
+        text: >-
+          Deploy Microsoft Azure Backup Server in the branch office and
+          protect the servers with it.
+      - id: c
+        text: >-
+          Install the Microsoft Azure Recovery Services (MARS) agent on each
+          server and register it with a Recovery Services vault.
+      - id: d
+        text: >-
+          Enable Azure VM backup with the VM backup extension on the servers.
+    answer: [c]
+    explanation: >-
+      The MARS agent backs up files, folders, volumes, and the system state
+      from an on-premises Windows computer directly to a Recovery Services
+      vault on the schedule and retention you set. It can restore individual
+      files and folders to the same server or to an alternate server.
+      Microsoft Azure Backup Server requires deploying an extra server, which
+      the office can't do. Site Recovery replicates machines for disaster
+      recovery rather than keeping file-level backups. The VM backup
+      extension protects Azure virtual machines, not on-premises servers.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/backup/backup-azure-about-mars
+
+  - id: q22
+    domain: AZ305-3
+    skill: Recommend a recovery solution for Azure and hybrid workloads that meets recovery objectives
+    kind: multiple
+    stem: >-
+      An organization replicates a three-tier application (SQL Server,
+      middleware, and web VMs) to Azure by using Azure Site Recovery. The
+      recovery time objective (RTO) is aggressive. After failover, the SQL tier
+      must be running before the middleware starts, the web tier must start
+      last, and each web VM needs a public IP address and a network security
+      group without manual work. What should you recommend? Each correct answer
+      presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: A recovery plan with three groups ordered SQL, middleware, then web
+      - id: b
+        text: Azure Automation runbooks added to the recovery plan as post-failover actions
+      - id: c
+        text: Place all VMs in a single recovery plan group so they start in parallel.
+      - id: d
+        text: Increase the recovery point retention in the replication policy.
+      - id: e
+        text: Manual action steps in the recovery plan for assigning public IP addresses
+    answer: [a, b]
+    explanation: >-
+      A recovery plan defines the sequence in which machines start: groups run
+      in order, so Group 2 starts only after Group 1 has failed over and
+      started. Automating tasks such as creating a public IP address or
+      assigning an NSG with Azure Automation runbooks reduces RTO. A single
+      group starts everything in parallel and breaks the required order.
+      Retention doesn't affect startup. Manual actions are for tasks that can't
+      be automated and would slow recovery here.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/site-recovery/recovery-plan-overview
+
+  - id: q23
+    domain: AZ305-3
+    skill: Recommend a backup and recovery solution for databases
+    kind: single
+    stem: >-
+      A team runs an Azure Cosmos DB for NoSQL account. Developers occasionally
+      delete a container or overwrite items by mistake. The team must be able to
+      restore to any point in time within the last week, and it doesn't want
+      to pay for backup storage. Which backup configuration should you
+      recommend?
+    options:
+      - id: a
+        text: Continuous backup with the 7-day tier
+      - id: b
+        text: Continuous backup with the 30-day tier
+      - id: c
+        text: Continuous backup with the 35-day tier
+      - id: d
+        text: Add a second read region to the account.
+    answer: [a]
+    explanation: >-
+      Continuous backup supports point-in-time restore of deleted containers
+      and accidental writes within the retention window. The 7-day tier meets a
+      one-week requirement and isn't charged for backup storage, although every
+      restore is charged. The 30-day and 35-day tiers add a monthly backup
+      storage charge. Adding a region improves availability of the account but
+      doesn't provide point-in-time restore of deleted containers or
+      overwritten items.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/cosmos-db/continuous-backup-restore-introduction
+
+  - id: q24
+    domain: AZ305-3
+    skill: Recommend a high availability solution for relational data
+    kind: single
+    stem: >-
+      An application uses five Azure SQL databases on one logical server in
+      West Europe. Requirements: the databases must fail over to North Europe
+      together as a unit, the application connection string must not change
+      after a geo-failover, and read-only reporting should be able to use the
+      secondary. What should you recommend?
+    options:
+      - id: a
+        text: Zone-redundant configuration for each database
+      - id: b
+        text: A failover group and the read-write and read-only listener endpoints
+      - id: c
+        text: Geo-restore of geo-redundant backups to a server in North Europe
+      - id: d
+        text: Long-term retention backups copied to North Europe
+    answer: [b]
+    explanation: >-
+      A failover group fails over a group of databases on a logical server to
+      another region as a unit. Its read-write listener always points to the
+      current primary, so the connection string doesn't change after
+      geo-failover, and the read-only listener directs reporting traffic to the
+      secondary. Zone redundancy protects against an availability zone outage,
+      not a region outage. Geo-restore and long-term retention backups are
+      restore options that don't provide automatic endpoint redirection.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-sql/database/failover-group-sql-db
+
+  - id: q25
+    domain: AZ305-3
+    skill: Recommend a high availability solution for relational data
+    kind: single
+    stem: >-
+      You are deploying a SQL Server Always On availability group on Azure
+      virtual machines in one virtual network. The database team wants
+      clients to connect to the availability group listener the same way
+      they do on-premises and doesn't want the listener to depend on an Azure
+      Load Balancer or a distributed network name (DNN). What should you
+      recommend?
+    options:
+      - id: a
+        text: >-
+          Place all replicas in one subnet and configure a virtual network
+          name (VNN) listener behind an internal load balancer.
+      - id: b
+        text: >-
+          Deploy the SQL Server VMs to multiple subnets within the virtual
+          network.
+      - id: c
+        text: >-
+          Place all replicas in one subnet and configure a DNN listener.
+      - id: d
+        text: >-
+          Place the VMs in an availability set within a proximity placement
+          group.
+    answer: [b]
+    explanation: >-
+      Deploying the SQL Server VMs to multiple subnets in the same virtual
+      network matches the on-premises listener experience and removes the
+      dependency on an Azure Load Balancer or a DNN, because the listener has
+      an IP address for a replica in each subnet. Availability groups in a
+      single subnet must use either a load balancer with a VNN listener or a
+      DNN listener to route traffic, which is the dependency the team wants to
+      avoid. An availability set and proximity placement group improve
+      redundancy and latency but don't change how traffic reaches the
+      listener.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-sql/virtual-machines/windows/availability-group-overview
+
+  - id: q26
+    domain: AZ305-3
+    skill: Recommend a high availability solution for semi-structured and unstructured data
+    kind: single
+    stem: >-
+      Your company stores documents in a general-purpose v2 storage account
+      configured for geo-zone-redundant storage (GZRS). Twice a year, the
+      company must test failing the account over to the secondary region
+      while both regions are healthy. The test must not lose data, and the
+      account must stay geo-redundant after the test and failback without any
+      reconfiguration. What should you use for the test?
+    options:
+      - id: a
+        text: >-
+          A customer-managed unplanned failover
+      - id: b
+        text: >-
+          A Microsoft-managed failover requested for the storage account
+      - id: c
+        text: >-
+          A customer-managed planned failover
+      - id: d
+        text: >-
+          An AzCopy job that copies the data to a new account in the
+          secondary region
+    answer: [c]
+    explanation: >-
+      A customer-managed planned failover is meant for disaster recovery
+      testing while both regions are available. It swaps the primary and
+      secondary regions with no expected data loss, and geo-redundancy is
+      retained: a GZRS account becomes GRS after failover and returns to GZRS
+      after failback. An unplanned failover can lose data and converts the
+      account to LRS, so geo-redundancy must be re-enabled at extra cost.
+      Microsoft-managed failover can't be initiated for an individual storage
+      account. Copying data with AzCopy doesn't test the account failover
+      process.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-disaster-recovery-guidance
+
+  - id: q27
+    domain: AZ305-3
+    skill: Recommend a backup and recovery solution for databases
+    kind: single
+    stem: >-
+      A regulator requires Veymark Logistics to keep a full backup of its Azure
+      SQL Database billing database from the end of each month for seven years
+      and to keep one yearly backup for 10 years. The team wants a built-in
+      capability with minimal administrative effort. What should you recommend?
+    options:
+      - id: a
+        text: Increase the point-in-time restore retention to 35 days.
+      - id: b
+        text: Configure a long-term retention policy with monthly and yearly retention values.
+      - id: c
+        text: Schedule SQL Server Agent jobs that take copy-only backups to a storage account.
+      - id: d
+        text: Add the database to a failover group in a second region.
+    answer: [b]
+    explanation: >-
+      Long-term retention copies automated full backups to redundant Blob
+      storage with a policy of up to 10 years, using weekly (W), monthly (M),
+      and yearly (Y) values plus WeekOfYear, so monthly backups can be kept for
+      seven years and yearly ones for 10. Point-in-time restore retention tops
+      out at 35 days. Copy-only backups with SQL Agent are a workaround for SQL
+      Managed Instance, not a built-in feature of SQL Database. A failover group
+      provides DR, not retention.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-sql/database/long-term-retention-overview
+
+  - id: q28
+    domain: AZ305-4
+    skill: Recommend a compute solution for batch processing
+    kind: single
+    stem: >-
+      Veymark Logistics runs a nightly route optimization job as thousands of
+      short, independent, restartable tasks. The job has a flexible deadline,
+      and cost must be minimized, but the business requires that the job always
+      keeps making progress even when surplus Azure capacity is unavailable.
+      What should you recommend?
+    options:
+      - id: a
+        text: An Azure Batch pool that uses only Spot VMs
+      - id: b
+        text: An Azure Batch pool with a fixed baseline of dedicated VMs plus Spot VMs
+      - id: c
+        text: An Azure Batch pool that uses only dedicated VMs
+      - id: d
+        text: An Azure Batch pool with multi-instance tasks on RDMA-capable VMs
+    answer: [b]
+    explanation: >-
+      Spot VMs are cheaper and suit short, restartable tasks with flexible
+      deadlines, and Batch automatically requeues interrupted tasks. A fixed
+      baseline of dedicated VMs ensures there's always some capacity to keep a
+      job progressing, while Spot VMs add low-cost capacity when available. A
+      Spot-only pool is cheapest but has no availability guarantee, so progress
+      can stop. Dedicated-only pools cost more. Multi-instance tasks target
+      tightly coupled MPI work, not independent tasks.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/batch/batch-spot-vms
+
+  - id: q29
+    domain: AZ305-4
+    skill: Recommend a compute solution for batch processing
+    kind: multiple
+    stem: >-
+      An engineering team needs to run a tightly coupled Message Passing
+      Interface (MPI) simulation across 16 nodes in Azure Batch. The simulation
+      runs for several hours, and a node loss forces the whole job to restart.
+      You are designing the pool. Which two settings should you include? Each
+      correct answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: Enable inter-node communication on the pool.
+      - id: b
+        text: Set the pool's task slots per node to 1.
+      - id: c
+        text: Use only Spot VMs to reduce cost.
+      - id: d
+        text: Set the pool's task slots per node to 4 to increase density.
+      - id: e
+        text: Submit 16 independent standard tasks, one for each node.
+    answer: [a, b]
+    explanation: >-
+      MPI workloads in Batch use multi-instance tasks, which require a pool
+      with inter-node communication enabled and concurrent task execution
+      disabled by setting task slots per node to 1. If either setting is
+      missing, the multi-instance task is never scheduled. Long-running MPI
+      jobs that use multiple VMs aren't well suited for Spot VMs because one
+      preempted VM can force the whole job to rerun. Independent standard tasks
+      don't coordinate across nodes the way a multi-instance task does.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/batch/batch-mpi
+      - https://learn.microsoft.com/en-us/azure/batch/batch-spot-vms
+
+  - id: q30
+    domain: AZ305-4
+    skill: Recommend an application configuration management solution
+    kind: single
+    stem: >-
+      A development team is releasing a new checkout experience in a web app.
+      They want to enable it first for an internal QA group, then for 5 percent
+      of customers, increasing the percentage over several days, and to turn it
+      off instantly if errors spike. None of these changes may require a
+      redeployment. What should you recommend?
+    options:
+      - id: a
+        text: Azure Traffic Manager weighted routing between two deployments of the app
+      - id: b
+        text: An Azure App Configuration feature flag that uses a rollout with targeting
+      - id: c
+        text: An Azure Key Vault secret that stores the percentage of users to enable
+      - id: d
+        text: Separate application builds for internal and external users
+    answer: [b]
+    explanation: >-
+      App Configuration feature flags decouple feature release from code
+      deployment. The Rollout scenario supports percentage-based gradual
+      release and targeted access for specific users or groups, and a flag can
+      be switched off instantly as a kill switch without redeploying. Traffic
+      Manager weighted routing splits DNS traffic between separate deployments,
+      and DNS caching can skew the split, so it can't target a QA group. Key
+      Vault is for secrets, and separate builds require redeployment.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-app-configuration/concept-feature-management
+      - https://learn.microsoft.com/en-us/azure/traffic-manager/traffic-manager-routing-methods
+
+  - id: q31
+    domain: AZ305-4
+    skill: Recommend an application configuration management solution
+    kind: multiple
+    stem: >-
+      Microservices on Azure Kubernetes Service read their settings from Azure
+      App Configuration by using the configuration provider library and a
+      managed identity. Database connection strings are secrets and must never
+      be stored as values in App Configuration, but developers want to read
+      them through the same configuration API as other settings. What should
+      you do? Each correct answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: Store the secrets in Azure Key Vault and add Key Vault references to App Configuration.
+      - id: b
+        text: Grant the application's managed identity read access to the secrets in Key Vault.
+      - id: c
+        text: Grant the App Configuration store's managed identity read access to the secrets in Key Vault.
+      - id: d
+        text: Store the secrets as App Configuration key-values with a label named secret.
+      - id: e
+        text: Create an App Configuration snapshot that contains the secrets.
+    answer: [a, b]
+    explanation: >-
+      A Key Vault reference in App Configuration stores only a URI to the
+      Key Vault value, not the secret itself. The client provider recognizes
+      the reference and retrieves the value from Key Vault, so the application
+      must authenticate to both services, and its managed identity needs access
+      to the secrets. App Configuration doesn't access the key vault, so
+      granting the store's identity access does nothing. Labels and snapshots
+      would still store the secret values in App Configuration.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-app-configuration/use-key-vault-references-dotnet-core
+
+  - id: q32
+    domain: AZ305-4
+    skill: Recommend an application configuration management solution
+    kind: single
+    stem: >-
+      Your company promotes each release through test, staging, and production.
+      A recent incident happened because someone edited a key-value in Azure App
+      Configuration while a release was in progress. You need each release to
+      reference a named set of settings that is guaranteed not to change, and
+      you need a last-known-good configuration to roll back to. What should you
+      recommend?
+    options:
+      - id: a
+        text: Use labels that match the release name on each key-value.
+      - id: b
+        text: Enable geo-replication and point production at a replica.
+      - id: c
+        text: Create an App Configuration snapshot for each release and reference it by name.
+      - id: d
+        text: Convert each setting to a feature flag with a time window filter.
+    answer: [c]
+    explanation: >-
+      A snapshot is a named, immutable subset of key-values chosen with key and
+      label filters, and its contents are guaranteed to stay unchanged.
+      Snapshots are designed for controlled rollout and last-known-good
+      rollback, and an app only needs to change the snapshot name it
+      references. Labeled key-values can still be edited. Geo-replication
+      synchronizes changes across replicas, so an edit still propagates.
+      Feature flags control feature availability, not an immutable set of
+      settings.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-app-configuration/concept-snapshots
+
+  - id: q33
+    domain: AZ305-4
+    skill: Recommend a solution for migrating unstructured data
+    kind: single
+    stem: >-
+      An organization has 60 SMB file shares on NAS devices in offices on three
+      continents, totaling 30 TB, and good network connectivity at every site.
+      The shares must be migrated to Azure file shares with timestamps, ACLs,
+      and file attributes preserved. The migration team wants to plan and track
+      every share's migration from one place. What should you recommend?
+    options:
+      - id: a
+        text: Azure Storage Mover with a migration project per workload
+      - id: b
+        text: An Azure Data Box order for each office
+      - id: c
+        text: Azure Data Factory copy activities on an Azure integration runtime
+      - id: d
+        text: Azure Site Recovery replication of the NAS devices
+    answer: [a]
+    explanation: >-
+      Azure Storage Mover is a fully managed migration service in which one
+      storage mover resource can manage migrations from multiple shares
+      worldwide, with a project per workload to track progress and results.
+      SMB 2.x and 3.x sources to Azure file shares are supported, and the
+      migration keeps timestamps, ACLs, and file attributes. Data Box targets
+      transfers larger than 40 TB with no to limited connectivity, which isn't
+      the case. An Azure IR connects to publicly accessible endpoints rather
+      than private NAS shares, and Site Recovery replicates machines, not file
+      shares.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage-mover/service-overview
+      - https://learn.microsoft.com/en-us/azure/databox/data-box-overview
+      - https://learn.microsoft.com/en-us/azure/data-factory/concepts-integration-runtime
+
+  - id: q34
+    domain: AZ305-4
+    skill: Recommend a solution for migrating unstructured data
+    kind: multiple
+    stem: >-
+      Veymark Logistics must move 350 TB of scanned documents from an
+      on-premises SMB file server to Azure Blob Storage. The site has limited
+      internet bandwidth. Users keep changing files during the migration, and
+      the cutover window must be as short as possible. What should you
+      recommend? Each correct answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: Use Azure Data Box for the initial bulk transfer.
+      - id: b
+        text: Use Azure Storage Mover to copy the changes made since the Data Box copy before cutover.
+      - id: c
+        text: Copy all 350 TB over the internet with AzCopy during the cutover window.
+      - id: d
+        text: Use Azure Site Recovery to replicate the file server to Azure.
+      - id: e
+        text: Order a Data Box Heavy device for the transfer.
+    answer: [a, b]
+    explanation: >-
+      Data Box suits transfers larger than 40 TB with no to limited network
+      connectivity, including an initial bulk transfer. Because files keep
+      changing while the device is in transit, Storage Mover performs the
+      online catch-up: it detects differences and transfers only updates and
+      new files, uploading only metadata when only permissions change. Copying
+      everything over limited bandwidth lengthens cutover. Data Box Heavy has
+      been retired, and Site Recovery replicates machines rather than
+      migrating files into Blob Storage.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/databox/data-box-overview
+      - https://learn.microsoft.com/en-us/azure/storage-mover/service-overview
+
+  - id: q35
+    domain: AZ305-4
+    skill: Recommend a load-balancing and routing solution
+    kind: single
+    stem: >-
+      A public e-commerce web app runs on Azure App Service in three regions.
+      Requirements: a single global entry point, path-based routing, TLS
+      offload, caching and acceleration of content for users worldwide, and
+      fast failover between regions that doesn't depend on DNS time-to-live
+      values. Which service should you recommend?
+    options:
+      - id: a
+        text: Azure Traffic Manager
+      - id: b
+        text: Azure Application Gateway
+      - id: c
+        text: Azure Front Door
+      - id: d
+        text: Azure Load Balancer with a global tier frontend
+    answer: [c]
+    explanation: >-
+      Azure Front Door is a global application delivery network for HTTP(S)
+      that provides SSL offload, path-based routing, fast failover, and
+      caching, and the decision tree ends at Front Door for internet-facing,
+      multi-region web apps that need acceleration. Traffic Manager is DNS-based
+      and can't fail over as quickly because of DNS caching. Application Gateway
+      is regional. The global load balancer is Layer 4 and has no Layer-7
+      features such as path-based routing or caching.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/load-balancing-overview
+
+  - id: q36
+    domain: AZ305-4
+    skill: Recommend a load-balancing and routing solution
+    kind: single
+    stem: >-
+      A multiplayer game backend runs on VMs behind public Standard Load
+      Balancers in East US 2 and West Europe. Players connect over UDP.
+      Requirements: one static public IP address for all players worldwide,
+      preservation of client IP addresses on the VMs, routing to the closest
+      healthy region, and failover that doesn't depend on DNS caching. Which
+      solution should you recommend?
+    options:
+      - id: a
+        text: A global tier Azure Load Balancer with the regional load balancers in its backend pool
+      - id: b
+        text: Azure Front Door with the regional load balancers as origins
+      - id: c
+        text: Azure Traffic Manager with the Performance routing method
+      - id: d
+        text: Azure Application Gateway with a TCP and TLS listener in each region
+    answer: [a]
+    explanation: >-
+      The global load balancer is a Layer 4 pass-through service with a static
+      anycast global IP address, client IP preservation, geo-proximity routing,
+      and instant failover to the next healthy regional load balancer. Its
+      backend pool contains the existing public regional load balancers. Front
+      Door handles HTTP(S) only. Traffic Manager returns DNS answers, so
+      failover is delayed by DNS caching and there's no single static IP.
+      Application Gateway is regional and handles HTTP(S), TCP, and TLS rather
+      than UDP.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/load-balancer/cross-region-overview
+      - https://learn.microsoft.com/en-us/azure/architecture/guide/technology-choices/load-balancing-overview
+
+  - id: q37
+    domain: AZ305-4
+    skill: Recommend a load-balancing and routing solution
+    kind: single
+    stem: >-
+      A logistics API runs in separate deployments in Europe, Australia, and
+      North America. Because of data sovereignty rules, users whose DNS queries
+      originate in Europe must always be directed to the European deployment,
+      even if another region would be faster. You plan to use Azure Traffic
+      Manager. Which routing method should you configure?
+    options:
+      - id: a
+        text: Performance
+      - id: b
+        text: Weighted
+      - id: c
+        text: Priority
+      - id: d
+        text: Geographic
+    answer: [d]
+    explanation: >-
+      Geographic routing directs users to specific endpoints based on the
+      geographic location of their DNS queries and is intended for data
+      sovereignty mandates. Microsoft recommends pairing it with nested
+      endpoints that contain at least two endpoints each. Performance routing
+      sends users to the lowest-latency endpoint, which could be outside
+      Europe. Weighted distributes traffic by weight, and Priority sends all
+      traffic to one primary endpoint with backups.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/traffic-manager/traffic-manager-routing-methods
+
+  - id: q38
+    domain: AZ305-4
+    skill: Recommend a messaging architecture
+    kind: multiple
+    stem: >-
+      An order service publishes status events to Azure Service Bus, and
+      several consumer instances process them in parallel. Events for the same
+      order must be processed in the order they were sent, while events for
+      different orders can be processed concurrently. What should you
+      recommend? Each correct answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: Use a Service Bus namespace in the Standard or Premium tier.
+      - id: b
+        text: Enable sessions on the queue and set the session ID to the order ID.
+      - id: c
+        text: Use a Service Bus namespace in the Basic tier.
+      - id: d
+        text: Rely on message sequence numbers without sessions.
+      - id: e
+        text: Increase the maximum delivery count on the queue.
+    answer: [a, b]
+    explanation: >-
+      Sessions provide FIFO processing: a receiver that accepts a session holds
+      an exclusive lock on all messages with that session ID, so each order's
+      messages are processed in order while other sessions go to other
+      receivers. The Basic tier doesn't support sessions, and Standard and
+      Premium do. Sequence numbers guarantee queuing and retrieval order but not
+      processing order across concurrent consumers. Delivery count only
+      controls when messages move to the dead-letter queue.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/service-bus-messaging/message-sessions
+
+  - id: q39
+    domain: AZ305-4
+    skill: Recommend an application configuration management solution
+    kind: single
+    stem: >-
+      Apps in Sweden Central, North Europe, and East Asia all read settings from
+      one Standard tier Azure App Configuration store in West US. The apps are
+      starting to exhaust the store's request limits, and the store is a single
+      point of failure during a regional outage. You need to fix both issues
+      with minimal code changes. What should you recommend?
+    options:
+      - id: a
+        text: Rely on availability zone support in West US.
+      - id: b
+        text: Create geo-replicas of the store in the regions where the apps run.
+      - id: c
+        text: Create an App Configuration snapshot and have each app read the snapshot.
+      - id: d
+        text: Downgrade the store to the Developer tier and create one store per region.
+    answer: [b]
+    explanation: >-
+      Geo-replication creates replicas in chosen regions. Each replica has
+      isolated request limits equal to the origin's, apps can use the closest
+      replica for lower latency, and the configuration providers support
+      automatic failover if a region has an outage. Availability zones protect
+      only within one region. Snapshots don't add regional endpoints or request
+      capacity. Geo-replication isn't available in the Free and Developer
+      tiers, and separate stores would need manual synchronization.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-app-configuration/concept-geo-replication
+
+  - id: q40
+    domain: AZ305-4
+    skill: Recommend a solution for migrating databases
+    kind: single
+    stem: >-
+      Your company runs a SQL Server Always On availability group on premises.
+      It will migrate the primary database to the Business Critical service
+      tier of Azure SQL Managed Instance. The business requires a true online
+      migration with the least possible downtime, and the source must stay
+      online and serving users until cutover. What should you recommend?
+    options:
+      - id: a
+        text: Back up the database to Azure Blob Storage and restore it with the T-SQL RESTORE FROM URL command.
+      - id: b
+        text: Use Azure Data Box to ship the database files.
+      - id: c
+        text: Use the Managed Instance link to replicate the database and then fail over.
+      - id: d
+        text: Export the database to a BACPAC file and import it.
+    answer: [c]
+    explanation: >-
+      The Managed Instance link uses distributed availability groups to
+      replicate data from SQL Server to SQL Managed Instance in near real time.
+      It provides the most performant, minimal downtime migration and is the
+      only solution that allows true online migrations to the Business
+      Critical tier, so backup and restore from URL, Data Box shipments, and
+      BACPAC export and import don't meet the true online requirement.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-sql/managed-instance/sql-managed-instance-paas-overview

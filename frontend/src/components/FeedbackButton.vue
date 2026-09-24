@@ -123,6 +123,17 @@ function closePanel(): void {
   trigger.value?.focus()
 }
 
+/**
+ * A practice exam keeps its answers and a pinned action bar at the bottom of a
+ * phone screen, exactly where the floating button sits, so that page hosts its
+ * own Feedback control and asks for the panel through the ui store.
+ */
+const hostedByPage = computed(() => route.name === 'practice-exam')
+watch(
+  () => ui.feedbackRequests,
+  () => void openPanel(),
+)
+
 async function send(): Promise<void> {
   if (!category.value || state.value === 'sending') return
   state.value = 'sending'
@@ -172,6 +183,7 @@ onUnmounted(() => {
   <button
     ref="trigger"
     type="button"
+    v-if="!hostedByPage"
     class="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-3 z-30 flex min-h-11
     items-center gap-2 rounded-full border border-ink-200 bg-white/95 px-4 text-sm font-medium
     shadow-lg backdrop-blur transition-colors hover:border-signal-500 dark:border-ink-700

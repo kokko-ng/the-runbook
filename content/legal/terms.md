@@ -1,6 +1,6 @@
 # Terms of use
 
-Last updated 24 August 2026.
+Last updated 24 September 2026.
 
 ## The short version
 
@@ -16,11 +16,21 @@ not exist, and any resemblance to a real firm is coincidental.
 ## Not affiliated with Microsoft
 
 The Runbook is not affiliated with, endorsed by, or sponsored by Microsoft
-Corporation. Microsoft, Azure, Microsoft Entra, and the exam codes AZ-104 and
-AZ-305 are trademarks of the Microsoft group of companies. Exam objectives are
+Corporation. Microsoft, Azure, Microsoft Entra, and the exam codes AZ-104,
+AZ-305 and AZ-700 are trademarks of the Microsoft group of companies. Exam objectives are
 transcribed from the publicly published study guides for reference and are the
 property of their owner. No exam questions are reproduced here: everything in
 this game is written from scratch, and nothing in it comes from a live exam.
+
+## Practice exams are written by an AI model
+
+The practice exams for AZ-104, AZ-700 and AZ-305 were made by Opus 5.5, an AI
+model made by Anthropic, and not by hand like the rest of the game. Every
+question was written from pages on learn.microsoft.com and links the pages it
+was drawn from. They are not official Microsoft practice assessments, they
+reproduce no live exam content, and AI-written material can be wrong: where an
+explanation and its linked source disagree, the source is right. Report a wrong
+question through the feedback button and it will be fixed.
 
 ## No exam dumps
 

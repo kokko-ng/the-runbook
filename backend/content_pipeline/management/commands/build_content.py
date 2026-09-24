@@ -8,7 +8,7 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 
-from content_pipeline import core
+from content_pipeline import core, practice
 
 
 class Command(BaseCommand):
@@ -25,16 +25,20 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         library = core.load_library()
+        practice_sets = practice.load_practice()
         if not options["skip_validation"]:
             problems = core.validate(library, require_full_coverage=not options["partial"])
+            problems += practice.validate_practice(practice_sets)
             if problems:
                 for problem in problems:
                     self.stdout.write(self.style.ERROR(str(problem)))
                 raise CommandError(f"refusing to compile: {len(problems)} content problem(s)")
         result = core.build_bundle(library, options["out"])
+        exams = practice.build_practice(practice_sets, result["out_dir"])
         self.stdout.write(
             self.style.SUCCESS(
                 f"compiled {result['quests']} quests / {result['encounters']} encounters "
+                f"and {exams['exams']} practice exams / {exams['questions']} questions "
                 f"at version {result['version']} into {result['out_dir']}"
             )
         )

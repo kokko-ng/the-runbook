@@ -18,6 +18,7 @@ const links = [
   { to: '/review', label: 'Review' },
   { to: '/skills', label: 'Skills' },
   { to: '/map', label: 'Map' },
+  { to: '/practice', label: 'Practice exams' },
   { to: '/account', label: 'Account' },
 ]
 
