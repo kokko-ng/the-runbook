@@ -133,7 +133,10 @@ def validate_practice(sets: list[PracticeSet], root: Path | None = None) -> list
         numbers = [exam.data.get("number") for exam in practice.exams]
         if numbers != list(range(1, len(numbers) + 1)):
             problems.append(
-                Problem(f"practice_exams/{practice.folder}", f"exam numbers {numbers} skip or repeat")
+                Problem(
+                    f"practice_exams/{practice.folder}",
+                    f"exam numbers {numbers} skip or repeat",
+                )
             )
         for exam in practice.exams:
             exam_where = f"practice_exams/{practice.folder}/{exam.path.name}"
