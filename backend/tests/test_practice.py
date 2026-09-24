@@ -127,7 +127,8 @@ def test_dealing_is_stable_lossless_and_relabels(sets):
             for question in exam.questions:
                 dealt = practice.deal_question(exam.id, question)
                 assert dealt == practice.deal_question(exam.id, question)
-                assert [o["id"] for o in dealt["options"]] == list("abcdef"[: len(dealt["options"])])
+                seats = list("abcdef"[: len(dealt["options"])])
+                assert [o["id"] for o in dealt["options"]] == seats
                 texts = {o["id"]: o["text"] for o in question["options"]}
                 dealt_texts = {o["id"]: o["text"] for o in dealt["options"]}
                 assert sorted(texts.values()) == sorted(dealt_texts.values())
