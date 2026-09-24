@@ -1,0 +1,1286 @@
+# AZ-104 practice exam 3. Written by Opus 5.5 (claude-opus-5-5); every
+# question is grounded in, and cites, pages on learn.microsoft.com.
+id: az-104-3
+exam: AZ-104
+number: 3
+title: AZ-104 practice exam 3
+author: Opus 5.5
+model_id: claude-opus-5-5
+written_on: "2026-09-24"
+questions:
+  - id: q01
+    domain: AZ104-1
+    skill: Manage licenses in Microsoft Entra ID
+    kind: single
+    stem: >-
+      Veymark Logistics uses group-based licensing. A Microsoft 365 license is
+      assigned to a security group named GRP-Operations. The only members of
+      GRP-Operations are two other groups, GRP-Drivers and GRP-Dispatch, which
+      contain the actual user accounts. None of the drivers or dispatchers
+      receive a license. You need the users in both groups to be licensed with
+      the least administrative effort as membership changes over time. What
+      should you do?
+    options:
+      - id: a
+        text: Convert GRP-Operations to a Microsoft 365 group so that nested membership is evaluated.
+      - id: b
+        text: Select Reprocess for GRP-Operations on the product's Errors and issues tab.
+      - id: c
+        text: Assign the license directly to GRP-Drivers and GRP-Dispatch.
+      - id: d
+        text: Set the usage location on GRP-Operations to the country where the users work.
+    answer: [c]
+    explanation: >-
+      Group-based licensing doesn't support nested groups. When a license is
+      assigned to a group that contains other groups, only users who are
+      first-level members of the licensed group are licensed. Assigning the
+      license to GRP-Drivers and GRP-Dispatch makes their users first-level
+      members of licensed groups, and future membership changes are handled
+      automatically. Security, mail-enabled, and Microsoft 365 groups are all
+      supported, so changing the group type doesn't add nesting support.
+      Reprocessing doesn't change the nesting limitation, and usage location is
+      a user property, not a group property.
+    sources:
+      - https://learn.microsoft.com/en-us/microsoft-365/admin/manage/manage-group-licenses
+  - id: q02
+    domain: AZ104-1
+    skill: Manage licenses in Microsoft Entra ID
+    kind: single
+    stem: >-
+      Your company licenses users by group membership. A user is moving from
+      the Sales department to the Finance department. Each department has its
+      own licensed group, and both groups assign the same Microsoft 365
+      product with different service plans enabled. The user must not lose
+      access to licensed services at any point during the change. What should
+      you do first?
+    options:
+      - id: a
+        text: Remove the user from the Sales group, then add the user to the Finance group.
+      - id: b
+        text: Add the user to the Finance group and confirm the new license appears on the user's Licenses page.
+      - id: c
+        text: Remove the user's usage location so the user inherits the tenant location during the move.
+      - id: d
+        text: Assign the license directly to the user, then remove both group-based assignments.
+    answer: [b]
+    explanation: >-
+      The documented order for moving a user between licensed groups without
+      interruption is to add the user to the destination group first, confirm
+      the new license has been applied on the user's Licenses page, and only
+      then remove the user from the original group. Removing the user from the
+      source group first leaves the user unlicensed until group-based licensing
+      finishes processing, which can take longer in large tenants. Clearing the
+      usage location doesn't help and risks assigning services in the wrong
+      location, and a direct assignment adds manual work the group model is
+      meant to avoid.
+    sources:
+      - https://learn.microsoft.com/en-us/microsoft-365/admin/manage/manage-group-licenses
+  - id: q03
+    domain: AZ104-1
+    skill: Interpret access assignments
+    kind: single
+    stem: >-
+      A user named Priya is assigned the Contributor role at the subscription
+      scope. Another administrator later assigns Priya the Reader role on a
+      resource group named RG-Billing in the same subscription, intending to
+      limit her to read-only access there. There are no deny assignments.
+      What access does Priya have to resources in RG-Billing?
+    options:
+      - id: a
+        text: Read-only access, because the assignment at the narrower scope takes precedence.
+      - id: b
+        text: Contributor access, because role assignments are additive across scopes.
+      - id: c
+        text: No access, because conflicting role assignments cancel each other out.
+      - id: d
+        text: Read-only access until the subscription-level assignment is refreshed in her token.
+    answer: [b]
+    explanation: >-
+      Azure RBAC is an additive model, so effective permissions are the sum of
+      all role assignments. The Contributor assignment at the subscription
+      scope is inherited by RG-Billing, and adding Reader at the resource group
+      scope grants nothing new, so Priya effectively has Contributor there. A
+      narrower assignment never overrides a broader grant, and assignments
+      don't cancel each other. To actually block actions despite a role
+      assignment, a deny assignment is required, and those can't be created
+      directly by administrators.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/overview
+  - id: q04
+    domain: AZ104-1
+    skill: Interpret access assignments
+    kind: single
+    stem: >-
+      A help desk engineer reports being able to restart a virtual machine
+      named VM-Scan01 in resource group RG-Depot. You open RG-Depot, select
+      Access control (IAM), and use Check access for the engineer. The pane
+      lists no role assignments for the engineer. What is the most likely
+      reason, and how should you confirm it?
+    options:
+      - id: a
+        text: The engineer has a role assignment at the VM scope; run Check access on VM-Scan01 itself.
+      - id: b
+        text: Check access only shows deny assignments; open the Role assignments tab of the subscription.
+      - id: c
+        text: The assignment is to a group, which Check access never evaluates; list the group members in Microsoft Entra ID.
+      - id: d
+        text: The engineer's token is cached; wait for the role assignment to replicate to the region.
+    answer: [a]
+    explanation: >-
+      The Check access pane lists the selected principal's access at the
+      current scope and inherited to that scope. Assignments at child scopes
+      aren't listed, so a role assignment made directly on VM-Scan01 doesn't
+      appear when you check access at the resource group. Running Check access
+      on the VM shows it. The pane lists both role assignments and deny
+      assignments, not only deny assignments. Role assignments are transitive
+      for groups, so group-based access is evaluated, and RBAC data is stored
+      globally rather than waiting on regional replication.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/check-access
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/overview
+  - id: q05
+    domain: AZ104-1
+    skill: Interpret access assignments
+    kind: single
+    stem: >-
+      Veymark Logistics deploys shared networking resources with Bicep. The
+      security team requires that no one can delete these resources, even
+      users who hold the Owner role, with the exception of a single break-glass
+      account. The restriction must be enforced by Azure RBAC evaluation. What
+      should you use?
+    options:
+      - id: a
+        text: A deny assignment created on the Deny assignments tab of Access control (IAM).
+      - id: b
+        text: A CanNotDelete resource lock on the resource group.
+      - id: c
+        text: A custom role that lists the delete actions in NotActions, assigned to all users.
+      - id: d
+        text: A deployment stack configured with deny settings and an excluded principal.
+    answer: [d]
+    explanation: >-
+      Deny assignments block actions even when a role assignment grants
+      access, and they support excluding principals. You can't create deny
+      assignments directly; Azure creates them, but you can specify deny
+      settings on a deployment stack, which creates a deny assignment owned by
+      the stack. A resource lock applies to all users and roles and has no
+      principal exclusion. NotActions in a custom role only subtracts from that
+      role's own Actions; because RBAC is additive, an Owner assignment would
+      still grant delete.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/deny-assignments
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/lock-resources
+  - id: q06
+    domain: AZ104-1
+    skill: Apply and manage tags on resources
+    kind: multiple
+    stem: >-
+      Each resource group in your subscription has a CostCenter tag. Finance
+      reports show that most resources inside the groups have no CostCenter
+      tag. You need every existing and future resource to carry the CostCenter
+      value of its parent resource group, and the value on the resource must
+      be corrected if it differs from the resource group. Which two actions
+      should you perform? Each correct answer presents part of the solution.
+      Choose two.
+    options:
+      - id: a
+        text: Assign the built-in policy Inherit a tag from the resource group.
+      - id: b
+        text: Assign the built-in policy Append a tag and its value from the resource group.
+      - id: c
+        text: Create a remediation task for the policy assignment.
+      - id: d
+        text: Apply the CostCenter tag at the subscription scope so that it flows to resources.
+      - id: e
+        text: Assign the built-in policy Require a tag on resources.
+    answer: [a, c]
+    explanation: >-
+      Resources don't inherit tags from their resource group or subscription.
+      The built-in policy Inherit a tag from the resource group uses the modify
+      effect to add or replace the tag from the parent resource group when a
+      resource is created or updated, and existing resources are brought into
+      compliance by triggering a remediation task. The append policy doesn't
+      modify resources created before the policy until they're changed, and it
+      doesn't replace a different value. Require a tag on resources only denies
+      noncompliant deployments. Tagging the subscription doesn't flow down.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/tag-resources
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/tag-policies
+  - id: q07
+    domain: AZ104-1
+    skill: Apply and manage tags on resources
+    kind: single
+    stem: >-
+      A finance analyst must maintain tags on all resources in a subscription
+      by using Azure PowerShell. The analyst must not be able to change any
+      other resource configuration. Which built-in role should you assign to
+      the analyst at the subscription scope?
+    options:
+      - id: a
+        text: Contributor
+      - id: b
+        text: Tag Contributor
+      - id: c
+        text: Reader
+      - id: d
+        text: Virtual Machine Contributor
+    answer: [b]
+    explanation: >-
+      Write access to the Microsoft.Resources/tags resource type lets a user
+      tag any resource even without access to the resource itself, and the Tag
+      Contributor role grants that access. It supports all tag operations
+      through Azure PowerShell and the REST API, although it can't apply tags
+      to resources or resource groups through the Azure portal. Contributor
+      would also allow changing resource configuration. Reader can't write
+      tags. Virtual Machine Contributor only covers virtual machines and grants
+      more than tagging on them.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/tag-resources
+  - id: q08
+    domain: AZ104-1
+    skill: Configure resource locks
+    kind: single
+    stem: >-
+      Operators who hold the Virtual Machine Contributor role report that they
+      can no longer start or restart any virtual machine in the resource group
+      RG-Routing. They can still view the virtual machines and their settings.
+      No role assignments were changed. What is the most likely cause?
+    options:
+      - id: a
+        text: A CanNotDelete lock was applied to one of the virtual machines.
+      - id: b
+        text: An Azure Policy assignment with the audit effect was applied to RG-Routing.
+      - id: c
+        text: A ReadOnly lock was applied to RG-Routing.
+      - id: d
+        text: The virtual machines were tagged with a value that contains a special character.
+    answer: [c]
+    explanation: >-
+      A ReadOnly lock on a resource group that contains a virtual machine
+      prevents all users from starting or restarting the VM, because those
+      operations require a POST request, which the lock blocks. Locks apply to
+      all users regardless of role, and reading the resources still works. A
+      CanNotDelete lock allows authorized users to read and modify a resource
+      and only blocks deletion. An audit policy only reports compliance, and a
+      tag value doesn't affect start operations.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/lock-resources
+  - id: q09
+    domain: AZ104-1
+    skill: Configure management groups
+    kind: single
+    stem: >-
+      Your company is designing a management group hierarchy under the tenant
+      root group. The proposed design nests management groups eight levels deep
+      below the root before reaching the subscriptions. What is the maximum
+      number of management group levels you can create in the tree, not
+      counting the root level or the subscription level?
+    options:
+      - id: a
+        text: "4"
+      - id: b
+        text: "6"
+      - id: c
+        text: "8"
+      - id: d
+        text: "10"
+    answer: [b]
+    explanation: >-
+      A management group tree can support up to six levels of depth, and that
+      limit doesn't include the root level or the subscription level, so the
+      proposed eight-level design must be flattened. Other facts from the same
+      page: a single directory can support 10,000 management groups, and each
+      management group and subscription can have only one parent. The values
+      four, eight, and ten don't match the documented depth limit.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/governance/management-groups/overview
+  - id: q10
+    domain: AZ104-1
+    skill: Manage costs by using alerts, budgets, and Azure Advisor recommendations
+    kind: single
+    stem: >-
+      You create a monthly budget at a management group scope that contains
+      five subscriptions. You want the budget to trigger an action group that
+      runs automation when forecasted cost exceeds 90 percent, but the option
+      to select an action group isn't available. What should you do to meet
+      the requirement?
+    options:
+      - id: a
+        text: Change the alert type from Forecasted to Actual.
+      - id: b
+        text: Create budgets at the subscription scope and configure the action group on each budget.
+      - id: c
+        text: Set the budget reset period to Billing month.
+      - id: d
+        text: Enable the common alert schema on the action group.
+    answer: [b]
+    explanation: >-
+      When you create or edit a budget for a subscription or resource group
+      scope, you can configure it to call an action group. Action groups are
+      currently supported only for those two scopes, so budgets at the
+      management group scope can't trigger them. Changing the alert type or
+      reset period doesn't change scope support, and budgets integrate with
+      action groups whether or not the common alert schema is enabled. Note
+      that budgets only notify; resources aren't affected and consumption isn't
+      stopped.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/cost-management-billing/costs/tutorial-acm-create-budgets
+  - id: q11
+    domain: AZ104-2
+    skill: Configure stored access policies
+    kind: multiple
+    stem: >-
+      A partner received a service SAS token for a blob container. The token
+      is associated with a stored access policy named partner-read on that
+      container. The partner's access must be revoked immediately. Other
+      applications authenticate with the storage account keys and must not be
+      disrupted. What should you do? Each correct answer presents a complete
+      solution. Choose two.
+    options:
+      - id: a
+        text: Delete the partner-read stored access policy from the container.
+      - id: b
+        text: Change the expiry time of the partner-read policy to a time in the past.
+      - id: c
+        text: Regenerate both storage account access keys.
+      - id: d
+        text: Create a second stored access policy on the container with read permission removed.
+      - id: e
+        text: Edit the start time in the partner's SAS URL to a future date.
+    answer: [a, b]
+    explanation: >-
+      To revoke a stored access policy, you can delete it, rename it by
+      changing the signed identifier, or change the expiry time to a value in
+      the past. Deleting or modifying the policy immediately affects all
+      shared access signatures associated with it. Regenerating the account
+      keys would also invalidate the token but disrupts the applications that
+      use the keys, which the scenario forbids. Adding another policy doesn't
+      affect the existing one. The SAS holder controls the URL, and a
+      parameter can't be specified on both the token and the policy anyway.
+    sources:
+      - https://learn.microsoft.com/en-us/rest/api/storageservices/define-stored-access-policy
+  - id: q12
+    domain: AZ104-2
+    skill: Configure stored access policies
+    kind: single
+    stem: >-
+      A developer at Veymark Logistics creates a separate stored access policy
+      on a blob container for each carrier that uploads shipping manifests.
+      Adding the sixth carrier's policy fails with status code 400 (Bad
+      Request). The first five policies still work. What is the cause?
+    options:
+      - id: a
+        text: Stored access policies are supported only for account SAS, not for containers.
+      - id: b
+        text: A container supports a maximum of five stored access policies at a time.
+      - id: c
+        text: New policies take up to 30 seconds to become active, so the request must be retried.
+      - id: d
+        text: The signed identifier exceeds 64 characters.
+    answer: [b]
+    explanation: >-
+      You can set a maximum of five access policies on a container, table,
+      queue, or share at a time, and trying to set more returns status code
+      400 (Bad Request). The five existing policies continue to work. Stored
+      access policies apply to service SAS; they aren't supported for account
+      SAS or user delegation SAS. The 30-second propagation delay causes 403
+      (Forbidden) errors on requests that use a new policy, not a 400 when
+      creating it. Nothing indicates an overlong identifier, and the pattern
+      of exactly the sixth policy failing points to the limit.
+    sources:
+      - https://learn.microsoft.com/en-us/rest/api/storageservices/define-stored-access-policy
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-stored-access-policy-define-dotnet
+  - id: q13
+    domain: AZ104-2
+    skill: Create and configure a container in Azure Blob Storage
+    kind: multiple
+    stem: >-
+      Veymark Logistics stores customs audit records as block blobs in a
+      container named audit-records. To meet a financial regulation, you
+      configured a container-level time-based retention policy of seven
+      years on the container and then locked the policy. A year later, the
+      compliance team asks which operations are still possible on the
+      container and its policy. Which two operations will succeed? Each
+      correct answer presents a complete solution. Choose two.
+    options:
+      - id: a
+        text: Extend the retention interval of the policy from seven years to ten years.
+      - id: b
+        text: Upload a new audit record blob to the audit-records container.
+      - id: c
+        text: Shorten the retention interval of the policy from seven years to five years.
+      - id: d
+        text: Delete the time-based retention policy from the container.
+      - id: e
+        text: Overwrite an existing audit record blob with a corrected copy.
+      - id: f
+        text: Delete the audit-records container while it still contains blobs.
+    answer: [a, b]
+    explanation: >-
+      While a time-based retention policy is in effect, clients can create
+      and read blobs but can't modify or delete them, so uploading a new
+      record succeeds and overwriting an existing one fails. You can't delete
+      a locked policy, and you can extend its retention period but not
+      decrease it; a container-level locked policy allows up to five
+      increases over its lifetime. Only unlocked policies can be shortened or
+      deleted. After a time-based retention policy on a container is locked,
+      the container can be deleted only if it's empty.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/immutable-storage-overview
+  - id: q14
+    domain: AZ104-2
+    skill: Configure object replication
+    kind: single
+    stem: >-
+      An object replication policy copies blobs from container invoices in
+      account stsrc to container invoices-copy in account stdst. A reporting
+      job now tries to upload a summary file into invoices-copy and receives
+      error code 409 (Conflict). Reads from invoices-copy succeed. What should
+      you do so the job can write its output?
+    options:
+      - id: a
+        text: Grant the job the Storage Blob Data Contributor role on stdst.
+      - id: b
+        text: Enable change feed on stdst.
+      - id: c
+        text: Write the summary file to a container that isn't a destination in a replication rule.
+      - id: d
+        text: Move the blobs in invoices-copy to the cool tier.
+    answer: [c]
+    explanation: >-
+      After a replication policy is created, write operations to the
+      destination container aren't permitted and fail with error code 409
+      (Conflict). Read and delete operations are allowed. To write to a
+      destination container you must disable replication for it by deleting
+      the rule or the policy, so the practical fix is to have the job write to
+      a different container. A permissions problem would return an
+      authorization error rather than 409, change feed is only needed on the
+      source, and changing the tier doesn't make the container writable.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/object-replication-overview
+  - id: q15
+    domain: AZ104-2
+    skill: Configure storage tiers
+    kind: single
+    stem: >-
+      Your company stores audit exports in a storage account configured for
+      zone-redundant storage (ZRS). A new requirement says exports older than
+      one year must be moved to the archive tier to minimize cost. When you
+      try to set a blob to the archive tier, the operation isn't supported.
+      What should you do?
+    options:
+      - id: a
+        text: Set the storage account's default access tier to Archive.
+      - id: b
+        text: Store the exports in an account configured for LRS, GRS, or RA-GRS.
+      - id: c
+        text: Enable blob versioning on the account and retry.
+      - id: d
+        text: Change the account redundancy to geo-zone-redundant storage (GZRS).
+    answer: [b]
+    explanation: >-
+      Only storage accounts configured for LRS, GRS, or RA-GRS support moving
+      blobs to the archive tier. The archive tier isn't supported for ZRS,
+      GZRS, or RA-GZRS accounts, so switching to GZRS doesn't help. The archive
+      tier also isn't supported as the default access tier for a storage
+      account; the default can only be hot, cool, or cold. Blob versioning has
+      no bearing on archive support.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/access-tiers-overview
+  - id: q16
+    domain: AZ104-2
+    skill: Configure storage tiers
+    kind: single
+    stem: >-
+      Veymark Logistics keeps scanned proof-of-delivery images for about 120
+      days. The images are rarely opened, but when a customer disputes a
+      delivery, the image must be downloadable immediately, with
+      millisecond latency. You need the lowest storage cost that meets the
+      requirement. Which access tier should you use?
+    options:
+      - id: a
+        text: Hot
+      - id: b
+        text: Cool
+      - id: c
+        text: Cold
+      - id: d
+        text: Archive
+    answer: [c]
+    explanation: >-
+      The cold tier is an online tier for data that is rarely accessed but
+      still needs fast retrieval, with millisecond time to first byte. Data in
+      the cold tier should be stored for at least 90 days, which fits a
+      120-day retention without early deletion charges, and it has lower
+      storage cost than hot or cool. The archive tier is cheaper but offline;
+      a blob must be rehydrated first, which can take up to 15 hours, so it
+      fails the immediate access requirement.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/access-tiers-overview
+  - id: q17
+    domain: AZ104-2
+    skill: Configure blob lifecycle management
+    kind: multiple
+    stem: >-
+      A lifecycle management policy moves blobs to the archive tier when their
+      last modified time is more than 180 days ago. An engineer rehydrated an
+      archived blob to the hot tier by changing its tier, but the next day the
+      blob was back in the archive tier. You need rehydrated data to stay
+      online. What should you do? Each correct answer presents a complete
+      solution. Choose two.
+    options:
+      - id: a
+        text: Add the daysAfterLastTierChangeGreaterThan condition to the tierToArchive action of the policy.
+      - id: b
+        text: Rehydrate by using Copy Blob to create a new blob in an online tier.
+      - id: c
+        text: Rehydrate with high priority instead of standard priority.
+      - id: d
+        text: Change the storage account default access tier to hot.
+      - id: e
+        text: Use a lifecycle management rule to rehydrate the blob to the hot tier.
+    answer: [a, b]
+    explanation: >-
+      Changing a blob's tier doesn't update its last modified time, so the
+      lifecycle policy can move the rehydrated blob back to archive. Adding
+      the daysAfterLastTierChangeGreaterThan condition to the tierToArchive
+      action prevents this. Alternatively, rehydrating with Copy Blob creates
+      a new blob with a new last modified time, so it isn't matched by the
+      policy. Rehydration priority only affects speed. The default account
+      tier applies only to blobs without an explicit tier. Lifecycle policies
+      can't rehydrate archived blobs.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/archive-rehydrate-overview
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/access-tiers-overview
+  - id: q18
+    domain: AZ104-3
+    skill: Modify an existing Bicep file
+    kind: multiple
+    stem: >-
+      A Bicep file that deploys a virtual machine declares the parameter
+      "param adminPassword string". Your security team requires that the
+      password value is never saved to the deployment history or logged, and
+      that deployments fail validation if the password is shorter than 12
+      characters. Which two decorators should you add to the parameter? Each
+      correct answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: "@secure()"
+      - id: b
+        text: "@minLength(12)"
+      - id: c
+        text: "@minValue(12)"
+      - id: d
+        text: "@description('Secret value')"
+      - id: e
+        text: "@metadata({ sensitive: true })"
+    answer: [a, b]
+    explanation: >-
+      The @secure() decorator marks a string or object parameter as secure;
+      its value isn't saved to the deployment history and isn't logged. The
+      @minLength decorator sets the minimum length for string and array
+      parameters and is inclusive, so @minLength(12) rejects shorter values.
+      @minValue applies only to integer parameters. @description only adds
+      help text shown to users, and @metadata adds custom properties without
+      changing how Resource Manager handles the value.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/parameters
+  - id: q19
+    domain: AZ104-3
+    skill: Modify an existing Bicep file
+    kind: single
+    stem: >-
+      A Bicep file uses a for loop over range(0, 6) to update six storage
+      accounts that serve production traffic. By default the six instances are
+      deployed in parallel. You need to modify the file so that the storage
+      accounts are updated one at a time, each starting only after the previous
+      one completes. What should you add to the resource declaration?
+    options:
+      - id: a
+        text: "@batchSize(1)"
+      - id: b
+        text: "@maxLength(1)"
+      - id: c
+        text: An if (i == 0) condition inside the loop
+      - id: d
+        text: A dependsOn property that references the resource group
+    answer: [a]
+    explanation: >-
+      Resources created in a Bicep loop are deployed in parallel by default.
+      To deploy instances serially, add the batchSize decorator and set its
+      value to the number of instances to deploy concurrently; for sequential
+      deployment, set the batch size to 1. Each batch waits for the previous
+      batch to complete. @maxLength constrains string and array parameters,
+      not deployment order. An if condition would skip five of the six
+      accounts entirely, and a dependency on the resource group doesn't order
+      the loop instances.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/loops
+  - id: q20
+    domain: AZ104-3
+    skill: Move a virtual machine to another resource group, subscription, or region
+    kind: single
+    stem: >-
+      You must move a virtual machine named VM-Yard to a different
+      subscription in the same Microsoft Entra tenant. VM-Yard and its managed
+      disks are in RG-Compute. Its network interface and virtual network are in
+      RG-Network, which also contains other resources. The destination
+      subscription is registered for all required resource providers. What
+      should you do first?
+    options:
+      - id: a
+        text: Move VM-Yard alone to the destination subscription, then move the network resources later.
+      - id: b
+        text: Use Azure Resource Mover to move the virtual machine to another region.
+      - id: c
+        text: Move the dependent resources into a single resource group so they can be moved together.
+      - id: d
+        text: Move RG-Compute itself to the destination subscription.
+    answer: [c]
+    explanation: >-
+      For a move across subscriptions, the resource and its dependent
+      resources must be in the same resource group and must be moved
+      together. The documented first step is to consolidate dependent
+      resources that are spread across resource groups into one group, then
+      move them together to the target subscription. Virtual machines in an
+      existing virtual network can move to a new subscription only when the
+      virtual network and its dependent resources move too. You can't move a
+      resource group itself to another subscription, and Resource Mover
+      targets region moves.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-resource-group-and-subscription
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations
+  - id: q21
+    domain: AZ104-3
+    skill: Move a virtual machine to another resource group, subscription, or region
+    kind: single
+    stem: >-
+      A virtual machine protected by Azure Backup must be moved to another
+      resource group. Validation of the move fails. Soft delete is disabled
+      for the vault. You need to complete the move while keeping the backup
+      data that has already been copied to the vault. What should you do
+      before you move the virtual machine?
+    options:
+      - id: a
+        text: Delete the Recovery Services vault.
+      - id: b
+        text: Stop the backup, retain the data, and delete the restore point collection for the virtual machine.
+      - id: c
+        text: Disable Azure Disk Encryption on the virtual machine.
+      - id: d
+        text: Delete all recovery points in the vault for the virtual machine.
+    answer: [b]
+    explanation: >-
+      To move a virtual machine configured with Azure Backup, you must delete
+      the restore point collection (the instant recovery snapshots), typically
+      named AzureBackup_ followed by the VM name. Deleting it removes only the
+      instant recovery points, not the backed-up data in the vault, which can
+      be retained. The portal steps are to stop the backup and keep backup
+      data, delete the collection, move the VM, then reconfigure backup.
+      Deleting the vault or vault recovery points loses data, and disk
+      encryption only matters for encrypted VMs.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/move-limitations/virtual-machines-move-limitations
+  - id: q22
+    domain: AZ104-3
+    skill: Move a virtual machine to another resource group, subscription, or region
+    kind: single
+    stem: >-
+      An administrator who has the Contributor role on a subscription tries to
+      add virtual machines to Azure Resource Mover for a move from West US to
+      East US. This is the first move for this source and destination pair in
+      the subscription, and the operation fails. What is the most likely
+      reason?
+    options:
+      - id: a
+        text: Resource Mover can move virtual machines only within the same region.
+      - id: b
+        text: The virtual machines must be deallocated before they can be added.
+      - id: c
+        text: Owner access on the subscription is required so that Resource Mover can create and assign roles to a managed identity.
+      - id: d
+        text: The destination resource group must be created manually before any resources are added.
+    answer: [c]
+    explanation: >-
+      The first time you add a resource for a specific source and destination
+      pair in a subscription, Resource Mover creates a system-assigned managed
+      identity trusted by the subscription and assigns it the Contributor or
+      User Access Administrator role. Creating that identity and role
+      assignment requires Owner permissions. Resource Mover moves resources
+      between regions, and the tutorial says the VMs to move should be turned
+      on, not deallocated. The target resource group is created with a
+      default naming convention, or you can select an existing one.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/resource-mover/tutorial-move-region-virtual-machines
+  - id: q23
+    domain: AZ104-3
+    skill: Provision a container by using Azure Container Apps
+    kind: single
+    stem: >-
+      Veymark Logistics deploys two container apps to the same Container Apps
+      environment, which has a public inbound IP. A front-end app receives
+      requests from the internet. A pricing API must be callable by the
+      front-end app but must not be reachable from the internet. How should
+      you configure ingress on the pricing API?
+    options:
+      - id: a
+        text: Enable ingress and set it to limited to Container Apps Environment (internal).
+      - id: b
+        text: Disable ingress on the pricing API.
+      - id: c
+        text: Enable external ingress and add an IP restriction that allows only the front-end app's FQDN.
+      - id: d
+        text: Enable external ingress with TCP transport.
+    answer: [a]
+    explanation: >-
+      Internal ingress makes the app's FQDN reachable only from within the
+      same Container Apps environment, such as from other container apps, and
+      not directly from the internet. The docs describe exactly this pattern:
+      the public-facing app uses external ingress and the background service
+      uses internal ingress. Disabling ingress removes HTTP access entirely, so
+      the front end couldn't call it. External ingress on an environment with
+      a public IP exposes the app to the internet regardless of transport, and
+      IP restrictions filter IP addresses, not FQDNs.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/container-apps/ingress-overview
+  - id: q24
+    domain: AZ104-3
+    skill: Provision a container by using Azure Container Apps
+    kind: multiple
+    stem: >-
+      You deploy a container app that processes messages from an Azure
+      Service Bus queue. Ingress is disabled. You accepted the default scale
+      settings and did not add a scale rule. After the first deployment, the
+      app never processes any messages and shows zero running replicas. What
+      should you do? Each correct answer presents a complete solution. Choose
+      two.
+    options:
+      - id: a
+        text: Set the minimum number of replicas to 1 or more.
+      - id: b
+        text: Add a custom scale rule of type azure-servicebus for the queue.
+      - id: c
+        text: Increase the maximum number of replicas from 10 to 30.
+      - id: d
+        text: Change the revision mode from single to multiple.
+      - id: e
+        text: Move the app to a new Container Apps environment.
+    answer: [a, b]
+    explanation: >-
+      The default minimum replica count is 0. If ingress is disabled and you
+      don't define minReplicas or a custom scale rule, the container app
+      scales to zero and has no way of starting back up. Setting the minimum
+      replicas to 1 or more keeps an instance running, and a custom KEDA-based
+      azure-servicebus scale rule lets the app scale out when messages arrive.
+      Raising the maximum doesn't help an app stuck at zero. Revision mode and
+      the environment don't affect this scaling behavior.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/container-apps/scale-app
+  - id: q25
+    domain: AZ104-3
+    skill: Create an App Service
+    kind: single
+    stem: >-
+      You write a script to create a new Linux web app with the Node.js
+      runtime in a new resource group. The command az webapp create --name
+      veymark-track --resource-group RG-Web --runtime "node:20LTS" fails
+      because a required argument is missing. Which command should run before
+      az webapp create, and which argument must you then add?
+    options:
+      - id: a
+        text: Run az appservice plan create, then add --plan to az webapp create.
+      - id: b
+        text: Run az webapp deployment slot create, then add --slot to az webapp create.
+      - id: c
+        text: Run az acr create, then add --container-image-name to az webapp create.
+      - id: d
+        text: Run az webapp config appsettings set, then add --startup-file to az webapp create.
+    answer: [a]
+    explanation: >-
+      The az webapp create command requires --name, --resource-group, and
+      --plan, the name or resource ID of an App Service plan. The plan must
+      already exist, so you create it first with az appservice plan create.
+      The --runtime value in Framework:Version format is optional and was
+      already supplied. A web app always runs in an App Service plan, which
+      defines the region, operating system, and compute resources. Slots,
+      container images, and startup files are optional and don't replace the
+      plan requirement.
+    sources:
+      - https://learn.microsoft.com/en-us/cli/azure/webapp
+      - https://learn.microsoft.com/en-us/azure/app-service/overview-hosting-plans
+  - id: q26
+    domain: AZ104-3
+    skill: Configure deployment slots for an App Service
+    kind: single
+    stem: >-
+      A web app runs in an App Service plan on the Basic tier. The development
+      team wants a staging deployment slot so they can validate releases and
+      swap them into production. You need to enable this at the lowest cost.
+      What should you do?
+    options:
+      - id: a
+        text: Keep the Basic tier and add a slot from the Deployment slots page.
+      - id: b
+        text: Scale the plan up to the Standard tier.
+      - id: c
+        text: Scale the plan up to the IsolatedV2 tier.
+      - id: d
+        text: Scale the plan out to two instances on the Basic tier.
+    answer: [b]
+    explanation: >-
+      Deployment slots are available only when the app runs in the Standard,
+      Premium, or Isolated tier of an App Service plan. If the app isn't in one
+      of those tiers, the portal prompts you to upgrade before adding a slot.
+      Standard is the lowest-cost tier that supports slots and supports five
+      slots. IsolatedV2 also supports slots but adds network isolation at a
+      higher cost. Scaling out on Basic adds instances but doesn't add slot
+      support. There is no extra charge for the slots themselves.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/app-service/deploy-staging-slots
+      - https://learn.microsoft.com/en-us/azure/app-service/overview-hosting-plans
+  - id: q27
+    domain: AZ104-3
+    skill: Configure deployment slots for an App Service
+    kind: multiple
+    stem: >-
+      You plan to swap a staging slot into production for a web app. Before
+      the swap, you review which configuration will follow the content and
+      which will stay with the production slot. Assume no settings are marked
+      as deployment slot settings and no override app settings are used.
+      Which two items stay in the production slot after the swap? Each correct
+      answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: Custom domain names
+      - id: b
+        text: Managed identities
+      - id: c
+        text: App settings
+      - id: d
+        text: Language framework version
+      - id: e
+        text: Handler mappings
+    answer: [a, b]
+    explanation: >-
+      Custom domain names and managed identities are among the settings that
+      aren't swapped, along with publishing endpoints, scale settings,
+      nonpublic certificates and TLS settings, and virtual network
+      integration. App settings, language framework settings, and handler
+      mappings are swapped with the content. App settings and connection
+      strings can be made slot-specific by selecting Deployment slot setting,
+      but by default they move with the swap.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/app-service/deploy-staging-slots
+  - id: q28
+    domain: AZ104-4
+    skill: Configure public IP addresses
+    kind: single
+    stem: >-
+      You are creating a public IP address for the frontend of a public load
+      balancer in a region that has three availability zones. The address must
+      not change when resources are stopped and started, and it must survive
+      the failure of any single availability zone. Which configuration should
+      you choose?
+    options:
+      - id: a
+        text: Basic SKU, static allocation
+      - id: b
+        text: Standard SKU, zonal in zone 1
+      - id: c
+        text: Standard SKU, zone-redundant
+      - id: d
+        text: Basic SKU, dynamic allocation, zone-redundant
+    answer: [c]
+    explanation: >-
+      Standard SKU public IPs always use static allocation, so the address
+      doesn't change, and they can be created as zone-redundant, which lets
+      the IP survive any single zone failure. A zonal IP shares fate with its
+      zone. Basic SKU public IPs don't support availability zones and were
+      retired on September 30, 2025, so they aren't a valid choice for new
+      designs. Dynamic allocation also releases the address when the resource
+      is stopped.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/ip-services/public-ip-addresses
+  - id: q29
+    domain: AZ104-4
+    skill: Configure public IP addresses
+    kind: single
+    stem: >-
+      You attach a new Standard SKU public IP address to the network interface
+      of a web server virtual machine. The web server listens on TCP 443 and
+      the guest firewall allows the port. Neither the NIC nor its subnet has a
+      network security group. Clients on the internet can't connect. What
+      should you do?
+    options:
+      - id: a
+        text: Change the public IP allocation method to dynamic.
+      - id: b
+        text: Associate a network security group that allows inbound TCP 443 with the NIC or subnet.
+      - id: c
+        text: Add a DNS name label to the public IP address.
+      - id: d
+        text: Enable the Internet routing preference on the public IP address.
+    answer: [b]
+    explanation: >-
+      Standard SKU public IPs are secure by default and closed to inbound
+      traffic. A network security group that allows the traffic is required,
+      for example on the NIC of a virtual machine with a Standard public IP
+      attached. Without an NSG, the inbound connection isn't allowed. Standard
+      IPs support only static allocation. A DNS name label maps a name to the
+      IP but doesn't open traffic, and routing preference affects how traffic
+      travels between Azure and the internet, not whether it's permitted.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/ip-services/public-ip-addresses
+  - id: q30
+    domain: AZ104-4
+    skill: Implement Azure Bastion
+    kind: single
+    stem: >-
+      Engineers at Veymark Logistics need to connect to virtual machines by
+      using the native SSH client through the Azure CLI, and contractors
+      without Azure credentials need to connect through a shareable link. You
+      don't need session recording or a private-only deployment. Which Azure
+      Bastion SKU should you deploy to meet the requirements at the lowest
+      cost?
+    options:
+      - id: a
+        text: Developer
+      - id: b
+        text: Basic
+      - id: c
+        text: Standard
+      - id: d
+        text: Premium
+    answer: [c]
+    explanation: >-
+      Connecting to VMs by using the Azure CLI native client and the shareable
+      link feature both require the Standard SKU or higher. Developer and
+      Basic support neither. Premium adds session recording and private-only
+      deployment on top of Standard features, which the scenario doesn't need,
+      so Standard is the lowest-cost SKU that meets the requirements. Standard
+      also supports host scaling from 2 to 50 instances.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/bastion/bastion-sku-comparison
+  - id: q31
+    domain: AZ104-4
+    skill: Implement Azure Bastion
+    kind: multiple
+    stem: >-
+      You plan to deploy the Standard SKU of Azure Bastion into an existing
+      virtual network named VNet-Hub. VNet-Hub has free address space and a
+      subnet named Bastion with a /27 prefix. Which three configuration
+      requirements must you meet? Each correct answer presents part of the
+      solution. Choose three.
+    options:
+      - id: a
+        text: A subnet named AzureBastionSubnet in VNet-Hub
+      - id: b
+        text: A subnet prefix of /26 or larger for the Bastion subnet
+      - id: c
+        text: A Standard SKU public IP address with static allocation
+      - id: d
+        text: A Basic SKU public IP address with dynamic allocation
+      - id: e
+        text: A NAT gateway associated with the Bastion subnet
+      - id: f
+        text: A /28 subnet prefix to conserve address space
+    answer: [a, b, c]
+    explanation: >-
+      All Bastion SKUs except Developer require a dedicated subnet named
+      exactly AzureBastionSubnet in the same virtual network and resource
+      group as the bastion host, sized /26 or larger, and containing no other
+      resources. The existing subnet named Bastion with a /27 prefix meets
+      neither requirement. Deployments other than Developer and private-only
+      also require a public IP address with the Standard SKU and static
+      allocation. A Basic dynamic IP doesn't meet the requirement, a /28 is too
+      small, and a NAT gateway isn't required.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/bastion/configuration-settings
+  - id: q32
+    domain: AZ104-4
+    skill: Troubleshoot load balancing
+    kind: single
+    stem: >-
+      A Standard public load balancer distributes TCP 443 traffic to three
+      virtual machines and uses a TCP health probe on port 8080. The security
+      team updates the subnet's network security group with an inbound rule at
+      priority 90 that allows TCP 443 from the Internet service tag and a rule
+      at priority 100 that denies all other inbound traffic. Shortly
+      afterward, all three backend instances are marked unhealthy and no new
+      connections are sent to them. The applications are running and
+      listening on both ports. What should you do?
+    options:
+      - id: a
+        text: Change the health probe protocol from TCP to HTTPS.
+      - id: b
+        text: Add an inbound NSG rule with a higher priority that allows the AzureLoadBalancer service tag.
+      - id: c
+        text: Remove the public IP address from the load balancer frontend and add it back.
+      - id: d
+        text: Increase the health probe interval to 120 seconds.
+    answer: [b]
+    explanation: >-
+      All IPv4 health probes originate from 168.63.129.16, which the
+      AzureLoadBalancer service tag identifies. The default NSG rules permit
+      this traffic, but the new deny rule at priority 100 overrides them, so
+      probes fail and the load balancer marks the instances down. You must
+      allow the probe source in NSGs and local firewalls. Changing the probe
+      protocol or interval doesn't help while the probe traffic is blocked,
+      and recreating the frontend doesn't address the NSG.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/load-balancer/load-balancer-custom-probe-overview
+  - id: q33
+    domain: AZ104-4
+    skill: Troubleshoot load balancing
+    kind: single
+    stem: >-
+      An internal Standard load balancer uses an HTTP health probe on port 80
+      with the path /health. After an application update, the backend web
+      servers return HTTP 302 redirects for /health to a sign-in page. Users
+      now report that the service is down, and Azure Monitor shows all backend
+      instances as unhealthy. What is the cause?
+    options:
+      - id: a
+        text: HTTP probes require an HTTP 200 response, so any other status code marks the instance down.
+      - id: b
+        text: HTTP probes can't be used with an internal load balancer.
+      - id: c
+        text: The probe threshold must be set to 1 for HTTP probes.
+      - id: d
+        text: Standard load balancers support only TCP health probes.
+    answer: [a]
+    explanation: >-
+      An HTTP or HTTPS probe is marked up only when the instance responds with
+      HTTP status 200 within the timeout period. A response code other than
+      200 marks the probe down, and when all instances probe down, no new
+      flows are sent to the backend pool. The fix is to have /health return
+      200 or point the probe at a path that does. Standard load balancers
+      support TCP, HTTP, and HTTPS probes. For HTTP probes, explicit responses
+      mark the probe up or down immediately, so the threshold isn't the issue.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/load-balancer/load-balancer-custom-probe-overview
+  - id: q34
+    domain: AZ104-4
+    skill: Create and configure network security groups (NSGs) and application security groups
+    kind: single
+    stem: >-
+      Your company runs a three-tier application in a single virtual network.
+      Web, business logic, and database VMs are added and removed often, and
+      their private IP addresses change. NSG1 is associated with all the
+      application subnets and contains only the default rules. Security
+      requires that only the business logic VMs can reach the database VMs
+      on TCP 1433, and administrators must not maintain lists of IP
+      addresses. You create the application security groups AsgLogic and
+      AsgDb and add each VM's network interface to the matching group. Which
+      rules should you add to NSG1?
+    options:
+      - id: a
+        text: >-
+          An Allow rule from AsgLogic to AsgDb on TCP 1433 at priority 110,
+          and a Deny rule from Any to AsgDb on port 1433 at priority 120.
+      - id: b
+        text: >-
+          Only an Allow rule from AsgLogic to AsgDb on TCP 1433 at priority
+          110.
+      - id: c
+        text: >-
+          A Deny rule from Any to AsgDb on port 1433 at priority 110, and an
+          Allow rule from AsgLogic to AsgDb on TCP 1433 at priority 120.
+      - id: d
+        text: >-
+          An Allow rule from the VirtualNetwork service tag to AsgDb on TCP
+          1433 at priority 110.
+    answer: [a]
+    explanation: >-
+      The AllowVNetInBound default rule allows all traffic between resources
+      in the same virtual network, so an Allow rule alone changes nothing:
+      web VMs could still reach the database. You need a Deny rule for all
+      sources to AsgDb on 1433, plus an Allow rule from AsgLogic with a
+      lower priority number so it's processed first. Rules are processed in
+      priority order and processing stops at the first match, so putting the
+      Deny rule at 110 would block the logic tier too. Allowing the
+      VirtualNetwork tag admits every VM in the network.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-network/application-security-groups
+      - https://learn.microsoft.com/en-us/azure/virtual-network/network-security-groups-overview
+  - id: q35
+    domain: AZ104-5
+    skill: Query and analyze logs in Azure Monitor
+    kind: single
+    stem: >-
+      You need a Log Analytics query that shows, for a single server, the
+      average of the Available MBytes counter in the Perf table for each
+      one-hour period over the last seven days, so you can display it as a
+      line chart. The query already filters TimeGenerated, Computer, and
+      CounterName. Which line should end the query?
+    options:
+      - id: a
+        text: "| summarize avg(CounterValue) by TimeGenerated"
+      - id: b
+        text: "| summarize avg(CounterValue) by bin(TimeGenerated, 1h)"
+      - id: c
+        text: "| summarize count() by bin(TimeGenerated, 1h)"
+      - id: d
+        text: "| top 168 by CounterValue"
+    answer: [b]
+    explanation: >-
+      To group by a continuous value such as a time column, break the range
+      into units with bin. Summarizing avg(CounterValue) by bin(TimeGenerated,
+      1h) calculates the average for each one-hour period. Summarizing by
+      TimeGenerated alone creates a group for every unique timestamp, down to
+      the millisecond. count() returns the number of records rather than the
+      average value, and top returns the highest individual values instead of
+      hourly averages.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/logs/get-started-queries
+  - id: q36
+    domain: AZ104-5
+    skill: Query and analyze logs in Azure Monitor
+    kind: single
+    stem: >-
+      An analyst runs the query SecurityEvent | take 10 to review the latest
+      security events on a domain controller, but the results include events
+      from several days ago in no particular order. You need a query that
+      returns the 10 most recent records and lets the service sort on the
+      server side. What should you use?
+    options:
+      - id: a
+        text: SecurityEvent | sort by TimeGenerated
+      - id: b
+        text: SecurityEvent | take 10 | sort by TimeGenerated asc
+      - id: c
+        text: SecurityEvent | top 10 by TimeGenerated
+      - id: d
+        text: search "SecurityEvent" | take 10
+    answer: [c]
+    explanation: >-
+      The take operator returns an arbitrary set of records in no particular
+      order. The top operator sorts the entire table on the server side and
+      returns only the top records, and descending is the default order, so
+      top 10 by TimeGenerated returns the 10 latest records. sort by alone
+      doesn't limit the number of records returned. Taking 10 arbitrary
+      records and then sorting them still gives an arbitrary sample, and a
+      search query is less efficient and doesn't order results.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/logs/get-started-queries
+  - id: q37
+    domain: AZ104-5
+    skill: Create and configure a backup policy
+    kind: single
+    stem: >-
+      Veymark Logistics runs a route-planning database on an Azure Trusted
+      Launch virtual machine. The business requires a recovery point objective
+      of no more than 4 hours for the virtual machine. You are creating a
+      backup policy in a Recovery Services vault. What should you configure?
+    options:
+      - id: a
+        text: A Standard policy with a daily schedule and instant restore retention of 5 days
+      - id: b
+        text: An Enhanced policy with an hourly schedule that runs every 4 hours
+      - id: c
+        text: A Standard policy with a weekly schedule and 4 retention points
+      - id: d
+        text: An Enhanced policy with a daily schedule and a 4-day retention range
+    answer: [b]
+    explanation: >-
+      The Enhanced policy supports multiple backups per day, with an hourly
+      schedule as frequent as every 4 hours; hourly backup has a minimum RPO of
+      4 hours. It also supports Trusted Launch VMs. A Standard policy provides
+      daily or weekly backups, so it can't meet a 4-hour RPO. An Enhanced
+      policy with a daily schedule takes only one backup a day, and changing
+      retention doesn't change backup frequency.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/backup/backup-azure-vms-enhanced-policy
+  - id: q38
+    domain: AZ104-5
+    skill: Create and configure a backup policy
+    kind: single
+    stem: >-
+      Your operations team restores virtual machines from instant restore
+      snapshots whenever possible because it is faster than restoring from
+      the vault. They need instant restore snapshots from daily backups to be
+      kept for 14 days. The current Standard backup policy won't accept this
+      value. What should you do?
+    options:
+      - id: a
+        text: Increase the daily retention range of the Standard policy to 14 days.
+      - id: b
+        text: Change the Standard policy to a weekly schedule.
+      - id: c
+        text: Create an Enhanced policy with instant restore retention of 14 days and assign it to the VMs.
+      - id: d
+        text: Disable instant restore so that all restores come from the vault.
+    answer: [c]
+    explanation: >-
+      Snapshot retention for instant restore can be configured from 1 to 5
+      days with the Standard policy and from 1 to 30 days with the Enhanced
+      policy, so 14 days requires an Enhanced policy. Instant restore
+      retention can't exceed the vault retention duration. The vault retention
+      range doesn't change the snapshot limit, and with weekly Standard
+      policies snapshot retention is fixed at 5 days. Instant restore is
+      enabled for everyone and can't be disabled.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/backup/backup-instant-restore-capability
+      - https://learn.microsoft.com/en-us/azure/backup/backup-azure-vms-enhanced-policy
+  - id: q39
+    domain: AZ104-5
+    skill: Set up alert rules, action groups, and alert processing rules in Azure Monitor
+    kind: single
+    stem: >-
+      Every Sunday from 01:00 to 05:00, virtual machines in the resource group
+      RG-Warehouse are patched. During that window, metric alert rules that
+      cover RG-Warehouse and several other resource groups send notifications
+      that page the on-call engineer. Alerts must still be recorded, and
+      alerts for the other resource groups must still notify normally. What
+      should you configure?
+    options:
+      - id: a
+        text: Disable the alert rules at 01:00 and re-enable them at 05:00 each Sunday.
+      - id: b
+        text: An alert processing rule scoped to RG-Warehouse with the suppression action and a weekly recurring schedule.
+      - id: c
+        text: Remove the on-call engineer from the action group.
+      - id: d
+        text: An alert processing rule scoped to the subscription that applies an additional action group.
+    answer: [b]
+    explanation: >-
+      An alert processing rule with the suppression action removes all action
+      groups from affected fired alerts, and the alerts remain visible in the
+      portal and APIs. Scoping the rule to RG-Warehouse and adding a recurring
+      weekly schedule suppresses notifications only during maintenance.
+      Disabling the alert rules stops alerts for every resource they cover,
+      including the other resource groups, and prevents them from firing at
+      all. Removing the engineer stops all notifications, and applying an
+      action group adds notifications instead of suppressing them.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-processing-rules
+  - id: q40
+    domain: AZ104-5
+    skill: Configure and interpret reports and alerts for backups
+    kind: single
+    stem: >-
+      Your company relies on the built-in Azure Backup alerts for failed
+      backup jobs. The backup operations team wants these alerts to also send
+      a notification to their existing action group, which posts to a team
+      webhook. There is no alert rule for these alerts where you can select an
+      action group. What should you do?
+    options:
+      - id: a
+        text: Create a log search alert rule that duplicates the Azure Backup alert logic.
+      - id: b
+        text: Create an alert processing rule with the Apply action groups action scoped to the vaults.
+      - id: c
+        text: Enable the common alert schema on the action group.
+      - id: d
+        text: Configure a budget with an action group on the subscription.
+    answer: [b]
+    explanation: >-
+      Some Azure alert sources don't let you specify action groups, and Azure
+      Backup alerts are one of the documented examples. For those alert types,
+      you can use an alert processing rule with the Apply action groups action
+      to add one or more action groups to the fired alerts within the rule's
+      scope. Duplicating the logic in a new alert rule adds maintenance and
+      isn't needed. The common alert schema only changes the payload format,
+      and a budget sends cost alerts, not backup job alerts.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/alerts/alerts-processing-rules

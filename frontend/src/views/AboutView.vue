@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 
 import { useContentStore } from '@/stores/content'
 
@@ -47,8 +48,15 @@ const totals = computed(() => {
           and keep solid from fading.
         </li>
         <li>
-          There is no language model behind any of this. Every scenario is written by hand and
+          There is no language model behind the game. Every scenario is written by hand and
           checked by a linter that refuses to ship a dead end.
+        </li>
+        <li>
+          The one exception is the
+          <RouterLink to="/practice" class="text-signal-600 underline dark:text-signal-400">
+            practice exams</RouterLink>: five each for AZ-104, AZ-700 and AZ-305, made by Opus 5.5,
+          an AI model made by Anthropic. Every question is drawn from learn.microsoft.com and links
+          its source, and each page says so.
         </li>
       </ul>
     </section>
@@ -91,7 +99,7 @@ const totals = computed(() => {
       <p class="text-sm text-ink-600 dark:text-ink-300">
         The Runbook is an independent study aid. It is not affiliated with, endorsed by, or
         sponsored by Microsoft Corporation. Microsoft, Azure, Microsoft Entra and the exam codes
-        AZ-104 and AZ-305 are trademarks of the Microsoft group of companies. Passing an exam
+        AZ-104, AZ-305 and AZ-700 are trademarks of the Microsoft group of companies. Passing an exam
         needs hands-on practice in a real subscription as well; this is preparation, not a
         substitute.
       </p>

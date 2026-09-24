@@ -1,0 +1,1382 @@
+# AZ-305 practice exam 2. Written by Opus 5.5 (claude-opus-5-5); every
+# question is grounded in, and cites, pages on learn.microsoft.com.
+id: az-305-2
+exam: AZ-305
+number: 2
+title: AZ-305 practice exam 2
+author: Opus 5.5
+model_id: claude-opus-5-5
+written_on: "2026-09-24"
+questions:
+  - id: q01
+    domain: AZ305-1
+    skill: Recommend a solution for routing logs
+    kind: single
+    stem: >-
+      Your company must keep a record of every create, update, and delete
+      operation performed on Azure resources in a production subscription for
+      two years. Auditors must be able to query the records by using Kusto
+      Query Language (KQL) and correlate them with resource logs that are
+      already collected in a Log Analytics workspace. You need to recommend a
+      solution that meets the requirements with the least administrative
+      effort. What should you recommend?
+    options:
+      - id: a
+        text: Increase the retention period of the subscription activity log to two years.
+      - id: b
+        text: Create a diagnostic setting that archives the activity log to a Standard storage account that has an immutability policy.
+      - id: c
+        text: Create a diagnostic setting that sends the activity log to the Log Analytics workspace, and set the retention of the AzureActivity table to two years.
+      - id: d
+        text: Stream the activity log to an event hub and write an Azure Functions app that inserts the records into the workspace.
+    answer: [c]
+    explanation: >-
+      Azure retains activity log events for 90 days and then deletes them; to
+      keep them longer you create a diagnostic setting that sends them to
+      another destination. Sending them to a Log Analytics workspace stores
+      them in the AzureActivity table, lets you correlate them with other log
+      data by using log queries, and supports retention of up to 12 years.
+      There are no data ingestion charges for activity logs. There is no
+      setting that extends the built-in 90-day activity log retention. A
+      storage account keeps the records but doesn't make them queryable with
+      KQL alongside the workspace data, and an event hub plus custom code adds
+      unnecessary effort.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/fundamentals/activity-log
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/data-collection/diagnostic-settings
+
+  - id: q02
+    domain: AZ305-1
+    skill: Recommend a solution for routing logs
+    kind: multiple
+    stem: >-
+      Veymark Logistics runs an Azure key vault in the West Europe region.
+      Security policy requires that the key vault's audit logs be sent to two
+      Log Analytics workspaces, one owned by the security team and one owned
+      by the operations team. The same logs must also be streamed to a
+      non-Microsoft security information and event management (SIEM) system
+      that runs outside Azure. You need to recommend how to route the logs.
+      Which two actions should you include in the recommendation? Each
+      correct answer presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: Create one diagnostic setting on the key vault that lists both Log Analytics workspaces as destinations.
+      - id: b
+        text: Create two diagnostic settings on the key vault, each targeting a different Log Analytics workspace, and add an event hub destination to one of them.
+      - id: c
+        text: Create the event hub as a compacted event hub so that duplicate records are removed before the SIEM reads them.
+      - id: d
+        text: Create the Event Hubs namespace in the West Europe region.
+      - id: e
+        text: Send the logs to a Premium storage account and configure the SIEM to poll the account.
+    answer: [b, d]
+    explanation: >-
+      A single diagnostic setting can define no more than one of each
+      destination type, so sending to two workspaces requires two settings (a
+      resource can have up to five). Event Hubs is the destination for
+      streaming to external systems such as non-Microsoft SIEM solutions, and
+      for a regional resource the event hub must be in the same region as the
+      monitored resource. A compacted event hub can't be used because it
+      requires a partition key that Azure Monitor doesn't include, and Premium
+      storage accounts aren't supported as diagnostic setting destinations.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/data-collection/diagnostic-settings
+
+  - id: q03
+    domain: AZ305-1
+    skill: Recommend a solution for routing logs
+    kind: single
+    stem: >-
+      Your organization has a management group named MG-Corp directly under
+      the tenant root group. MG-Corp contains two child management groups,
+      MG-Prod and MG-Dev, and each child contains several subscriptions. The
+      compliance team wants all management group activity log events, such as
+      policy assignments and management group membership changes, for the
+      MG-Corp hierarchy sent to a central Log Analytics workspace. The
+      solution must minimize duplicate events and configuration effort. What
+      should you recommend?
+    options:
+      - id: a
+        text: Create a diagnostic setting on MG-Corp only.
+      - id: b
+        text: Create a diagnostic setting on MG-Prod and another on MG-Dev.
+      - id: c
+        text: Create a diagnostic setting on every subscription in the hierarchy.
+      - id: d
+        text: Create a diagnostic setting on MG-Corp, MG-Prod, and MG-Dev.
+    answer: [a]
+    explanation: >-
+      A diagnostic setting on a management group exports activity log events
+      for that management group and all management groups under it. If
+      multiple management groups in the hierarchy have diagnostic settings,
+      you receive duplicate events, so you need a setting only on the highest
+      level management group. Settings on MG-Prod and MG-Dev miss MG-Corp
+      events, settings on all three duplicate data, and subscription-level
+      settings capture subscription events rather than management group
+      events such as policy assignments at the management group scope.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/fundamentals/activity-log
+
+  - id: q04
+    domain: AZ305-1
+    skill: Recommend a logging solution
+    kind: single
+    stem: >-
+      Your company ingests several terabytes per month of verbose network
+      appliance logs into a DCR-based custom table in a Log Analytics
+      workspace. The logs are rarely queried and are kept only to answer audit
+      requests for seven years. Auditors accept slow query performance, but
+      queries must use KQL against the same workspace. No alerts are
+      configured on this data. You need to recommend a table plan that
+      minimizes ingestion cost. Which table plan should you recommend?
+    options:
+      - id: a
+        text: Analytics, with long-term retention extended to seven years
+      - id: b
+        text: Basic
+      - id: c
+        text: Analytics, with a data export rule to a storage account
+      - id: d
+        text: Auxiliary
+    answer: [d]
+    explanation: >-
+      The Auxiliary plan is best for low-touch data, such as verbose logs and
+      data required for auditing and compliance. It has the minimal ingestion
+      cost of the three plans, supports DCR-based custom tables, allows full
+      KQL (with slower queries), and supports total retention of up to 12
+      years. Basic has reduced but not minimal ingestion cost and targets
+      medium-touch troubleshooting data. The Analytics plan has standard
+      ingestion cost, which is unnecessary for data that is rarely queried and
+      never used for alerts.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/logs/data-platform-logs
+
+  - id: q05
+    domain: AZ305-1
+    skill: Recommend an identity management solution
+    kind: single
+    stem: >-
+      Veymark Logistics wants to give employees of 40 partner carriers access
+      to an internal shipment-tracking web app that uses Microsoft Entra ID
+      for authentication. Some partners use Microsoft Entra ID, some use
+      Google accounts, and some have no corporate identity system at all. The
+      IT team does not want to create accounts, manage passwords, or run
+      synchronization for partner users. What should you recommend?
+    options:
+      - id: a
+        text: Create a cloud-only member user account in the Veymark tenant for each partner employee.
+      - id: b
+        text: Use Microsoft Entra B2B collaboration in the Veymark workforce tenant and invite partner users as guests.
+      - id: c
+        text: Synchronize each partner's directory into the Veymark tenant by using Microsoft Entra Cloud Sync.
+      - id: d
+        text: Create one shared account per partner organization and protect it with multifactor authentication.
+    answer: [b]
+    explanation: >-
+      With Microsoft Entra B2B collaboration, partners use their own
+      identities and credentials, whether or not they have Microsoft Entra ID,
+      and you don't need to manage external accounts or passwords or sync
+      accounts and manage their lifecycles. B2B supports identity providers
+      such as Google, and the email one-time passcode feature covers users
+      without a supported identity provider. Member accounts and shared
+      accounts both require you to manage partner credentials, and
+      synchronizing partner directories adds the sync and lifecycle overhead
+      the IT team wants to avoid.
+    sources:
+      - https://learn.microsoft.com/en-us/entra/external-id/what-is-b2b
+
+  - id: q06
+    domain: AZ305-1
+    skill: Recommend an identity management solution
+    kind: single
+    stem: >-
+      Your company recently acquired two businesses. Each business has its own
+      on-premises Active Directory forest, and the forests have no network
+      connectivity or trust between them or with the parent company's forest.
+      You need to synchronize users and groups from all three forests into a
+      single Microsoft Entra tenant. The solution must avoid a single point of
+      failure in the synchronization infrastructure and minimize on-premises
+      server management. What should you recommend?
+    options:
+      - id: a
+        text: Microsoft Entra Cloud Sync with multiple provisioning agents deployed in each forest
+      - id: b
+        text: A single Microsoft Entra Connect Sync server in the parent forest configured to connect to all three forests
+      - id: c
+        text: Consolidate the three forests into one forest, and then deploy Microsoft Entra Connect Sync
+      - id: d
+        text: Invite the acquired employees to the tenant as Microsoft Entra B2B guest users
+    answer: [a]
+    explanation: >-
+      Microsoft Entra Cloud Sync natively handles multiple disconnected Active
+      Directory forests, which supports mergers and acquisitions where forests
+      can't be connected. It uses lightweight provisioning agents that need
+      only outbound connections, keeps configuration in the cloud, and
+      supports multiple active agents on different servers for automatic
+      failover, eliminating a single point of failure. A single sync server
+      can't reach disconnected forests and is itself a single point of
+      failure, forest consolidation adds major effort, and B2B guests don't
+      synchronize the acquired users' existing directory objects.
+    sources:
+      - https://learn.microsoft.com/en-us/entra/identity/hybrid/cloud-sync/what-is-cloud-sync
+
+  - id: q07
+    domain: AZ305-1
+    skill: Recommend an identity management solution
+    kind: single
+    stem: >-
+      An application runs on 12 Azure virtual machines that an automation
+      pipeline frequently deletes and re-creates. Every instance must read
+      blobs from the same storage account by using Microsoft Entra
+      authentication. Permissions must stay consistent when virtual machines
+      are replaced, and no credentials can be stored in code or configuration
+      files. What should you recommend?
+    options:
+      - id: a
+        text: Enable a system-assigned managed identity on each virtual machine and grant each identity access to the storage account.
+      - id: b
+        text: Create a service principal, store its client secret in the application configuration file, and grant it access.
+      - id: c
+        text: Store the storage account access key in an environment variable on each virtual machine.
+      - id: d
+        text: Create a user-assigned managed identity, assign it to all the virtual machines, and grant it access to the storage account.
+    answer: [d]
+    explanation: >-
+      A user-assigned managed identity is a standalone resource with an
+      independent lifecycle that can be shared by multiple resources. Its
+      documented use cases include workloads where multiple virtual machines
+      need to access the same resource and workloads where resources are
+      recycled frequently but permissions should stay consistent. A
+      system-assigned identity is deleted with its virtual machine, so role
+      assignments would have to be recreated after every rebuild. Client
+      secrets and access keys are stored credentials, which the requirements
+      prohibit.
+    sources:
+      - https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/overview
+
+  - id: q08
+    domain: AZ305-1
+    skill: Recommend a solution for managing compliance
+    kind: single
+    stem: >-
+      External auditors ask Veymark Logistics to show continuous assessment of
+      its Azure subscriptions against PCI DSS controls, including which
+      controls are failing, and to provide a PDF summary of the current
+      compliance status. Microsoft Defender for Cloud is enabled on the
+      subscriptions with only the default Microsoft cloud security benchmark.
+      No paid Defender plans are enabled. You need to recommend a solution
+      that requires the least administrative effort. What should you
+      recommend?
+    options:
+      - id: a
+        text: Enable at least one paid Defender for Cloud plan, add the PCI DSS standard in the Regulatory compliance dashboard, and use Download report.
+      - id: b
+        text: Provide the Microsoft cloud security benchmark report as evidence of PCI DSS compliance.
+      - id: c
+        text: Build a custom KQL workbook that maps Azure Resource Graph data to each PCI DSS control.
+      - id: d
+        text: Configure Microsoft Entra access reviews for all subscription Owners.
+    answer: [a]
+    explanation: >-
+      The Regulatory compliance dashboard in Defender for Cloud continuously
+      assesses resources against the controls of each enabled standard and
+      shows failing assessments. The Microsoft cloud security benchmark is
+      enabled by default, and you can add non-default standards only when at
+      least one paid plan is enabled. Download report generates a PDF summary
+      of compliance status for a standard that can be shared with auditors.
+      The benchmark is not a PCI DSS assessment, a custom workbook requires
+      significant effort, and access reviews don't assess resource compliance.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/defender-for-cloud/regulatory-compliance-dashboard
+
+  - id: q09
+    domain: AZ305-1
+    skill: Recommend a solution for managing compliance
+    kind: multiple
+    stem: >-
+      Your company requires that every virtual network send its logs to a
+      central Log Analytics workspace by using a diagnostic setting. Hundreds
+      of existing virtual networks don't comply, and teams create new virtual
+      networks every week. You plan to assign an Azure Policy definition that
+      uses the deployIfNotExists effect at a management group. You need both
+      existing and new virtual networks to become compliant without manual
+      configuration of each network. Which two actions should you include in
+      the recommendation? Each correct answer presents part of the solution.
+      Choose two.
+    options:
+      - id: a
+        text: Change the effect of the definition to audit so that existing virtual networks are reported as noncompliant.
+      - id: b
+        text: Associate a managed identity with the policy assignment and grant it the roles listed in the definition's roleDefinitionIds.
+      - id: c
+        text: After the compliance evaluation completes, create a remediation task for the policy assignment.
+      - id: d
+        text: Change the effect of the definition to deny.
+      - id: e
+        text: Apply a ReadOnly lock to each existing virtual network.
+    answer: [b, c]
+    explanation: >-
+      deployIfNotExists is evaluated after a create or update request
+      succeeds, so new virtual networks are handled automatically. Existing
+      noncompliant resources are fixed through remediation tasks, and for
+      assignments at a management group the task is created after evaluation
+      determines compliance. Azure Policy performs the deployment by using the
+      managed identity associated with the assignment, which must hold the
+      roles in roleDefinitionIds. The audit effect only reports compliance and
+      deny blocks requests; neither deploys the missing diagnostic settings.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/governance/policy/how-to/remediate-resources
+      - https://learn.microsoft.com/en-us/azure/governance/policy/concepts/effect-basics
+
+  - id: q10
+    domain: AZ305-1
+    skill: Recommend a solution for managing compliance
+    kind: single
+    stem: >-
+      The governance team must enforce eight related policy definitions that
+      cover allowed locations, required tags, and allowed virtual machine SKUs
+      across 30 subscriptions under one management group. They want to assign
+      the definitions and track compliance as a single item, and they want to
+      supply one list of allowed locations that is passed to several of the
+      definitions. What should you recommend?
+    options:
+      - id: a
+        text: Assign each of the eight policy definitions separately to each subscription.
+      - id: b
+        text: Create one custom policy definition that combines all eight rules and uses a different effect for each rule.
+      - id: c
+        text: Create a policy initiative definition that includes the eight definitions and an initiative-level allowed locations parameter, and assign it to the management group.
+      - id: d
+        text: Apply CanNotDelete resource locks to each subscription.
+    answer: [c]
+    explanation: >-
+      An initiative groups several related policy definitions so that you work
+      with the group as a single item for assignment and management.
+      Initiative parameters can be passed to several included policy
+      definitions, for example one allowed locations parameter shared by the
+      definitions that restrict locations. Assigning eight definitions to 30
+      subscriptions separately adds management effort. Each policy definition
+      has a single effect in its policyRule, so one combined definition can't
+      use a different effect per rule. Resource locks don't evaluate resource
+      properties.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/governance/policy/concepts/initiative-definition-structure
+      - https://learn.microsoft.com/en-us/azure/governance/policy/concepts/effect-basics
+
+  - id: q11
+    domain: AZ305-1
+    skill: Recommend an authentication solution
+    kind: single
+    stem: >-
+      Veymark Logistics has Microsoft Entra ID P2 licenses for all users. The
+      security team wants sign-ins that Microsoft Entra ID Protection rates as
+      medium or high risk to be challenged rather than blocked, so that users
+      can prove their identity and self-remediate the risk without help desk
+      involvement. The design must follow Microsoft's recommended risk policy
+      configuration and must not depend on the legacy risk policies in ID
+      Protection. What should you recommend?
+    options:
+      - id: a
+        text: >-
+          A Conditional Access policy with a user risk condition of High that
+          grants access with Require risk remediation
+      - id: b
+        text: >-
+          A Conditional Access policy with a sign-in risk condition of Medium
+          and High that grants access with Require authentication strength set
+          to Multifactor authentication and a sign-in frequency of Every time
+      - id: c
+        text: >-
+          A Conditional Access policy with a sign-in risk condition of Medium
+          and High that blocks access
+      - id: d
+        text: >-
+          One Conditional Access policy that combines the sign-in risk and user
+          risk conditions and requires multifactor authentication
+    answer: [b]
+    explanation: >-
+      Microsoft recommends a sign-in risk policy in Conditional Access that
+      requires multifactor authentication when sign-in risk is Medium or High,
+      using the built-in Multifactor authentication strength, plus the sign-in
+      frequency Every time session control. Strong authentication is the way
+      users self-remediate sign-in risk. A user risk policy with Require risk
+      remediation addresses risky users, not risky sign-ins. Blocking access
+      stops self-remediation and needs administrator intervention. Microsoft
+      warns against combining sign-in risk and user risk conditions in one
+      policy; create separate policies. Risk policies need Microsoft Entra ID
+      P2, and the legacy ID Protection policies are being retired.
+    sources:
+      - https://learn.microsoft.com/en-us/entra/id-protection/howto-identity-protection-configure-risk-policies
+
+  - id: q12
+    domain: AZ305-2
+    skill: Recommend a database service tier and compute tier
+    kind: single
+    stem: >-
+      Veymark Logistics is migrating a 9 TB OLTP database to Azure SQL
+      Database. The database grows by about 1 TB per quarter. Requirements:
+      storage must grow well beyond 4 TB without redesigning the application,
+      storage charges should reflect only allocated data rather than a
+      configured maximum, and the reporting team wants up to four read
+      scale-out replicas. Which service tier should you recommend?
+    options:
+      - id: a
+        text: General Purpose
+      - id: b
+        text: Business Critical
+      - id: c
+        text: Hyperscale
+      - id: d
+        text: General Purpose with the serverless compute tier
+    answer: [c]
+    explanation: >-
+      Hyperscale supports storage from 10 GB to 128 TB, charges only for
+      allocated data storage, and offers up to 4 read scale-out replicas. The
+      General Purpose and Business Critical tiers both support a maximum
+      storage size of 4 TB and charge for the maximum storage size configured.
+      General Purpose has no read scale-out replicas, and Business Critical
+      has one. Choosing the serverless compute tier doesn't change the storage
+      limits of General Purpose.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-sql/database/service-tiers-sql-database-vcore
+
+  - id: q13
+    domain: AZ305-2
+    skill: Recommend a database service tier and compute tier
+    kind: single
+    stem: >-
+      An order-processing application uses a 600 GB Azure SQL database. The
+      workload needs consistently low storage latency of about 1-2
+      milliseconds on average, fast recovery from infrastructure failures,
+      and a readable secondary replica for reports at no extra charge. The
+      developers also use In-Memory OLTP tables. Which service tier should you
+      recommend?
+    options:
+      - id: a
+        text: Business Critical
+      - id: b
+        text: General Purpose
+      - id: c
+        text: Hyperscale
+      - id: d
+        text: General Purpose with the serverless compute tier
+    answer: [a]
+    explanation: >-
+      Business Critical is designed for applications that need low-latency
+      responses from local SSD storage (1-2 ms on average), faster recovery
+      from failures, and a free-of-charge readable secondary replica for
+      reports and analytics. It is also the tier that supports in-memory
+      tables. General Purpose, including serverless, has storage latency
+      between 5 ms and 10 ms and doesn't support in-memory tables. Hyperscale
+      can provide low latency for frequently accessed data but doesn't support
+      in-memory tables.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-sql/database/service-tiers-sql-database-vcore
+
+  - id: q14
+    domain: AZ305-2
+    skill: Recommend a database service tier and compute tier
+    kind: single
+    stem: >-
+      A new internal application will use a single Azure SQL database. The
+      application is used mainly during business hours and sits idle at night
+      and on weekends. Usage is unpredictable and there is no history to size
+      compute. The application can tolerate a short delay on the first
+      connection after an idle period. You need to minimize compute costs,
+      including stopping compute charges while the database is idle. What
+      should you recommend?
+    options:
+      - id: a
+        text: General Purpose with provisioned compute
+      - id: b
+        text: Hyperscale with the serverless compute tier and auto-pause enabled
+      - id: c
+        text: General Purpose with the serverless compute tier and auto-pause enabled
+      - id: d
+        text: Business Critical with the serverless compute tier
+    answer: [c]
+    explanation: >-
+      The serverless compute tier suits single databases with intermittent,
+      unpredictable usage and new databases without usage history. It bills
+      compute per second and, when auto-pause is enabled, pauses the database
+      during inactivity so that only storage is billed. Auto-pause and
+      auto-resume are currently supported only in the General Purpose service
+      tier, so Hyperscale serverless can't stop compute charges this way.
+      Serverless isn't supported in Business Critical, and provisioned compute
+      bills for capacity continuously regardless of activity.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-sql/database/serverless-tier-overview
+
+  - id: q15
+    domain: AZ305-2
+    skill: Recommend a solution for database scalability
+    kind: single
+    stem: >-
+      A software-as-a-service (SaaS) application provisions one Azure SQL
+      database per customer. There are 300 customer databases. Each database
+      has low average utilization with infrequent spikes, and the spikes occur
+      at different times for different customers. Management wants a
+      predictable budget and wants to avoid provisioning every database for
+      its peak load. What should you recommend?
+    options:
+      - id: a
+        text: Place the databases in one or more elastic pools.
+      - id: b
+        text: Deploy each database as a single database sized for its peak load.
+      - id: c
+        text: Deploy each database as a Business Critical single database and use read scale-out.
+      - id: d
+        text: Deploy each database as a separate serverless single database.
+    answer: [a]
+    explanation: >-
+      Elastic pools are a cost-effective solution for many databases with
+      varying and unpredictable usage. Databases in a pool share a set amount
+      of resources at a set price, which gives a predictable budget, and pools
+      are well suited to databases with low average utilization and
+      infrequent spikes that occur at different times. Sizing each database
+      for peak overprovisions resources, and read scale-out doesn't address
+      the cost pattern. The serverless guidance states that multiple databases
+      with intermittent, unpredictable usage that can be consolidated into
+      elastic pools are better suited to provisioned compute in pools.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-sql/database/elastic-pool-overview
+      - https://learn.microsoft.com/en-us/azure/azure-sql/database/serverless-tier-overview
+
+  - id: q16
+    domain: AZ305-2
+    skill: Recommend a solution for storing unstructured data
+    kind: single
+    stem: >-
+      Your company stores scanned delivery receipts as block blobs in a
+      general-purpose v2 storage account configured for zone-redundant storage
+      (ZRS). Receipts older than 60 days are rarely read, but when a customer
+      opens a dispute, the receipt must be retrieved within seconds. Receipts
+      are kept for at least one year. You need to minimize storage costs for
+      receipts older than 60 days. To which access tier should you move them?
+    options:
+      - id: a
+        text: Hot
+      - id: b
+        text: Cool
+      - id: c
+        text: Archive
+      - id: d
+        text: Cold
+    answer: [d]
+    explanation: >-
+      The cold tier is an online tier for data that is rarely accessed but
+      still requires fast retrieval, with millisecond latency and lower
+      storage costs than the cool tier. Its 90-day minimum retention is
+      acceptable because receipts are kept for a year. The archive tier is
+      offline, can take up to 15 hours to rehydrate, and isn't supported for
+      ZRS accounts. The hot and cool tiers meet the latency requirement but
+      have higher storage costs than cold.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/access-tiers-overview
+
+  - id: q17
+    domain: AZ305-2
+    skill: Recommend a solution for storing unstructured data
+    kind: multiple
+    stem: >-
+      A general-purpose v2 storage account holds application log blobs under
+      the prefix logs/. Requirements: move each blob to the cool tier when it
+      hasn't been read for 30 days, delete each blob 365 days after it was
+      created, and minimize administrative effort and custom code. Which two
+      actions should you include in the recommendation? Each correct answer
+      presents part of the solution. Choose two.
+    options:
+      - id: a
+        text: Enable last access time tracking on the storage account.
+      - id: b
+        text: Create an Azure Automation runbook that calls Set Blob Tier for each blob every night.
+      - id: c
+        text: Create a lifecycle management policy rule, filtered to the logs/ prefix, that moves blobs to cool based on last accessed time and deletes blobs based on creation time.
+      - id: d
+        text: Change the default access tier of the storage account to cool.
+      - id: e
+        text: Create a lifecycle management rule that rehydrates blobs to hot when they are read.
+    answer: [a, c]
+    explanation: >-
+      Lifecycle management policies are rule-based, free of charge, and can
+      transition blobs to cooler tiers or delete them. Rule conditions can use
+      creation time, last modified time, or last accessed time, and last
+      accessed time requires access time tracking to be enabled. Filters can
+      limit a rule to blobs that match a prefix. A runbook adds custom code,
+      changing the default tier affects new and inferred-tier blobs regardless
+      of access, and lifecycle policies can't rehydrate archived blobs.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/lifecycle-management-overview
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/access-tiers-overview
+
+  - id: q18
+    domain: AZ305-2
+    skill: Recommend a solution for storing unstructured data
+    kind: single
+    stem: >-
+      A data engineering team will land petabytes of raw files that Apache
+      Spark jobs process. The jobs frequently rename and delete entire
+      directories, and the security team requires POSIX-style access control
+      lists (ACLs) at the directory and file level. The team wants Blob
+      Storage pricing, access tiers, and lifecycle management policies. What
+      should you recommend?
+    options:
+      - id: a
+        text: A general-purpose v2 storage account with a flat namespace and container-level Azure RBAC assignments
+      - id: b
+        text: A storage account with the hierarchical namespace enabled (Azure Data Lake Storage)
+      - id: c
+        text: An Azure Data Explorer cluster with one database per data source
+      - id: d
+        text: An Azure SQL Database Hyperscale database with FILESTREAM-style tables
+    answer: [b]
+    explanation: >-
+      Azure Data Lake Storage capabilities are unlocked by enabling the
+      hierarchical namespace on a storage account. Directory rename and delete
+      become single atomic metadata operations, the ABFS driver provides
+      Hadoop-compatible access for engines such as Apache Spark, and the
+      security model supports both Azure RBAC and POSIX ACLs at the directory
+      and file level. It is priced at Blob Storage levels and supports access
+      tiers and lifecycle policies. A flat namespace lacks directory-level
+      ACLs and atomic directory operations, and the other options aren't file
+      stores for raw data lakes.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-introduction
+
+  - id: q19
+    domain: AZ305-2
+    skill: Recommend a solution for data analysis
+    kind: single
+    stem: >-
+      Veymark Logistics collects telemetry from 50,000 delivery vehicles. The
+      data arrives at very high velocity in semi-structured formats. Analysts
+      need interactive, near real-time queries over the raw data, including
+      time series analysis and anomaly detection, and they want built-in
+      dashboards. What should you recommend for the analytics store?
+    options:
+      - id: a
+        text: Azure Synapse Analytics serverless SQL pool over files in a data lake
+      - id: b
+        text: Azure Data Explorer
+      - id: c
+        text: Azure SQL Database in the Hyperscale service tier
+      - id: d
+        text: Azure Blob Storage in the cold tier with lifecycle management
+    answer: [b]
+    explanation: >-
+      Azure Data Explorer is a fully managed big data analytics platform for
+      analyzing high volumes of data in near real time. It ingests high
+      velocity data (millions of events per second), is useful for log, time
+      series, and IoT analytics, provides time series functions including
+      anomaly detection and forecasting, and offers built-in dashboards. It is
+      ideal for interactive analytics over high-velocity, diverse raw data. A
+      serverless SQL pool queries files in place and suits exploration rather
+      than streaming ingestion, and the other options aren't analytics
+      engines for this workload.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/data-explorer/data-explorer-overview
+
+  - id: q20
+    domain: AZ305-2
+    skill: Recommend a solution for data analysis
+    kind: single
+    stem: >-
+      Business analysts need to run occasional ad hoc T-SQL queries over
+      Parquet and CSV files that are already stored in Azure Data Lake
+      Storage. Usage is sporadic. The solution must not require copying or
+      loading the data into another store, must not require any
+      infrastructure to set up or clusters to maintain, and must charge only
+      for the data processed by queries. What should you recommend?
+    options:
+      - id: a
+        text: An Azure Synapse Analytics serverless SQL pool
+      - id: b
+        text: An Azure Data Explorer cluster with scheduled ingestion from the data lake
+      - id: c
+        text: An Azure SQL Database with provisioned compute and a nightly load job
+      - id: d
+        text: An Azure Event Hubs namespace with Capture enabled
+    answer: [a]
+    explanation: >-
+      Every Azure Synapse workspace includes a serverless SQL pool endpoint
+      that queries Parquet, Delta Lake, and delimited text files in the data
+      lake by using familiar T-SQL, without copying or loading the data. There
+      is no infrastructure to set up and no clusters to maintain, and you are
+      charged only for the data processed by your queries. Data Explorer and
+      Azure SQL Database both require ingesting or loading data into their own
+      store, and Event Hubs Capture writes streaming data to storage rather
+      than querying it.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/synapse-analytics/sql/on-demand-workspace-overview
+
+  - id: q21
+    domain: AZ305-3
+    skill: Recommend a backup and recovery solution for compute
+    kind: single
+    stem: >-
+      A warehouse management application runs on Azure virtual machines whose
+      data disks are Premium SSD v2 managed disks. The business requires a
+      recovery point objective (RPO) of four hours for the virtual machines
+      and wants fast restores from snapshots for recent recovery points. You
+      need to recommend a backup solution. What should you recommend?
+    options:
+      - id: a
+        text: Azure Backup with a Standard policy that runs one backup per day
+      - id: b
+        text: Azure Backup with an Enhanced policy that uses a daily schedule
+      - id: c
+        text: Azure Backup with a Standard policy and instant restore retention set to five days
+      - id: d
+        text: Azure Backup with an Enhanced policy that uses an hourly schedule every 4 hours
+    answer: [d]
+    explanation: >-
+      The Enhanced policy for Azure VM backup supports multiple backups per
+      day, as frequently as every 4 hours, and supports newer offerings such
+      as Premium SSD v2 and Ultra Disks. An hourly schedule has a minimum RPO
+      of 4 hours, and instant restore snapshots can be retained for 1 to 30
+      days. The Standard policy doesn't support protecting Premium SSD v2
+      disks and runs daily, and an Enhanced policy with a daily schedule
+      doesn't meet the four-hour RPO.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/backup/backup-azure-vms-enhanced-policy
+
+  - id: q22
+    domain: AZ305-3
+    skill: Recommend a backup and recovery solution for compute
+    kind: multiple
+    stem: >-
+      Your company backs up Azure virtual machines to a newly created Recovery
+      Services vault. No items are protected yet. Requirements: if the
+      primary region has a disaster, the virtual machines must be restorable
+      in the Azure paired secondary region, and the team must be able to run
+      restore drills in the secondary region for audits. Which two actions
+      should you include in the recommendation? Each correct answer presents
+      part of the solution. Choose two.
+    options:
+      - id: a
+        text: Set the vault storage replication type to geo-redundant before configuring any backups.
+      - id: b
+        text: Set the vault storage replication type to zone-redundant.
+      - id: c
+        text: Enable Cross Region Restore in the vault properties.
+      - id: d
+        text: Create a second vault in the secondary region and back up the virtual machines to it.
+      - id: e
+        text: Enable Cross Subscription Restore in the vault properties.
+    answer: [a, c]
+    explanation: >-
+      Cross Region Restore lets you restore data in the Azure paired secondary
+      region, both for drills when there's an audit or compliance requirement
+      and during a disaster in the primary region. It is supported only for
+      vaults that use GRS, and the storage replication type must be set before
+      you configure backups because the option is disabled afterward. ZRS
+      keeps data in the primary region. A vault must be in the same region as
+      the data source, so a vault in the secondary region can't protect these
+      virtual machines. Cross Subscription Restore targets another
+      subscription, not another region.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/backup/backup-create-recovery-services-vault
+
+  - id: q23
+    domain: AZ305-3
+    skill: Recommend a backup and recovery solution for compute
+    kind: single
+    stem: >-
+      After a ransomware incident at a partner company, Veymark Logistics
+      wants to ensure that an attacker who compromises a backup administrator
+      account can't delete virtual machine recovery points before they expire
+      or reduce retention in backup policies. The protection must be
+      permanent so that the attacker can't simply turn it off. What should you
+      recommend for the Recovery Services vault?
+    options:
+      - id: a
+        text: Enable immutability on the vault and lock the immutability setting.
+      - id: b
+        text: Enable immutability on the vault and leave the setting unlocked.
+      - id: c
+        text: Keep soft delete enabled on the vault.
+      - id: d
+        text: Encrypt the vault by using a customer-managed key.
+    answer: [a]
+    explanation: >-
+      An immutable vault blocks operations that could lead to loss of recovery
+      points, such as stopping protection with deletion of data and modifying
+      a policy to reduce retention. Immutability is reversible while it's only
+      enabled; locking it makes the setting irreversible and uses WORM storage
+      so malicious actors can't disable it. Soft delete helps protect against
+      deletion but doesn't block retention reductions, and customer-managed
+      key encryption protects data confidentiality rather than preventing
+      deletion.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/backup/backup-azure-immutable-vault-concept
+      - https://learn.microsoft.com/en-us/azure/backup/backup-create-recovery-services-vault
+
+  - id: q24
+    domain: AZ305-3
+    skill: Recommend a high availability solution for relational data
+    kind: single
+    stem: >-
+      A Business Critical Azure SQL database runs in a region that supports
+      availability zones. The database must remain available with zero loss
+      of committed data if an entire availability zone fails. The solution
+      must not require application changes and must minimize additional cost.
+      What should you recommend?
+    options:
+      - id: a
+        text: Add the database to a failover group with a secondary server in another region.
+      - id: b
+        text: Rely on geo-restore from geo-redundant backup storage.
+      - id: c
+        text: Enable the zone-redundant configuration for the database.
+      - id: d
+        text: Enable read scale-out and direct reporting queries to the secondary replica.
+    answer: [c]
+    explanation: >-
+      Zone redundancy protects against outages of an availability zone and
+      ensures an RPO of zero loss of committed data if a single zone becomes
+      unavailable, without changes to application logic. For the Business
+      Critical tier, the existing replicas are placed in different zones, so
+      you can enable it at no extra cost. A failover group adds a billed
+      secondary and uses asynchronous replication, so forced failover can lose
+      data. Geo-restore is a disaster recovery option with downtime, and read
+      scale-out doesn't add zone resilience.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-sql/database/high-availability-sla-local-zone-redundancy
+
+  - id: q25
+    domain: AZ305-3
+    skill: Recommend a high availability solution for relational data
+    kind: single
+    stem: >-
+      An order service uses an Azure Database for PostgreSQL flexible server
+      in the Burstable compute tier with high availability disabled. The
+      region supports availability zones. The business now requires that the
+      database survive the loss of an entire availability zone with no loss
+      of committed data, and that failover happen automatically without an
+      operator promoting a replica. What should you recommend?
+    options:
+      - id: a
+        text: >-
+          Keep the Burstable tier and enable same-zone (zonal) high
+          availability.
+      - id: b
+        text: >-
+          Create a read replica in another region and use a virtual endpoint
+          for the application.
+      - id: c
+        text: >-
+          Rely on the automatic zone-redundant backups and restore to another
+          zone with point-in-time restore if a zone fails.
+      - id: d
+        text: >-
+          Move the server to the General Purpose tier and enable
+          zone-redundant high availability.
+    answer: [d]
+    explanation: >-
+      Zone-redundant high availability places a warm standby in a different
+      availability zone and replicates synchronously, so zero data loss is
+      expected in a zone failure and Azure performs a forced failover to the
+      standby automatically. High availability isn't supported in the
+      Burstable tier, so the server must move to General Purpose or Memory
+      Optimized. Same-zone high availability doesn't protect against a zone
+      outage. Read replicas replicate asynchronously and you must trigger
+      promotion yourself. Restoring backups creates a new server and involves
+      more downtime and data loss than replication.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/reliability/reliability-database-postgresql
+
+  - id: q26
+    domain: AZ305-3
+    skill: Recommend a recovery solution for Azure and hybrid workloads that meets recovery objectives
+    kind: single
+    stem: >-
+      A payment ledger stored in Azure SQL Database has a disaster recovery
+      requirement for a regional failure: a guaranteed recovery point
+      objective (RPO) of 5 seconds and a recovery time objective (RTO) of 30
+      seconds. Which solution should you recommend?
+    options:
+      - id: a
+        text: General Purpose service tier with geo-restore from geo-redundant backups
+      - id: b
+        text: Business Critical service tier with active geo-replication to another region
+      - id: c
+        text: General Purpose service tier with zone redundancy enabled
+      - id: d
+        text: Any service tier with long-term retention backups kept for 10 years
+    answer: [b]
+    explanation: >-
+      When active geo-replication is configured, the Business Critical tier
+      has a guaranteed RPO of 5 seconds and RTO of 30 seconds for 100% of
+      deployed hours. Geo-restore recovers from backups and can't meet a
+      30-second RTO. Zone redundancy protects against availability zone
+      outages within a region, not a regional failure. Long-term retention
+      backups are for compliance retention, not fast geo-recovery.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-sql/database/service-tiers-sql-database-vcore
+      - https://learn.microsoft.com/en-us/azure/azure-sql/database/high-availability-sla-local-zone-redundancy
+
+  - id: q27
+    domain: AZ305-3
+    skill: Recommend a high availability solution for semi-structured and unstructured data
+    kind: single
+    stem: >-
+      A customer portal stores documents in Azure Blob Storage. Requirements:
+      reads and writes must continue if an availability zone in the primary
+      region becomes unavailable, the data must stay durable during a
+      region-wide disaster, and the application must be able to read from the
+      secondary region during a primary region outage without waiting for an
+      account failover. Which redundancy option should you recommend?
+    options:
+      - id: a
+        text: Geo-zone-redundant storage (GZRS)
+      - id: b
+        text: Read-access geo-redundant storage (RA-GRS)
+      - id: c
+        text: Zone-redundant storage (ZRS)
+      - id: d
+        text: Read-access geo-zone-redundant storage (RA-GZRS)
+    answer: [d]
+    explanation: >-
+      GZRS copies data synchronously across availability zones in the primary
+      region and asynchronously to a secondary region, so reads and writes
+      continue during a zone outage and data remains durable during a
+      regional disaster. The read-access variant, RA-GZRS, allows reads from
+      the secondary region at any time without a failover. Plain GZRS makes
+      the secondary available only after failover. RA-GRS uses LRS in the
+      primary region, which requires failover to restore writes when a
+      datacenter is unavailable. ZRS doesn't protect against a regional
+      disaster.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-redundancy
+
+  - id: q28
+    domain: AZ305-4
+    skill: Recommend a virtual machine-based solution
+    kind: single
+    stem: >-
+      A stateless web tier runs on Azure virtual machines. Requirements:
+      automatic scaling based on CPU load, instances spread across
+      availability zones, and a mix of Spot and standard (regular priority)
+      instances in the same group to reduce cost. You also want to manage the
+      instances by using standard virtual machine APIs. What should you
+      recommend?
+    options:
+      - id: a
+        text: A Virtual Machine Scale Set with Uniform orchestration
+      - id: b
+        text: A Virtual Machine Scale Set with Flexible orchestration
+      - id: c
+        text: An availability set with manually added virtual machines
+      - id: d
+        text: A dedicated host group with automatic placement
+    answer: [b]
+    explanation: >-
+      Flexible orchestration is the recommended scale set mode. It manages
+      standard Azure IaaS virtual machines, supports metrics-based autoscaling,
+      distributes instances across availability zones, and can mix Spot and
+      regular priority instances. With Uniform orchestration, instances must
+      be either all Spot or all regular, and they use the scale set VM APIs.
+      Availability sets don't support automatic scaling or availability
+      zones, and a dedicated host group addresses hardware isolation rather
+      than cost-optimized scaling.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-machine-scale-sets/virtual-machine-scale-sets-orchestration-modes
+
+  - id: q29
+    domain: AZ305-4
+    skill: Recommend a virtual machine-based solution
+    kind: single
+    stem: >-
+      Every night, Veymark Logistics runs route-optimization batch jobs that
+      take about two hours. The jobs checkpoint their progress and can restart
+      if interrupted. A pipeline creates fresh virtual machines for each run,
+      so disks don't need to be kept after a run. No SLA is required. You need
+      to minimize compute and storage costs. What should you recommend?
+    options:
+      - id: a
+        text: Azure Spot Virtual Machines with the eviction policy set to Delete
+      - id: b
+        text: Azure Spot Virtual Machines with the eviction policy set to Deallocate
+      - id: c
+        text: Standard pay-as-you-go virtual machines in an availability set
+      - id: d
+        text: Virtual machines on an Azure Dedicated Host
+    answer: [a]
+    explanation: >-
+      Azure Spot Virtual Machines use unused capacity at significant cost
+      savings and suit workloads that handle interruptions, such as batch
+      processing. They have no SLA and can be evicted with 30 seconds of
+      notice. With the Delete eviction policy, evicted VMs are deleted
+      together with their disks, so you aren't charged for storage. The
+      Deallocate policy keeps the VM, which counts against quota and incurs
+      disk storage charges. Standard VMs and dedicated hosts cost more for an
+      interruptible workload.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-machines/spot-vms
+
+  - id: q30
+    domain: AZ305-4
+    skill: Recommend a virtual machine-based solution
+    kind: single
+    stem: >-
+      A regulator requires that virtual machines that process customs
+      declarations must not share physical servers with virtual machines from
+      other Azure customers. The operations team also wants to control when
+      platform maintenance is applied to the underlying hardware, and finance
+      wants to use Azure Hybrid Benefit for existing Windows Server licenses.
+      What should you recommend?
+    options:
+      - id: a
+        text: A Virtual Machine Scale Set with Flexible orchestration and maximum spreading
+      - id: b
+        text: Azure Spot Virtual Machines deployed across availability zones
+      - id: c
+        text: Azure Dedicated Host with a host group
+      - id: d
+        text: Standard virtual machines deployed across three availability zones
+    answer: [c]
+    explanation: >-
+      Azure Dedicated Host provides physical servers dedicated to one Azure
+      subscription. It gives hardware isolation at the physical server level,
+      so no other customer's VMs are placed on your hosts. Maintenance Control
+      lets you apply platform updates on dedicated hosts at a time of your
+      choice within a 35-day rolling window, and you can use Azure Hybrid
+      Benefit to bring Windows and SQL licenses. Scale sets, Spot VMs, and
+      zonal deployments of standard VMs run on shared hosts.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-machines/dedicated-hosts
+
+  - id: q31
+    domain: AZ305-4
+    skill: Recommend an event-driven architecture
+    kind: single
+    stem: >-
+      Partner carriers upload shipping manifests to a container named
+      manifests in a general-purpose v2 storage account. Each new .csv file
+      must be processed within seconds of upload by serverless code. The
+      solution must avoid polling, must ignore files in other containers and
+      files with other extensions, and must minimize cost. What should you
+      recommend?
+    options:
+      - id: a
+        text: An Azure Functions timer trigger that lists the container every minute
+      - id: b
+        text: An Azure Event Hubs namespace with Capture enabled on the storage account
+      - id: c
+        text: An Azure Service Bus queue that the partners' upload tools write to after each upload
+      - id: d
+        text: An Azure Event Grid subscription for Microsoft.Storage.BlobCreated events with subject filters for the manifests container and the .csv suffix, delivering to an Azure function
+    answer: [d]
+    explanation: >-
+      Blob Storage events are pushed through Azure Event Grid to subscribers
+      such as Azure Functions, which avoids expensive polling, and you pay
+      only for what you use. Event subscriptions can filter by event type and
+      by subject prefix (container) and suffix (such as .csv). A timer trigger
+      polls, which the requirements rule out. Event Hubs Capture writes
+      streaming data to storage rather than reacting to blob creation, and a
+      Service Bus queue requires changes to partner tooling.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-event-overview
+      - https://learn.microsoft.com/en-us/azure/event-grid/overview
+
+  - id: q32
+    domain: AZ305-4
+    skill: Recommend an event-driven architecture
+    kind: single
+    stem: >-
+      Veymark Logistics will stream GPS telemetry from 40,000 vehicles, which
+      can reach millions of events per second. A real-time dashboard and a
+      fraud detection service must each read the same stream independently at
+      their own pace. The raw stream must also be written to Azure Data Lake
+      Storage for batch analytics without writing custom code. What should you
+      recommend for ingestion?
+    options:
+      - id: a
+        text: Azure Event Hubs with a consumer group per consuming application and Capture enabled
+      - id: b
+        text: An Azure Event Grid custom topic with a push subscription per application
+      - id: c
+        text: An Azure Service Bus topic with one subscription per application
+      - id: d
+        text: An Azure Service Bus queue with sessions enabled
+    answer: [a]
+    explanation: >-
+      Event Hubs is built for big data streaming and telemetry and can ingest
+      millions of events per second. Consumer groups give each consuming
+      application its own view of the stream so it can read independently,
+      and Capture writes streaming data to Blob Storage or Data Lake Storage
+      in near real time. Event Grid is designed for reactive routing of
+      discrete events and has no capture or replay, and Service Bus is
+      designed for enterprise transactional messaging rather than
+      high-throughput telemetry streaming.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/event-hubs/event-hubs-about
+      - https://learn.microsoft.com/en-us/azure/service-bus-messaging/compare-messaging-services
+
+  - id: q33
+    domain: AZ305-4
+    skill: Recommend a messaging architecture
+    kind: single
+    stem: >-
+      An order management system sends messages for each customer order.
+      Messages that belong to the same order must be processed in first-in,
+      first-out (FIFO) order, duplicate submissions from retrying clients must
+      be detected, and several operations must be completed together in a
+      transaction. What should you recommend?
+    options:
+      - id: a
+        text: Azure Event Grid with advanced filtering
+      - id: b
+        text: Azure Service Bus with message sessions and duplicate detection
+      - id: c
+        text: Azure Event Hubs with one partition per order
+      - id: d
+        text: An Azure Event Grid namespace topic with pull delivery
+    answer: [b]
+    explanation: >-
+      Service Bus is designed for enterprise transactional messaging such as
+      order processing. It provides FIFO ordering through sessions, duplicate
+      detection, and transactions. Event Grid offers no ordering guarantee and
+      no duplicate detection or transactions. Event Hubs orders events only
+      per partition and doesn't support duplicate detection or transactions,
+      so it is suited to telemetry streaming rather than order workflows.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/service-bus-messaging/compare-messaging-services
+
+  - id: q34
+    domain: AZ305-4
+    skill: Evaluate on-premises servers, data, and applications for migration
+    kind: single
+    stem: >-
+      Your company plans to assess 3,500 servers that run in a VMware
+      environment managed by four vCenter Servers. The assessment must use
+      configuration and performance data, include installed software
+      inventory and SQL Server instances, and must not require installing
+      agents on the servers. You need to minimize the number of components to
+      deploy. What should you recommend?
+    options:
+      - id: a
+        text: Deploy one Azure Migrate appliance for each vCenter Server.
+      - id: b
+        text: Deploy one Azure Migrate appliance per 1,000 servers.
+      - id: c
+        text: Install discovery agents on each server and deploy no appliance.
+      - id: d
+        text: Deploy one Azure Migrate appliance from the OVA template and connect it to all four vCenter Servers.
+    answer: [d]
+    explanation: >-
+      For VMware, the Azure Migrate appliance discovers servers without
+      installing agents on them, collects configuration and performance
+      metadata for assessments, and discovers installed software inventory
+      and SQL Server instances. A single VMware appliance can connect to up to
+      10 vCenter Servers and discover up to 10,000 servers, so one appliance
+      covers this environment. One appliance per vCenter Server or per 1,000
+      servers deploys more components than necessary (the 1,000 server limit
+      applies to physical server discovery), and agents are ruled out by the
+      requirements.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/migrate/migrate-appliance
+
+  - id: q35
+    domain: AZ305-4
+    skill: Evaluate on-premises servers, data, and applications for migration
+    kind: single
+    stem: >-
+      Before migrating 600 Hyper-V virtual machines to Azure, the migration
+      team needs to identify which servers communicate with each other so
+      that interdependent servers can be moved in the same migration wave.
+      Security policy forbids installing additional agents on the servers,
+      and the team uses the current Azure Migrate experience. What should you
+      recommend?
+    options:
+      - id: a
+        text: Agent-based dependency analysis by using the Service Map solution
+      - id: b
+        text: A performance-based assessment without dependency analysis
+      - id: c
+        text: Agentless dependency analysis by using the Azure Migrate appliance
+      - id: d
+        text: A software inventory export reviewed manually by application owners
+    answer: [c]
+    explanation: >-
+      Dependency analysis identifies dependencies between discovered servers
+      so you can group interdependent servers and identify servers that must
+      be migrated together. Agentless dependency analysis captures TCP
+      connection data without installing agents, is available for Hyper-V
+      VMs, and is the recommended approach. Agent-based analysis requires
+      agents on each server and is supported only in the classic view, where
+      new servers can't be onboarded. Performance assessments and software
+      inventory don't reveal network dependencies between servers.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/migrate/concepts-dependency-visualization
+      - https://learn.microsoft.com/en-us/azure/migrate/migrate-appliance
+
+  - id: q36
+    domain: AZ305-4
+    skill: Recommend a connectivity solution that connects Azure resources to on-premises networks
+    kind: multiple
+    stem: >-
+      Your company connects its data center to a hub virtual network by using
+      ExpressRoute private peering. The hub has an ExpressRoute gateway in a
+      GatewaySubnet with a /28 prefix. You need to add a site-to-site VPN
+      connection over the internet that carries traffic only if the
+      ExpressRoute circuit fails. Which two actions should you include in the
+      recommendation? Each correct answer presents part of the solution.
+      Choose two.
+    options:
+      - id: a
+        text: Delete the existing gateway and re-create the GatewaySubnet with a /27 or shorter prefix.
+      - id: b
+        text: Deploy a policy-based VPN gateway.
+      - id: c
+        text: Deploy a route-based VPN gateway that uses a SKU other than Basic, such as VpnGw1.
+      - id: d
+        text: Deploy a Basic SKU VPN gateway to minimize cost.
+      - id: e
+        text: Configure the on-premises routers to prefer routes learned over the VPN connection.
+    answer: [a, c]
+    explanation: >-
+      A site-to-site VPN can be configured as a secure failover path for
+      ExpressRoute private peering. Coexistence requires a route-based VPN
+      gateway, isn't supported with the Basic SKU, and requires a gateway
+      subnet of /27 or a shorter prefix. If the existing gateway subnet is
+      /28, you must delete the gateway and enlarge the subnet. To avoid
+      asymmetric routing, on-premises routers should prefer the ExpressRoute
+      routes by setting a higher local preference, not the VPN routes.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/expressroute/expressroute-howto-coexist-resource-manager
+
+  - id: q37
+    domain: AZ305-4
+    skill: Recommend a connectivity solution that connects Azure resources to on-premises networks
+    kind: single
+    stem: >-
+      Veymark Logistics has two data centers in the United States, each
+      connected to Azure by its own ExpressRoute circuit. The data centers
+      currently can reach Azure virtual networks but can't reach each other
+      through those circuits. The company wants private data exchange between
+      the two data centers over the Microsoft global network, without sending
+      the traffic over the public internet. What should you recommend?
+    options:
+      - id: a
+        text: Link the two circuits by using ExpressRoute Global Reach.
+      - id: b
+        text: Create a site-to-site VPN between the two data centers over the internet.
+      - id: c
+        text: Enable the ExpressRoute Premium add-on on both circuits.
+      - id: d
+        text: Peer the virtual networks that each circuit connects to.
+    answer: [a]
+    explanation: >-
+      ExpressRoute Global Reach links ExpressRoute circuits to create a
+      private network between on-premises networks, so the data centers can
+      exchange data through their existing circuits and Microsoft's global
+      network. A site-to-site VPN over the internet doesn't meet the
+      requirement. The Premium add-on extends access to Azure regions across
+      geopolitical boundaries but doesn't connect on-premises sites to each
+      other. Virtual network peering connects Azure networks, not the two
+      data centers.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/expressroute/expressroute-global-reach
+      - https://learn.microsoft.com/en-us/azure/expressroute/expressroute-introduction
+
+  - id: q38
+    domain: AZ305-4
+    skill: Recommend a connectivity solution that connects Azure resources to on-premises networks
+    kind: single
+    stem: >-
+      Your company has 60 branch offices with SD-WAN devices from a supported
+      partner, remote workers who need point-to-site VPN, and a headquarters
+      connected by ExpressRoute. The network team wants any-to-any
+      connectivity between branches, remote users, headquarters, and virtual
+      networks in several regions over the Microsoft backbone, with automated
+      branch configuration and a single operational interface. What should you
+      recommend?
+    options:
+      - id: a
+        text: A Basic Azure Virtual WAN with one hub per region
+      - id: b
+        text: A VPN gateway in each spoke virtual network with site-to-site connections to every branch
+      - id: c
+        text: A Standard Azure Virtual WAN with a virtual hub in each region
+      - id: d
+        text: ExpressRoute Global Reach between all branch offices
+    answer: [c]
+    explanation: >-
+      Azure Virtual WAN brings branch connectivity (with partner SD-WAN
+      automation), site-to-site VPN, point-to-site VPN, ExpressRoute, and
+      transit between virtual networks into a single operational interface.
+      In a Standard virtual WAN, all hubs are connected in a full mesh, which
+      enables any-to-any connectivity over the Microsoft backbone. A Basic
+      virtual WAN supports site-to-site VPN only. Per-spoke VPN gateways don't
+      provide managed transit, and Global Reach links ExpressRoute circuits,
+      not SD-WAN branches or remote users.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-wan/virtual-wan-about
+
+  - id: q39
+    domain: AZ305-4
+    skill: Recommend a connectivity solution that connects Azure resources to on-premises networks
+    kind: multiple
+    stem: >-
+      A data center connects to Azure by using a site-to-site VPN. The data
+      center has two VPN devices. The connectivity must survive the failure of
+      either on-premises VPN device or either Azure VPN gateway instance, and
+      traffic should use all tunnels simultaneously. Which two actions should
+      you include in the recommendation? Each correct answer presents part of
+      the solution. Choose two.
+    options:
+      - id: a
+        text: Configure the Azure VPN gateway in active-active mode.
+      - id: b
+        text: Keep the default active-standby gateway and create one local network gateway.
+      - id: c
+        text: Create two local network gateways and two connections, one for each on-premises VPN device, with BGP enabled.
+      - id: d
+        text: Use static routes instead of BGP on both connections.
+      - id: e
+        text: Replace the site-to-site VPN with point-to-site VPN connections from each server.
+    answer: [a, c]
+    explanation: >-
+      The most reliable design is dual redundancy: an active-active Azure VPN
+      gateway plus two on-premises VPN devices, which creates a full mesh of
+      four IPsec tunnels with traffic spread across all of them. This topology
+      requires two local network gateways and two connections, and BGP is
+      required for simultaneous connectivity to the same on-premises network.
+      The default active-standby mode causes a brief interruption during
+      failover and uses only one active instance, and static routing doesn't
+      meet the BGP requirement.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/vpn-gateway/vpn-gateway-highlyavailable
+
+  - id: q40
+    domain: AZ305-4
+    skill: Recommend a connectivity solution that connects Azure resources to on-premises networks
+    kind: single
+    stem: >-
+      Your company has an ExpressRoute circuit at the Amsterdam peering
+      location that provides private connectivity to virtual networks in
+      North Europe and West Europe. The company is deploying new virtual
+      networks in Australia East and West US and wants them reachable from
+      on-premises through the same circuit. What should you recommend?
+    options:
+      - id: a
+        text: Change the circuit to the ExpressRoute Local SKU.
+      - id: b
+        text: Enable the ExpressRoute Premium add-on on the circuit.
+      - id: c
+        text: Configure ExpressRoute Global Reach on the circuit.
+      - id: d
+        text: Increase the circuit bandwidth to 10 Gbps.
+    answer: [b]
+    explanation: >-
+      A standard ExpressRoute connection provides access to regions within the
+      same geopolitical region as the peering location. The ExpressRoute
+      Premium add-on extends connectivity across geopolitical boundaries, so a
+      circuit in Amsterdam can reach resources in regions such as West US or
+      Australia East. It also raises private peering route limits and the
+      number of virtual network links. The Local SKU targets an Azure region
+      near the peering location, Global Reach connects on-premises sites to
+      each other, and more bandwidth doesn't change regional reach.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/expressroute/expressroute-introduction

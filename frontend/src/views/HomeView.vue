@@ -43,6 +43,7 @@ const totals = computed(() => {
         </RouterLink>
         <RouterLink to="/career" class="btn-primary" v-else>Start the first shift</RouterLink>
         <RouterLink to="/career" v-if="resumeTarget" class="btn-quiet">The queue</RouterLink>
+        <RouterLink to="/practice" class="btn-quiet">Practice exams</RouterLink>
         <RouterLink to="/about" class="btn-quiet">What this is</RouterLink>
       </div>
       <p class="text-sm text-ink-500 dark:text-ink-400">

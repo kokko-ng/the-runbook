@@ -8,6 +8,7 @@
  */
 
 import type { SaveState } from '@/engine'
+import type { Attempt, HistoryEntry } from '@/practice'
 
 const SAVE_KEY = 'runbook.save.v1'
 const ANON_KEY = 'runbook.anon.v1'
@@ -74,4 +75,34 @@ export function loadTheme(): ThemeChoice {
 
 export function persistTheme(choice: ThemeChoice): void {
   writeRaw(THEME_KEY, choice)
+}
+
+const PRACTICE_KEY = 'runbook.practice.v1'
+
+/**
+ * Practice exam attempts and scores. Kept apart from the game save so a
+ * practice exam can never disturb reputation or progress, and vice versa.
+ */
+export interface PracticeStore {
+  attempts: Record<string, Attempt>
+  history: Record<string, HistoryEntry[]>
+}
+
+export function loadPractice(): PracticeStore {
+  const raw = readRaw(PRACTICE_KEY)
+  const empty: PracticeStore = { attempts: {}, history: {} }
+  if (!raw) return empty
+  try {
+    const parsed = JSON.parse(raw) as Partial<PracticeStore>
+    return {
+      attempts: parsed.attempts && typeof parsed.attempts === 'object' ? parsed.attempts : {},
+      history: parsed.history && typeof parsed.history === 'object' ? parsed.history : {},
+    }
+  } catch {
+    return empty
+  }
+}
+
+export function persistPractice(store: PracticeStore): boolean {
+  return writeRaw(PRACTICE_KEY, JSON.stringify(store))
 }

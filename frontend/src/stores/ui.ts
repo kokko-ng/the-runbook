@@ -17,6 +17,12 @@ export const useUiStore = defineStore('ui', () => {
   const mapPanelOpen = ref(true)
   const drawerOpen = ref(false)
   const toasts = ref<Toast[]>([])
+  /** Bumped by pages that host their own feedback control instead of the floating one. */
+  const feedbackRequests = ref(0)
+
+  function requestFeedback(): void {
+    feedbackRequests.value += 1
+  }
 
   function applyTheme(): void {
     const dark =
@@ -54,6 +60,8 @@ export const useUiStore = defineStore('ui', () => {
     mapPanelOpen,
     drawerOpen,
     toasts,
+    feedbackRequests,
+    requestFeedback,
     restoreTheme,
     setTheme,
     toast,

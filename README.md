@@ -56,6 +56,27 @@ one core encounter, and the build fails if that stops being true.
 | 1 (AZ-104) | Identity, Storage, Compute, Networking, Monitoring | 33 | 10 | 133 |
 | 2 (AZ-305) | Identity and governance, Data, Continuity, Infrastructure | 24 | 8 | 98 |
 
+## Practice exams
+
+**The practice exams were made by Opus 5.5 (`claude-opus-5-5`), an AI model
+made by Anthropic. They are the one part of The Runbook that is not written by
+hand.**
+
+Five full-length practice exams each for AZ-104, AZ-700 and AZ-305, 40
+questions apiece, 600 questions in all, at `/practice`. Each exam deals its
+questions across the domains in proportion to the weights on the official
+study guide, and every question names the study-guide skill it tests. Every
+question, answer and explanation was written from pages on
+learn.microsoft.com, and each question links the pages it was drawn from; no
+other source was used. They are not official Microsoft content and not a
+Microsoft practice assessment. AI-written material can be wrong, so where an
+explanation and its linked source disagree, the source wins.
+
+Take one timed (the study guide's clock, results and a per-domain breakdown at
+the end) or in study mode (untimed, explanation and source after each
+question). Answers and scores stay in the browser's local storage and never
+touch the game save.
+
 ## Layout
 
 ```
@@ -63,6 +84,7 @@ content/        Authored quests, objective inventories, diagrams, legal pages
   schema/       JSON Schema for every content file
   objectives/   AZ-104 and AZ-305 objectives, transcribed from the study guides
   quests/       One YAML file per quest
+  practice_exams/  Blueprint plus five exam files per exam code (AI-written, see above)
 frontend/       Vue 3 + Vite + Pinia + Tailwind. The engine lives in src/engine
 backend/        Django 5 + Django Ninja. Accounts, save sync, telemetry, linter
 deploy/         PythonAnywhere WSGI entry point and deploy scripts
@@ -128,6 +150,16 @@ One YAML file per quest under `content/quests/act1` or `act2`, validated against
 - Diagram operations may only name nodes and edges declared in
   `content/diagrams/`.
 - Bonus quests never carry unique objective coverage.
+
+Practice exams live under `content/practice_exams/<exam code>/`, validated
+against `practice_exam.schema.json` and `practice_blueprint.schema.json` by
+`backend/content_pipeline/practice.py`. The linter requires the Opus 5.5
+authorship stamp, a `learn.microsoft.com/en-us/` source on every question, a
+skill copied verbatim from the blueprint, the blueprint's exact question count
+per domain, one answer for a single-answer question and a "Choose two" or
+"Choose three" stem for a multiple-answer one, no options that point at other
+options by position, and no stem repeated anywhere in the set. The bundle deals
+and relabels the options, so the authored position of the answer never ships.
 
 `python manage.py validate_content --partial` relaxes the coverage gate while a
 chapter is half written. `--require-all-chapters` is the release gate.

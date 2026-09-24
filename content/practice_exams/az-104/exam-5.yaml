@@ -1,0 +1,1230 @@
+# AZ-104 practice exam 5. Written by Opus 5.5 (claude-opus-5-5); every
+# question is grounded in, and cites, pages on learn.microsoft.com.
+id: az-104-5
+exam: AZ-104
+number: 5
+title: AZ-104 practice exam 5
+author: Opus 5.5
+model_id: claude-opus-5-5
+written_on: "2026-09-24"
+questions:
+  - id: q01
+    domain: AZ104-1
+    skill: Configure self-service password reset (SSPR)
+    kind: single
+    stem: >-
+      Veymark Logistics enabled self-service password reset (SSPR) for all
+      users and set the number of methods required to reset to one. A
+      helpdesk engineer who holds a Microsoft Entra administrator role
+      reports that the SSPR portal asks for two authentication methods,
+      while standard users are asked for only one. Other settings are
+      unchanged. What explains the behavior?
+    options:
+      - id: a
+        text: The engineer is not a member of the group that is enabled for SSPR.
+      - id: b
+        text: Password writeback is not deployed, so on-premises users need two methods.
+      - id: c
+        text: Accounts with an administrator role are subject to the strong two-gate policy regardless of the user policy.
+      - id: d
+        text: The engineer registered the Microsoft Authenticator app, which always counts as two methods.
+    answer: [c]
+    explanation: >-
+      SSPR checks whether an administrator role is assigned to the user. If
+      it is, the strong two-gate password policy is enforced, and the SSPR
+      tutorial notes that admins are required to use two authentication
+      methods to reset their password. This is expected behavior, not a
+      misconfiguration. If the engineer were outside the enabled scope, SSPR
+      would tell them to contact an administrator rather than prompt for
+      methods. Missing writeback affects users whose passwords are managed
+      on-premises, and Authenticator does not count as two methods.
+    sources:
+      - https://learn.microsoft.com/en-us/entra/identity/authentication/concept-sspr-howitworks
+      - https://learn.microsoft.com/en-us/entra/identity/authentication/tutorial-enable-sspr
+  - id: q02
+    domain: AZ104-1
+    skill: Configure self-service password reset (SSPR)
+    kind: multiple
+    stem: >-
+      Your company uses password hash synchronization with Microsoft Entra
+      Connect and has enabled SSPR with password writeback. The security
+      team wants to know which password operations will be written back to
+      on-premises Active Directory Domain Services. Which two operations are
+      written back? Each correct answer presents a complete solution. Choose
+      two.
+    options:
+      - id: a
+        text: An end user resets a forgotten password from the password reset portal.
+      - id: b
+        text: An administrator resets a user's password from the Microsoft 365 admin center.
+      - id: c
+        text: An administrator resets a user's password from the Microsoft Entra admin center.
+      - id: d
+        text: An end user resets their own password by using the Microsoft Graph API.
+      - id: e
+        text: An administrator resets a user's password by using PowerShell version 2.
+    answer: [a, c]
+    explanation: >-
+      The writeback article lists supported operations that include any
+      end-user self-service password reset that originates from the password
+      reset portal and any administrator-initiated end-user password reset
+      from the Microsoft Entra admin center. It explicitly lists as
+      unsupported an administrator reset from the Microsoft 365 admin center,
+      an end user resetting their own password with PowerShell version 1,
+      version 2, or the Microsoft Graph API, and an administrator reset from
+      PowerShell version 1 or 2.
+    sources:
+      - https://learn.microsoft.com/en-us/entra/identity/authentication/concept-sspr-writeback
+  - id: q03
+    domain: AZ104-1
+    skill: Configure self-service password reset (SSPR)
+    kind: single
+    stem: >-
+      Veymark Logistics wants to pilot SSPR for the members of two existing
+      Microsoft Entra security groups, Dispatch and Finance, before a wider
+      rollout. No other users should be enabled yet. You are configuring
+      the Password reset Properties page in the Microsoft Entra admin
+      center. What should you do?
+    options:
+      - id: a
+        text: Set Self service password reset enabled to Selected and add both the Dispatch and Finance groups.
+      - id: b
+        text: Create a pilot group that contains Dispatch and Finance as nested members, then set SSPR to Selected for the pilot group.
+      - id: c
+        text: Set Self service password reset enabled to All and use a Conditional Access policy to block other users.
+      - id: d
+        text: Enable SSPR for Dispatch now and add Finance through a second SSPR policy.
+    answer: [b]
+    explanation: >-
+      SSPR can be enabled for None, Selected, or All users. The tutorial notes
+      that you can only enable one Microsoft Entra group for SSPR in the admin
+      center, and that Microsoft Entra ID supports nested groups. A single
+      pilot group containing both groups meets the requirement. Adding two
+      groups directly is not possible, there is no second SSPR policy, and
+      setting All would enable every user in the tenant, which the pilot
+      must avoid.
+    sources:
+      - https://learn.microsoft.com/en-us/entra/identity/authentication/tutorial-enable-sspr
+  - id: q04
+    domain: AZ104-1
+    skill: Assign roles at different scopes
+    kind: single
+    stem: >-
+      You need to grant the Billing Reader role to an auditor at the
+      management group named ops-mg by using the Azure CLI. Which value
+      should you pass to the --scope parameter of az role assignment create?
+    options:
+      - id: a
+        text: /subscriptions/{subscriptionId}/managementGroups/ops-mg
+      - id: b
+        text: /managementGroups/ops-mg
+      - id: c
+        text: /providers/Microsoft.Authorization/managementGroups/ops-mg
+      - id: d
+        text: /providers/Microsoft.Management/managementGroups/ops-mg
+    answer: [d]
+    explanation: >-
+      The scope format for a management group is
+      /providers/Microsoft.Management/managementGroups/{managementGroupName},
+      and the CLI article shows exactly this form for a management group
+      assignment, including a Billing Reader example. Management groups sit
+      above subscriptions, so a path under /subscriptions is wrong. The
+      Microsoft.Authorization namespace is used for role assignment and
+      definition IDs, not for the management group itself, and a path
+      without the provider segment is not a valid scope.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/role-assignments-cli
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/scope-overview
+  - id: q05
+    domain: AZ104-1
+    skill: Assign roles at different scopes
+    kind: single
+    stem: >-
+      Veymark Logistics has 12 production subscriptions under a management
+      group named Production, and more subscriptions will be added to that
+      management group next quarter. The operations team must be able to
+      manage virtual machines in all current and future production
+      subscriptions, but not in development subscriptions that sit under a
+      different management group. You want to use as few role assignments
+      as possible. What should you do?
+    options:
+      - id: a
+        text: Assign Virtual Machine Contributor to the team at the Production management group.
+      - id: b
+        text: Assign Virtual Machine Contributor to the team at the Tenant root group.
+      - id: c
+        text: Assign Virtual Machine Contributor to the team on each of the 12 subscriptions.
+      - id: d
+        text: Create an Azure Policy assignment at the Production management group that grants the team access.
+    answer: [a]
+    explanation: >-
+      Role assignments at a management group are inherited by the
+      subscriptions within it, and management groups let you create one
+      assignment that applies to all subscriptions moved under the group. A
+      single assignment at Production covers current and future
+      subscriptions. The root management group applies to every resource in
+      the directory, including development. Per-subscription assignments
+      need 12 assignments and miss future subscriptions. Azure Policy
+      governs resource compliance and does not grant access.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/governance/management-groups/overview
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/scope-overview
+  - id: q06
+    domain: AZ104-1
+    skill: Assign roles at different scopes
+    kind: single
+    stem: >-
+      You create a custom role that includes DataActions for reading blob
+      data. The role definition lists the management group Logistics-mg as
+      its assignable scope. When you try to assign the role at Logistics-mg,
+      the assignment fails. The requirement is to let a data team read blobs
+      in the subscriptions under Logistics-mg. What should you do?
+    options:
+      - id: a
+        text: Move the role definition's assignable scope to the Tenant root group and assign it there.
+      - id: b
+        text: Remove the DataActions and assign the role at Logistics-mg.
+      - id: c
+        text: Assign the custom role at the scope of each subscription under Logistics-mg.
+      - id: d
+        text: Add a second management group to the role's assignable scopes and retry.
+    answer: [c]
+    explanation: >-
+      Custom roles with DataActions can't be assigned at the management group
+      scope. A custom role whose assignable scope is a management group is
+      still available for assignment on any subscription, resource group, or
+      resource under that group, so assigning it per subscription works.
+      Moving it to the root group does not lift the restriction. Removing
+      DataActions would remove the blob read permission. A new role can list
+      only one management group in its assignable scopes.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/governance/management-groups/overview
+  - id: q07
+    domain: AZ104-1
+    skill: Manage subscriptions
+    kind: multiple
+    stem: >-
+      After an acquisition, Veymark Logistics will transfer an Azure
+      subscription from the acquired company's Microsoft Entra directory to
+      its own directory. The subscription contains VMs, storage accounts
+      accessed by using account keys, and many Azure RBAC role assignments.
+      Which two outcomes should you plan for? Each correct answer presents
+      part of the solution. Choose two.
+    options:
+      - id: a
+        text: All Azure role assignments are permanently deleted and must be re-created in the target directory.
+      - id: b
+        text: Role assignments are automatically remapped to users with matching names in the target directory.
+      - id: c
+        text: Storage account access keys continue to work after the transfer until you rotate them.
+      - id: d
+        text: Storage account access keys are regenerated automatically during the transfer.
+      - id: e
+        text: Custom roles are copied to the target directory with their assignments.
+    answer: [a, c]
+    explanation: >-
+      When a subscription moves to a different Microsoft Entra directory, all
+      role assignments and custom roles are permanently deleted and must be
+      re-created after mapping principals in the target directory. Users
+      from the source can keep access through other methods such as storage
+      access keys, which keep working until you rotate them. Nothing is
+      remapped automatically, keys are not regenerated by the transfer, and
+      custom roles are deleted, not copied.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/role-based-access-control/transfer-subscription
+  - id: q08
+    domain: AZ104-1
+    skill: Manage subscriptions
+    kind: single
+    stem: >-
+      An administrator holds the Owner role on a subscription only through
+      inheritance from its current parent management group, Legacy-mg. She
+      has the Contributor role on the target management group, Shared-mg.
+      Her attempt to move the subscription to Shared-mg is not allowed. You
+      must enable the move without granting her more rights on Shared-mg.
+      What should you do?
+    options:
+      - id: a
+        text: Assign her the Management Group Reader role on Shared-mg.
+      - id: b
+        text: Assign her the Owner role directly on the subscription.
+      - id: c
+        text: Assign her the Contributor role directly on the subscription.
+      - id: d
+        text: Assign her the User Access Administrator role on the Tenant root group.
+    answer: [b]
+    explanation: >-
+      If the Owner role on a subscription is inherited from the current
+      management group, you can move the subscription only to a management
+      group where you are Owner, because you would otherwise lose ownership.
+      If you are directly assigned the Owner role on the subscription, you
+      can move it to any management group where you have Contributor. Reader
+      roles give no write access, Contributor on the subscription lacks role
+      assignment write permission, and User Access Administrator does not
+      grant management group write.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/governance/management-groups/overview
+  - id: q09
+    domain: AZ104-1
+    skill: Configure resource locks
+    kind: single
+    stem: >-
+      A resource group named rg-temp contains six unlocked resources and one
+      storage account that has a Delete (CanNotDelete) lock. An engineer
+      runs a command to delete rg-temp. What is the result?
+    options:
+      - id: a
+        text: The six unlocked resources are deleted, and the storage account and resource group remain.
+      - id: b
+        text: The whole delete operation is blocked, and nothing is deleted.
+      - id: c
+        text: Everything is deleted because the lock applies only to the storage account, not to its resource group.
+      - id: d
+        text: The storage account data is deleted, but the storage account resource remains.
+    answer: [b]
+    explanation: >-
+      If you have a Delete lock on a resource and try to delete its resource
+      group, the lock blocks the whole delete operation. Even if the resource
+      group or other resources are unlocked, the deletion doesn't happen, and
+      a partial deletion isn't possible. The lock also applies to control
+      plane operations on the resource, so the resource group delete cannot
+      bypass it.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/lock-resources
+  - id: q10
+    domain: AZ104-1
+    skill: Apply and manage tags on resources
+    kind: single
+    stem: >-
+      You add the tag CostCenter=Freight to a resource group. A week later,
+      the finance team reports that the VMs and disks in the resource group
+      do not show the CostCenter tag in cost reports. You need the resources
+      to carry the resource group's tag automatically. What should you do?
+    options:
+      - id: a
+        text: Assign an Azure Policy definition that inherits the tag from the resource group.
+      - id: b
+        text: Wait up to 24 hours for tag inheritance to complete.
+      - id: c
+        text: Apply the tag at the management group so it cascades to resources.
+      - id: d
+        text: Grant the finance team the Tag Contributor role on the resource group.
+    answer: [a]
+    explanation: >-
+      Resources don't inherit the tags that you apply to a resource group or
+      a subscription. To apply tags from a subscription or resource group to
+      its resources, you assign policy definitions for tag compliance.
+      Waiting does not help because inheritance never occurs by itself. Tags
+      can't be applied to management groups at all, and Tag Contributor only
+      lets someone manage tags, it does not copy them.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/management/tag-resources
+  - id: q11
+    domain: AZ104-2
+    skill: Configure identity-based access for Azure Files
+    kind: single
+    stem: >-
+      Veymark Logistics enabled identity-based access on a storage account
+      for SMB Azure file shares. Members of a synced group named Planners
+      must be able to read, create, change, and delete files in the share
+      named routes, but must not be able to change NTFS permissions. Which
+      role should you assign to Planners on the share?
+    options:
+      - id: a
+        text: Storage File Data SMB Share Elevated Contributor
+      - id: b
+        text: Storage File Data SMB Share Reader
+      - id: c
+        text: Storage Account Contributor
+      - id: d
+        text: Storage File Data SMB Share Contributor
+    answer: [d]
+    explanation: >-
+      Storage File Data SMB Share Contributor grants read, write, and delete
+      access on files and directories in Azure Files. Elevated Contributor
+      adds modify-ACLs access, which Planners must not have. Share Reader
+      grants read access only. Storage Account Contributor is a management
+      role for the storage account resource and is not one of the
+      share-level roles for SMB data access.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/files/storage-files-identity-assign-share-level-permissions
+  - id: q12
+    domain: AZ104-2
+    skill: Configure identity-based access for Azure Files
+    kind: multiple
+    stem: >-
+      You enable Microsoft Entra Kerberos authentication for hybrid
+      identities on a storage account that hosts SMB file shares. Your
+      tenant has a Conditional Access policy that requires MFA for all cloud
+      apps. Users on Microsoft Entra joined Windows 11 devices must be able
+      to mount the shares. Which two actions should you perform on the
+      Microsoft Entra side? Each correct answer presents part of the
+      solution. Choose two.
+    options:
+      - id: a
+        text: Grant admin consent for the API permissions of the application registered for the storage account.
+      - id: b
+        text: Exclude the storage account's Microsoft Entra application from the MFA Conditional Access policy.
+      - id: c
+        text: Join the client devices to Microsoft Entra Domain Services.
+      - id: d
+        text: Enable Microsoft Entra Domain Services authentication on the same storage account.
+      - id: e
+        text: Remove the synced users from the Conditional Access policy scope.
+    answer: [a, b]
+    explanation: >-
+      After enabling Microsoft Entra Kerberos, you grant admin consent to the
+      new application named for the storage account (openid, profile, and
+      User.Read). Microsoft Entra Kerberos doesn't support MFA for Azure file
+      shares, so you must exclude the storage account app from MFA
+      Conditional Access policies, or mounting fails with system error 1327.
+      Clients must be Microsoft Entra joined or hybrid joined, not joined to
+      Domain Services. A storage account can use only one identity source.
+      Excluding users weakens security needlessly.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/files/storage-files-identity-auth-hybrid-identities-enable
+  - id: q13
+    domain: AZ104-2
+    skill: Configure identity-based access for Azure Files
+    kind: single
+    stem: >-
+      A storage account uses on-premises AD DS authentication for Azure
+      Files. A scheduled job runs under a group Managed Service Account
+      (gMSA) that is not synced to Microsoft Entra ID, and it must write to
+      every file share in the account. Windows ACLs on the folders already
+      grant the gMSA the correct rights. What should you configure?
+    options:
+      - id: a
+        text: Assign Storage File Data SMB Share Contributor to the gMSA on each share.
+      - id: b
+        text: Set a default share-level permission for all authenticated identities on the storage account.
+      - id: c
+        text: Assign Storage File Data SMB Share Contributor to the storage account's managed identity.
+      - id: d
+        text: Switch the identity source to Microsoft Entra Kerberos for cloud-only identities.
+    answer: [b]
+    explanation: >-
+      Identities tied to Active Directory that aren't syncing to Microsoft
+      Entra ID, including gMSAs, sMSAs, and computer accounts, can use a
+      default share-level permission. It applies to all file shares in the
+      storage account and removes the sync requirement, while Windows ACLs
+      still enforce granular permissions. You can't assign an RBAC role to an
+      identity that doesn't exist in Microsoft Entra ID. A managed identity
+      is unrelated to the job's SMB identity, and a gMSA is not a cloud-only
+      identity.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/files/storage-files-identity-assign-share-level-permissions
+  - id: q14
+    domain: AZ104-2
+    skill: Manage data by using Azure Storage Explorer and AzCopy
+    kind: single
+    stem: >-
+      A nightly script runs azcopy sync from a local folder to a blob
+      container. Files deleted from the local folder must also be deleted
+      from the container, and the script runs unattended, so no prompt can
+      be shown. Which flag should you add?
+    options:
+      - id: a
+        text: --delete-destination=prompt
+      - id: b
+        text: --compare-hash=MD5
+      - id: c
+        text: --delete-destination=true
+      - id: d
+        text: --overwrite=ifSourceNewer
+    answer: [c]
+    explanation: >-
+      Setting --delete-destination to true or prompt deletes files in the
+      destination that no longer exist in the source. With true, AzCopy
+      deletes without a prompt, which suits an unattended job. The prompt
+      value waits for input. --compare-hash changes how changes are detected
+      but does not delete anything, and --overwrite is a copy option that
+      never removes destination files. Enable blob soft delete before using
+      this flag to guard against accidental deletions.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-use-azcopy-blobs-synchronize
+  - id: q15
+    domain: AZ104-2
+    skill: Manage data by using Azure Storage Explorer and AzCopy
+    kind: single
+    stem: >-
+      You sign in with azcopy login and run azcopy copy to copy a container
+      from a partner's storage account to a Veymark Logistics storage
+      account. The partner's account is in a different Microsoft Entra
+      tenant. The copy fails with an authorization error, although your
+      identity has the correct data roles on your own account. Network
+      access is allowed on both accounts. What should you do?
+    options:
+      - id: a
+        text: Assign yourself the Owner role on your own storage account.
+      - id: b
+        text: Append a SAS token from the partner to the source URL in the command.
+      - id: c
+        text: Run the copy with the --s2s-preserve-access-tier=false flag.
+      - id: d
+        text: Replace azcopy copy with azcopy sync.
+    answer: [b]
+    explanation: >-
+      If you use Microsoft Entra authorization for both the source and the
+      destination, both accounts must belong to the same Microsoft Entra
+      tenant. You can instead append a SAS token to the source or destination
+      URL in each AzCopy command. Owner does not grant data access by itself
+      and would not fix the cross-tenant source. The access tier flag is for
+      premium block blob destinations, and sync has the same authorization
+      requirements.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-use-azcopy-blobs-copy
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-use-azcopy-v10
+  - id: q16
+    domain: AZ104-2
+    skill: Configure snapshots and soft delete for Azure Files
+    kind: single
+    stem: >-
+      A storage account has soft delete for file shares enabled with a
+      30-day retention period. A test share named scratch was deleted
+      yesterday and is now in a soft-deleted state. Compliance requires that
+      its data be removed permanently today, and soft delete must protect
+      the other shares afterward. What should you do?
+    options:
+      - id: a
+        text: Reduce the retention period to 1 day so the share expires tonight.
+      - id: b
+        text: Delete all snapshots of the scratch share, which purges the soft-deleted share.
+      - id: c
+        text: Apply a Delete lock to the storage account, then delete the share again.
+      - id: d
+        text: Undelete the share, disable soft delete, delete the share, and then re-enable soft delete.
+    answer: [d]
+    explanation: >-
+      To permanently delete a soft-deleted file share before its expiry
+      time, you must undelete the share, disable soft delete, and delete the
+      share again, then re-enable soft delete to protect other shares.
+      Changing the retention period does not help because shares deleted
+      before the update expire based on the retention period configured when
+      they were deleted. Snapshots are restored with the share on undelete,
+      and a lock blocks deletion instead of forcing it.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/files/storage-files-prevent-file-share-deletion
+  - id: q17
+    domain: AZ104-2
+    skill: Configure snapshots and soft delete for Azure Files
+    kind: single
+    stem: >-
+      A user accidentally overwrote a spreadsheet stored on an SMB Azure file
+      share that is mapped as a drive on her Windows computer. Share
+      snapshots are taken every night, and share soft delete is enabled. She
+      wants to recover last night's version of the single file herself. What
+      should she use?
+    options:
+      - id: a
+        text: The Previous Versions tab in File Explorer for the file or its folder.
+      - id: b
+        text: The Show deleted shares option to undelete the share.
+      - id: c
+        text: Blob versioning on the storage account.
+      - id: d
+        text: A point-in-time restore of the storage account.
+    answer: [a]
+    explanation: >-
+      Share snapshots are taken at the share level, but retrieval is
+      provided at the individual file level. On Windows, you can view SMB
+      share snapshots from the Previous Versions tab of a mounted share and
+      restore or copy an earlier version. Soft delete works only at the file
+      share level and recovers a deleted share, not an overwritten file. Blob
+      versioning applies to Blob Storage, not Azure Files.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/files/storage-snapshots-files
+      - https://learn.microsoft.com/en-us/azure/storage/files/storage-files-prevent-file-share-deletion
+  - id: q18
+    domain: AZ104-3
+    skill: Export a deployment as an Azure Resource Manager template or convert an Azure Resource Manager template to a Bicep file
+    kind: single
+    stem: >-
+      A resource group was deployed from a template six months ago. Since
+      then, engineers changed several settings manually in the portal. You
+      need a template that reflects the current configuration of three of
+      the ten resources in the group so you can reproduce them elsewhere.
+      Which export option should you use?
+    options:
+      - id: a
+        text: Save the template from the resource group's deployment history.
+      - id: b
+        text: Select the three resources in the resource group and use Export template.
+      - id: c
+        text: Run az bicep decompile against the original template file.
+      - id: d
+        text: Run a what-if deployment of the original template.
+    answer: [b]
+    explanation: >-
+      Exporting from a resource group or resource produces a snapshot of the
+      current state, including manual changes made after deployment, and
+      lets you select which resources to export. Saving from deployment
+      history returns the exact original template, shows only the state at
+      deployment time, and includes all resources for that deployment
+      without letting you pick a subset. Decompiling only changes the format
+      of the original template, and what-if does not produce a template.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/export-template-portal
+  - id: q19
+    domain: AZ104-3
+    skill: Export a deployment as an Azure Resource Manager template or convert an Azure Resource Manager template to a Bicep file
+    kind: single
+    stem: >-
+      You converted main.json to Bicep last week. The JSON template has
+      since been updated, and you must regenerate the Bicep file in the same
+      folder, replacing the existing main.bicep. Which command should you
+      run?
+    options:
+      - id: a
+        text: az bicep build --file main.json
+      - id: b
+        text: az bicep decompile --file main.json --force
+      - id: c
+        text: az bicep decompile-params --file main.json
+      - id: d
+        text: az group export --name rg-app > main.bicep
+    answer: [b]
+    explanation: >-
+      az bicep decompile --file main.json creates main.bicep in the same
+      directory, and if main.bicep already exists you use the --force switch
+      to overwrite it. The build command goes the other way, compiling Bicep
+      to JSON. decompile-params targets parameter files, not the template.
+      az group export outputs an ARM JSON template for a resource group, so
+      redirecting it to a .bicep file would not produce Bicep.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/decompile
+  - id: q20
+    domain: AZ104-3
+    skill: Export a deployment as an Azure Resource Manager template or convert an Azure Resource Manager template to a Bicep file
+    kind: single
+    stem: >-
+      You decompiled an ARM template to Bicep. The original template had a
+      parameter named Network.Hub.Prefix. When you deploy the new Bicep file
+      with the existing parameter file, the deployment reports that the
+      parameter Network.Hub.Prefix is not defined in the template. What is
+      the most likely cause?
+    options:
+      - id: a
+        text: Decompile drops every parameter that has a default value.
+      - id: b
+        text: The Bicep CLI was not installed, so the decompile ran in JSON compatibility mode.
+      - id: c
+        text: Bicep identifiers can't contain periods, so the decompiler renamed the parameter by using underscores.
+      - id: d
+        text: Parameter files can't be used with Bicep deployments.
+    answer: [c]
+    explanation: >-
+      Bicep identifiers, including parameter names, can contain only
+      letters, digits, and underscores. When an ARM template uses periods in
+      parameter names, the decompiler replaces them with underscores, so
+      Network.Hub.Prefix becomes Network_Hub_Prefix. You must review
+      decompiled names and update references in parameter files. Decompile
+      keeps parameters with defaults, as the page's example shows, and there
+      is no JSON compatibility mode.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/decompile
+  - id: q21
+    domain: AZ104-3
+    skill: Manage virtual machine disks
+    kind: single
+    stem: >-
+      A running VM uses a Premium-capable size and has a Standard HDD
+      managed data disk. You need to convert the data disk to Premium SSD by
+      using the Azure CLI. What should you do first?
+    options:
+      - id: a
+        text: Detach the data disk and create a snapshot.
+      - id: b
+        text: Deallocate the VM.
+      - id: c
+        text: Migrate the disk to Premium SSD v2.
+      - id: d
+        text: Convert the disk to an unmanaged disk.
+    answer: [b]
+    explanation: >-
+      Conversion requires a restart of the VM, and the CLI example
+      deallocates the VM before updating the disk SKU with az disk update,
+      then starts the VM. A snapshot is needed only for moves to Ultra Disk
+      or Premium SSD v2 from certain sources, not for Standard HDD to Premium
+      SSD. Premium SSD v2 is a different disk type from Premium SSD, and
+      disk type changes work only for managed disks. Note that a disk type
+      can be changed only twice per day.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-machines/disks-convert-types
+  - id: q22
+    domain: AZ104-3
+    skill: Manage virtual machine disks
+    kind: single
+    stem: >-
+      You used Create and attach a new disk on the Disks pane of a Windows
+      Server VM and saved the change. When you connect to the VM, the new
+      disk does not appear in File Explorer. What should you do?
+    options:
+      - id: a
+        text: Restart the VM so that the disk is detected.
+      - id: b
+        text: Change the disk host caching to Read/Write.
+      - id: c
+        text: Open Disk Management, initialize the disk, and create and format a new simple volume.
+      - id: d
+        text: Detach the disk and reattach it at a different LUN.
+    answer: [c]
+    explanation: >-
+      A newly attached empty data disk must be initialized inside the guest
+      OS. In Disk Management, Windows detects the uninitialized disk, you
+      initialize it, create a new simple volume, and format it so it appears
+      with a drive letter. A restart, a caching change, or a different LUN
+      does not create a partition or file system on an empty disk.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/virtual-machines/windows/attach-managed-disk-portal
+  - id: q23
+    domain: AZ104-3
+    skill: Create and manage an Azure Container Registry
+    kind: multiple
+    stem: >-
+      Veymark Logistics runs a Standard tier container registry. The
+      platform team lists five new requirements. Which two requirements can
+      be met only by moving the registry to the Premium tier? Each correct
+      answer presents a complete solution. Choose two.
+    options:
+      - id: a
+        text: Serve the same images and tags from registry replicas in three Azure regions.
+      - id: b
+        text: Restrict registry access to clients that connect through private endpoints.
+      - id: c
+        text: Send webhook notifications when images are pushed.
+      - id: d
+        text: Authenticate developers by using Microsoft Entra ID.
+      - id: e
+        text: Allow anonymous pull access for a public sample repository.
+    answer: [a, b]
+    explanation: >-
+      The SKU table shows geo-replication and private link with private
+      endpoints as supported only in Premium. Webhooks are available in all
+      tiers, with higher limits in higher tiers. Microsoft Entra
+      authentication integration is available in Basic, Standard, and
+      Premium. Anonymous pull access is supported in Standard and Premium,
+      so the current Standard registry already allows it.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/container-registry/container-registry-skus
+  - id: q24
+    domain: AZ104-3
+    skill: Create and manage an Azure Container Registry
+    kind: single
+    stem: >-
+      You must copy the official nginx image from Docker Hub into a registry
+      named veymarkacr. You are working in Azure Cloud Shell, which has no
+      Docker daemon. Your identity has the Container Registry Data Importer
+      and Data Reader role on the registry. Which command should you use?
+    options:
+      - id: a
+        text: az acr import --name veymarkacr --source docker.io/library/nginx:latest --image nginx:latest
+      - id: b
+        text: az acr build --registry veymarkacr --image nginx:latest .
+      - id: c
+        text: az acr replication create --registry veymarkacr --location westus
+      - id: d
+        text: docker pull nginx:latest followed by docker push veymarkacr.azurecr.io/nginx:latest
+    answer: [a]
+    explanation: >-
+      az acr import copies images into a registry without Docker commands
+      or a local Docker installation, and it copies all architectures in a
+      multi-architecture image. Official Docker Hub images are in the
+      library repository. The role named in the scenario is the one required
+      to trigger imports. az acr build builds an image from source code,
+      replication create adds a geo-replica, and docker pull and push need a
+      Docker daemon.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/container-registry/container-registry-import-images
+  - id: q25
+    domain: AZ104-3
+    skill: Map an existing custom DNS name to an App Service
+    kind: multiple
+    stem: >-
+      You need to map the root domain veymark-logistics.com, hosted at a
+      third-party DNS provider, to an App Service app. You want the domain
+      ownership to be verified to help prevent subdomain takeover. Which two
+      DNS records should you create? Each correct answer presents part of
+      the solution. Choose two.
+    options:
+      - id: a
+        text: An A record for host @ that points to the app's IP address.
+      - id: b
+        text: A CNAME record for host @ that points to the app's default host name.
+      - id: c
+        text: A TXT record for host asuid that contains the domain verification ID.
+      - id: d
+        text: A TXT record for host @ that contains the app's IP address.
+      - id: e
+        text: An MX record for host @ that points to the app's default host name.
+    answer: [a, c]
+    explanation: >-
+      For a root domain, App Service recommends an A record, not a CNAME,
+      because a CNAME must not be used for the root domain. The A record with
+      host @ points to the app's IP address shown in the Add custom domain
+      dialog. A TXT record with host asuid contains the domain verification
+      ID, which App Service uses to verify ownership and to help avoid
+      subdomain takeovers. A TXT record with an IP address or an MX record
+      plays no part in the mapping.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/app-service/app-service-web-tutorial-custom-domain
+  - id: q26
+    domain: AZ104-3
+    skill: Map an existing custom DNS name to an App Service
+    kind: single
+    stem: >-
+      A developer created an App Service app in an App Service plan on the
+      Free (F1) tier for a marketing page. You created the correct CNAME and
+      TXT records for www.veymark-logistics.com, but you cannot complete the
+      custom domain mapping for the app. What should you do?
+    options:
+      - id: a
+        text: Replace the CNAME record with an A record.
+      - id: b
+        text: Create the records in an Azure private DNS zone instead.
+      - id: c
+        text: Scale up the App Service plan to a paid tier.
+      - id: d
+        text: Buy an App Service Managed Certificate before adding the domain.
+    answer: [c]
+    explanation: >-
+      The prerequisites for mapping a custom domain state that the app's App
+      Service plan must be a paid tier, not the Free (F1) tier. Scaling up
+      the plan resolves the problem. A CNAME is the recommended record for a
+      subdomain, custom domains must be in a public DNS zone because private
+      DNS zones aren't supported, and App Service Managed Certificates are
+      free and issued after the domain is added, so none of those steps
+      helps.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/app-service/app-service-web-tutorial-custom-domain
+  - id: q27
+    domain: AZ104-3
+    skill: Configure backup for an App Service
+    kind: multiple
+    stem: >-
+      A web app runs in a Standard tier App Service plan and currently relies
+      only on the automatic backups that App Service creates. The operations
+      team has new requirements: backup files must be stored in a storage
+      account that the team controls so they can be downloaded, and the app's
+      large log folder under site\wwwroot must be left out of backups. Which
+      two actions should you perform? Each correct answer presents part of
+      the solution. Choose two.
+    options:
+      - id: a
+        text: Configure custom backups that use a storage account and container.
+      - id: b
+        text: >-
+          Create a _backup.filter file in the site\wwwroot folder that lists
+          the log folder.
+      - id: c
+        text: Change the automatic backup frequency and retention on the Backups page.
+      - id: d
+        text: Scale up the App Service plan to a Premium tier.
+      - id: e
+        text: Select Backup/restore over virtual network integration.
+    answer: [a, b]
+    explanation: >-
+      Automatic backups aren't downloadable, don't use your storage account,
+      and don't support partial backups. Custom backups require a storage
+      account, are downloadable as Azure Storage blobs, and support partial
+      backups. To exclude folders, you create a _backup.filter file in the
+      site\wwwroot folder that lists them. Automatic backup frequency
+      (hourly) and retention (30 days) aren't configurable. Backup is
+      supported in Basic, Standard, Premium, and Isolated tiers, so no
+      scale-up is needed. Backup over virtual network integration is only
+      for firewall-protected storage accounts.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/app-service/manage-backup
+  - id: q28
+    domain: AZ104-4
+    skill: Troubleshoot network connectivity
+    kind: single
+    stem: >-
+      Users cannot connect to a VM on TCP port 3389 from the on-premises
+      network. The VM has NSGs associated with both its subnet and its
+      network interface, and several rules use overlapping priorities. You
+      need to identify quickly which security rule is denying the traffic.
+      Which Network Watcher feature should you use?
+    options:
+      - id: a
+        text: Next hop
+      - id: b
+        text: IP flow verify
+      - id: c
+        text: Packet capture
+      - id: d
+        text: Connection monitor
+    answer: [b]
+    explanation: >-
+      IP flow verify checks whether a packet is allowed or denied to or from
+      a VM, based on NSG rules applied to the subnet or network interface and
+      Azure Virtual Network Manager admin rules. You supply direction,
+      protocol, local and remote IP, and ports, and it returns Access denied
+      or Access allowed with the name of the rule. Next hop diagnoses routing,
+      packet capture records traffic without naming rules, and Connection
+      monitor tracks connectivity over time.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/network-watcher/ip-flow-verify-overview
+  - id: q29
+    domain: AZ104-4
+    skill: Troubleshoot network connectivity
+    kind: single
+    stem: >-
+      Traffic from a VM to an on-premises subnet is being dropped. You
+      suspect a user-defined route is sending the traffic to a network
+      virtual appliance that is offline. You need to confirm the next hop
+      type for the destination IP and identify which route table contains
+      the route. What should you use?
+    options:
+      - id: a
+        text: Network Watcher next hop
+      - id: b
+        text: Network Watcher IP flow verify
+      - id: c
+        text: NSG diagnostics
+      - id: d
+        text: Azure Monitor Storage insights
+    answer: [a]
+    explanation: >-
+      Next hop returns the next hop type, IP address, and route table ID for
+      a destination IP. If the route comes from a user-defined route, it
+      returns the route table that has the route; otherwise it returns System
+      Route. A VirtualAppliance result would confirm the suspicion. IP flow
+      verify and NSG diagnostics evaluate security rules, not routes, and
+      Storage insights monitors storage accounts.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/network-watcher/next-hop-overview
+  - id: q30
+    domain: AZ104-4
+    skill: Configure private endpoints for Azure PaaS
+    kind: single
+    stem: >-
+      You create a private endpoint for the blob subresource of a storage
+      account in a VNet that uses Azure-provided DNS. VMs in the VNet still
+      resolve veymarkdata.blob.core.windows.net to a public IP address. You
+      need the existing name to resolve to the private endpoint's IP without
+      changing application connection strings. What should you do?
+    options:
+      - id: a
+        text: Create a private DNS zone named blob.core.windows.net and link it to the VNet.
+      - id: b
+        text: Create a private DNS zone named privatelink.blob.core.windows.net with the endpoint's A record and link it to the VNet.
+      - id: c
+        text: Create a private DNS zone named privatelink.file.core.windows.net and link it to the VNet.
+      - id: d
+        text: Enable a service endpoint for Microsoft.Storage on the subnet.
+    answer: [b]
+    explanation: >-
+      Azure creates a CNAME on public DNS that redirects the name to the
+      privatelink domain, so connection URLs don't change. The recommended
+      private DNS zone for the blob subresource is
+      privatelink.blob.core.windows.net, linked to the VNet so that the name
+      resolves to the private IP. Overriding a zone used for public
+      endpoints is not recommended, the file zone is for a different
+      subresource, and a service endpoint does not give the account a
+      private IP.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/private-link/private-endpoint-dns
+  - id: q31
+    domain: AZ104-4
+    skill: Configure private endpoints for Azure PaaS
+    kind: single
+    stem: >-
+      A general-purpose v2 storage account has a private endpoint for the
+      blob subresource. Application servers in the same VNet must also reach
+      Azure Files in that account over a private IP address, but file
+      traffic still uses the public endpoint. What should you do?
+    options:
+      - id: a
+        text: Add the file subresource to the existing blob private endpoint's DNS zone.
+      - id: b
+        text: Enable network policies on the private endpoint subnet.
+      - id: c
+        text: Create a second private endpoint that targets the file subresource.
+      - id: d
+        text: Peer the VNet with itself to extend the existing endpoint.
+    answer: [c]
+    explanation: >-
+      Each private endpoint connects to one target subresource. To access
+      more subresources within the same service, more private endpoints are
+      required, and for Azure Storage you need separate private endpoints to
+      access the file and blob subresources. DNS records alone cannot route
+      traffic to a subresource that has no endpoint, network policies add NSG
+      and UDR support but do not create connectivity, and self-peering is not
+      a thing.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/private-link/private-endpoint-overview
+  - id: q32
+    domain: AZ104-4
+    skill: Configure private endpoints for Azure PaaS
+    kind: single
+    stem: >-
+      A network engineer at Veymark Logistics creates a private endpoint to
+      an Azure SQL logical server that is owned by the data team. The
+      engineer has no RBAC permissions on the SQL server and used the manual
+      request method. The private endpoint shows a connection status of
+      Pending, and no traffic flows. What must happen next?
+    options:
+      - id: a
+        text: The engineer must restart the private endpoint's network interface.
+      - id: b
+        text: The data team, as owner of the private-link resource, must approve the connection.
+      - id: c
+        text: The engineer must assign a static IP address to the private endpoint.
+      - id: d
+        text: The engineer must delete and re-create the endpoint by using automatic approval.
+    answer: [b]
+    explanation: >-
+      With the manual request method, the private endpoint and its
+      connection are created in a Pending state, and the private-link
+      resource owner is responsible for approving the connection. Only
+      endpoints in an Approved state can send traffic. Automatic approval
+      requires the privateEndpointConnectionsApproval permission on the
+      resource, which the engineer lacks, so re-creating it would not help.
+      Restarting or changing IP settings does not affect approval.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/private-link/private-endpoint-overview
+  - id: q33
+    domain: AZ104-4
+    skill: Configure an internal or public load balancer
+    kind: single
+    stem: >-
+      Veymark Logistics runs a TCP-based order service on three VMs in a
+      VNet. The service must be reachable only from web servers in the same
+      VNet and from the on-premises network over a site-to-site VPN. It must
+      never be exposed to the internet. You need Layer 4 load balancing with
+      health probes. What should you deploy?
+    options:
+      - id: a
+        text: A Standard public load balancer with an NSG that blocks internet traffic
+      - id: b
+        text: A Basic internal load balancer
+      - id: c
+        text: A Standard internal load balancer with a private frontend IP address
+      - id: d
+        text: A Gateway load balancer chained to the VPN gateway
+    answer: [c]
+    explanation: >-
+      An internal load balancer distributes traffic inside a virtual network
+      and supports private connectivity scenarios such as reaching the
+      frontend from an on-premises network in a hybrid setup. A public load
+      balancer is for internet-facing traffic, so it adds unneeded exposure.
+      Basic Load Balancer was retired on September 30, 2025. Gateway Load
+      Balancer is for chaining network virtual appliances, not for fronting
+      an internal service.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/load-balancer/load-balancer-overview
+  - id: q34
+    domain: AZ104-4
+    skill: Configure an internal or public load balancer
+    kind: single
+    stem: >-
+      A Standard load balancer uses an HTTP health probe on port 80 with the
+      path /portal. The web app on each backend VM responds to /portal with
+      an HTTP 302 redirect to a sign-in page. All backend instances show as
+      unhealthy and no new connections are distributed. NSGs use the default
+      rules. What should you do?
+    options:
+      - id: a
+        text: Add an NSG rule that allows inbound traffic from 168.63.129.16.
+      - id: b
+        text: Change the probe path to an endpoint that returns HTTP 200, or use a TCP probe on the port.
+      - id: c
+        text: Increase the probe interval to 120 seconds.
+      - id: d
+        text: Add an inbound NAT rule for port 80 on each VM.
+    answer: [b]
+    explanation: >-
+      An HTTP or HTTPS probe fails when the endpoint returns any status code
+      other than 200, and is marked up only on a 200 response. A 302 redirect
+      therefore marks every instance down. Pointing the probe at a path that
+      returns 200, or using a TCP probe, fixes it. The AzureLoadBalancer
+      service tag permits probe traffic from 168.63.129.16 by default, a
+      longer interval does not change the response code, and NAT rules don't
+      affect health probes.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/load-balancer/load-balancer-custom-probe-overview
+  - id: q35
+    domain: AZ104-5
+    skill: Configure and interpret monitoring of virtual machines, storage accounts, and networks by using Azure Monitor Insights
+    kind: single
+    stem: >-
+      The Monitor view of a Windows VM shows CPU, network, and disk I/O
+      charts, but the operations team also needs guest-level data such as
+      memory used by processes inside the OS, plus recommended alert rules.
+      Nothing else has been configured on the VM. What should you do?
+    options:
+      - id: a
+        text: Enable boot diagnostics on the VM.
+      - id: b
+        text: Create a diagnostic setting on the VM to send host metrics to a Log Analytics workspace.
+      - id: c
+        text: Install the legacy Log Analytics agent and connect it to a workspace.
+      - id: d
+        text: Enable enhanced monitoring, which installs Azure Monitor Agent and collects guest metrics.
+    answer: [d]
+    explanation: >-
+      Host metrics such as CPU, network traffic, and disk I/O are collected
+      automatically. Guest metrics and logs require enhanced monitoring,
+      which installs Azure Monitor Agent on the VM, starts collecting a
+      default set of metrics, and creates a baseline set of recommended
+      alert rules. You can choose OpenTelemetry metrics or logs-based
+      metrics. Boot diagnostics does not collect guest performance data,
+      host metrics come from outside the guest, and the legacy agent is not
+      the current method.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/azure-monitor/vm/monitor-vm
+  - id: q36
+    domain: AZ104-5
+    skill: Configure and interpret monitoring of virtual machines, storage accounts, and networks by using Azure Monitor Insights
+    kind: single
+    stem: >-
+      Veymark Logistics has storage accounts in three subscriptions. An
+      administrator wants a single view of availability, end-to-end latency,
+      server latency, and capacity across the accounts, with drill-down
+      workbooks for failures. She asks what must be configured before she
+      can open Storage insights from Azure Monitor. What should you tell
+      her?
+    options:
+      - id: a
+        text: Nothing; Storage insights uses storage metrics that are collected by default.
+      - id: b
+        text: Create a diagnostic setting on each account that sends logs to one Log Analytics workspace.
+      - id: c
+        text: Enable classic Storage Analytics logging on every account.
+      - id: d
+        text: Install Azure Monitor Agent on a VM in each subscription.
+    answer: [a]
+    explanation: >-
+      Storage insights doesn't require you to enable or configure anything,
+      because storage metrics are collected by default. From Azure Monitor,
+      under Insights, Storage Accounts shows availability, latency, and
+      capacity across subscriptions, with Failures, Performance,
+      Availability, and Capacity workbooks for drill-down. There is no
+      charge to access the feature. Diagnostic settings, classic logging, and
+      agents are not prerequisites for this metrics-based view.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/storage/common/storage-insights-overview
+  - id: q37
+    domain: AZ104-5
+    skill: Configure and interpret monitoring of virtual machines, storage accounts, and networks by using Azure Monitor Insights
+    kind: single
+    stem: >-
+      The network team has configured Connection monitor tests in several
+      subscriptions. The team lead wants one place that shows the
+      reachability status of every test grouped by sources and destinations,
+      alongside the health of all deployed network resources, without
+      building a custom dashboard. What should the team lead use?
+    options:
+      - id: a
+        text: The Connectivity tab in Azure Monitor Network Insights
+      - id: b
+        text: Network Watcher packet capture
+      - id: c
+        text: A Log Analytics query against virtual network flow logs
+      - id: d
+        text: Azure Service Health
+    answer: [a]
+    explanation: >-
+      Azure Monitor Network Insights shows topology, health, and metrics for
+      all deployed network resources without requiring configuration. Its
+      Connectivity tab visualizes all tests configured through Connection
+      monitor for the selected subscriptions, grouped into Sources and
+      Destinations tiles with reachability status. Packet capture records
+      traffic on one VM, flow log queries need custom work and don't show
+      test status, and Service Health reports platform incidents.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/network-watcher/network-insights-overview
+  - id: q38
+    domain: AZ104-5
+    skill: Configure Azure Site Recovery for Azure resources
+    kind: single
+    stem: >-
+      You will replicate VMs that run in the East US region to West US by
+      using Azure Site Recovery. You are creating the Recovery Services
+      vault by following the Azure-to-Azure disaster recovery tutorial.
+      Which option should you choose for the vault region?
+    options:
+      - id: a
+        text: East US, in the same resource group as the VMs
+      - id: b
+        text: West US
+      - id: c
+        text: East US, next to the cache storage account
+      - id: d
+        text: Any region, because vault location does not matter for Azure VM replication
+    answer: [b]
+    explanation: >-
+      The tutorial says to create the Recovery Services vault in any region
+      except the source region from which you want to replicate VMs. East US
+      is the source, so it is ruled out, while West US is valid. The cache
+      storage account does live in the source region, but that is not where
+      the vault goes. The last option is wrong because the source region is
+      explicitly excluded.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/site-recovery/azure-to-azure-tutorial-enable-replication
+      - https://learn.microsoft.com/en-us/azure/site-recovery/azure-to-azure-architecture
+  - id: q39
+    domain: AZ104-5
+    skill: Configure Azure Site Recovery for Azure resources
+    kind: multiple
+    stem: >-
+      Replication for Azure VMs protected by Site Recovery fails because an
+      NSG on the source subnet denies all outbound internet traffic. You
+      will add outbound HTTPS rules on port 443 that use service tags rather
+      than IP addresses. Which two service tags are required for Site
+      Recovery replication? Each correct answer presents part of the
+      solution. Choose two.
+    options:
+      - id: a
+        text: AzureLoadBalancer
+      - id: b
+        text: Storage
+      - id: c
+        text: AzureSiteRecovery
+      - id: d
+        text: AzureTrafficManager
+      - id: e
+        text: VirtualNetwork
+    answer: [b, c]
+    explanation: >-
+      Replicated VMs need outbound connectivity. The Storage tag allows data
+      to be written from the VM to the cache storage account, and the
+      AzureSiteRecovery tag allows access to the Site Recovery service. The
+      required list also includes Microsoft Entra ID and Event Hubs tags,
+      which are not among the options. AzureLoadBalancer identifies health
+      probe traffic, AzureTrafficManager is for Traffic Manager probes, and
+      VirtualNetwork covers internal address space, none of which Site
+      Recovery needs.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/site-recovery/azure-to-azure-tutorial-enable-replication
+      - https://learn.microsoft.com/en-us/azure/site-recovery/azure-to-azure-architecture
+  - id: q40
+    domain: AZ104-5
+    skill: Configure Azure Site Recovery for Azure resources
+    kind: single
+    stem: >-
+      You enabled Site Recovery for a SQL Server VM by using the default
+      replication policy. The database team now requires app-consistent
+      recovery points every four hours so that failover does not depend on
+      crash recovery. What should you do?
+    options:
+      - id: a
+        text: Change the crash-consistent recovery point frequency to four hours.
+      - id: b
+        text: Nothing; the default policy already creates app-consistent snapshots every four hours.
+      - id: c
+        text: Add the VM to a replication group for multi-VM consistency.
+      - id: d
+        text: Modify the replication policy to set an app-consistent snapshot frequency of four hours, below the recovery point retention.
+    answer: [d]
+    explanation: >-
+      The default replication policy keeps recovery points for one day and
+      sets the app-consistent snapshot frequency to zero hours, which means
+      disabled. You set a frequency in the replication policy, and it should
+      always be less than the recovery point retention. Crash-consistent
+      points are created every five minutes and that setting can't be
+      modified. Multi-VM consistency shares recovery points across VMs but
+      does not create app-consistent snapshots for a single VM.
+    sources:
+      - https://learn.microsoft.com/en-us/azure/site-recovery/azure-to-azure-architecture
