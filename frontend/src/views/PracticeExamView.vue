@@ -305,7 +305,6 @@ onBeforeUnmount(() => clearInterval(timer))
         </div>
       </section>
 
-      <PracticeDisclosure compact />
 
       <!-- Thumb-reach controls: pinned to the bottom of the screen on every width. -->
       <nav
@@ -419,7 +418,6 @@ onBeforeUnmount(() => clearInterval(timer))
         </div>
       </section>
 
-      <PracticeDisclosure compact />
 
       <section class="space-y-3" aria-labelledby="review-title">
         <div class="flex flex-wrap items-center justify-between gap-2">
@@ -500,7 +498,6 @@ onBeforeUnmount(() => clearInterval(timer))
         </p>
       </header>
 
-      <PracticeDisclosure />
 
       <section class="grid gap-3 sm:grid-cols-2">
         <div class="card flex flex-col gap-3 p-4 sm:p-5">
@@ -542,5 +539,7 @@ onBeforeUnmount(() => clearInterval(timer))
         </ul>
       </section>
     </template>
+
+    <PracticeDisclosure />
   </div>
 </template>
