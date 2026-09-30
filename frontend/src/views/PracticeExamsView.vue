@@ -32,7 +32,6 @@ onMounted(() => practice.loadIndex())
       </p>
     </header>
 
-    <PracticeDisclosure />
 
     <p v-if="practice.error" class="card border-broken/40 p-4 text-sm text-broken" role="alert">
       {{ practice.error }}
@@ -92,5 +91,7 @@ onMounted(() => practice.loadIndex())
         </li>
       </ul>
     </section>
+
+    <PracticeDisclosure />
   </div>
 </template>
