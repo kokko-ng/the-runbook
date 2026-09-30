@@ -36,3 +36,37 @@ class SaveGame(models.Model):
     @property
     def reputation(self) -> int:
         return int(self.blob.get("rep", 0))
+
+
+class PracticeProgress(models.Model):
+    """One server-side copy of a player's practice exam attempts and scores.
+
+    Kept apart from the game save for the same reason the browser keeps them
+    under separate keys: a practice exam can never disturb reputation or
+    progress. Like the save, the blob is stored as the browser sent it.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="practice_progress"
+    )
+    blob = models.JSONField(default=dict)
+    client_updated_at = models.DateTimeField(
+        help_text="When the browser last wrote this record. Drives last-write-wins."
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "practice exam progress"
+        verbose_name_plural = "practice exam progress"
+
+    def __str__(self) -> str:
+        return f"practice progress for {self.user.username}"
+
+    @property
+    def attempts(self) -> int:
+        return len(self.blob.get("attempts") or {})
+
+    @property
+    def scores(self) -> int:
+        return sum(len(entries) for entries in (self.blob.get("history") or {}).values())

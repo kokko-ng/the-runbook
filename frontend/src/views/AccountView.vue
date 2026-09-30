@@ -49,7 +49,8 @@ onMounted(() => account.refresh())
       <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Account</h1>
       <p class="text-sm text-ink-600 dark:text-ink-300">
         Entirely optional. The game is playable without one, and an account exists for exactly one
-        reason: carrying your save to another device.
+        reason: carrying your save and practice exam progress to another device. While you are
+        signed in, practice exam answers and scores sync on their own.
       </p>
     </header>
 
@@ -62,10 +63,10 @@ onMounted(() => account.refresh())
       </div>
       <div class="flex flex-wrap gap-2">
         <button class="btn-quiet" type="button" :disabled="account.busy" @click="account.push()">
-          Upload this device's save
+          Upload this device's progress
         </button>
         <button class="btn-quiet" type="button" :disabled="account.busy" @click="account.pull()">
-          Download the server save
+          Download the server progress
         </button>
         <button class="btn-quiet" type="button" :disabled="account.busy" @click="account.signOut()">
           Sign out

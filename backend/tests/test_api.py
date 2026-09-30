@@ -6,7 +6,7 @@ import pytest
 from django.test import Client
 
 from analytics.models import AnalyticsEvent
-from saves.models import SaveGame
+from saves.models import PracticeProgress, SaveGame
 
 SAVE = {
     "schema_version": 1,
@@ -116,6 +116,51 @@ def test_deleting_a_save(client_signed_in):
     put(client_signed_in, "/api/save", SAVE)
     assert client_signed_in.delete("/api/save").status_code == 200
     assert SaveGame.objects.count() == 0
+
+
+PRACTICE = {
+    "updated_at": "2026-09-30T10:00:00Z",
+    "blob": {
+        "attempts": {"az-104-exam-1": {"exam_id": "az-104-exam-1", "answers": {"q1": ["b"]}}},
+        "history": {"az-104-exam-1": [{"mode": "exam", "percent": 72, "passed": False}]},
+    },
+}
+
+
+@pytest.mark.django_db
+def test_practice_progress_needs_an_account(client):
+    assert client.get("/api/practice").status_code == 401
+    assert put(client, "/api/practice", PRACTICE).status_code == 401
+
+
+@pytest.mark.django_db
+def test_practice_progress_round_trip(client_signed_in):
+    assert client_signed_in.get("/api/practice").status_code == 404
+    assert put(client_signed_in, "/api/practice", PRACTICE).status_code == 200
+    stored = client_signed_in.get("/api/practice").json()
+    assert stored["blob"]["attempts"]["az-104-exam-1"]["answers"] == {"q1": ["b"]}
+    record = PracticeProgress.objects.get()
+    assert (record.attempts, record.scores) == (1, 1)
+
+
+@pytest.mark.django_db
+def test_practice_progress_is_kept_apart_from_the_save(client_signed_in):
+    put(client_signed_in, "/api/save", SAVE)
+    put(client_signed_in, "/api/practice", PRACTICE)
+    assert client_signed_in.get("/api/save").json()["blob"]["rep"] == 62
+    client_signed_in.delete("/api/practice")
+    assert PracticeProgress.objects.count() == 0
+    assert SaveGame.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_older_practice_progress_is_refused_and_the_newer_copy_comes_back(client_signed_in):
+    put(client_signed_in, "/api/practice", PRACTICE)
+    stale = {"updated_at": "2026-09-30T09:00:00Z", "blob": {"attempts": {}, "history": {}}}
+    response = put(client_signed_in, "/api/practice", stale)
+    assert response.status_code == 409
+    assert "az-104-exam-1" in response.json()["blob"]["attempts"]
+    assert PracticeProgress.objects.count() == 1
 
 
 @pytest.mark.django_db

@@ -1,7 +1,8 @@
 """The whole HTTP API.
 
 It is deliberately small. The game runs entirely in the browser; the server only
-holds optional accounts, one save blob per account, and anonymous telemetry.
+holds optional accounts, one save blob per account, a copy of each account's
+practice exam progress, and anonymous telemetry.
 There are no entitlement checks anywhere because there is nothing to buy.
 """
 
@@ -26,7 +27,7 @@ from ninja.throttling import AnonRateThrottle, AuthRateThrottle
 
 from analytics.models import AnalyticsEvent
 from feedback.models import Feedback
-from saves.models import SaveGame
+from saves.models import PracticeProgress, SaveGame
 
 User = get_user_model()
 
@@ -81,6 +82,16 @@ class SavePayload(Schema):
 
 class SaveOut(Schema):
     schema_version: int
+    updated_at: datetime
+    blob: dict
+
+
+class PracticePayload(Schema):
+    updated_at: datetime
+    blob: dict
+
+
+class PracticeOut(Schema):
     updated_at: datetime
     blob: dict
 
@@ -237,6 +248,51 @@ def put_save(request, payload: SavePayload):
 @api.delete("/save", auth=django_auth, tags=["saves"])
 def delete_save(request):
     SaveGame.objects.filter(user=request.user).delete()
+    return {"deleted": True}
+
+
+# --------------------------------------------------------------------------
+# practice exams
+# --------------------------------------------------------------------------
+
+
+@api.get("/practice", response={200: PracticeOut, 404: dict}, auth=django_auth,
+         tags=["practice"])
+def get_practice(request):
+    record = PracticeProgress.objects.filter(user=request.user).first()
+    if record is None:
+        return Status(404, {"detail": "No practice exam progress on the server yet."})
+    return Status(200, PracticeOut(updated_at=record.client_updated_at, blob=record.blob))
+
+
+@api.put("/practice", response={200: PracticeOut, 409: PracticeOut}, auth=django_auth,
+         tags=["practice"], throttle=[AuthRateThrottle("1200/h")])
+def put_practice(request, payload: PracticePayload):
+    """Store practice exam attempts and scores, last write wins like the save.
+
+    A push older than the stored copy is refused with the stored copy in a 409;
+    the browser merges the two score histories and pushes again.
+    """
+    if len(str(payload.blob)) > MAX_BLOB_BYTES:
+        raise HttpError(413, "Practice exam progress is too large.")
+    incoming = payload.updated_at
+    if timezone.is_naive(incoming):
+        incoming = timezone.make_aware(incoming, UTC)
+
+    record = PracticeProgress.objects.filter(user=request.user).first()
+    if record and record.client_updated_at > incoming:
+        return Status(409, PracticeOut(updated_at=record.client_updated_at, blob=record.blob))
+    if record is None:
+        record = PracticeProgress(user=request.user)
+    record.blob = payload.blob
+    record.client_updated_at = incoming
+    record.save()
+    return Status(200, PracticeOut(updated_at=record.client_updated_at, blob=record.blob))
+
+
+@api.delete("/practice", auth=django_auth, tags=["practice"])
+def delete_practice(request):
+    PracticeProgress.objects.filter(user=request.user).delete()
     return {"deleted": True}
 
 

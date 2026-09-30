@@ -4,6 +4,7 @@ import {
   formatClock,
   isAnswered,
   isExpired,
+  mergePractice,
   reveal,
   score,
   startAttempt,
@@ -12,7 +13,7 @@ import {
   toggleFlag,
   toggleOption,
 } from '../src/practice'
-import type { PracticeExam, PracticeQuestion } from '../src/practice'
+import type { Attempt, PracticeExam, PracticeQuestion, PracticeRecord } from '../src/practice'
 
 const NOW = Date.UTC(2026, 8, 24, 9, 0, 0)
 
@@ -116,5 +117,48 @@ describe('practice exams', () => {
     expect(formatClock(100 * 60_000)).toBe('1:40:00')
     expect(formatClock(59_500)).toBe('1:00')
     expect(formatClock(9 * 60_000 + 5_000)).toBe('9:05')
+  })
+})
+
+describe('mergePractice', () => {
+  const attemptAt = (updated_at: number, answer: string): Attempt => ({
+    ...startAttempt(exam, 'study', NOW),
+    answers: { q01: [answer] },
+    updated_at,
+  })
+  const entry = (submitted_at: number, percent: number) => ({
+    mode: 'exam' as const,
+    percent,
+    passed: percent >= 70,
+    submitted_at,
+  })
+  const record = (partial: Partial<PracticeRecord>): PracticeRecord => ({
+    attempts: {},
+    history: {},
+    discarded: {},
+    ...partial,
+  })
+
+  it('keeps the more recently touched attempt for each exam', () => {
+    const local = record({ attempts: { [exam.id]: attemptAt(NOW + 10, 'a') } })
+    const remote = record({ attempts: { [exam.id]: attemptAt(NOW + 20, 'b') } })
+    expect(mergePractice(local, remote).attempts[exam.id].answers.q01).toEqual(['b'])
+    expect(mergePractice(remote, local).attempts[exam.id].answers.q01).toEqual(['b'])
+  })
+
+  it('unions score histories without duplicates, newest first', () => {
+    const local = record({ history: { [exam.id]: [entry(NOW + 2, 80), entry(NOW, 60)] } })
+    const remote = record({ history: { [exam.id]: [entry(NOW + 1, 70), entry(NOW, 60)] } })
+    expect(mergePractice(local, remote).history[exam.id].map((e) => e.percent)).toEqual([
+      80, 70, 60,
+    ])
+  })
+
+  it('does not bring back an attempt discarded after it was last touched', () => {
+    const local = record({ discarded: { [exam.id]: NOW + 30 } })
+    const remote = record({ attempts: { [exam.id]: attemptAt(NOW + 20, 'b') } })
+    expect(mergePractice(local, remote).attempts).toEqual({})
+    const restarted = record({ attempts: { [exam.id]: attemptAt(NOW + 40, 'c') } })
+    expect(mergePractice(local, restarted).attempts[exam.id].answers.q01).toEqual(['c'])
   })
 })

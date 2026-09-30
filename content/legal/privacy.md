@@ -1,6 +1,6 @@
 # Privacy
 
-Last updated 24 September 2026.
+Last updated 30 September 2026.
 
 The Runbook is a free study aid. It is built to need as little of your data as
 possible, and this page is short because there is not much to describe.
@@ -20,6 +20,10 @@ nowhere to send one.
 uploaded so you can continue on another device. It contains your position in the
 story, reputation, skill points, perks, the state of the architecture diagram and
 the choices you have made. Nothing else.
+
+**Your practice exam progress:** when you are signed in, your practice exam
+answers, flags, in-progress attempts and scores are uploaded too, kept apart
+from the save, so an exam started on one device can be finished on another.
 
 **Anonymous gameplay events:** which encounter was resolved and whether the
 answer was right or wrong, tagged with a random identifier your browser generates
@@ -44,7 +48,7 @@ which include IP addresses, and holds them under its own retention policy.
 A session cookie and a CSRF cookie, both strictly necessary and both set only
 once you sign in or submit a form. Local storage holds your save, a theme
 preference, the random analytics identifier, and your practice exam answers and
-scores, which never leave the browser. There are no advertising,
+scores, which leave the browser only if you sign in. There are no advertising,
 tracking or third-party cookies, and no third-party scripts on any page.
 
 ## Why it is collected
@@ -56,7 +60,7 @@ parties. No profiling and no automated decisions are made about you.
 
 ## How long it is kept
 
-Account and save data are kept until you delete the account or ask for it to be
+Account, save and practice exam data are kept until you delete the account or ask for it to be
 removed. Anonymous events are kept for up to 24 months, and feedback for as long
 as the scenario it refers to is still in the game. You can wipe the local
 save at any time from the Account page.
@@ -68,7 +72,8 @@ personal data held about you, ask for it to be corrected, and withdraw consent b
 asking for the account to be deleted. Requests go through the project's issue
 tracker at https://github.com/kokko-ng/the-runbook, which is the contact channel
 for this project. Since the only identifier held is a username, quote it in the
-request. Account deletion removes the username, password hash and save.
+request. Account deletion removes the username, password hash, save and practice exam
+progress.
 
 ## Children
 

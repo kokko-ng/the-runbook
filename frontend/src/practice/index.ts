@@ -10,6 +10,9 @@
 export const PRACTICE_AUTHOR = 'Opus 5.5'
 export const PRACTICE_MODEL_ID = 'claude-opus-5-5'
 
+/** How many past scores to keep per exam. */
+export const HISTORY_LIMIT = 10
+
 export interface PracticeDomain {
   id: string
   title: string
@@ -89,6 +92,8 @@ export interface Attempt {
   revealed: string[]
   flagged: string[]
   submitted_at: number | null
+  /** Epoch ms of the last change, stamped by the store so two devices can be merged. */
+  updated_at?: number
 }
 
 export interface DomainScore {
@@ -223,4 +228,54 @@ export function formatClock(ms: number): string {
   const s = seconds % 60
   const mm = String(m).padStart(h ? 2 : 1, '0')
   return `${h ? `${h}:` : ''}${mm}:${String(s).padStart(2, '0')}`
+}
+
+/** Everything a player has done in the practice exams, as stored and synced. */
+export interface PracticeRecord {
+  attempts: Record<string, Attempt>
+  history: Record<string, HistoryEntry[]>
+  /** Epoch ms each exam's attempt was discarded, so a sync cannot bring it back. */
+  discarded: Record<string, number>
+}
+
+/** When an attempt last changed. Older saves carry no stamp, so fall back. */
+export function attemptStamp(attempt: Attempt): number {
+  return Math.max(attempt.updated_at ?? 0, attempt.submitted_at ?? 0, attempt.started_at)
+}
+
+/**
+ * Combine the practice records of two devices. Scores are append-only, so the
+ * histories are unioned; for each exam the more recently touched attempt wins,
+ * unless that exam was discarded after it. Ties go to `local`.
+ */
+export function mergePractice(local: PracticeRecord, remote: PracticeRecord): PracticeRecord {
+  const discarded: Record<string, number> = { ...remote.discarded }
+  for (const [id, at] of Object.entries(local.discarded)) {
+    discarded[id] = Math.max(at, discarded[id] ?? 0)
+  }
+
+  const attempts: Record<string, Attempt> = {}
+  for (const id of new Set([...Object.keys(local.attempts), ...Object.keys(remote.attempts)])) {
+    const mine = local.attempts[id]
+    const theirs = remote.attempts[id]
+    const winner =
+      mine && theirs ? (attemptStamp(theirs) > attemptStamp(mine) ? theirs : mine) : mine ?? theirs
+    if (winner && attemptStamp(winner) > (discarded[id] ?? -Infinity)) attempts[id] = winner
+  }
+
+  const history: Record<string, HistoryEntry[]> = {}
+  for (const id of new Set([...Object.keys(local.history), ...Object.keys(remote.history)])) {
+    const seen = new Set<string>()
+    history[id] = [...(local.history[id] ?? []), ...(remote.history[id] ?? [])]
+      .filter((entry) => {
+        const key = `${entry.submitted_at}:${entry.mode}:${entry.percent}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      .sort((a, b) => b.submitted_at - a.submitted_at)
+      .slice(0, HISTORY_LIMIT)
+  }
+
+  return { attempts, history, discarded }
 }
