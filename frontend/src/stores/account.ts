@@ -11,6 +11,7 @@ import { computed, ref } from 'vue'
 
 import { ApiError, api } from '@/lib/api'
 import { useGameStore } from './game'
+import { usePracticeStore } from './practice'
 import { useUiStore } from './ui'
 
 export type SyncState = 'idle' | 'syncing' | 'synced' | 'error' | 'offline'
@@ -76,8 +77,20 @@ export const useAccountStore = defineStore('account', () => {
     })
   }
 
-  /** Send the local save up. Refuses politely if the server holds a newer one. */
+  /** Send the local save and practice exam progress up. */
   async function push(): Promise<void> {
+    await pushSave()
+    await usePracticeStore().push()
+  }
+
+  /** Bring down whatever the server holds that this device does not. */
+  async function pull(): Promise<void> {
+    await pullSave()
+    await usePracticeStore().pull()
+  }
+
+  /** Send the local save up. Refuses politely if the server holds a newer one. */
+  async function pushSave(): Promise<void> {
     const game = useGameStore()
     if (!signedIn.value || !game.save) return
     syncState.value = 'syncing'
@@ -88,7 +101,7 @@ export const useAccountStore = defineStore('account', () => {
       game.dirty = false
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 409) {
-        await pull()
+        await pullSave()
         useUiStore().toast('A newer save from another device came down instead.', 'info')
         return
       }
@@ -97,7 +110,7 @@ export const useAccountStore = defineStore('account', () => {
   }
 
   /** Take the server save if it is newer than the local one. */
-  async function pull(): Promise<void> {
+  async function pullSave(): Promise<void> {
     const game = useGameStore()
     if (!signedIn.value) return
     syncState.value = 'syncing'
@@ -113,7 +126,7 @@ export const useAccountStore = defineStore('account', () => {
       lastSyncedAt.value = new Date().toISOString()
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 404) {
-        await push()
+        await pushSave()
         return
       }
       syncState.value = 'error'

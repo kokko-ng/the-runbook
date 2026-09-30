@@ -6,6 +6,7 @@
  */
 
 import type { SaveState } from '@/engine'
+import type { PracticeStore } from './storage'
 
 export interface Me {
   username: string | null
@@ -70,6 +71,12 @@ export const api = {
         updated_at: save.updated_at,
         blob: save,
       }),
+    }),
+  getPractice: () => request<{ updated_at: string; blob: PracticeStore }>('/api/practice'),
+  putPractice: (practice: PracticeStore) =>
+    request<{ updated_at: string; blob: PracticeStore }>('/api/practice', {
+      method: 'PUT',
+      body: JSON.stringify({ updated_at: practice.updated_at, blob: practice }),
     }),
   deleteSave: () => request<{ deleted: boolean }>('/api/save', { method: 'DELETE' }),
   feedback: (body: { category: string; message: string; anonymous_id: string; context: unknown }) =>

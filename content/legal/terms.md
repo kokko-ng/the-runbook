@@ -1,6 +1,6 @@
 # Terms of use
 
-Last updated 24 September 2026.
+Last updated 30 September 2026.
 
 ## The short version
 
@@ -45,7 +45,8 @@ the content is held back behind one.
 
 ## Accounts
 
-An account is optional and exists only to sync a save between devices. You are
+An account is optional and exists only to sync a save and practice exam progress
+between devices. You are
 responsible for keeping your password safe. Because no email address is
 collected, a forgotten password cannot be reset by self-service; it can only be
 reset by hand on request through the issue tracker, and only where account

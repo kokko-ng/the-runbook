@@ -1,22 +1,55 @@
 import { defineStore } from 'pinia'
 import { markRaw, ref, shallowRef } from 'vue'
 
-import { loadPractice, persistPractice } from '@/lib/storage'
+import { ApiError, api } from '@/lib/api'
+import { loadPractice, normalizePractice, persistPractice } from '@/lib/storage'
 import type { PracticeStore } from '@/lib/storage'
 import {
+  HISTORY_LIMIT,
+  mergePractice,
   score,
   startAttempt,
   submit as submitAttempt,
 } from '@/practice'
-import type { Attempt, AttemptMode, PracticeExam, PracticeIndex } from '@/practice'
+import type { Attempt, AttemptMode, PracticeExam, PracticeIndex, PracticeRecord } from '@/practice'
+import { useAccountStore } from './account'
 
-/** How many past scores to keep per exam. */
-const HISTORY_LIMIT = 10
+/** Answers arrive a click at a time; wait for a pause before sending them up. */
+const PUSH_DELAY_MS = 2000
+/** After a failed push (offline, server down), try again this much later. */
+const RETRY_DELAY_MS = 30_000
+
+/** An ISO stamp later than now and than every stamp given, so it always wins. */
+function stampAfter(...stamps: string[]): string {
+  const floor = Math.max(0, ...stamps.map((stamp) => Date.parse(stamp) || 0))
+  return new Date(Math.max(Date.now(), floor + 1)).toISOString()
+}
+
+/** Compare two records by content, ignoring key order and the change stamp. */
+function sameRecord(a: PracticeRecord, b: PracticeRecord): boolean {
+  const canonical = (value: unknown): unknown =>
+    Array.isArray(value)
+      ? value.map(canonical)
+      : value && typeof value === 'object'
+        ? Object.fromEntries(
+            Object.keys(value)
+              .sort()
+              .map((key) => [key, canonical((value as Record<string, unknown>)[key])]),
+          )
+        : value
+  const strip = ({ attempts, history, discarded }: PracticeRecord) => ({
+    attempts,
+    history,
+    discarded,
+  })
+  return JSON.stringify(canonical(strip(a))) === JSON.stringify(canonical(strip(b)))
+}
 
 /**
  * Practice exams are compiled to static JSON beside the game content. The
  * store fetches them, owns the in-progress attempt for each exam and the score
- * history, and persists both to localStorage. The rules live in `@/practice`.
+ * history, and persists both to localStorage and, when the player is signed
+ * in, to their account on the server. The rules live in `@/practice`.
  */
 export const usePracticeStore = defineStore('practice', () => {
   const index = shallowRef<PracticeIndex | null>(null)
@@ -55,8 +88,63 @@ export const usePracticeStore = defineStore('practice', () => {
     }
   }
 
+  let pushTimer: ReturnType<typeof setTimeout> | undefined
+
   function persist(): void {
+    saved.value = { ...saved.value, updated_at: stampAfter(saved.value.updated_at) }
     persistPractice(saved.value)
+    schedulePush()
+  }
+
+  function schedulePush(delay = PUSH_DELAY_MS): void {
+    if (!useAccountStore().signedIn) return
+    clearTimeout(pushTimer)
+    pushTimer = setTimeout(() => void push(), delay)
+  }
+
+  /** Send the local record up. A newer copy on the server is merged in instead. */
+  async function push(): Promise<void> {
+    clearTimeout(pushTimer)
+    pushTimer = undefined
+    if (!useAccountStore().signedIn || !saved.value.updated_at) return
+    try {
+      await api.putPractice(saved.value)
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 409) {
+        await pull()
+        return
+      }
+      // The local copy is safe either way; a refusal other than 409 will not improve.
+      if (!(cause instanceof ApiError) || cause.status >= 500) schedulePush(RETRY_DELAY_MS)
+    }
+  }
+
+  /** Merge the server copy into the local one, and send the result back if it differs. */
+  async function pull(): Promise<void> {
+    if (!useAccountStore().signedIn) return
+    try {
+      const remote = await api.getPractice()
+      const theirs = normalizePractice(remote.blob)
+      const merged = mergePractice(saved.value, theirs)
+      const localChanged = !sameRecord(merged, saved.value)
+      const remoteChanged = !sameRecord(merged, theirs)
+      if (!localChanged && !remoteChanged) return
+      saved.value = {
+        ...merged,
+        updated_at: stampAfter(saved.value.updated_at, theirs.updated_at, remote.updated_at),
+      }
+      if (localChanged) persistPractice(saved.value)
+      if (remoteChanged) await api.putPractice(saved.value)
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 404) await push()
+    }
+  }
+
+  // Leaving the tab sends any answers still waiting out the debounce.
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden' && pushTimer !== undefined) void push()
+    })
   }
 
   function attempt(examId: string): Attempt | null {
@@ -64,7 +152,8 @@ export const usePracticeStore = defineStore('practice', () => {
   }
 
   function setAttempt(next: Attempt): void {
-    saved.value = { ...saved.value, attempts: { ...saved.value.attempts, [next.exam_id]: next } }
+    const stamped = { ...next, updated_at: Date.now() }
+    saved.value = { ...saved.value, attempts: { ...saved.value.attempts, [next.exam_id]: stamped } }
     persist()
   }
 
@@ -77,7 +166,8 @@ export const usePracticeStore = defineStore('practice', () => {
   function discard(examId: string): void {
     const attempts = { ...saved.value.attempts }
     delete attempts[examId]
-    saved.value = { ...saved.value, attempts }
+    const discarded = { ...saved.value.discarded, [examId]: Date.now() }
+    saved.value = { ...saved.value, attempts, discarded }
     persist()
   }
 
@@ -85,7 +175,7 @@ export const usePracticeStore = defineStore('practice', () => {
   function finish(exam: PracticeExam): void {
     const current = attempt(exam.id)
     if (!current || current.submitted_at !== null) return
-    const closed = submitAttempt(current, Date.now())
+    const closed = { ...submitAttempt(current, Date.now()), updated_at: Date.now() }
     const result = score(exam, closed)
     const entry = {
       mode: closed.mode,
@@ -95,6 +185,7 @@ export const usePracticeStore = defineStore('practice', () => {
     }
     const history = [entry, ...(saved.value.history[exam.id] ?? [])].slice(0, HISTORY_LIMIT)
     saved.value = {
+      ...saved.value,
       attempts: { ...saved.value.attempts, [exam.id]: closed },
       history: { ...saved.value.history, [exam.id]: history },
     }
@@ -117,5 +208,7 @@ export const usePracticeStore = defineStore('practice', () => {
     discard,
     finish,
     history,
+    push,
+    pull,
   }
 })

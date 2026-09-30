@@ -8,7 +8,7 @@
  */
 
 import type { SaveState } from '@/engine'
-import type { Attempt, HistoryEntry } from '@/practice'
+import type { PracticeRecord } from '@/practice'
 
 const SAVE_KEY = 'runbook.save.v1'
 const ANON_KEY = 'runbook.anon.v1'
@@ -82,24 +82,38 @@ const PRACTICE_KEY = 'runbook.practice.v1'
 /**
  * Practice exam attempts and scores. Kept apart from the game save so a
  * practice exam can never disturb reputation or progress, and vice versa.
+ * When the player is signed in, the same record is copied to the server.
  */
-export interface PracticeStore {
-  attempts: Record<string, Attempt>
-  history: Record<string, HistoryEntry[]>
+export interface PracticeStore extends PracticeRecord {
+  /** ISO stamp of the last local change. Drives last-write-wins on the server. */
+  updated_at: string
+}
+
+export function emptyPractice(): PracticeStore {
+  return { attempts: {}, history: {}, discarded: {}, updated_at: '' }
+}
+
+/** Accept whatever localStorage or the server holds, dropping what is malformed. */
+export function normalizePractice(raw: unknown): PracticeStore {
+  if (!raw || typeof raw !== 'object') return emptyPractice()
+  const parsed = raw as Partial<PracticeStore>
+  const record = (value: unknown) =>
+    value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+  return {
+    attempts: record(parsed.attempts) as PracticeStore['attempts'],
+    history: record(parsed.history) as PracticeStore['history'],
+    discarded: record(parsed.discarded) as PracticeStore['discarded'],
+    updated_at: typeof parsed.updated_at === 'string' ? parsed.updated_at : '',
+  }
 }
 
 export function loadPractice(): PracticeStore {
   const raw = readRaw(PRACTICE_KEY)
-  const empty: PracticeStore = { attempts: {}, history: {} }
-  if (!raw) return empty
+  if (!raw) return emptyPractice()
   try {
-    const parsed = JSON.parse(raw) as Partial<PracticeStore>
-    return {
-      attempts: parsed.attempts && typeof parsed.attempts === 'object' ? parsed.attempts : {},
-      history: parsed.history && typeof parsed.history === 'object' ? parsed.history : {},
-    }
+    return normalizePractice(JSON.parse(raw))
   } catch {
-    return empty
+    return emptyPractice()
   }
 }
 
