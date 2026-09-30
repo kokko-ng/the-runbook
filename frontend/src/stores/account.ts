@@ -7,12 +7,17 @@
  */
 
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import { ApiError, api } from '@/lib/api'
 import { useGameStore } from './game'
 import { usePracticeStore } from './practice'
 import { useUiStore } from './ui'
+
+/** Moves arrive in bursts; wait for a pause before sending the save up. */
+const PUSH_DELAY_MS = 3000
+/** After a failed upload (offline, server down), try again this much later. */
+const RETRY_DELAY_MS = 30_000
 
 export type SyncState = 'idle' | 'syncing' | 'synced' | 'error' | 'offline'
 
@@ -25,6 +30,36 @@ export const useAccountStore = defineStore('account', () => {
   const lastSyncedAt = ref<string | null>(null)
 
   const signedIn = computed(() => username.value !== null)
+
+  // Every move replaces the save and marks it dirty; send it up once play pauses.
+  const game = useGameStore()
+  let pushTimer: ReturnType<typeof setTimeout> | undefined
+
+  function schedulePush(delay = PUSH_DELAY_MS): void {
+    clearTimeout(pushTimer)
+    pushTimer = setTimeout(() => {
+      pushTimer = undefined
+      void pushSave()
+    }, delay)
+  }
+
+  watch(
+    () => game.save,
+    () => {
+      if (signedIn.value && game.dirty) schedulePush()
+    },
+  )
+
+  // Leaving the tab sends a save still waiting out the pause.
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden' && pushTimer !== undefined) {
+        clearTimeout(pushTimer)
+        pushTimer = undefined
+        void pushSave()
+      }
+    })
+  }
 
   async function refresh(): Promise<void> {
     try {
@@ -91,7 +126,8 @@ export const useAccountStore = defineStore('account', () => {
 
   /** Send the local save up. Refuses politely if the server holds a newer one. */
   async function pushSave(): Promise<void> {
-    const game = useGameStore()
+    clearTimeout(pushTimer)
+    pushTimer = undefined
     if (!signedIn.value || !game.save) return
     syncState.value = 'syncing'
     try {
@@ -106,12 +142,12 @@ export const useAccountStore = defineStore('account', () => {
         return
       }
       syncState.value = 'error'
+      if (!(cause instanceof ApiError) || cause.status >= 500) schedulePush(RETRY_DELAY_MS)
     }
   }
 
   /** Take the server save if it is newer than the local one. */
   async function pullSave(): Promise<void> {
-    const game = useGameStore()
     if (!signedIn.value) return
     syncState.value = 'syncing'
     try {
@@ -122,6 +158,8 @@ export const useAccountStore = defineStore('account', () => {
       } else if (localAt > remote.blob.updated_at) {
         await api.putSave(game.save)
       }
+      // Both sides now match, so the watcher has nothing to send back up.
+      game.dirty = false
       syncState.value = 'synced'
       lastSyncedAt.value = new Date().toISOString()
     } catch (cause) {

@@ -50,7 +50,7 @@ onMounted(() => account.refresh())
       <p class="text-sm text-ink-600 dark:text-ink-300">
         Entirely optional. The game is playable without one, and an account exists for exactly one
         reason: carrying your save and practice exam progress to another device. While you are
-        signed in, practice exam answers and scores sync on their own.
+        signed in, both sync on their own as you play.
       </p>
     </header>
 
