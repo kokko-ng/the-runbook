@@ -2,6 +2,8 @@
 # pipeline, the test suites or a build stays in CI, where it has Django, node
 # and the compiled content bundle to hand.
 exclude: '^(frontend/public/content/|\.legacy/)'
+# pre-commit install sets up both stages: the checks and the commit message.
+default_install_hook_types: [pre-commit, commit-msg]
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -47,3 +49,10 @@ repos:
     rev: v8.30.0
     hooks:
       - id: gitleaks
+
+  # Commit messages follow Conventional Commits; CI checks every commit too.
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.19.2
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
