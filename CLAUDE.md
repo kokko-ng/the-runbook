@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-Backend (run from `backend/`; `uv run` works against the checked-in `.venv`, or use `.venv/bin/python` directly):
+Backend (run from `backend/`; `uv run` works against the local `.venv` (gitignored; README "Running it locally" creates it), or use `.venv/bin/python` directly):
 
 ```bash
 uv run python manage.py validate_content        # content lint + objective coverage gate
@@ -26,7 +26,7 @@ npm run typecheck    # vue-tsc only
 npm run build        # typecheck + production build
 ```
 
-Repo-wide: `pre-commit run --all-files` (fast checks only — yamllint, ruff, gitleaks, actionlint; the content linter, tests and builds stay in CI). Run the full check suite (validate_content, pytest, npm test, npm run build) before pushing: **a push to `main` that passes CI deploys straight to production** on PythonAnywhere. A commit can opt out with `[skip deploy]` in its message.
+Repo-wide: `pre-commit run --all-files` (fast checks only — yamllint, ruff, gitleaks, actionlint; the content linter, tests and builds stay in CI). Run the full check suite (validate_content, pytest, npm test, npm run build) before pushing: **a push to `main` that passes CI deploys straight to production** on PythonAnywhere. A commit can opt out with `[skip deploy]` in its message. Commit messages follow Conventional Commits (`type(scope): subject`); commitizen checks them in the commit-msg hook that `pre-commit install` sets up, and CI checks every commit again.
 
 The content bundle under `frontend/public/content/` is generated and gitignored — run `build_content` after editing anything under `content/`, and never edit the JSON by hand.
 
@@ -44,7 +44,7 @@ Three layers with one-way data flow: authored YAML content → a compiled JSON b
 
 ## Invariants that are easy to break
 
-- **Diagram ids are save-state keys.** Player saves store living-map state keyed by node/edge id, so ids in `content/diagrams/act{1,2}.yaml` are permanent once shipped. Ids are deliberately decoupled from labels (`id: st-pod` / `label: stveymarkpod`). Rename the label, never the id — or add the old-to-new pair to `RENAMED_DIAGRAM_IDS` in `migrateSave` (`engine.ts`) if an id genuinely must change, as was done when the company was renamed. The same applies to quest and encounter ids, which key progress.
+- **Diagram ids are save-state keys.** Player saves store living-map state keyed by node/edge id, so ids in `content/diagrams/act{1,2}.yaml` are permanent once shipped. Ids are deliberately decoupled from labels (`id: st-pod` / `label: stveymarkpod`). Rename the label, never the id — or add the old-to-new pair to `RENAMED_DIAGRAM_IDS` in `migrateSave` (`engine.ts`) if an id genuinely must change. The same applies to quest and encounter ids, which key progress.
 - **A node only renders when `present`.** The map shows a node if the save says `present: true`, which happens either from `present: true` in the diagram registry (exists on day one) or an `add_node` op in some quest's fix. A node declared but never marked present anywhere is silently invisible — the linter does not catch this, only that op ids exist.
 - **`migrateSave` merges saves key-by-key and the save always wins.** New content nodes fold in with their defaults; anything the player already touched is untouched. Content changes should be additive from an existing player's point of view.
 - **Vue Flow quirks** (`LivingMap.vue`, `MapNode.vue`): nodes are non-draggable/non-selectable, so Vue Flow writes `pointer-events: none` and `z-index: 0` inline on every node wrapper. Interactive behavior inside a node needs `pointer-events-auto`, and anything that must paint above neighbours needs an `!important` z-index override.
